@@ -23,7 +23,7 @@ limitations under the License. */
 namespace paddle {
 namespace platform {
 
-void ParseCommandLineFlags(int argc, char** argv, bool remove);
+void ParseCommandLineFlags(int argc, const char** argv, bool remove);
 
 }  // namespace platform
 }  // namespace paddle

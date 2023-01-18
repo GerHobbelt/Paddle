@@ -67,7 +67,7 @@ PADDLE_DEFINE_EXPORTED_int32(
 namespace paddle {
 namespace platform {
 
-void ParseCommandLineFlags(int argc, char **argv, bool remove) {
+void ParseCommandLineFlags(int argc, const char **argv, bool remove) {
   ::GFLAGS_NAMESPACE::ParseCommandLineFlags(&argc, &argv, remove);
 }
 
