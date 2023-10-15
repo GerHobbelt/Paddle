@@ -206,10 +206,10 @@ def lm_model(
                 input = m
 
                 if dropout is not None and dropout > 0.0:
-                    input = layers.dropout(
+                    input = paddle.nn.functional.dropout(
                         input,
-                        dropout_prob=dropout,
-                        dropout_implementation='upscale_in_train',
+                        p=dropout,
+                        mode='upscale_in_train',
                     )
 
             rnn.step_output(input)
@@ -306,10 +306,10 @@ def lm_model(
                 input = m
 
                 if dropout is not None and dropout > 0.0:
-                    input = layers.dropout(
+                    input = paddle.nn.functional.dropout(
                         input,
-                        dropout_prob=dropout,
-                        dropout_implementation='upscale_in_train',
+                        p=dropout,
+                        mode='upscale_in_train',
                     )
 
             res.append(input)
@@ -384,10 +384,10 @@ def lm_model(
 
     x_emb = paddle.reshape(x_emb, shape=[-1, num_steps, hidden_size])
     if dropout is not None and dropout > 0.0:
-        x_emb = layers.dropout(
+        x_emb = paddle.nn.functional.dropout(
             x_emb,
-            dropout_prob=dropout,
-            dropout_implementation='upscale_in_train',
+            p=dropout,
+            mode='upscale_in_train',
         )
 
     if rnn_model == "padding":
@@ -404,21 +404,6 @@ def lm_model(
             init_hidden=init_hidden_reshape,
             init_cell=init_cell_reshape,
         )
-    elif rnn_model == "cudnn":
-        x_emb = paddle.transpose(x_emb, perm=[1, 0, 2])
-        rnn_out, last_hidden, last_cell = layers.lstm(
-            x_emb,
-            init_hidden_reshape,
-            init_cell_reshape,
-            num_steps,
-            hidden_size,
-            num_layers,
-            is_bidirec=False,
-            default_initializer=fluid.initializer.UniformInitializer(
-                low=-init_scale, high=init_scale
-            ),
-        )
-        rnn_out = paddle.transpose(rnn_out, perm=[1, 0, 2])
     elif rnn_model == "basic_lstm":
         rnn_out, last_hidden, last_cell = basic_lstm(
             x_emb,
