@@ -244,7 +244,7 @@ class PrimForwardChecker:
     def init_checker(self):
         assert hasattr(
             self.op_test, 'prim_op_type'
-        ), "if you want to test comp op, please set prim_op_type in setUp function."
+        ), "if you want to test comp op, please set prim_op_type with \'prim\' or \'comp\' in setUp function."
         assert self.op_test.prim_op_type in [
             "comp",
             "prim",
@@ -378,6 +378,11 @@ class PrimForwardChecker:
             )
 
     def check(self):
+        if (
+            self.place is paddle.fluid.libpaddle.CUDAPlace
+            and not paddle.is_compiled_with_cuda()
+        ):
+            return
         self.eager_desire = self.get_eager_desire()
         if self.enable_check_static_comp:
             self.check_static_comp()
@@ -773,6 +778,11 @@ class PrimGradChecker(PrimForwardChecker):
         self.checker_name = "PrimGradChecker"
 
     def check(self):
+        if (
+            self.place is paddle.fluid.libpaddle.CUDAPlace
+            and not paddle.is_compiled_with_cuda()
+        ):
+            return
         self.eager_desire = self.get_eager_desire()
         if self.enable_check_eager_comp:
             self.check_eager_comp()
@@ -786,11 +796,12 @@ class PrimGradChecker(PrimForwardChecker):
         self.recover_eager_or_static_status()
 
     def get_output_dict(self, np_outputs, api_outputs, outputs_sig):
-        assert len(api_outputs) == len(outputs_sig), (
-            "forward api outputs length must be the same as KernelSignature outputs,but recive %s and %s"
+        assert len(api_outputs) <= len(outputs_sig), (
+            "forward api outputs length must be the less than or equal to KernelSignature outputs,but recive %s and %s"
         ) % (len(api_outputs), len(outputs_sig))
         output_dict = {}
-        for i, output_name in enumerate(outputs_sig):
+        for i in range(len(api_outputs)):
+            output_name = outputs_sig[i]
             if isinstance(np_outputs[output_name], list):
                 for j, tup in enumerate(np_outputs[output_name]):
                     output_dict.update({tup[0]: api_outputs[i][j]})
