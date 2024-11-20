@@ -1130,15 +1130,14 @@ void BindPaddleInferPredictor(py::module *m) {
       .def("get_output_handle", &paddle_infer::Predictor::GetOutputHandle)
       .def(
           "run",
-          [](paddle_infer::Predictor &self, py::handle py_in_tensor_list) {
+          [](paddle_infer::Predictor &self,
+             const std::vector<paddle::Tensor> &in_tensor_list) {
 #if defined(PADDLE_WITH_CUSTOM_DEVICE) && !defined(PADDLE_NO_PYTHON)
             pybind11::gil_scoped_release release;
 #endif
-            auto in_tensor_list =
-                CastPyArg2VectorOfTensor(py_in_tensor_list.ptr(), 0);
             std::vector<paddle::Tensor> outputs;
             self.Run(in_tensor_list, &outputs);
-            return py::handle(ToPyObject(outputs));
+            return outputs;
           },
           py::arg("inputs"))
       .def("run",

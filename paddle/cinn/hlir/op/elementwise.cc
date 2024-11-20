@@ -571,19 +571,6 @@ std::shared_ptr<OpStrategy> StrategyForFillConstantSymbolic(
                               "The attribute value of fill_constant "
                               "is not found! Please check."));
         auto value = GetScalarExpr(attrs.attr_store.at("value"));
-        PADDLE_ENFORCE_EQ(attrs.attr_store.count("force_cpu"),
-                          true,
-                          ::common::errors::InvalidArgument(
-                              "The attribute force_cpu of fill_constant "
-                              "is not found! Please check."));
-        force_cpu = absl::get<bool>(attrs.attr_store.at("force_cpu"));
-
-        if (force_cpu && target != cinn::common::DefaultHostTarget()) {
-          LOG(WARNING) << "The attribute force_cpu of fill_constant "
-                          "not supported in CINN! The fill_constant's "
-                          "output tensor will placed on "
-                       << target;
-        }
 
         CINNValuePack arg_pack = args[0];
         PADDLE_ENFORCE_EQ(

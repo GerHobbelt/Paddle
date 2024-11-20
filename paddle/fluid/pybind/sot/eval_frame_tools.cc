@@ -213,7 +213,7 @@ void CodeStatus::clear() {
 
 int need_skip(FrameObject* frame) {
   auto& skip_info = SkipCodeInfo::Instance();
-  PyCodeObject* code = frame->f_code;  // NOLINT
+  PyCodeObject* code = PyFrame_GET_CODE(frame);
   PyObject* co_filename = code->co_filename;
 
   if (skip_info.is_no_skip_code(code)) {

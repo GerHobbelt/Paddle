@@ -613,5 +613,30 @@ class TestIfElseMaybeUnbound(Dy2StTestBase):
             static_fn(falsy)
 
 
+def dynamic_shape_with_constant_promotion(x):
+    x_shape0 = x.shape[0]
+    if x_shape0 < 10:
+        x_shape0 = x.shape[-1]
+    return x_shape0
+
+
+class TestDynamicShapeWithConstantPromotion(Dy2StTestBase):
+    @test_ast_only
+    @test_pir_only
+    def test_dynamic_shape_with_constant_promotion(self):
+        x = paddle.randn([5, 3])
+        static_fn = paddle.jit.to_static(
+            dynamic_shape_with_constant_promotion,
+            input_spec=[
+                paddle.static.InputSpec(
+                    shape=[None, 3],
+                    dtype='float32',
+                )
+            ],
+        )
+        out = static_fn(x)
+        self.assertEqual(out, 3)
+
+
 if __name__ == '__main__':
     unittest.main()

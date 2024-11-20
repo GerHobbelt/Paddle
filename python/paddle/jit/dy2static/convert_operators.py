@@ -41,16 +41,19 @@ from .utils import (
 __all__ = []
 
 
-def to_static_variable(x):
+def to_static_variable(x, dtype=None):
     '''
     Translate a Python Tensor to PaddlePaddle static graph Tensor
     '''
     if isinstance(x, bool):
-        return paddle.full(shape=[], dtype='bool', fill_value=x)
+        dtype = 'bool' if dtype is None else dtype
+        return paddle.full(shape=[], dtype=dtype, fill_value=x)
     if isinstance(x, float):
-        return paddle.full(shape=[], dtype='float64', fill_value=x)
+        dtype = 'float64' if dtype is None else dtype
+        return paddle.full(shape=[], dtype=dtype, fill_value=x)
     if isinstance(x, int):
-        return paddle.full(shape=[], dtype='int64', fill_value=x)
+        dtype = 'int64' if dtype is None else dtype
+        return paddle.full(shape=[], dtype=dtype, fill_value=x)
     if not use_pir_api() and (isinstance(x, UndefinedVar) or x is None):
         """
         for early return case, we need a variable to represent None, current we use data_layer_not_check.

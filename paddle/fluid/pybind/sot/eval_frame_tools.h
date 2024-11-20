@@ -20,12 +20,14 @@ extern "C" {
 
 #include <Python.h>
 #include <frameobject.h>
-#include <string.h>
 #include "paddle/fluid/pybind/sot/macros.h"
 
 #if SOT_IS_SUPPORTED
 
 #if PY_3_11_PLUS
+#if PY_3_13_PLUS
+#define Py_BUILD_CORE
+#endif
 #include <internal/pycore_frame.h>
 typedef _PyInterpreterFrame FrameObject;
 #else
