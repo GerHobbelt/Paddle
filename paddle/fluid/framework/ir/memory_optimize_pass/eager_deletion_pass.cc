@@ -49,7 +49,7 @@ static std::map<size_t, std::unordered_set<std::string>> VarsGroupByScopeIdx(
 
 // Check whether the variable is phi::DenseTensor based on static VarDesc info
 static bool IsLoDTensor(VarDesc *var) {
-  return var->Proto()->type().type() == proto::VarType::LOD_TENSOR;
+  return var->Proto()->type().type() == proto::VarType::DENSE_TENSOR;
 }
 
 // Get memory size of phi::DenseTensor

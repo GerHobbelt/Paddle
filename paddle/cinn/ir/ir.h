@@ -579,6 +579,8 @@ struct Load : public ExprNode<Load>, public LoadStoreAddrMnger {
 
   void convert_int32_to_int64() override;
 
+  void convert_int64_to_int32() override;
+
   static const IrNodeTy _node_type_ = IrNodeTy::Load;
 };
 

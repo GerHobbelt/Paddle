@@ -207,7 +207,7 @@ class ProgramStats:
             added_var = self.block.create_var(
                 name=var_unique_name,
                 dtype='int32',
-                type=core.VarDesc.VarType.LOD_TENSOR,
+                type=core.VarDesc.VarType.DENSE_TENSOR,
                 persistable=False,
                 stop_gradient=False,
             )
@@ -2763,6 +2763,7 @@ def gradients(
 
         .. code-block:: python
 
+            >>> # doctest: +SKIP("This has diff in xdoctest env")
             >>> import paddle
             >>> import paddle.nn.functional as F
 
@@ -2774,7 +2775,7 @@ def gradients(
             >>> y = F.relu(y)
             >>> z = paddle.static.gradients([y], x)
             >>> print(z)
-            [var x@GRAD : LOD_TENSOR.shape(-1, 2, 8, 8).dtype(float32).stop_gradient(False)]
+            [var x@GRAD : DENSE_TENSOR.shape(-1, 2, 8, 8).dtype(float32).stop_gradient(False)]
     """
     if framework.in_pir_mode():
         check_type(

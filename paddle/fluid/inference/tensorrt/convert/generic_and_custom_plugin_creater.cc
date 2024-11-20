@@ -211,7 +211,7 @@ class GenericPluginCreater : public OpConverter {
                                      arg_name.c_str()));
         PADDLE_ENFORCE_EQ(
             var->GetType(),
-            FluidDT::VarType_Type_LOD_TENSOR,
+            FluidDT::VarType_Type_DENSE_TENSOR,
             common::errors::InvalidArgument("TensorRT engine only takes "
                                             "LoDTensor as input"));
         in_out_info.inputs_data_type.push_back(
@@ -230,7 +230,7 @@ class GenericPluginCreater : public OpConverter {
                                      arg_name.c_str()));
         PADDLE_ENFORCE_EQ(
             var->GetType(),
-            FluidDT::VarType_Type_LOD_TENSOR,
+            FluidDT::VarType_Type_DENSE_TENSOR,
             common::errors::InvalidArgument("TensorRT engine only takes "
                                             "LoDTensor as input"));
         in_out_info.outputs_data_type.push_back(
@@ -288,7 +288,7 @@ class CustomGenericPluginCreater : public OpConverter {
                                      arg_name.c_str()));
         PADDLE_ENFORCE_EQ(
             var->GetType(),
-            FluidDT::VarType_Type_LOD_TENSOR,
+            FluidDT::VarType_Type_DENSE_TENSOR,
             common::errors::InvalidArgument("TensorRT engine only takes "
                                             "LoDTensor as input"));
         in_out_info.inputs_data_type.push_back(
@@ -313,7 +313,7 @@ class CustomGenericPluginCreater : public OpConverter {
                                      arg_name.c_str()));
         PADDLE_ENFORCE_EQ(
             var->GetType(),
-            FluidDT::VarType_Type_LOD_TENSOR,
+            FluidDT::VarType_Type_DENSE_TENSOR,
             common::errors::InvalidArgument("TensorRT engine only takes "
                                             "LoDTensor as input"));
         in_out_info.outputs_data_type.push_back(

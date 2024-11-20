@@ -44,7 +44,7 @@ class ElementwiseOp : public framework::OperatorWithKernel {
 
     PADDLE_ENFORCE_EQ(
         ctx->GetInputsVarType("Y").front(),
-        framework::proto::VarType::LOD_TENSOR,
+        framework::proto::VarType::DENSE_TENSOR,
         common::errors::InvalidArgument(
             "The input var's type should be phi::DenseTensor, but the "
             "received is %s [%s].",
@@ -70,10 +70,10 @@ class ElementwiseOp : public framework::OperatorWithKernel {
               "But reveived the first dimension of Y = %s.",
               ctx->GetInputDim("Y")[0]));
     } else if (ctx->GetInputsVarType("X").front() !=
-               framework::proto::VarType::LOD_TENSOR) {
+               framework::proto::VarType::DENSE_TENSOR) {
       PADDLE_THROW(common::errors::InvalidArgument(
           "Input X's type[%s] is not supported by elementwise_op. Please set "
-          "its type to LOD_TENSOR.",
+          "its type to DENSE_TENSOR.",
           ctx->GetInputsVarType("X").front()));
     }
 

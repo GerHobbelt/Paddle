@@ -903,7 +903,7 @@ struct Layers {
                       bool is_persistable = false,
                       proto::VarType::Type data_type = proto::VarType::FP32) {
     auto* var = program_.MutableBlock(0)->Var(name);
-    var->SetType(proto::VarType::LOD_TENSOR);
+    var->SetType(proto::VarType::DENSE_TENSOR);
     var->SetDataType(data_type);
     var->SetShape(shape);
     var->SetPersistable(is_persistable);

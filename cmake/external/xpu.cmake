@@ -21,6 +21,7 @@ set(XPU_PROJECT "extern_xpu")
 set(XPU_API_LIB_NAME "libxpuapi.so")
 set(XPU_RT_LIB_NAME "libxpurt.so")
 set(XPU_CUDA_LIB_NAME "libxpucuda.so")
+set(XPU_CUDA_RT_LIB_NAME "libcudart.so")
 set(XPU_XFT_LIB_NAME "libxft.so")
 set(XPU_XPTI_LIB_NAME "libxpti.so")
 set(XPU_XBLAS_LIB_NAME "libxpu_blas.so")
@@ -31,7 +32,7 @@ if(NOT DEFINED XPU_XRE_BASE_VERSION)
   set(XPU_XRE_BASE_VERSION "4.32.0.1")
 endif()
 if(NOT DEFINED XPU_XHPC_BASE_DATE)
-  set(XPU_XHPC_BASE_DATE "eb35/20241104")
+  set(XPU_XHPC_BASE_DATE "dev/20241113")
 endif()
 set(XPU_XCCL_BASE_VERSION "1.2.11e")
 if(NOT DEFINED XPU_XFT_BASE_VERSION)
@@ -139,6 +140,7 @@ set(XPU_API_LIB "${XPU_LIB_DIR}/${XPU_API_LIB_NAME}")
 set(XPU_XBLAS_LIB "${XPU_LIB_DIR}/${XPU_XBLAS_LIB_NAME}")
 set(XPU_RT_LIB "${XPU_LIB_DIR}/${XPU_RT_LIB_NAME}")
 set(XPU_CUDA_LIB "${XPU_LIB_DIR}/${XPU_CUDA_LIB_NAME}")
+set(XPU_CUDA_RT_LIB "${XPU_LIB_DIR}/${XPU_CUDA_RT_LIB_NAME}")
 set(XPU_XFA_LIB "${XPU_LIB_DIR}/${XPU_XFA_LIB_NAME}")
 set(XPU_XPUDNN_LIB "${XPU_LIB_DIR}/${XPU_XPUDNN_LIB_NAME}")
 
@@ -160,29 +162,51 @@ if(WITH_XPU_BKCL)
   include_directories(${XPU_BKCL_INC_DIR})
 endif()
 
-ExternalProject_Add(
-  ${XPU_PROJECT}
-  ${EXTERNAL_PROJECT_LOG_ARGS}
-  PREFIX ${SNAPPY_PREFIX_DIR}
-  DOWNLOAD_DIR ${XPU_DOWNLOAD_DIR}
-  DOWNLOAD_COMMAND
-    bash ${CMAKE_SOURCE_DIR}/tools/xpu/pack_paddle_dependence.sh ${XPU_XRE_URL}
-    ${XPU_XRE_DIR_NAME} ${XPU_XHPC_URL} ${XPU_XHPC_DIR_NAME} ${XPU_XCCL_URL}
-    ${XPU_XCCL_DIR_NAME} ${XPU_XHPC_URL} ${XPU_XHPC_DIR_NAME} && wget
-    ${XPU_XFT_GET_DEPENCE_URL} && bash get_xft_dependence.sh ${XPU_XFT_URL}
-    ${XPU_XFT_DIR_NAME} && bash
-    ${CMAKE_SOURCE_DIR}/tools/xpu/get_xpti_dependence.sh ${XPU_XPTI_URL}
-    ${XPU_XPTI_DIR_NAME}
-  DOWNLOAD_NO_PROGRESS 1
-  UPDATE_COMMAND ""
-  CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${XPU_INSTALL_ROOT}
-  CMAKE_CACHE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${XPU_INSTALL_ROOT}
-  BUILD_BYPRODUCTS ${XPU_API_LIB}
-  BUILD_BYPRODUCTS ${XPU_XBLAS_LIB}
-  BUILD_BYPRODUCTS ${XPU_XPUDNN_LIB}
-  BUILD_BYPRODUCTS ${XPU_XFA_LIB}
-  BUILD_BYPRODUCTS ${XPU_RT_LIB}
-  BUILD_BYPRODUCTS ${XPU_BKCL_LIB})
+if(WITH_XPU_XRE5)
+  ExternalProject_Add(
+    ${XPU_PROJECT}
+    ${EXTERNAL_PROJECT_LOG_ARGS}
+    PREFIX ${SNAPPY_PREFIX_DIR}
+    DOWNLOAD_DIR ${XPU_DOWNLOAD_DIR}
+    DOWNLOAD_COMMAND
+      bash ${CMAKE_SOURCE_DIR}/tools/xpu/pack_paddle_dependence.sh
+      ${XPU_XRE_URL} ${XPU_XRE_DIR_NAME} ${XPU_XHPC_URL} ${XPU_XHPC_DIR_NAME}
+      ${XPU_XCCL_URL} ${XPU_XCCL_DIR_NAME} 1 && wget ${XPU_XFT_GET_DEPENCE_URL}
+      && bash get_xft_dependence.sh ${XPU_XFT_URL} ${XPU_XFT_DIR_NAME} && bash
+      ${CMAKE_SOURCE_DIR}/tools/xpu/get_xpti_dependence.sh ${XPU_XPTI_URL}
+      ${XPU_XPTI_DIR_NAME}
+    DOWNLOAD_NO_PROGRESS 1
+    UPDATE_COMMAND ""
+    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${XPU_INSTALL_ROOT}
+    CMAKE_CACHE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${XPU_INSTALL_ROOT}
+    BUILD_BYPRODUCTS ${XPU_API_LIB}
+    BUILD_BYPRODUCTS ${XPU_XBLAS_LIB}
+    BUILD_BYPRODUCTS ${XPU_XPUDNN_LIB}
+    BUILD_BYPRODUCTS ${XPU_XFA_LIB}
+    BUILD_BYPRODUCTS ${XPU_RT_LIB}
+    BUILD_BYPRODUCTS ${XPU_CUDA_RT_LIB}
+    BUILD_BYPRODUCTS ${XPU_BKCL_LIB})
+else()
+  ExternalProject_Add(
+    ${XPU_PROJECT}
+    ${EXTERNAL_PROJECT_LOG_ARGS}
+    PREFIX ${SNAPPY_PREFIX_DIR}
+    DOWNLOAD_DIR ${XPU_DOWNLOAD_DIR}
+    DOWNLOAD_COMMAND
+      bash ${CMAKE_SOURCE_DIR}/tools/xpu/pack_paddle_dependence.sh
+      ${XPU_XRE_URL} ${XPU_XRE_DIR_NAME} ${XPU_XHPC_URL} ${XPU_XHPC_DIR_NAME}
+      ${XPU_XCCL_URL} ${XPU_XCCL_DIR_NAME} 0 && wget ${XPU_XFT_GET_DEPENCE_URL}
+      && bash get_xft_dependence.sh ${XPU_XFT_URL} ${XPU_XFT_DIR_NAME} && bash
+      ${CMAKE_SOURCE_DIR}/tools/xpu/get_xpti_dependence.sh ${XPU_XPTI_URL}
+      ${XPU_XPTI_DIR_NAME}
+    DOWNLOAD_NO_PROGRESS 1
+    UPDATE_COMMAND ""
+    CMAKE_ARGS -DCMAKE_INSTALL_PREFIX=${XPU_INSTALL_ROOT}
+    CMAKE_CACHE_ARGS -DCMAKE_INSTALL_PREFIX:PATH=${XPU_INSTALL_ROOT}
+    BUILD_BYPRODUCTS ${XPU_API_LIB}
+    BUILD_BYPRODUCTS ${XPU_RT_LIB}
+    BUILD_BYPRODUCTS ${XPU_BKCL_LIB})
+endif()
 
 include_directories(${XPU_INC_DIR})
 add_library(shared_xpuapi SHARED IMPORTED GLOBAL)
@@ -192,7 +216,11 @@ set_property(TARGET shared_xpuapi PROPERTY IMPORTED_LOCATION "${XPU_API_LIB}")
 # for cc_library(xxx SRCS xxx.c DEPS xpulib)
 generate_dummy_static_lib(LIB_NAME "xpulib" GENERATOR "xpu.cmake")
 
-target_link_libraries(xpulib ${XPU_API_LIB} ${XPU_RT_LIB})
+if(WITH_XPU_XRE5)
+  target_link_libraries(xpulib ${XPU_API_LIB} ${XPU_RT_LIB} ${XPU_CUDA_RT_LIB})
+else()
+  target_link_libraries(xpulib ${XPU_API_LIB} ${XPU_RT_LIB})
+endif()
 
 if(WITH_XPU_XFT)
   message(STATUS "Compile with XPU XFT!")
@@ -205,15 +233,17 @@ endif()
 
 set(XPU_XHPC_INC_DIR "${XPU_INC_DIR}/xhpc")
 include_directories(${XPU_XHPC_INC_DIR})
-set(XPU_XBLAS_INC_DIR "${XPU_INC_DIR}/xhpc/xblas")
-include_directories(${XPU_XBLAS_INC_DIR})
-set(XPU_XPUDNN_INC_DIR "${XPU_INC_DIR}/xhpc/xpudnn")
-include_directories(${XPU_XPUDNN_INC_DIR})
+set(XPU_XRE_INC_DIR "${XPU_INC_DIR}/xre")
+include_directories(${XPU_XRE_INC_DIR})
 
 if(WITH_XPU_XRE5)
   add_definitions(-DPADDLE_WITH_XPU_XRE5)
+  set(XPU_XBLAS_INC_DIR "${XPU_INC_DIR}/xhpc/xblas")
+  include_directories(${XPU_XBLAS_INC_DIR})
   set(XPU_XFA_INC_DIR "${XPU_INC_DIR}/xhpc/xfa")
   include_directories(${XPU_XFA_INC_DIR})
+  set(XPU_XPUDNN_INC_DIR "${XPU_INC_DIR}/xhpc/xpudnn")
+  include_directories(${XPU_XPUDNN_INC_DIR})
 endif()
 
 if(WITH_XPTI)
@@ -236,14 +266,14 @@ if(WITH_XPU_XRE5)
   target_link_libraries(
     xpulib
     ${XPU_RT_LIB}
+    ${XPU_CUDA_RT_LIB}
     ${XPU_BKCL_LIB}
     ${XPU_XBLAS_LIB}
     ${XPU_API_LIB}
     ${XPU_XFA_LIB}
     ${XPU_XPUDNN_LIB})
 else()
-  target_link_libraries(xpulib ${XPU_RT_LIB} ${XPU_BKCL_LIB} ${XPU_XBLAS_LIB}
-                        ${XPU_API_LIB})
+  target_link_libraries(xpulib ${XPU_RT_LIB} ${XPU_BKCL_LIB} ${XPU_API_LIB})
 endif()
 
 add_dependencies(xpulib ${XPU_PROJECT})

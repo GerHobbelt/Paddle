@@ -110,7 +110,7 @@ void FuseOptimizerOpPass::ApplyImpl(ir::Graph *graph) const {
     // FIXME(wangxi). update persistable
     details::VariableInfo var_info;
     var_info.name_ = fused_var_name;
-    var_info.type_ = proto::VarType::LOD_TENSOR;
+    var_info.type_ = proto::VarType::DENSE_TENSOR;
     var_info.persistable_ = false;
     fused_var_set.insert({fused_var_name, var_info});
     fused_vars_name.emplace(var_name, fused_var_name);
@@ -434,8 +434,8 @@ FuseOptimizerOpPass::GetVarInfo(const Graph &result) const {
 
 bool FuseOptimizerOpPass::IsLoDTensorType(
     const proto::VarType::Type &type) const {
-  // Current only support LOD_TENSOR.
-  return type == proto::VarType::LOD_TENSOR;
+  // Current only support DENSE_TENSOR.
+  return type == proto::VarType::DENSE_TENSOR;
 }
 
 const VarDesc *FuseOptimizerOpPass::GetVarDescFromVarsInfo(

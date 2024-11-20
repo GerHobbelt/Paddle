@@ -49,11 +49,11 @@ framework::BlockDesc* AppendSendAndRecvBlock(framework::ProgramDesc* program) {
   op2->SetAttr("scale", 0.5f);
 
   auto& out = *root_block->Var("res");
-  out.SetType(framework::proto::VarType::LOD_TENSOR);
+  out.SetType(framework::proto::VarType::DENSE_TENSOR);
   out.SetShape({1, 10});
 
   auto& persistable_var = *root_block->Var("p_var");
-  persistable_var.SetType(framework::proto::VarType::LOD_TENSOR);
+  persistable_var.SetType(framework::proto::VarType::DENSE_TENSOR);
   persistable_var.SetShape({1, 10});
   persistable_var.SetPersistable(true);
 

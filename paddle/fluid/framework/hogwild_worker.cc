@@ -1074,10 +1074,10 @@ void HogwildWorker::CreateThreadScope(const ProgramDesc &program) {
             }
           } else {
             auto *ptr = thread_scope_->Var(name);
-            PADDLE_ENFORCE_EQ(proto::VarType::LOD_TENSOR,
+            PADDLE_ENFORCE_EQ(proto::VarType::DENSE_TENSOR,
                               var->GetType(),
                               common::errors::InvalidArgument(
-                                  "The type of var should be LOD_TENSOR."));
+                                  "The type of var should be DENSE_TENSOR."));
             InitializeVariable(ptr, var->GetType());
             phi::DenseTensor *thread_tensor =
                 ptr->GetMutable<phi::DenseTensor>();

@@ -87,16 +87,13 @@ ShardableAxesSignature CreateDefaultSignature(pir::Operation* op) {
 }
 
 std::optional<ShardableAxesSignature> CreateSignatureForSpecialOps(
-    pir::Operation* op) {
+    pir::Operation* op, ShardableAxesInfoManager* axes_manager) {
   if (op->num_results() != 1) {
     VLOG(4) << "Now we do not support op with multi outputs, create default: "
             << op->name();
     return CreateDefaultSignature(op);
   }
   if (op->name() == "cinn_op.generate_shape") {
-    return CreateDefaultSignature(op);
-  }
-  if (op->name() == "pd_op.reshape") {
     return CreateDefaultSignature(op);
   }
   return std::nullopt;
@@ -313,6 +310,11 @@ ShardableAxesSignature CreateSignatureForReshape(
   const auto input_axes = CreateNewNamesWithRank(input_rank);
   result.inputs.emplace_back(input_axes);
 
+  if (op->name() == "pd_op.reshape" && op->num_operands() == 2) {
+    result.inputs.emplace_back(
+        CreateNewNamesWithRank(GetCompitableRank(op->operand_source(1))));
+  }
+
   if (GetRank(op->operand_source(0)) == 0 || GetRank(op->result(0)) == 0) {
     // 0d reshape
     result.outputs.emplace_back(CreateNewNamesWithRank(output_rank));
@@ -320,15 +322,6 @@ ShardableAxesSignature CreateSignatureForReshape(
     return result;
   }
 
-  const auto has_dynamic_shape = [&shape_analysis](pir::Value v) {
-    for (int axis = 0; axis < GetRank(v); ++axis) {
-      const auto& sym = shape_analysis->GetProductDimExpr(v, {axis});
-      if (!sym.isa<std::int64_t>()) {
-        return true;
-      }
-    }
-    return false;
-  };
   const auto shape_product_equal = [&](int lhs_end, int rhs_end) {
     PADDLE_ENFORCE(lhs_end <= input_rank && rhs_end <= output_rank,
                    ::common::errors::InvalidArgument(
@@ -348,9 +341,7 @@ ShardableAxesSignature CreateSignatureForReshape(
     return shape_analysis->IsEqual(sym, symbol::DimExpr(1));
   };
 
-  if (has_dynamic_shape(op->operand_source(0)) ||
-      has_dynamic_shape(op->result(0))) {
-    // dynamic reshape
+  if (!shape_product_equal(input_rank, output_rank)) {
     const auto output_axes = CreateNewNamesWithRank(output_rank);
     for (int i = 0; i < input_rank; ++i) {
       for (int j = 0; j < output_rank; ++j) {
@@ -362,10 +353,6 @@ ShardableAxesSignature CreateSignatureForReshape(
     result.loop = result.outputs.back();
     return result;
   }
-
-  PADDLE_ENFORCE(shape_product_equal(input_rank, output_rank),
-                 ::common::errors::InvalidArgument(
-                     "Shape product should be equal for reshape op."));
 
   std::vector<std::pair<int, int>> partion_indices = {{0, 0}};
   for (int i = 1, j = 1; i <= input_rank && j <= output_rank;) {
@@ -467,7 +454,7 @@ ShardableAxesSignature ShardableAxesInfoManager::CreateShardableSignature(
     pir::Operation* op) {
   VLOG(4) << "[ShardableAxesInfoManager] Create Shardable Axes Signature for \n"
           << OpsDebugStr({op});
-  auto special_result = CreateSignatureForSpecialOps(op);
+  auto special_result = CreateSignatureForSpecialOps(op, this);
   if (special_result != std::nullopt) {
     return special_result.value();
   }
@@ -476,7 +463,7 @@ ShardableAxesSignature ShardableAxesInfoManager::CreateShardableSignature(
   const hlir::framework::OpPatternKind kind = GetOpPatternKind(op);
   if (kind == hlir::framework::kReduction) {
     result = CreateSignatureForReduce(op);
-  } else if (op->name() == "cinn_op.reshape") {
+  } else if (op->name() == "cinn_op.reshape" || op->name() == "pd_op.reshape") {
     result = CreateSignatureForReshape(op, this, shape_analysis_);
   } else if (kind == hlir::framework::kElementWise) {
     result = CreateSignatureForElementWise(op);
@@ -491,7 +478,6 @@ ShardableAxesSignature ShardableAxesInfoManager::CreateShardableSignature(
   } else {
     result = CreateDefaultSignature(op);
   }
-  VLOG(4) << "[ShardableAxesInfoManager] " << result.DebugStr();
   return result;
 }
 
@@ -502,6 +488,8 @@ ShardableAxesInfoManager::ShardableAxesInfoManager(
   for (const auto& op : ops) {
     if (op->name() == "cf.yield") continue;
     op_signature_map_[op] = CreateShardableSignature(op);
+    VLOG(4) << "[ShardableAxesInfoManager] "
+            << op_signature_map_[op].DebugStr();
   }
 
   const auto CombineAxes = [&](const ShardableAxes& root,

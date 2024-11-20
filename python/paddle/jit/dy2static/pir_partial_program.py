@@ -858,7 +858,7 @@ class PartialProgramLayer:
             if exist a op whose inputs is var, then return True
             """
             if var.type not in [
-                core.VarDesc.VarType.LOD_TENSOR,
+                core.VarDesc.VarType.DENSE_TENSOR,
                 core.VarDesc.VarType.SELECTED_ROWS,
             ]:
                 return False
@@ -1221,7 +1221,7 @@ class PartialProgramLayer:
                 )
             elif value.is_dense_tensor_type():
                 param._set_grad_type(
-                    paddle.base.core.VarDesc.VarType.LOD_TENSOR
+                    paddle.base.core.VarDesc.VarType.DENSE_TENSOR
                 )
             else:
                 raise NotImplementedError(

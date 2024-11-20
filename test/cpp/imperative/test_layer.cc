@@ -134,10 +134,12 @@ TEST(test_layer, test_runtime_context) {
   ASSERT_EQ(2u, ctx->InputSize("X"));
   ASSERT_EQ("vin", ctx->InputVarName("X", 0));
 
-  ASSERT_TRUE(ctx->InputTypeAnyOf("X", framework::proto::VarType::LOD_TENSOR));
-  ASSERT_TRUE(ctx->InputTypeAllOf("X", framework::proto::VarType::LOD_TENSOR));
+  ASSERT_TRUE(
+      ctx->InputTypeAnyOf("X", framework::proto::VarType::DENSE_TENSOR));
+  ASSERT_TRUE(
+      ctx->InputTypeAllOf("X", framework::proto::VarType::DENSE_TENSOR));
 
-  ASSERT_EQ(framework::proto::VarType::LOD_TENSOR, ctx->GetInputType("X"));
+  ASSERT_EQ(framework::proto::VarType::DENSE_TENSOR, ctx->GetInputType("X"));
   ASSERT_EQ(framework::proto::VarType::FP32, ctx->GetInputDataType("X"));
 
   ctx->SyncTypeAndDataType("X", "Out");
@@ -145,7 +147,7 @@ TEST(test_layer, test_runtime_context) {
   // Remove DataType check, because it doesn't make sense of set dtype in
   // dygraph
 
-  ASSERT_EQ(framework::proto::VarType::LOD_TENSOR, ctx->GetOutputType("Out"));
+  ASSERT_EQ(framework::proto::VarType::DENSE_TENSOR, ctx->GetOutputType("Out"));
 
   ctx->SetOutputType(
       "Out", framework::proto::VarType::SELECTED_ROWS, framework::ALL_ELEMENTS);
@@ -162,7 +164,7 @@ TEST(test_layer, test_runtime_context) {
 
   // no throw, but do nothing
   ASSERT_NO_THROW(
-      ctx->InsertVar("vout", framework::proto::VarType::LOD_TENSOR));
+      ctx->InsertVar("vout", framework::proto::VarType::DENSE_TENSOR));
   ASSERT_EQ(framework::proto::VarType::DENSE_TENSOR_ARRAY, vout->Type());
 
   ASSERT_ANY_THROW(ctx->HasVar("vin"));
@@ -170,7 +172,7 @@ TEST(test_layer, test_runtime_context) {
   ASSERT_ANY_THROW(ctx->OutputVars("Out"));
   ASSERT_ANY_THROW(ctx->GetVarType("vin"));
   ASSERT_ANY_THROW(
-      ctx->SetVarType("vin", framework::proto::VarType::LOD_TENSOR));
+      ctx->SetVarType("vin", framework::proto::VarType::DENSE_TENSOR));
   ASSERT_ANY_THROW(ctx->GetVarDataType("vin"));
   ASSERT_ANY_THROW(
       ctx->SetVarDataType("vout", framework::proto::VarType::FP32));
@@ -231,7 +233,7 @@ TEST(test_layer, test_debug_string) {
   // 5. test init lod tensor
   tensor_l->mutable_data<float>(place);
   std::string res_lod_t = test_func(lod_tensor);
-  ASSERT_TRUE(res_lod_t.find("LoDTensor") != std::string::npos);
+  ASSERT_TRUE(res_lod_t.find("DenseTensor") != std::string::npos);
 
   // 6. test uninit selected rows
   std::shared_ptr<imperative::VarBase> selected_rows(

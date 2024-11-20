@@ -383,7 +383,7 @@ static void PerformBackwardInplace(const std::string& op_type,
         if (p.first == pair.second) {
           if (!p.second.empty() && p.second[0]) {
             auto& out_var = p.second[0];
-            if (out_var->Type() == framework::proto::VarType::LOD_TENSOR) {
+            if (out_var->Type() == framework::proto::VarType::DENSE_TENSOR) {
               out_tensor =
                   out_var->MutableVar()->GetMutable<phi::DenseTensor>();
             }

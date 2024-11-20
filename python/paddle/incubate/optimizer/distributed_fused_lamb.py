@@ -273,7 +273,7 @@ class DistributedFusedLamb(Optimizer):
     def _apply_gradients_impl(self, params_grads):
         for p, g in params_grads:
             assert (
-                g.type == core.VarDesc.VarType.LOD_TENSOR
+                g.type == core.VarDesc.VarType.DENSE_TENSOR
             ), "Only support dense gradient"
             g.persistable = True  # the gradient must be persistable for fusion
 

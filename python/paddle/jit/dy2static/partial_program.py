@@ -591,7 +591,7 @@ class PartialProgramLayer:
             if exist a op whose inputs is var, then return True
             """
             if not isinstance(var, framework.Variable) or var.type not in [
-                core.VarDesc.VarType.LOD_TENSOR,
+                core.VarDesc.VarType.DENSE_TENSOR,
                 core.VarDesc.VarType.SELECTED_ROWS,
             ]:
                 return False

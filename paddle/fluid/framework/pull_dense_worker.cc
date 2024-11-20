@@ -93,7 +93,7 @@ void PullDenseWorker::CreatePinVar() {
 
       phi::DenseTensor* tensor = var->GetMutable<phi::DenseTensor>();
       auto* ptr = root_scope_->Var(name + "pin");
-      InitializeVariable(ptr, proto::VarType::LOD_TENSOR);
+      InitializeVariable(ptr, proto::VarType::DENSE_TENSOR);
       phi::DenseTensor* pin_tensor = ptr->GetMutable<phi::DenseTensor>();
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
       pin_tensor->mutable_data<float>(tensor->dims(), phi::GPUPinnedPlace());

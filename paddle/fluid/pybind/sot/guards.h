@@ -16,7 +16,6 @@ limitations under the License. */
 #include <Python.h>
 #include "paddle/fluid/framework/data_type.h"
 #include "paddle/fluid/pybind/sot/macros.h"
-#include "paddle/phi/core/framework/heter_service.pb.h"
 #include "paddle/phi/core/utils/data_type.h"
 #include "paddle/utils/pybind.h"
 #include "pybind11/pybind11.h"
@@ -38,111 +37,131 @@ class GuardBase {
 class LambdaGuard : public GuardBase {
  public:
   explicit LambdaGuard(PyObject* guard_check_fn)
-      : _guard_check_fn(guard_check_fn) {}
+      : guard_check_fn_(guard_check_fn) {}
 
   explicit LambdaGuard(const py::function& guard_check_fn)
-      : _guard_check_fn(guard_check_fn.ptr()) {
-    Py_INCREF(_guard_check_fn);
+      : guard_check_fn_(guard_check_fn.ptr()) {
+    Py_INCREF(guard_check_fn_);
   }
 
-  ~LambdaGuard() { Py_DECREF(_guard_check_fn); }
+  ~LambdaGuard() { Py_DECREF(guard_check_fn_); }
 
   bool check(PyObject* value);
 
  private:
-  PyObject* _guard_check_fn;
+  PyObject* guard_check_fn_;
 };
 
 class GuardGroup : public GuardBase {
  public:
-  explicit GuardGroup(std::vector<std::shared_ptr<GuardBase>> guards) {
+  explicit GuardGroup(const std::vector<std::shared_ptr<GuardBase>>& guards) {
     for (auto& guard : guards) {
       if (auto group = dynamic_cast<GuardGroup*>(guard.get())) {
-        _guards.insert(
-            _guards.end(), group->_guards.begin(), group->_guards.end());
+        guards_.insert(
+            guards_.end(), group->guards_.begin(), group->guards_.end());
       } else {
-        _guards.push_back(std::move(guard));
+        guards_.push_back(std::move(guard));
       }
     }
   }
   bool check(PyObject* value);
 
  private:
-  std::vector<std::shared_ptr<GuardBase>> _guards;
+  std::vector<std::shared_ptr<GuardBase>> guards_;
 };
 
 class TypeMatchGuard : public GuardBase {
  public:
   explicit TypeMatchGuard(PyObject* type_ptr)
-      : _expected(reinterpret_cast<PyTypeObject*>(type_ptr)) {}
+      : expected_(reinterpret_cast<PyTypeObject*>(type_ptr)) {}
 
   explicit TypeMatchGuard(const py::type& py_type)
-      : _expected(reinterpret_cast<PyTypeObject*>(py_type.ptr())) {}
+      : expected_(reinterpret_cast<PyTypeObject*>(py_type.ptr())) {}
 
   bool check(PyObject* value);
 
  private:
-  PyTypeObject* _expected;
+  PyTypeObject* expected_;
 };
 
 class ValueMatchGuard : public GuardBase {
  public:
   explicit ValueMatchGuard(PyObject* value_ptr)
-      : _expected_value(value_ptr), _expected_type(value_ptr->ob_type) {}
+      : expected_value_(value_ptr), expected_type_(value_ptr->ob_type) {}
 
   explicit ValueMatchGuard(const py::object& py_value)
-      : _expected_value(py_value.ptr()),
-        _expected_type(Py_TYPE(py_value.ptr())) {
-    Py_INCREF(_expected_value);
+      : expected_value_(py_value.ptr()),
+        expected_type_(Py_TYPE(py_value.ptr())) {
+    Py_INCREF(expected_value_);
   }
 
-  ~ValueMatchGuard() { Py_DECREF(_expected_value); }
+  ~ValueMatchGuard() { Py_DECREF(expected_value_); }
 
   bool check(PyObject* value);
 
  private:
-  PyObject* _expected_value;
-  PyTypeObject* _expected_type;
+  PyObject* expected_value_;
+  PyTypeObject* expected_type_;
 };
 
 class LengthMatchGuard : public GuardBase {
  public:
-  explicit LengthMatchGuard(Py_ssize_t length) : _expected(length) {}
+  explicit LengthMatchGuard(const Py_ssize_t& length) : expected_(length) {}
 
   bool check(PyObject* value);
 
  private:
-  Py_ssize_t _expected;
+  Py_ssize_t expected_;
 };
 
 class DtypeMatchGuard : public GuardBase {
  public:
   explicit DtypeMatchGuard(const paddle::framework::proto::VarType& dtype_ptr)
-      : _expected(dtype_ptr.type()) {}
+      : expected_(dtype_ptr.type()) {}
 
   explicit DtypeMatchGuard(const phi::DataType& dtype_ptr)
-      : _expected(phi::TransToProtoVarType(dtype_ptr)) {}
+      : expected_(phi::TransToProtoVarType(dtype_ptr)) {}
 
   bool check(PyObject* value);
 
  private:
-  int _expected;
+  int expected_;
+};
+
+class ShapeMatchGuard : public GuardBase {
+ public:
+  explicit ShapeMatchGuard(const std::vector<std::optional<int64_t>>& shape)
+      : expected_(shape) {}
+
+  explicit ShapeMatchGuard(const std::vector<py::object>& shape) {
+    expected_.resize(shape.size());
+    for (size_t i = 0; i < shape.size(); ++i) {
+      if (py::isinstance<py::int_>(shape[i]) && shape[i].cast<int64_t>() > 0) {
+        expected_[i] = std::make_optional(shape[i].cast<int64_t>());
+      }
+    }
+  }
+
+  bool check(PyObject* value);
+
+ private:
+  std::vector<std::optional<int64_t>> expected_;
 };
 
 class LayerMatchGuard : public GuardBase {
  public:
-  explicit LayerMatchGuard(PyObject* layer_ptr) : _layer_ptr(layer_ptr) {
-    _training = PyObject_GetAttrString(layer_ptr, "training") == Py_True;
+  explicit LayerMatchGuard(PyObject* layer_ptr) : layer_ptr_(layer_ptr) {
+    training_ = PyObject_GetAttrString(layer_ptr, "training") == Py_True;
   }
 
   explicit LayerMatchGuard(const py::object& layer_obj)
-      : _layer_ptr(layer_obj.ptr()), _training(layer_obj.attr("training")) {}
+      : layer_ptr_(layer_obj.ptr()), training_(layer_obj.attr("training")) {}
 
   bool check(PyObject* value);
 
  private:
-  PyObject* _layer_ptr;
-  bool _training;
+  PyObject* layer_ptr_;
+  bool training_;
 };
 
 #endif

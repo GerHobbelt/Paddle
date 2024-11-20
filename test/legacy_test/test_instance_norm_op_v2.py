@@ -35,6 +35,11 @@ def instance_norm_wrapper(
 
 
 def _reference_instance_norm(x, scale, bias, epsilon):
+    prev_x_shape = x.shape
+    if len(x.shape) < 4:
+        N, C = x.shape[0], x.shape[1]
+        x = np.reshape(x, (N, C, -1, 1))
+
     N, C, H, W = x.shape
     mean = np.mean(x, axis=(2, 3), keepdims=True)
     variance = np.var(x, axis=(2, 3), keepdims=True)
@@ -43,10 +48,14 @@ def _reference_instance_norm(x, scale, bias, epsilon):
     scale = scale.reshape([1, C, 1, 1])
     bias = bias.reshape([1, C, 1, 1])
     x_norm = scale * x_norm + bias
-    return x_norm, mean.reshape(N * C), std.reshape(N * C)
+    return x_norm.reshape(prev_x_shape), mean.reshape(N * C), std.reshape(N * C)
 
 
 def _reference_instance_norm_grad(x, scale, mean, var):
+    prev_x_shape = x.shape
+    if len(x.shape) < 4:
+        N, C = x.shape[0], x.shape[1]
+        x = np.reshape(x, (N, C, -1, 1))
     n, c, h, w = x.shape
     d_y = np.ones(x.shape) / (np.prod(x.shape))
     d_bias = np.ones((c,)) / c
@@ -75,7 +84,7 @@ def _reference_instance_norm_grad(x, scale, mean, var):
         )
     )
 
-    return d_x, d_scale, d_bias
+    return d_x.reshape(prev_x_shape), d_scale, d_bias
 
 
 class TestInstanceNorm(unittest.TestCase):
@@ -284,6 +293,30 @@ class TestInstanceNormFP32OP(OpTest):
         self.rev_comp_atol = 1e-4
         self.cinn_rtol = 1e-4
         self.cinn_atol = 1e-4
+
+
+class TestInstanceNormWithNCL(TestInstanceNormFP32OP):
+    def init_shape(self):
+        self.shape = [4, 100, 16]
+
+    def test_check_output(self):
+        self.check_output(
+            atol=self.atol,
+            check_pir=True,
+            check_prim_pir=(
+                False if os.getenv("FLAGS_enable_pir_in_executor") else True
+            ),
+        )
+
+    def test_check_grad(self):
+        self.check_grad(
+            ['X', 'Scale', 'Bias'],
+            'Y',
+            check_pir=True,
+            check_prim_pir=(
+                False if os.getenv("FLAGS_enable_pir_in_executor") else True
+            ),
+        )
 
 
 @unittest.skipIf(

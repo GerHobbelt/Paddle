@@ -818,7 +818,6 @@ XPUOpMap& get_kl3_ops() {
        XPUKernelSet({
            phi::DataType::FLOAT32,
            phi::DataType::FLOAT16,
-           phi::DataType::BFLOAT16,
        })},
       {"not_equal",
        XPUKernelSet({phi::DataType::INT64,

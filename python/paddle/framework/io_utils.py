@@ -147,7 +147,7 @@ def is_belong_to_optimizer(var):
 
 def _clone_var_in_block_(block, var):
     assert isinstance(var, Variable)
-    if var.desc.type() == core.VarDesc.VarType.LOD_TENSOR:
+    if var.desc.type() == core.VarDesc.VarType.DENSE_TENSOR:
         return block.create_var(
             name=var.name,
             shape=var.shape,

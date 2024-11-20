@@ -153,6 +153,7 @@ def fc(
     Examples:
         .. code-block:: python
 
+            >>> # doctest: +SKIP("This has diff in xdoctest env")
             >>> import paddle
             >>> paddle.enable_static()
 
@@ -165,7 +166,7 @@ def fc(
             ...     weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.Constant(value=0.5)),
             ...     bias_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.Constant(value=1.0)))
             >>> print(out)
-            var fc_0.tmp_1 : LOD_TENSOR.shape(1, 2, 1).dtype(float32).stop_gradient(False)
+            var fc_0.tmp_1 : DENSE_TENSOR.shape(1, 2, 1).dtype(float32).stop_gradient(False)
 
             >>> # When input is multiple tensors
             >>> x0 = paddle.static.data(name="x0", shape=[1, 2, 2], dtype="float32")
@@ -177,7 +178,7 @@ def fc(
             ...     weight_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.Constant(value=0.5)),
             ...     bias_attr=paddle.ParamAttr(initializer=paddle.nn.initializer.Constant(value=1.0)))
             >>> print(out)
-            var fc_1.tmp_3 : LOD_TENSOR.shape(1, 2).dtype(float32).stop_gradient(False)
+            var fc_1.tmp_3 : DENSE_TENSOR.shape(1, 2).dtype(float32).stop_gradient(False)
 
     """
 

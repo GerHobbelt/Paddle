@@ -68,7 +68,7 @@ class TEST_API VarDesc {
   explicit VarDesc(const std::string &name) {
     desc_.set_name(name);
     // TODO(paddle-dev): Why default to lodtensor.
-    desc_.mutable_type()->set_type(proto::VarType::LOD_TENSOR);
+    desc_.mutable_type()->set_type(proto::VarType::DENSE_TENSOR);
     need_updated_ = true;
   }
 

@@ -1003,8 +1003,9 @@ class UnsqueezeOpPattern
             CastDefinedTo<FullIntArrayOp>(op, 1);
         auto axis_vec = cinn::dialect::ir::GetVectorAttr(axis_full_op, "value");
         std::set<int64_t> axis_set;
-        for (int64_t axis : axis_vec) {
-          int64_t axis_val = axis < 0 ? axis += in_shape.size() + 1 : axis;
+        for (size_t i = 0; i < axis_vec.size(); ++i) {
+          auto axis = axis_vec[i];
+          int64_t axis_val = axis < 0 ? axis + in_shape.size() + 1 + i : axis;
           axis_set.insert(axis_val);
         }
         return axis_set;

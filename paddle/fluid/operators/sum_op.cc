@@ -169,8 +169,8 @@ class SumOpVarTypeInference : public framework::VarTypeInference {
         }
         var_type = framework::proto::VarType::DENSE_TENSOR_ARRAY;
       } else if (ctx->InputTypeAnyOf("X",
-                                     framework::proto::VarType::LOD_TENSOR)) {
-        var_type = framework::proto::VarType::LOD_TENSOR;
+                                     framework::proto::VarType::DENSE_TENSOR)) {
+        var_type = framework::proto::VarType::DENSE_TENSOR;
       }
 
       ctx->SetOutputType("Out", var_type);

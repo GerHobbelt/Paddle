@@ -870,7 +870,7 @@ class Layer:
             name=var_name,
             persistable=persistable,
             dtype=dtype,
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
         )
 
     # TODO: Add more parameter list when we need them
@@ -927,7 +927,7 @@ class Layer:
             name=var_name,
             persistable=persistable,
             dtype=dtype,
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
         )
 
     def parameters(self, include_sublayers: bool = True) -> list[Tensor]:

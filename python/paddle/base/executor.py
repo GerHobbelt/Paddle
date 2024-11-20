@@ -2101,7 +2101,7 @@ class Executor:
 
                 if (
                     vardesc.persistable() is False
-                    and vardesc.type() == core.VarDesc.VarType.LOD_TENSOR
+                    and vardesc.type() == core.VarDesc.VarType.DENSE_TENSOR
                     and vardesc.need_check_feed() is True
                     and varobj.stop_gradient is True
                     and varobj.is_data is True

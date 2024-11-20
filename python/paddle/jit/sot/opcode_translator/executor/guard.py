@@ -22,13 +22,19 @@ from typing import TYPE_CHECKING, Any, Callable, TypeVar
 import paddle
 
 from ...profiler import EventGuard
-from ...utils import current_symbol_registry, log, log_do
+from ...utils import (
+    ENV_SOT_ENABLE_FASTER_GUARD,
+    current_symbol_registry,
+    log,
+    log_do,
+)
 
 Guard = Callable[[types.FrameType], bool]
 
 if TYPE_CHECKING:
     from .variables import VariableBase
 
+    GuardBase = paddle.framework.core.GuardBase
     CheckGuardInputT = TypeVar("CheckGuardInputT", bound=VariableBase)
 
 # NOTE(SigureMo): [How to write Stringified Guard?]
@@ -83,6 +89,33 @@ class StringifiedExpression:
             return hash(self.inlined_expr)
 
 
+class FasterStringifiedExpression(StringifiedExpression):
+    def __init__(
+        self,
+        expr_template: str,
+        faster_guard: GuardBase,
+        sub_exprs: list[StringifiedExpression],
+        free_vars: dict[str, Any],
+    ):
+        self.faster_guard = faster_guard
+        if ENV_SOT_ENABLE_FASTER_GUARD:
+            original_expr_template = expr_template
+            guard_cls_name = faster_guard.__class__.__name__
+            guard_name = f"{guard_cls_name}_{id(faster_guard)}"
+            expr_template = (
+                guard_name + "(" + ", ".join(["{}"] * len(sub_exprs)) + ")"
+            )
+            free_vars = union_free_vars(
+                free_vars, {guard_name: faster_guard.check}
+            )
+            log(
+                3,
+                f"[FasterGuard]: transform {original_expr_template} to {expr_template}\n",
+            )
+
+        super().__init__(expr_template, sub_exprs, free_vars)
+
+
 def union_free_vars(*free_vars: dict[str, Any]):
     return {k: v for d in free_vars for k, v in d.items()}
 
@@ -132,7 +165,7 @@ def support_weak_ref(obj):
 
 
 def check_guard(
-    fn: Callable[[CheckGuardInputT], list[StringifiedExpression]]
+    fn: Callable[[CheckGuardInputT], list[StringifiedExpression]],
 ) -> Callable[[CheckGuardInputT], list[StringifiedExpression]]:
     def wrapper(self: CheckGuardInputT) -> list[StringifiedExpression]:
         assert (

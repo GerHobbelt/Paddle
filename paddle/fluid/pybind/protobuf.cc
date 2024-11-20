@@ -295,7 +295,7 @@ void BindVarDesc(pybind11::module *m) {
       .value("COMPLEX128", pd::proto::VarType::COMPLEX128)
       .value("FP8_E4M3FN", pd::proto::VarType::FP8_E4M3FN)
       .value("FP8_E5M2", pd::proto::VarType::FP8_E5M2)
-      .value("LOD_TENSOR", pd::proto::VarType::LOD_TENSOR)
+      .value("DENSE_TENSOR", pd::proto::VarType::DENSE_TENSOR)
       .value("SELECTED_ROWS", pd::proto::VarType::SELECTED_ROWS)
       .value("FEED_MINIBATCH", pd::proto::VarType::FEED_MINIBATCH)
       .value("FETCH_LIST", pd::proto::VarType::FETCH_LIST)

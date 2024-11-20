@@ -499,7 +499,7 @@ void ReplaceAllReduceOp(const Node &node,
     all_reduce_var_name = "fake_coalesce_" + std::to_string(ops->size());
     proto::VarDesc var_desc;
     var_desc.set_name(all_reduce_var_name);
-    var_desc.mutable_type()->set_type(proto::VarType::LOD_TENSOR);
+    var_desc.mutable_type()->set_type(proto::VarType::DENSE_TENSOR);
     block->mutable_vars()->Add()->CopyFrom(var_desc);
     VLOG(4) << "add variable for check_memory_continue: "
             << all_reduce_var_name;

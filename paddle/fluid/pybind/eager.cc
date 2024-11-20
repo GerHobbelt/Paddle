@@ -83,7 +83,7 @@ void EmptyTensorInitializer(TensorObject* self,
                             paddle::DataType dtype = paddle::DataType::FLOAT32,
                             const std::vector<int>& dims = {0},
                             framework::proto::VarType::Type var_type =
-                                paddle::framework::proto::VarType::LOD_TENSOR,
+                                paddle::framework::proto::VarType::DENSE_TENSOR,
                             ProcessMesh* process_mesh = nullptr,
                             Placements* placements = nullptr) {
   auto ddims = common::make_ddim(dims);
@@ -106,7 +106,7 @@ void EmptyTensorInitializer(TensorObject* self,
 #endif
   } else {
     VLOG(6) << "in EmptyTensorInitializer, create DenseTensor";
-    if (var_type == paddle::framework::proto::VarType::LOD_TENSOR) {
+    if (var_type == paddle::framework::proto::VarType::DENSE_TENSOR) {
       // TODO(jiabin): Maybe support LOD later
       std::shared_ptr<phi::DenseTensor> dense_tensor = nullptr;
       if (dims.size() == 1 && dims[0] == 0) {

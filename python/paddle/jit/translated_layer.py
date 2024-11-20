@@ -545,7 +545,7 @@ class _ProgramHolder:
                                 ".".join(["reserve_space", 'tmp'])
                             ),
                             dtype=block.var(op.input("X")[0]).dtype,
-                            type=core.VarDesc.VarType.LOD_TENSOR,
+                            type=core.VarDesc.VarType.DENSE_TENSOR,
                             persistable=False,
                             stop_gradient=True,
                         )
@@ -573,7 +573,7 @@ class _ProgramHolder:
                                         ]
                                     )
                                 ),
-                                type=core.VarDesc.VarType.LOD_TENSOR,
+                                type=core.VarDesc.VarType.DENSE_TENSOR,
                                 persistable=False,
                                 stop_gradient=True,
                             )
@@ -1247,7 +1247,7 @@ def append_var_from_block_desc_static(
             var_type = var_desc.type()
             if var_type in [
                 core.VarDesc.VarType.SELECTED_ROWS,
-                core.VarDesc.VarType.LOD_TENSOR,
+                core.VarDesc.VarType.DENSE_TENSOR,
                 core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
             ]:
                 data_type = var_desc.dtype()
@@ -1256,7 +1256,7 @@ def append_var_from_block_desc_static(
                 data_type = None
                 var_shape = None
             if var_type in [
-                core.VarDesc.VarType.LOD_TENSOR,
+                core.VarDesc.VarType.DENSE_TENSOR,
                 core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
             ]:
                 lod_level = var_desc.lod_level()

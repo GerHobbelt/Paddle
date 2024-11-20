@@ -86,6 +86,10 @@ if(WITH_FLASHATTN)
   list(APPEND DYNLOAD_COMMON_SRCS flashattn.cc)
 endif()
 
+if(WITH_FLASHATTN_V3)
+  list(APPEND DYNLOAD_COMMON_SRCS flashattnv3.cc)
+endif()
+
 if(WITH_PSCORE)
   list(APPEND DYNLOAD_COMMON_SRCS afs_api.cc)
 endif()

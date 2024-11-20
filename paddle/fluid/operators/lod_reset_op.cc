@@ -96,7 +96,7 @@ class LoDResetOpVarTypeInference
       SetLoDLevel(ctx, out_var_name, 1);
     }
     SetDataType(ctx, out_var_name, GetDataType(ctx, x_var_name));
-    SetType(ctx, out_var_name, paddle::framework::proto::VarType::LOD_TENSOR);
+    SetType(ctx, out_var_name, paddle::framework::proto::VarType::DENSE_TENSOR);
   }
 };
 

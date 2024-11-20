@@ -615,13 +615,16 @@ def convert_len(var):
     if isinstance(var, Variable):
         assert var.ndim > 0, "len() of a 0-D tensor is wrong"
         if var.type in [
-            core.VarDesc.VarType.LOD_TENSOR,
+            core.VarDesc.VarType.DENSE_TENSOR,
             core.VarDesc.VarType.SELECTED_ROWS,
         ]:
             # Note: Length of var may be known ahead of time in dygraph,
             # but it probably represents batch size which can be variant.
             # so we return a variable dynamically inferred from var.shape.
-            if var.shape[0] > 0 and var.type == core.VarDesc.VarType.LOD_TENSOR:
+            if (
+                var.shape[0] > 0
+                and var.type == core.VarDesc.VarType.DENSE_TENSOR
+            ):
                 return var.shape[0]
             return paddle.shape(var)[0]
         elif var.type == core.VarDesc.VarType.DENSE_TENSOR_ARRAY:

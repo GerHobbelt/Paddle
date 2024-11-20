@@ -724,8 +724,8 @@ class TestSaveLoadWithDictInput(unittest.TestCase):
         )
         # net.forward.concrete_program.inputs:
         # (<__main__.LinearNetWithDictInput object at 0x7f2655298a98>,
-        #  {'img': var img : base.VarType.LOD_TENSOR.shape(-1, 8).astype(VarType.FP32)},
-        #  {'label': var label : base.VarType.LOD_TENSOR.shape(-1, 1).astype(VarType.INT64)})
+        #  {'img': var img : base.VarType.DENSE_TENSOR.shape(-1, 8).astype(VarType.FP32)},
+        #  {'label': var label : base.VarType.DENSE_TENSOR.shape(-1, 1).astype(VarType.INT64)})
         self.assertEqual(len(net.forward.concrete_program.inputs), 3)
         temp_dir = tempfile.TemporaryDirectory()
         path = os.path.join(

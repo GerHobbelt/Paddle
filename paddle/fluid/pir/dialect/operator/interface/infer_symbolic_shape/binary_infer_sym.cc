@@ -2374,12 +2374,60 @@ bool UnpoolOpInferSymbolicShape(pir::Operation *op,
   return true;
 }
 
-// bool WeightDequantizeOpInferSymbolicShape(pir::Operation *op,
-//                                           pir::InferSymbolicShapeContext
-//                                           *infer_context) {
-//   // pass
-//   return true;
-// }
+bool WeightDequantizeOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  const auto &x_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(0)).shape();
+  const auto &scale_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(1)).shape();
+  PADDLE_ENFORCE_EQ(x_shape.size(),
+                    2UL,
+                    common::errors::InvalidArgument(
+                        "The x tensor of dequantize op must be 2D, but got[%d]",
+                        x_shape.size()));
+  int group_size = op->attribute<pir::Int32Attribute>("group_size").data();
+  std::string algo = op->attribute<pir::StrAttribute>("algo").AsString();
+  PADDLE_ENFORCE_EQ(
+      (group_size == -1 || group_size == 64 || group_size == 128),
+      true,
+      common::errors::InvalidArgument("group_size must be -1, 64 or 128."));
+  symbol::DimExpr real_channel_shape;
+  if (algo == "weight_only_int8") {
+    real_channel_shape = x_shape[0];
+  } else if (algo == "weight_only_int4") {
+    real_channel_shape = x_shape[0] * 2;
+  } else {
+    PADDLE_THROW(common::errors::InvalidArgument(
+        "The algo must be in ['weight_only_int8', 'weight_only_int4'], "
+        "but got[%s]",
+        algo));
+  }
+  if (group_size == -1) {
+    PADDLE_ENFORCE_EQ(scale_shape.size(),
+                      1UL,
+                      common::errors::InvalidArgument(
+                          "The scale tensor of dequantize op must "
+                          "be 1D in per-channel mode, but got[%d]",
+                          scale_shape.size()));
+    infer_context->AddEqualCstr(scale_shape[0], real_channel_shape);
+  } else {
+    PADDLE_ENFORCE_EQ(scale_shape.size(),
+                      2UL,
+                      common::errors::InvalidArgument(
+                          "The scale tensor of dequantize op must "
+                          "be 2D in group-wise mode, but got[%d]",
+                          scale_shape.size()));
+    infer_context->AddEqualCstr(scale_shape[0],
+                                (x_shape[1] + (group_size - 1)) / group_size);
+    infer_context->AddEqualCstr(scale_shape[1], real_channel_shape);
+  }
+  std::vector<symbol::DimExpr> out_shape{x_shape[1], real_channel_shape};
+  infer_context->SetShapeOrDataForValue(
+      op->result(0),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs(out_shape)});
+  return true;
+}
 
 bool YoloBoxOpInferSymbolicShape(
     pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {

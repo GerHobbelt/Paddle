@@ -6444,11 +6444,6 @@ def take_along_axis(
                     f"Size does not match at dimension {i} expected index {indices.shape} to be smaller than self {arr.shape} apart from dimension {axis}"
                 )
 
-        axis_max_size = arr.shape[axis]
-        if in_dynamic_mode() and not (indices < axis_max_size).all():
-            raise RuntimeError(
-                f"one of element of indices is out of bounds for dimension {axis} with size {axis_max_size}"
-            )
     if in_dynamic_or_pir_mode():
         return _C_ops.take_along_axis(arr, indices, axis)
     else:

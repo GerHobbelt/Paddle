@@ -37,7 +37,7 @@ _logger = get_logger(
 )
 
 _valid_types = [
-    core.VarDesc.VarType.LOD_TENSOR,
+    core.VarDesc.VarType.DENSE_TENSOR,
     core.VarDesc.VarType.SELECTED_ROWS,
     core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
 ]

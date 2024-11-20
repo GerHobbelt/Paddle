@@ -61,7 +61,7 @@ class FusionGroupPassTest(PassTest):
     def _feed_random_data(self, feed_vars):
         feeds = {}
         for var in feed_vars:
-            if var.type != base.core.VarDesc.VarType.LOD_TENSOR:
+            if var.type != base.core.VarDesc.VarType.DENSE_TENSOR:
                 raise TypeError("Feed data of non LoDTensor is not supported.")
 
             shape = var.shape

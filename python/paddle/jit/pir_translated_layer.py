@@ -211,7 +211,7 @@ def _load_pir_parameter_vars(model_path, program_holder, params_filename):
                 dtype=datatype_to_vartype[var.dtype],
                 dims=var.shape,
                 name=var.name,
-                type=core.VarDesc.VarType.LOD_TENSOR,
+                type=core.VarDesc.VarType.DENSE_TENSOR,
                 place=framework._current_expected_place(),
                 persistable=False,
             )

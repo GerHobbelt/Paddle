@@ -340,7 +340,7 @@ class LayerHelperBase:
         is_bias=False,
         default_initializer=None,
         stop_gradient=False,
-        type=core.VarDesc.VarType.LOD_TENSOR,
+        type=core.VarDesc.VarType.DENSE_TENSOR,
     ):
         """Create parameters for this layers.
 
@@ -470,7 +470,7 @@ class LayerHelperBase:
         """Create a temporary variable that should be type inferred layer.
 
         Note:
-            The default type will be set to LOD_TENSOR. However, when
+            The default type will be set to DENSE_TENSOR. However, when
             the var is used as operator output, its type will be updated
             based on operator's `VarTypeInference` implementation in
             infer_var_type.
@@ -484,7 +484,7 @@ class LayerHelperBase:
             ),
             dtype=dtype,
             shape=shape,
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
             persistable=False,
             stop_gradient=stop_gradient,
         )
@@ -495,7 +495,7 @@ class LayerHelperBase:
         """Create a global variable that should be type inferred layer.
 
         Note:
-            The default type will be set to LOD_TENSOR. However, when
+            The default type will be set to DENSE_TENSOR. However, when
             the var is used as operator output, its type will be updated
             based on operator's `VarTypeInference` implementation in
             infer_var_type.
@@ -509,7 +509,7 @@ class LayerHelperBase:
             ),
             dtype=dtype,
             shape=shape,
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
             persistable=False,
             stop_gradient=stop_gradient,
         )

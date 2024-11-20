@@ -16,13 +16,13 @@
 #include "paddle/phi/backends/xpu/enforce_xpu.h"
 #include "paddle/phi/backends/xpu/xpu_context.h"
 #include "paddle/phi/core/kernel_registry.h"
-#include "xblas/cublasLt.h"
 
-#ifndef PADDLE_WITH_XPU_XRE5
+#ifdef PADDLE_WITH_XPU_XRE5
+#include "xblas/cublasLt.h"
+namespace xblas = baidu::xpu::xblas;
+#else
 #include "paddle/phi/kernels/xpu/xpu_api_wrapper.h"
 #endif
-
-namespace xblas = baidu::xpu::xblas;
 
 namespace phi {
 

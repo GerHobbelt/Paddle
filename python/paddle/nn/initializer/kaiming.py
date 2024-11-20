@@ -127,7 +127,7 @@ class MSRAInitializer(Initializer):
                 ),
                 shape=var.shape,
                 dtype=out_dtype,
-                type=core.VarDesc.VarType.LOD_TENSOR,
+                type=core.VarDesc.VarType.DENSE_TENSOR,
                 persistable=False,
             )
         elif (

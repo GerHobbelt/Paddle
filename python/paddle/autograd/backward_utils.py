@@ -31,6 +31,7 @@ from paddle.base.wrapped_decorator import signature_safe_contextmanager
 ALLOW_DYNAMIC_SHAPE_VJP_OPS = [
     "pd_op.abs",
     "pd_op.add",
+    "pd_op.argsort",
     "pd_op.assign",
     "pd_op.batch_norm_",
     "pd_op.cast",
@@ -52,6 +53,7 @@ ALLOW_DYNAMIC_SHAPE_VJP_OPS = [
     "pd_op.gather_nd",
     "pd_op.gelu",
     "pd_op.hardswish",
+    "pd_op.kron",
     "pd_op.kthvalue",
     "pd_op.layer_norm",
     "pd_op.leaky_relu",

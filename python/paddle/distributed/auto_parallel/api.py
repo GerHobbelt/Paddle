@@ -37,6 +37,7 @@ from paddle.base.framework import (
     in_pir_mode,
     use_pir_api,
 )
+from paddle.distributed import fleet
 from paddle.distributed.auto_parallel import Engine, strategy as auto_strategy
 from paddle.distributed.auto_parallel.interface import (
     shard_tensor as shard_tensor_static,
@@ -1044,6 +1045,7 @@ class _ShardOptimizer(Optimizer):
                 self._shard_fn._shard_parameter(param)
 
     def _set_and_check_sharding_prop_from_param(self):
+        all_params_replicated_on_each_mesh = True
         if (self._shard_fn._mesh is not None) and (
             len(self._shard_fn._mesh._shape) == 1
         ):
@@ -1067,11 +1069,17 @@ class _ShardOptimizer(Optimizer):
                         isinstance(placement, dist.Shard)
                         for placement in placements
                     ):
+                        all_params_replicated_on_each_mesh = False
                         for idx, placement in enumerate(placements):
                             if isinstance(placement, dist.Replicate):
                                 self._sharding_degree = mesh.dim_size(idx)
                                 self._sharding_mesh_axis = idx
                                 break
+                    elif any(
+                        isinstance(placement, dist.Partial)
+                        for placement in placements
+                    ):
+                        all_params_replicated_on_each_mesh = False
                 else:
                     # check the placement on sharding axis is Replicate
                     assert isinstance(
@@ -1083,6 +1091,17 @@ class _ShardOptimizer(Optimizer):
                         mesh.dim_size(self._sharding_mesh_axis)
                         == self._sharding_degree
                     ), "The sharding degree of all parameters must be equal currently."
+
+        # Note(luchang): When all parameters are replicated across meshes,
+        # we set sharding degree to dp degree and mesh axis to 0. This is sufficient
+        # because each device already holds a full copy of the parameters,
+        # so no additional sharding configuration is needed.
+        if self._sharding_degree is None and all_params_replicated_on_each_mesh:
+            global_mesh = fleet.auto.get_mesh()
+            self._sharding_degree = global_mesh.get_dim_size(
+                self._shard_fn._shard_dims
+            )
+            self._sharding_mesh_axis = 0
 
         assert (
             self._sharding_degree is not None
@@ -1286,9 +1305,10 @@ class _ShardOptimizer(Optimizer):
 
 
 class _ShardingStageBase:
-    def __init__(self, mesh):
+    def __init__(self, mesh, shard_dims, shard_axis):
         self._mesh = mesh
-        self._sharding_mesh_axis = None
+        self._sharding_mesh_axis = shard_axis
+        self._shard_dims = shard_dims
 
     def _set_sharding_mesh_axis(self, sharding_mesh_axis):
         self._sharding_mesh_axis = sharding_mesh_axis
@@ -1331,6 +1351,8 @@ class ShardingStage1(_ShardingStageBase):
 
     Args:
         mesh(None|paddle.distributed.ProcessMesh): If mesh is not None, the `ProcessMesh` object describes the Cartesian topology of the used processes for dense type parameters. Note: Currently, only one mesh configuration is supported for all dense parameters. If there is a need for multiple mesh configurations, please configure them yourself in the upper layer networking code.
+        shard_dims(None|int|str): The sharding dimension in the mesh.
+        shard_axis(int): The sharding axis of the weight tensor.
 
     Examples:
         .. code-block:: python
@@ -1363,8 +1385,13 @@ class ShardingStage1(_ShardingStageBase):
             >>> # python -m paddle.distributed.launch --gpus=0,1 {test_case}.py
     """
 
-    def __init__(self, mesh: ProcessMesh | None = None) -> None:
-        super().__init__(mesh)
+    def __init__(
+        self,
+        mesh: ProcessMesh | None = None,
+        shard_dims: int | str | None = None,
+        shard_axis: int = 0,
+    ) -> None:
+        super().__init__(mesh, shard_dims, shard_axis)
 
     def __call__(self, key: str, param: Tensor, accumulator: Tensor) -> Tensor:
         if param.is_dist():
@@ -1418,6 +1445,8 @@ class ShardingStage2(_ShardingStageBase):
 
     Args:
         mesh(None|paddle.distributed.ProcessMesh): If mesh is not None, the `ProcessMesh` object describes the Cartesian topology of the used processes for dense type parameters. Note: Currently, only one mesh configuration is supported for all dense parameters. If there is a need for multiple mesh configurations, please configure them yourself in the upper layer networking code.
+        shard_dims(None|int|str): The sharding dimension name in the mesh.
+        shard_axis(int): The sharding axis of the weight tensor.
 
     Examples:
         .. code-block:: python
@@ -1450,8 +1479,13 @@ class ShardingStage2(_ShardingStageBase):
             >>> # python -m paddle.distributed.launch --gpus=0,1 {test_case}.py
     """
 
-    def __init__(self, mesh: ProcessMesh | None = None) -> None:
-        super().__init__(mesh)
+    def __init__(
+        self,
+        mesh: ProcessMesh | None = None,
+        shard_dims: int | str | None = None,
+        shard_axis: int = 0,
+    ) -> None:
+        super().__init__(mesh, shard_dims, shard_axis)
 
     def __call__(self, key: str, param: Tensor, accumulator: Tensor) -> Tensor:
         if param.is_dist():
@@ -1529,6 +1563,8 @@ class ShardingStage3(_ShardingStageBase):
 
     Args:
         mesh(None|paddle.distributed.ProcessMesh): If mesh is not None, the `ProcessMesh` object describes the Cartesian topology of the used processes for dense type parameters. Note: Currently, only one mesh configuration is supported for all dense parameters. If there is a need for multiple mesh configurations, please configure them yourself in the upper layer networking code.
+        shard_dims(None|int|str): The sharding dimension name in the mesh.
+        shard_axis(int): The sharding axis of the weight tensor.
 
     Examples:
         .. code-block:: python
@@ -1561,8 +1597,13 @@ class ShardingStage3(_ShardingStageBase):
             >>> # python -m paddle.distributed.launch --gpus=0,1 {test_case}.py
     """
 
-    def __init__(self, mesh: ProcessMesh | None = None) -> None:
-        super().__init__(mesh)
+    def __init__(
+        self,
+        mesh: ProcessMesh | None = None,
+        shard_dims: int | str | None = None,
+        shard_axis: int = 0,
+    ) -> None:
+        super().__init__(mesh, shard_dims, shard_axis)
 
     def _shard_parameter(self, param):
         if param.is_dense() and self._mesh is not None:

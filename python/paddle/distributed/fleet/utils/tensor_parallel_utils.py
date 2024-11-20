@@ -101,7 +101,7 @@ def copy_parameters(block_, params):
             type=param.type,
             lod_level=(
                 param.lod_level
-                if param.type == core.VarDesc.VarType.LOD_TENSOR
+                if param.type == core.VarDesc.VarType.DENSE_TENSOR
                 else None
             ),
             stop_gradient=param.stop_gradient,

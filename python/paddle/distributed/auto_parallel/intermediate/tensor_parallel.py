@@ -17,7 +17,7 @@ import re
 import paddle
 import paddle.distributed as dist
 
-from .parallel_base import ParallelModel, ParallelOptimizer
+from .parallel_base import ParallelModel, ParallelOptimizer, is_tensor
 
 
 class PlanBase:
@@ -162,7 +162,7 @@ def sp_split(x, process_mesh, need_transpose):
         target_x = x[0]
     else:
         target_x = x
-    assert isinstance(target_x, paddle.Tensor)
+    assert is_tensor(target_x)
     assert len(target_x.shape) == 3
     if need_transpose:
         target_x = paddle.transpose(target_x, perm=[1, 0, 2])
@@ -187,7 +187,7 @@ def sp_reduce_scatter(x, process_mesh, need_transpose):
         target_x = x[0]
     else:
         target_x = x
-    assert isinstance(target_x, paddle.Tensor)
+    assert is_tensor(target_x)
     assert len(target_x.shape) == 3
     placements = target_x.placements
     if placements is None:
@@ -220,7 +220,8 @@ class SequenceParallelBegin(PlanBase):
         self.need_transpose = need_transpose
 
     def sequence_parallel_begin(self, process_mesh):
-        def begin(layer, input, output=None):
+        def begin(layer, input, output):
+            assert output is not None
             return sp_split(output, process_mesh, self.need_transpose)
 
         return begin
@@ -246,6 +247,7 @@ class SequenceParallelEnd(PlanBase):
 
     def sequence_parallel_end(self, process_mesh):
         def end(layer, input, output=None):
+            assert input is not None
             return sp_reduce_scatter(input, process_mesh, self.need_transpose)
 
         return end
@@ -266,12 +268,14 @@ class SequenceParallel(PlanBase):
 
     def sequence_parallel_begin(self, process_mesh):
         def begin(layer, input, output=None):
+            assert input is not None
             return sp_split(input, process_mesh, True)
 
         return begin
 
     def sequence_parallel_end(self, process_mesh):
-        def end(layer, input, output=None):
+        def end(layer, input, output):
+            assert output is not None
             return sp_reduce_scatter(output, process_mesh, True)
 
         return end
@@ -309,20 +313,6 @@ class TensorParallel(ParallelModel):
             self.parallelize_plan = parallelize_plan
             self.tp_parallelizer = self.tensor_parallelizer_fn
 
-    def get_mesh(self):
-        # TODO(yaliu): fit pp
-        # Get local mesh for current pp.
-        assert "mp" in self.global_mesh.dim_names
-        if "pp" in self.global_mesh.dim_names:
-            assert (
-                self.global_mesh.get_dim_size("pp") == 1
-            ), "Not support pp with mp for now."
-            mesh = self.global_mesh.get_mesh_with_dim("pp")[0]
-        else:
-            mesh = self.global_mesh
-        assert len(mesh.shape) in [1, 2]
-        return mesh
-
     def match_layer(self, name):
         # Match the layer to a plan.
         # Will return the plan if the layer hits one, otherwise return None.
@@ -355,11 +345,15 @@ class TensorParallel(ParallelModel):
         for name, layer in model.named_sublayers():
             plans = self.match_layer(name)
             if len(plans) > 0:
+                pp_idx = getattr(layer, "pipeline_stage_index", 0)
                 for plan in plans:
                     real_plan, shard_weight, shard_bias = plan
                     for p in real_plan:
                         p.apply(
-                            layer, self.get_mesh(), shard_weight, shard_bias
+                            layer,
+                            self.get_mesh(pp_idx),
+                            shard_weight,
+                            shard_bias,
                         )
         return model
 

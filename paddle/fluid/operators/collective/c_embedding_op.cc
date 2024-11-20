@@ -45,7 +45,7 @@ class CEmbeddingOp : public framework::OperatorWithKernel {
     ctx->SetOutputDim("Out", common::make_ddim(output_dims));
 
     if (ctx->GetOutputsVarType("Out")[0] ==
-        framework::proto::VarType::LOD_TENSOR) {
+        framework::proto::VarType::DENSE_TENSOR) {
       ctx->ShareLoD("Ids", /*->*/ "Out");
     }
 
@@ -167,7 +167,7 @@ class CEmbeddingOpGradVarTypeInference : public framework::VarTypeInference {
     auto out_var_name = framework::GradVarName("W");
     VLOG(3) << "c_embedding_grad op " << framework::GradVarName("W")
             << " is set to phi::DenseTensor";
-    ctx->SetOutputType(out_var_name, framework::proto::VarType::LOD_TENSOR);
+    ctx->SetOutputType(out_var_name, framework::proto::VarType::DENSE_TENSOR);
     ctx->SetOutputDataType(out_var_name, ctx->GetInputDataType("W"));
   }
 };

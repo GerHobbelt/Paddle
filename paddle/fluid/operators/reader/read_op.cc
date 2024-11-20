@@ -86,7 +86,7 @@ class ReadInferVarType : public framework::StaticGraphVarTypeInference {
                             "The number of input reader's dtypes do not match "
                             "the output variable number."));
       for (size_t i = 0; i < dtypes.size(); ++i) {
-        SetType(ctx, out_names[i], framework::proto::VarType::LOD_TENSOR);
+        SetType(ctx, out_names[i], framework::proto::VarType::DENSE_TENSOR);
         SetDataType(ctx, out_names[i], dtypes[i]);
       }
     }

@@ -138,7 +138,7 @@ void GraphVizPass::ApplyImpl(ir::Graph* graph) const {
           marked_nodes.count(n) ? marked_op_attrs : op_attrs;
       dot.AddNode(node_id, attr, node_id);
     } else if (n->IsVar()) {
-      if (n->Var() && n->Var()->GetType() == proto::VarType::LOD_TENSOR) {
+      if (n->Var() && n->Var()->GetType() == proto::VarType::DENSE_TENSOR) {
         bool is_first = true;
         for (int64_t length : n->Var()->GetShape()) {
           if (is_first) {

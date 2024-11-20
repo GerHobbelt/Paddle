@@ -83,7 +83,7 @@ static bool VarCanBeDeleted(const std::string &name,
 
   auto type = var_desc->Proto()->type().type();
 
-  return type == proto::VarType::LOD_TENSOR ||
+  return type == proto::VarType::DENSE_TENSOR ||
          type == proto::VarType::SELECTED_ROWS ||
          type == proto::VarType::DENSE_TENSOR_ARRAY;
 }

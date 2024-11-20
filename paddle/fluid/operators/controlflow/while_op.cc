@@ -157,7 +157,7 @@ class WhileOp : public framework::OperatorBase {
                 << "input not found:" << in_name;
       }
 
-      if (var->Type() == framework::proto::VarType::LOD_TENSOR) {
+      if (var->Type() == framework::proto::VarType::DENSE_TENSOR) {
         input_var_original_places[in_name] =
             (var->Get<phi::DenseTensor>()).place();
       } else {

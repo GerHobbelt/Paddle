@@ -18,6 +18,7 @@ import contextlib
 import copy
 import types
 import unittest
+from functools import wraps
 
 import numpy as np
 
@@ -26,6 +27,7 @@ from paddle.jit.sot import symbolic_translate
 from paddle.jit.sot.opcode_translator.executor.executor_cache import (
     OpcodeExecutorCache,
 )
+from paddle.jit.sot.utils import faster_guard_guard
 
 
 @contextlib.contextmanager
@@ -34,6 +36,17 @@ def test_instruction_translator_cache_context():
     cache.clear()
     yield cache
     cache.clear()
+
+
+def test_with_faster_guard(func):
+    @wraps(func)
+    def impl(*args, **kwargs):
+        with faster_guard_guard(False):
+            func(*args, **kwargs)
+        with faster_guard_guard(True):
+            func(*args, **kwargs)
+
+    return impl
 
 
 class TestCaseBase(unittest.TestCase):

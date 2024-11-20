@@ -173,6 +173,9 @@ class IrNode : public cinn::common::Object {
   //! Elevate int32 to int64 if needed
   virtual void convert_int32_to_int64();
 
+  //! Elevate int64 to int32 if needed
+  virtual void convert_int64_to_int32();
+
   virtual void replace(Expr old_op, Expr new_op);
   //! Get i-th operand
   const Expr& operand(int i);

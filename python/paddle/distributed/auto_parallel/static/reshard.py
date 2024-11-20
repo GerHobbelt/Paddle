@@ -632,7 +632,7 @@ class Inserter:
                 ),
                 dtype=paddle.int64,
                 shape=None,
-                type=core.VarDesc.VarType.LOD_TENSOR,
+                type=core.VarDesc.VarType.DENSE_TENSOR,
                 persistable=False,
                 stop_gradient=False,
             )

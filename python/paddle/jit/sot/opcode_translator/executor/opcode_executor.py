@@ -1259,6 +1259,10 @@ class OpcodeExecutorBase:
             # Python 3.12 use lower 4 bits to store the inline cache `jump mask`
             # see https://github.com/python/cpython/pull/100924
             cmp_op_index >>= 4
+        # in python3.13, the offset is 5
+        if sys.version_info >= (3, 13):
+            cmp_op_index >>= 1
+        # TODO 3.13 modified the behavior related to TO_BOOL, needs further modification
         op = dis.cmp_op[cmp_op_index]
         right, left = self.stack.pop(), self.stack.pop()
         self.stack.push(
@@ -1531,6 +1535,22 @@ class OpcodeExecutorBase:
             self.stack.push(
                 ConstantVariable(result, self._graph, DummyTracker([value]))
             )
+        else:
+            raise FallbackError(f"Do not support format {type(value)} now")
+
+    def FORMAT_SIMPLE(self, instr: Instruction):
+        value = self.stack.pop()
+
+        if isinstance(value, ConstantVariable) and isinstance(value, str):
+            self.stack.push(value)
+
+        elif isinstance(value, ConstantVariable):
+            result = value.get_py_value()
+            result = format(result, "")
+            self.stack.push(
+                ConstantVariable(result, self._graph, DummyTracker([value]))
+            )
+            return
         else:
             raise FallbackError(f"Do not support format {type(value)} now")
 

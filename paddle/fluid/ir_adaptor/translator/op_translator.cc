@@ -326,7 +326,7 @@ pir::OpInfo OpTranscriber::LookUpOpInfo(pir::IrContext* ctx,
                  paddle::framework::proto::VarType::SPARSE_CSR) {
         input_types.emplace_back("sparse_csr");
       } else if (var_desc->GetType() ==
-                 paddle::framework::proto::VarType::LOD_TENSOR) {
+                 paddle::framework::proto::VarType::DENSE_TENSOR) {
         input_types.emplace_back("dense");
       } else {
         PADDLE_THROW(common::errors::InvalidArgument(
@@ -419,7 +419,7 @@ pir::OpInfo OpTranscriber::LookUpOpInfo(pir::IrContext* ctx,
                                         op_desc.Type(),
                                         legacy_input_vars[0]));
 
-    if (var->GetType() == paddle::framework::proto::VarType::LOD_TENSOR) {
+    if (var->GetType() == paddle::framework::proto::VarType::DENSE_TENSOR) {
       need_inputs_sig.emplace_back("dense");
     } else if (var->GetType() ==
                paddle::framework::proto::VarType::SELECTED_ROWS) {
@@ -3600,7 +3600,7 @@ struct SliceOpTranscriber : public OpTranscriber {
                             op_desc.Type(),
                             output_vars[0]));
 
-      if (output_var->GetType() == framework::proto::VarType::LOD_TENSOR) {
+      if (output_var->GetType() == framework::proto::VarType::DENSE_TENSOR) {
         target_op_name = dialect::SliceArrayDenseOp::name();
       } else {
         target_op_name = dialect::SliceArrayOp::name();

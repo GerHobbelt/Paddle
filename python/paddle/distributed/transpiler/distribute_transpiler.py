@@ -2364,7 +2364,7 @@ WIKI: https://github.com/PaddlePaddle/Fleet/blob/develop/markdown_doc/transpiler
                     RPC_OP_ROLE_ATTR_NAME: DIST_OP_ROLE_ATTR_VALUE,
                 },
             )
-        elif orig_var.type == core.VarDesc.VarType.LOD_TENSOR:
+        elif orig_var.type == core.VarDesc.VarType.DENSE_TENSOR:
             program.global_block()._insert_op(
                 index=index + 1,
                 type="split_byref",
@@ -2377,7 +2377,8 @@ WIKI: https://github.com/PaddlePaddle/Fleet/blob/develop/markdown_doc/transpiler
             )
         else:
             AssertionError(
-                "Variable type should be in set " "[LOD_TENSOR, SELECTED_ROWS]"
+                "Variable type should be in set "
+                "[DENSE_TENSOR, SELECTED_ROWS]"
             )
 
     def _get_optimizer_input_shape(
@@ -2506,7 +2507,7 @@ WIKI: https://github.com/PaddlePaddle/Fleet/blob/develop/markdown_doc/transpiler
         # trainer_id_var is block local
         trainer_id_var = block.create_var(
             name="@TRAINER_ID@",
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
             dtype=core.VarDesc.VarType.INT64,
             shape=[1],
             persistable=False,

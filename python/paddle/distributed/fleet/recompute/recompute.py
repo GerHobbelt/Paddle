@@ -391,7 +391,7 @@ def _recompute_without_reentrant(
                             inner_x.dtype,
                             inner_x.shape,
                             inner_x.name + "cpy",
-                            core.VarDesc.VarType.LOD_TENSOR,
+                            core.VarDesc.VarType.DENSE_TENSOR,
                             inner_x.persistable,
                             inner_x.process_mesh,
                             inner_x.placements,
@@ -401,7 +401,7 @@ def _recompute_without_reentrant(
                             inner_x.dtype,
                             inner_x.shape,
                             inner_x.name + "cpy",
-                            core.VarDesc.VarType.LOD_TENSOR,
+                            core.VarDesc.VarType.DENSE_TENSOR,
                             inner_x.persistable,
                         )
                     inner_x._unsafe_share_buffer_to(tmp_tensor)

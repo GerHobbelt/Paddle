@@ -5961,10 +5961,10 @@ void WeightQuantizeInferMeta(const MetaTensor& x,
   } else if (algo == "weight_only_int4") {
     dim_out = std::vector<int64_t>({x_dims[1] / 2, x_dims[0]});
   } else {
-    common::errors::InvalidArgument(
+    PADDLE_THROW(common::errors::InvalidArgument(
         "The algo must be in ['weight_only_int8', 'weight_only_int4', "
         "'llm.int8'], but got[%s]",
-        algo);
+        algo));
   }
   out->set_dims(common::make_ddim(dim_out));
 

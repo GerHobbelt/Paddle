@@ -44,7 +44,7 @@ const std::shared_ptr<VariableWrapper> &GetVariableWrapper<VariableWrapper>(
 
 void InitializeVariable(paddle::framework::Variable *var,
                         paddle::framework::proto::VarType::Type var_type) {
-  if (var_type == paddle::framework::proto::VarType::LOD_TENSOR) {
+  if (var_type == paddle::framework::proto::VarType::DENSE_TENSOR) {
     var->GetMutable<phi::DenseTensor>();
   } else if (var_type == paddle::framework::proto::VarType::SELECTED_ROWS) {
     var->GetMutable<phi::SelectedRows>();
@@ -73,7 +73,7 @@ void InitializeVariable(paddle::framework::Variable *var,
   } else {
     PADDLE_THROW(common::errors::Unavailable(
         "paddle::framework::Variable type %d is not in "
-        "[LOD_TENSOR, SELECTED_ROWS, FEED_MINIBATCH, FETCH_LIST, "
+        "[DENSE_TENSOR, SELECTED_ROWS, FEED_MINIBATCH, FETCH_LIST, "
         "LOD_RANK_TABLE, PLACE_LIST, READER, RAW].",
         var_type));
   }
@@ -125,7 +125,7 @@ template <>
 void SetType<egr::EagerVariable>(std::shared_ptr<egr::EagerVariable> var,
                                  framework::proto::VarType::Type type) {
   switch (type) {
-    case paddle::framework::proto::VarType::LOD_TENSOR: {
+    case paddle::framework::proto::VarType::DENSE_TENSOR: {
       var->MutableVar()->GetMutable<phi::DenseTensor>();
       break;
     }
@@ -156,7 +156,7 @@ framework::proto::VarType::Type GetType<egr::EagerVariable>(
   if (var->Var().IsInitialized()) {
     return paddle::framework::ToVarType(var->Var().Type());
   } else {
-    return paddle::framework::proto::VarType::LOD_TENSOR;
+    return paddle::framework::proto::VarType::DENSE_TENSOR;
   }
 }
 template framework::proto::VarType::Type GetType<VarBase>(

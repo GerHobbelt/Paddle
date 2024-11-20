@@ -31,7 +31,7 @@ inline bool IsType(const std::type_index& type) {
 
 inline proto::VarType::Type ToVarType(int type) {
   switch (type) {
-    case proto::VarType::LOD_TENSOR:
+    case proto::VarType::DENSE_TENSOR:
     case proto::VarType::SELECTED_ROWS:
     case proto::VarType::SPARSE_COO:
     case proto::VarType::LOD_RANK_TABLE:
@@ -48,7 +48,7 @@ inline proto::VarType::Type ToVarType(int type) {
 template <typename Visitor>
 inline void VisitVarType(const framework::Variable& var, Visitor visitor) {
   switch (var.Type()) {
-    case proto::VarType::LOD_TENSOR:
+    case proto::VarType::DENSE_TENSOR:
       visitor(var.Get<phi::DenseTensor>());
       return;
     case proto::VarType::LOD_RANK_TABLE:

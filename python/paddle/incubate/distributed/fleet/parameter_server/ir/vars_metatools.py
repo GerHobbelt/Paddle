@@ -42,10 +42,10 @@ class VarBlock:
 def create_var_struct(var):
     if var.type == core.VarDesc.VarType.SELECTED_ROWS:
         lod_level = None
-    elif var.type == core.VarDesc.VarType.LOD_TENSOR:
+    elif var.type == core.VarDesc.VarType.DENSE_TENSOR:
         lod_level = var.lod_level
     else:
-        raise ValueError("can only support SELECTED_ROWS/LOD_TENSOR now")
+        raise ValueError("can only support SELECTED_ROWS/DENSE_TENSOR now")
 
     return VarStruct(
         var.name, var.shape, var.dtype, var.type, lod_level, var.persistable

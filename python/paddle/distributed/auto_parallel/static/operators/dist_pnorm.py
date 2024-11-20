@@ -207,7 +207,7 @@ class DistributedPNormImpl0(DistributedOperatorImpl):
             name=".".join(["all_gather", X_var.name]),
             dtype=X_var.dtype,
             shape=X_var.shape,
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
             persistable=False,
             stop_gradient=X_var.stop_gradient,
         )
@@ -300,7 +300,7 @@ class DistributedPNormImpl0(DistributedOperatorImpl):
             name=".".join(["all_gather", X_grad_var.name]),
             dtype=X_grad_var.dtype,
             shape=new_X_var.shape,
-            type=core.VarDesc.VarType.LOD_TENSOR,
+            type=core.VarDesc.VarType.DENSE_TENSOR,
             persistable=False,
             stop_gradient=X_grad_var.stop_gradient,
         )

@@ -408,8 +408,12 @@ struct XPUSigmoidGradFunctor : public funcs::BaseActivationFunctor<T> {
                   const DenseTensor* out,
                   const DenseTensor* dout,
                   DenseTensor* dx) const {
-    int r = xpu_activation_backward<Context, T, XPUType>(
-        dev_ctx, x, out, dout, dx, xpu::sigmoid_grad<XPUType>);
+    dev_ctx.template Alloc<T>(dx);
+    const XPUType* y_data = reinterpret_cast<const XPUType*>(out->data<T>());
+    const XPUType* y_grad = reinterpret_cast<const XPUType*>(dout->data<T>());
+    XPUType* x_grad = reinterpret_cast<XPUType*>(dx->data<T>());
+    int r = xpu::sigmoid_grad(
+        dev_ctx.x_context(), y_data, y_grad, x_grad, dx->numel());
     PADDLE_ENFORCE_XDNN_SUCCESS(r, "sigmoid_grad");
   }
 };

@@ -161,7 +161,7 @@ std::vector<proto::VarType::Type> VarDesc::GetDataTypes() const {
 
 void VarDesc::SetLoDLevel(int32_t lod_level) {
   switch (desc_.type().type()) {
-    case proto::VarType::LOD_TENSOR:
+    case proto::VarType::DENSE_TENSOR:
       desc_.mutable_type()->mutable_lod_tensor()->set_lod_level(lod_level);
       break;
     case proto::VarType::DENSE_TENSOR_ARRAY:
@@ -202,7 +202,7 @@ void VarDesc::SetLoDLevels(const std::vector<int32_t> &multiple_lod_level) {
 
 int32_t VarDesc::GetLoDLevel() const {
   switch (desc_.type().type()) {
-    case proto::VarType::LOD_TENSOR:
+    case proto::VarType::DENSE_TENSOR:
       return desc_.type().lod_tensor().lod_level();
     case proto::VarType::DENSE_TENSOR_ARRAY:
       return desc_.type().tensor_array().lod_level();
@@ -242,7 +242,7 @@ const proto::VarType::TensorDesc &VarDesc::tensor_desc() const {
   switch (desc_.type().type()) {
     case proto::VarType::SELECTED_ROWS:
       return desc_.type().selected_rows();
-    case proto::VarType::LOD_TENSOR:
+    case proto::VarType::DENSE_TENSOR:
       return desc_.type().lod_tensor().tensor();
     case proto::VarType::DENSE_TENSOR_ARRAY:
       return desc_.type().tensor_array().tensor();
@@ -291,7 +291,7 @@ proto::VarType::TensorDesc *VarDesc::mutable_tensor_desc() {
   switch (desc_.type().type()) {
     case proto::VarType::SELECTED_ROWS:
       return desc_.mutable_type()->mutable_selected_rows();
-    case proto::VarType::LOD_TENSOR:
+    case proto::VarType::DENSE_TENSOR:
       return desc_.mutable_type()->mutable_lod_tensor()->mutable_tensor();
     case proto::VarType::DENSE_TENSOR_ARRAY:
       return desc_.mutable_type()->mutable_tensor_array()->mutable_tensor();

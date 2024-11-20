@@ -337,7 +337,7 @@ class TestVariable(unittest.TestCase):
             self.assertTrue(var.name.startswith('_generated_var_'))
             self.assertEqual(var.shape, (1, 1))
             self.assertEqual(var_dtype, paddle.float64)
-            self.assertEqual(var.type, base.core.VarDesc.VarType.LOD_TENSOR)
+            self.assertEqual(var.type, base.core.VarDesc.VarType.DENSE_TENSOR)
 
     def test_create_selected_rows(self):
         b = default_main_program().current_block()

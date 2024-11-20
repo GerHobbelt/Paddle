@@ -186,7 +186,7 @@ void MultiTrainer::InitTrainerEnv(const ProgramDesc& main_program,
           phi::DenseTensor* root_tensor =
               root_var->GetMutable<phi::DenseTensor>();
           auto* ptr = scope->Var(name);
-          InitializeVariable(ptr, proto::VarType::LOD_TENSOR);
+          InitializeVariable(ptr, proto::VarType::DENSE_TENSOR);
           phi::DenseTensor* thread_tensor = ptr->GetMutable<phi::DenseTensor>();
           TensorCopy(*root_tensor, place, thread_tensor);
         }

@@ -135,7 +135,7 @@ class XavierInitializer(Initializer):
                 ),
                 shape=out_var_shape,
                 dtype=out_dtype,
-                type=core.VarDesc.VarType.LOD_TENSOR,
+                type=core.VarDesc.VarType.DENSE_TENSOR,
                 persistable=False,
             )
         elif (

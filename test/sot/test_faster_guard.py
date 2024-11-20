@@ -58,6 +58,17 @@ class TestFasterGuard(unittest.TestCase):
             guard_dtype.check(paddle.to_tensor(1, dtype=paddle.float32))
         )
 
+    def test_shape_match_guard(self):
+        tensor = paddle.randn([2, 3])
+        guard_shape = paddle.framework.core.ShapeMatchGuard([2, 3])
+        self.assertTrue(guard_shape.check(tensor))
+        guard_shape = paddle.framework.core.ShapeMatchGuard([2, None])
+        self.assertTrue(guard_shape.check(tensor))
+        guard_shape = paddle.framework.core.ShapeMatchGuard([3, 2])
+        self.assertFalse(guard_shape.check(tensor))
+        guard_shape = paddle.framework.core.ShapeMatchGuard([2, 3, 1])
+        self.assertFalse(guard_shape.check(tensor))
+
     def test_layer_match_guard(self):
         layer = paddle.nn.Linear(10, 10)
         guard_layer = paddle.framework.core.LayerMatchGuard(layer)

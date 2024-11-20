@@ -326,7 +326,7 @@ class OpConverter {
                                    input.c_str()));
       PADDLE_ENFORCE_EQ(
           var->GetType(),
-          FluidDT::VarType_Type_LOD_TENSOR,
+          FluidDT::VarType_Type_DENSE_TENSOR,
           common::errors::InvalidArgument("TensorRT engine only takes "
                                           "LoDTensor as input"));
       nvinfer1::DataType in_dtype = FluidDataType2TRT(var->GetDataType());
@@ -389,7 +389,7 @@ class OpConverter {
                                    output.c_str()));
       PADDLE_ENFORCE_EQ(
           var->GetType(),
-          FluidDT::VarType_Type_LOD_TENSOR,
+          FluidDT::VarType_Type_DENSE_TENSOR,
           common::errors::InvalidArgument(
               "The output tensor in TensorRT subgraph should be LoDTensor"));
       nvinfer1::DataType out_dtype = FluidDataType2TRT(var->GetDataType());

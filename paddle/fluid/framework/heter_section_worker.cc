@@ -30,7 +30,7 @@ void SetMicroId(paddle::framework::Scope* scope,
   // create microbatch_id variable
   // and set micro id value
   auto* ptr = scope->Var("microbatch_id");
-  InitializeVariable(ptr, proto::VarType::LOD_TENSOR);
+  InitializeVariable(ptr, proto::VarType::DENSE_TENSOR);
   framework::Variable* var = scope->FindVar("microbatch_id");
   PADDLE_ENFORCE_EQ(
       var->IsType<phi::DenseTensor>(),

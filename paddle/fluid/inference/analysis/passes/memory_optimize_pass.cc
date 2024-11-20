@@ -173,7 +173,7 @@ void MemoryOptimizePass::CollectVarMemorySize(
   for (auto* node : graph->Nodes()) {
     if (node->IsVar() && node->Var() &&
         node->Var()->GetType() ==
-            framework::proto::VarType::Type::VarType_Type_LOD_TENSOR) {
+            framework::proto::VarType::Type::VarType_Type_DENSE_TENSOR) {
       if (!valid_var(node)) {
         black_list.emplace(node->Var()->Name());
       }
@@ -184,7 +184,7 @@ void MemoryOptimizePass::CollectVarMemorySize(
   for (auto* node : graph->Nodes()) {
     if (node->IsVar() && node->Var() &&
         node->Var()->GetType() ==
-            framework::proto::VarType::Type::VarType_Type_LOD_TENSOR &&
+            framework::proto::VarType::Type::VarType_Type_DENSE_TENSOR &&
         !black_list.count(node->Var()->Name())) {
       // Parameters will not be reused.
       if (node->Var()->Persistable()) continue;

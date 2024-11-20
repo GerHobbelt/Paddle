@@ -65,7 +65,7 @@ framework::BlockDesc* AppendSendAndRecvBlock(framework::ProgramDesc* program) {
   op->SetOutput("Out", {"res"});
   op->SetAttr("scale", 0.5f);
   auto& out = *root_block->Var("res");
-  out.SetType(framework::proto::VarType::LOD_TENSOR);
+  out.SetType(framework::proto::VarType::DENSE_TENSOR);
   out.SetShape({1, 10});
   return block;
 }

@@ -19,6 +19,7 @@ import unittest
 from test_case_base import (
     TestCaseBase,
     test_instruction_translator_cache_context,
+    test_with_faster_guard,
 )
 
 import paddle
@@ -32,6 +33,7 @@ def test_guard_fn(fn, inp):
 
 
 class TestGuardOutputs(TestCaseBase):
+    @test_with_faster_guard
     def test_non_operator_related_fn(self):
         with test_instruction_translator_cache_context() as ctx:
             self.assert_results(

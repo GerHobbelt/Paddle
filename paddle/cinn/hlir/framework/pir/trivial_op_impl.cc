@@ -490,6 +490,29 @@ void DebugPrintReduceVar(const FusibleOp& op) {
   }
 }
 
+ir::Expr GetBaseVariableExpr(const ir::Expr& expr) {
+  const auto GetBase =
+      [&](const ir::Expr& base, const ir::Expr& a, const ir::Expr& b) {
+        if (a.is_constant()) {
+          return b;
+        } else if (b.is_constant()) {
+          return a;
+        }
+
+        return base;
+      };
+
+  if (auto max_op = expr.As<ir::Max>()) {
+    return GetBase(expr, max_op->a(), max_op->b());
+  } else if (auto min_op = expr.As<ir::Min>()) {
+    return GetBase(expr, min_op->a(), min_op->b());
+  } else if (auto add_op = expr.As<ir::Add>()) {
+    return GetBase(expr, add_op->a(), add_op->b());
+  }
+
+  return expr;
+}
+
 std::pair<TrivialOp, ReduceOp> SplitReduceOp(const ReduceOp& reduce_op) {
   VLOG(4) << "Start SplitReduceOp";
   VLOG(4) << "DebugPrint Op Origin: " << _GetRootExpr(reduce_op);
@@ -502,6 +525,11 @@ std::pair<TrivialOp, ReduceOp> SplitReduceOp(const ReduceOp& reduce_op) {
 
   const std::vector<ir::Var>& all_iters = ComposeUtils::ConcatVector(
       GetOutputIters(reduce_op), GetReduceIters(reduce_op));
+
+  // TODO(phlrain): trivial_compute_body contain cinn_max(-inf, var[i])
+  // only need keep var[i].
+  // Need to remove split transform
+  trivial_compute_body = GetBaseVariableExpr(trivial_compute_body);
   VLOG(4) << "Trivial Compute Body is " << trivial_compute_body;
   ir::Tensor new_trivial_tensor =
       ir::Tensor(reduce_out_tensor->name + "_split_transform",

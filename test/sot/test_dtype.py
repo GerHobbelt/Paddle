@@ -17,6 +17,7 @@ import unittest
 from test_case_base import (
     TestCaseBase,
     test_instruction_translator_cache_context,
+    test_with_faster_guard,
 )
 
 import paddle
@@ -54,6 +55,7 @@ class TestTensorAstype(TestCaseBase):
 
 
 class TestTensorDtypeGuard(TestCaseBase):
+    @test_with_faster_guard
     def test_tensor_dtype_guard(self):
         x = paddle.ones([2, 3], dtype="float32")
         y = paddle.ones([2, 3], dtype="int32")

@@ -92,7 +92,7 @@ bool KernelSupportPrecision(
 
 inline bool VarNodeHasDtype(Node* var_node) {
   auto type = var_node->Var()->GetType();
-  return (type == VarType::SELECTED_ROWS) || (type == VarType::LOD_TENSOR) ||
+  return (type == VarType::SELECTED_ROWS) || (type == VarType::DENSE_TENSOR) ||
          (type == VarType::DENSE_TENSOR_ARRAY) || (type == VarType::STRINGS) ||
          (type == VarType::VOCAB) || (type == VarType::SPARSE_COO) ||
          (type == VarType::SPARSE_CSR);
@@ -479,7 +479,7 @@ void AutoMixedPrecisionPass::GetOpPrecision() const {
 
           support_low_precision =
               support_low_precision &&
-              (real_in_var_node->Var()->GetType() == VarType::LOD_TENSOR ||
+              (real_in_var_node->Var()->GetType() == VarType::DENSE_TENSOR ||
                real_in_var_node->Var()->GetType() == VarType::SPARSE_COO ||
                real_in_var_node->Var()->GetType() == VarType::SPARSE_CSR);
         }
@@ -496,7 +496,7 @@ void AutoMixedPrecisionPass::GetOpPrecision() const {
 
           support_low_precision =
               support_low_precision &&
-              (real_out_var_node->Var()->GetType() == VarType::LOD_TENSOR ||
+              (real_out_var_node->Var()->GetType() == VarType::DENSE_TENSOR ||
                real_out_var_node->Var()->GetType() == VarType::SPARSE_COO ||
                real_out_var_node->Var()->GetType() == VarType::SPARSE_CSR);
         }

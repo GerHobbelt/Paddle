@@ -165,6 +165,13 @@ ItersFusionPolicy::SearchTransformRouteFromReduce2Reduce(
     auto [source_flatten_iters, source_reduce_iters] = SplitReduceIters(source);
     auto [target_flatten_iters, target_reduce_iters] = SplitReduceIters(target);
 
+    if (AnyFirstInSecond(source_reduce_iters, target_flatten_iters) ||
+        AnyFirstInSecond(target_reduce_iters, source_flatten_iters)) {
+      VLOG(4) << "Exist reduce iters in one ReduceOp found in the flatten "
+                 "iters in another ReduceOp.";
+      return std::nullopt;
+    }
+
     ItersTransformRoute route;
     // 1. Apply ReuseItersTransform
     const auto flatten_reuse_iters_transform =

@@ -12,13 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
 import tempfile
 import unittest
 
 import collective.test_communication_api_base as test_base
-
-os.environ['FLAGS_enable_pir_api'] = '0'
 
 
 class TestShardingParallelAPI(test_base.CommunicationTestDistBase):

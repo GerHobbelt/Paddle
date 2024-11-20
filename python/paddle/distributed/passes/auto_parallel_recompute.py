@@ -157,7 +157,7 @@ class RecomputeState(ProgramStats):
             seed_var = self.block.create_var(
                 name=var_unique_name,
                 dtype='int32',
-                type=core.VarDesc.VarType.LOD_TENSOR,
+                type=core.VarDesc.VarType.DENSE_TENSOR,
                 persistable=False,
                 stop_gradient=False,
             )

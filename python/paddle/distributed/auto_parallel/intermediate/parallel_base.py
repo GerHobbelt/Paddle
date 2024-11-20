@@ -12,10 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import paddle
 import paddle.distributed as dist
+from paddle import pir
+from paddle.base.framework import (
+    in_dygraph_mode,
+    in_pir_mode,
+)
 from paddle.distributed import fleet
 from paddle.nn import Layer
 from paddle.optimizer import Optimizer
+
+
+def is_tensor(tensor):
+    if in_dygraph_mode():
+        return isinstance(tensor, paddle.Tensor)
+    elif in_pir_mode():
+        return isinstance(tensor, pir.Value)
+    else:
+        raise RuntimeError(
+            "PipelineParallel are only supported in dynamic or pir mode."
+        )
 
 
 class ParallelOptimizer:

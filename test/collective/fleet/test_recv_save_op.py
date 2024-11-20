@@ -123,7 +123,7 @@ class TestListenAndServOp(unittest.TestCase):
 
         origin = load_block.create_var(
             name="var.origin",
-            type=base.core.VarDesc.VarType.LOD_TENSOR,
+            type=base.core.VarDesc.VarType.DENSE_TENSOR,
             shape=[10, 8],
             dtype="float32",
             persistable=True,
@@ -131,7 +131,7 @@ class TestListenAndServOp(unittest.TestCase):
 
         slice0 = load_block.create_var(
             name="var.slice0",
-            type=base.core.VarDesc.VarType.LOD_TENSOR,
+            type=base.core.VarDesc.VarType.DENSE_TENSOR,
             shape=[3, 8],
             dtype="float32",
             persistable=True,
@@ -139,7 +139,7 @@ class TestListenAndServOp(unittest.TestCase):
 
         slice1 = load_block.create_var(
             name="var.slice1",
-            type=base.core.VarDesc.VarType.LOD_TENSOR,
+            type=base.core.VarDesc.VarType.DENSE_TENSOR,
             shape=[5, 8],
             dtype="float32",
             persistable=True,

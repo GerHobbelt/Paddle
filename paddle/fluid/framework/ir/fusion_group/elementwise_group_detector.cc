@@ -67,7 +67,7 @@ bool GroupDetector::CheckPrecondition(const Node* n) {
     proto::VarType::Type data_type_0 = proto::VarType::BOOL;
     for (auto* n : nodes) {
       if (n && n->IsVar() && n->Var()) {
-        if (n->Var()->GetType() != proto::VarType::LOD_TENSOR) {
+        if (n->Var()->GetType() != proto::VarType::DENSE_TENSOR) {
           return false;
         }
 

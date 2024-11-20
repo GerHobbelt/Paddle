@@ -199,7 +199,7 @@ static void TensorCopyFrom(phi::DenseTensor *dst,
 void BindTensor(pybind11::module &m) {  // NOLINT
   using namespace paddle::framework;    // NOLINT
   py::class_<phi::DenseTensor> framework_tensor(
-      m, "Tensor", py::buffer_protocol());
+      m, "DenseTensor", py::buffer_protocol());
   g_framework_tensor_pytype =
       reinterpret_cast<PyTypeObject *>(framework_tensor.ptr());
   framework_tensor
@@ -390,7 +390,7 @@ void BindTensor(pybind11::module &m) {  // NOLINT
         Set the data of Tensor on place with given numpy array.
 
         Args:
-          lod (numpy.ndarray): The data to set.
+          array (numpy.ndarray): The shape where the DenseTensor is to be set.
           place (CPUPlace|CUDAPlace|XPUPlace|IPUPlace|CUDAPinnedPlace): The place where the
           Tensor is to be set.
           zero_copy (bool, optional): Whether to share memory with the input numpy array.

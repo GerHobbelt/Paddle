@@ -1912,7 +1912,7 @@ paddle::Tensor CreateTensorFromVarDesc(
   autograd_meta->SetPersistable(false);
   autograd_meta->SetStopGradient(var_desc.StopGradient());
 
-  if (var_type == paddle::framework::proto::VarType::LOD_TENSOR) {
+  if (var_type == paddle::framework::proto::VarType::DENSE_TENSOR) {
     // TODO(jiabin): Maybe support LOD later
     std::shared_ptr<phi::DenseTensor> dense_tensor = nullptr;
     if (dims.size() == 1 && dims[0] == 0) {

@@ -465,8 +465,8 @@ class CoalesceGradTensorPass : public ir::Pass {
 
  private:
   bool IsLoDTensorType(const proto::VarType::Type &type) const {
-    // Current only support LOD_TENSOR.
-    return type == proto::VarType::LOD_TENSOR;
+    // Current only support DENSE_TENSOR.
+    return type == proto::VarType::DENSE_TENSOR;
   }
 
   std::unordered_map<std::string, std::vector<Node *>> GetVarInfo(

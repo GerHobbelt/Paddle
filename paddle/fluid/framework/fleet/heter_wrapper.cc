@@ -91,7 +91,7 @@ void HeterWrapper::SerializeToReq(const std::string& varname,
   }
   phi::DenseTensor* tensor = var->GetMutable<phi::DenseTensor>();
   req_var->set_varname(varname);
-  req_var->set_type(LOD_TENSOR);
+  req_var->set_type(DENSE_TENSOR);
   req_var->set_data_type(static_cast<VariableMessage::Type>(
       framework::TransToProtoVarType(tensor->dtype())));
 

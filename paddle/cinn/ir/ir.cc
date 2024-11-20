@@ -926,7 +926,18 @@ Expr Load::Make(Expr tensor, const std::vector<Expr> &origin_indices) {
 
 void Load::convert_int32_to_int64() {
   IrNode::convert_int32_to_int64();
+  for (auto &indice : indices) {
+    indice->convert_int32_to_int64();
+  }
   tensor->convert_int32_to_int64();
+}
+
+void Load::convert_int64_to_int32() {
+  IrNode::convert_int64_to_int32();
+  for (auto &indice : indices) {
+    indice->convert_int64_to_int32();
+  }
+  tensor->convert_int64_to_int32();
 }
 
 Type Load::type() const {

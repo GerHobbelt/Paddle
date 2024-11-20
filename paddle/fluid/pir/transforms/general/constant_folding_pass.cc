@@ -26,6 +26,7 @@
 #include "paddle/fluid/pir/dialect/operator/ir/op_dialect.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_type.h"
 #include "paddle/fluid/pir/dialect/operator/ir/pd_op.h"
+#include "paddle/fluid/pir/dialect/operator/utils/utils.h"
 #include "paddle/fluid/pir/transforms/pd_op_to_kernel_pass.h"
 #include "paddle/fluid/pir/utils/general_functions.h"
 
@@ -389,6 +390,11 @@ class ConstantFoldingPattern : public pir::RewritePattern {
       if (!op_copy->result(i) || !op_copy->result(i).type()) {
         continue;
       }
+
+      auto cast_op = builder.Build<paddle::dialect::CastOp>(
+          op_copy->result(i),
+          paddle::dialect::GetValueDataType(op_copy->result(i)));
+
       std::stringstream ss;
       ss << std::chrono::high_resolution_clock::now()
                 .time_since_epoch()
@@ -396,7 +402,7 @@ class ConstantFoldingPattern : public pir::RewritePattern {
       std::string output_var_name =
           "constant_folding@_" + ss.str() + std::to_string((*suffix_)++);
 
-      builder.Build<pir::ShadowOutputOp>(op_copy->result(i), output_var_name);
+      builder.Build<pir::ShadowOutputOp>(cast_op.result(0), output_var_name);
       output_var_names.push_back(output_var_name);
     }
 

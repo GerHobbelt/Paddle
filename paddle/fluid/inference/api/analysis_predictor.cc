@@ -993,6 +993,14 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
       basic_pass_pm.AddPass(std::move(transfer_layout_pass));
     }
   }
+  auto common_subexpression_elimination_pass =
+      ::pir::CreateCommonSubexpressionEliminationPass();
+  if (std::find(config_.deleted_passes_.begin(),
+                config_.deleted_passes_.end(),
+                common_subexpression_elimination_pass->name()) ==
+      config_.deleted_passes_.end()) {
+    basic_pass_pm.AddPass(std::move(common_subexpression_elimination_pass));
+  }
   auto params_sync_among_devices_pass =
       ::pir::CreateParamsSyncAmongDevicesPass();
   if (std::find(config_.deleted_passes_.begin(),
@@ -1021,14 +1029,6 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
     dead_code_elimination_pass->SetNotOwned(pir::Pass::kParamScopeAttr,
                                             sub_scope_);
     basic_pass_pm.AddPass(std::move(dead_code_elimination_pass));
-  }
-  auto common_subexpression_elimination_pass =
-      ::pir::CreateCommonSubexpressionEliminationPass();
-  if (std::find(config_.deleted_passes_.begin(),
-                config_.deleted_passes_.end(),
-                common_subexpression_elimination_pass->name()) ==
-      config_.deleted_passes_.end()) {
-    basic_pass_pm.AddPass(std::move(common_subexpression_elimination_pass));
   }
   auto replace_fetch_with_shadow_output_pass =
       ::pir::CreateReplaceFetchWithShadowOutputPass();

@@ -3277,6 +3277,15 @@
     data_type : out_grad
   optional : reserve_space
 
+- backward_op : take_along_axis_double_grad
+  forward : take_along_axis_grad (Tensor arr, Tensor indices, Tensor grad_out, int axis) -> Tensor(grad_arr)
+  args : (Tensor indices, Tensor grad_arr_grad, int axis)
+  output : Tensor(grad_out_grad)
+  infer_meta :
+    func : TakeAlongAxisInferMeta
+    param : [grad_arr_grad, indices, axis]
+  composite : take_along_axis_double_grad(indices, grad_arr_grad, axis, grad_out_grad)
+
 - backward_op : take_along_axis_grad
   forward : take_along_axis (Tensor arr, Tensor indices, int axis) -> Tensor(out)
   args : (Tensor arr, Tensor indices, Tensor out_grad, int axis)
@@ -3286,6 +3295,7 @@
     param : [arr]
   kernel :
     func : take_along_axis_grad
+  backward : take_along_axis_double_grad
 
 - backward_op : tan_grad
   forward : tan (Tensor x) -> Tensor(out)

@@ -1,7 +1,6 @@
 test/sot/test_03_tuple.py
 test/sot/test_04_list.py
 test/sot/test_06_call_function.py
-test/sot/test_09_f_string.py
 test/sot/test_11_jumps.py
 test/sot/test_12_for_loop.py
 test/sot/test_13_make_function.py
@@ -11,7 +10,6 @@ test/sot/test_16_paddle_api.py
 test/sot/test_17_paddle_layer.py
 test/sot/test_18_tensor_method.py
 test/sot/test_19_closure.py
-test/sot/test_20_string.py
 test/sot/test_21_global.py
 test/sot/test_analysis_inputs.py
 test/sot/test_binary_operator_tracker.py

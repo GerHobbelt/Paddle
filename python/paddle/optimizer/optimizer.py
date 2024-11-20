@@ -1016,7 +1016,7 @@ class Optimizer:
                 name=var_name,
                 persistable=True,
                 dtype=dtype or param.dtype,
-                type=core.VarDesc.VarType.LOD_TENSOR,
+                type=core.VarDesc.VarType.DENSE_TENSOR,
                 shape=shape,
                 belong_to_optimizer=True,
             )
@@ -1671,7 +1671,7 @@ class Optimizer:
                     dtype=param.dtype,
                     shape=param.shape,
                     lod_level=param.lod_level,
-                    type=core.VarDesc.VarType.LOD_TENSOR,
+                    type=core.VarDesc.VarType.DENSE_TENSOR,
                 )
 
             inputs = {"X": [grad, regularization_term]}

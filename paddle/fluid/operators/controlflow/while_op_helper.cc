@@ -260,7 +260,7 @@ void TransferVariablePlace(const framework::Scope *scope,
             << "lost in_var: " << var_name;
     return;
   }
-  if (var->Type() != framework::proto::VarType::LOD_TENSOR) {
+  if (var->Type() != framework::proto::VarType::DENSE_TENSOR) {
     VLOG(10) << "[TransferVariablePlace]" << var_name << " type changed:"
              << phi::TransToPhiDataType(framework::ToVarType(var->Type()));
     return;

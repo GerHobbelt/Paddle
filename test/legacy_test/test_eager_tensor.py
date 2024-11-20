@@ -122,7 +122,7 @@ class TestEagerTensor(unittest.TestCase):
                 self.assertEqual(x.dtype, paddle.float32)
                 self.assertEqual(x.shape, [])
                 self.assertEqual(x.stop_gradient, False)
-                self.assertEqual(x.type, core.VarDesc.VarType.LOD_TENSOR)
+                self.assertEqual(x.type, core.VarDesc.VarType.DENSE_TENSOR)
 
                 x = paddle.to_tensor(
                     (1, 2), dtype="float32", place=place, stop_gradient=False
@@ -135,7 +135,7 @@ class TestEagerTensor(unittest.TestCase):
                 self.assertIsNone(x.grad)
                 self.assertEqual(x.shape, [2])
                 self.assertEqual(x.stop_gradient, False)
-                self.assertEqual(x.type, core.VarDesc.VarType.LOD_TENSOR)
+                self.assertEqual(x.type, core.VarDesc.VarType.DENSE_TENSOR)
 
                 x = paddle.to_tensor(
                     self.array,
@@ -147,7 +147,7 @@ class TestEagerTensor(unittest.TestCase):
                 self.assertEqual(x.dtype, paddle.float32)
                 self.assertEqual(x.shape, self.shape)
                 self.assertEqual(x.stop_gradient, False)
-                self.assertEqual(x.type, core.VarDesc.VarType.LOD_TENSOR)
+                self.assertEqual(x.type, core.VarDesc.VarType.DENSE_TENSOR)
 
                 y = paddle.to_tensor(x)
                 y = paddle.to_tensor(y, dtype="float64", place=place)
@@ -155,7 +155,7 @@ class TestEagerTensor(unittest.TestCase):
                 self.assertEqual(y.dtype, paddle.float64)
                 self.assertEqual(y.shape, self.shape)
                 self.assertEqual(y.stop_gradient, True)
-                self.assertEqual(y.type, core.VarDesc.VarType.LOD_TENSOR)
+                self.assertEqual(y.type, core.VarDesc.VarType.DENSE_TENSOR)
                 z = x + y
                 np.testing.assert_array_equal(z.numpy(), 2 * self.array)
 
@@ -241,7 +241,7 @@ class TestEagerTensor(unittest.TestCase):
                 lod_tensor.set(numpy_array, place)
                 x = paddle.to_tensor(lod_tensor)
                 np.testing.assert_array_equal(x.numpy(), numpy_array)
-                self.assertEqual(x.type, core.VarDesc.VarType.LOD_TENSOR)
+                self.assertEqual(x.type, core.VarDesc.VarType.DENSE_TENSOR)
                 self.assertEqual(str(x.place), str(place))
 
                 # covert core.Tensor to paddle.Tensor
@@ -250,7 +250,7 @@ class TestEagerTensor(unittest.TestCase):
                 tensor_from_dlpack = paddle.base.core.from_dlpack(dlpack)
                 x = paddle.to_tensor(tensor_from_dlpack)
                 np.testing.assert_array_equal(x.numpy(), numpy_array)
-                self.assertEqual(x.type, core.VarDesc.VarType.LOD_TENSOR)
+                self.assertEqual(x.type, core.VarDesc.VarType.DENSE_TENSOR)
 
                 # test dtype=bfloat16
                 x = paddle.to_tensor(-1e6, dtype=paddle.bfloat16)
@@ -373,7 +373,7 @@ class TestEagerTensor(unittest.TestCase):
         self.assertEqual(var.stop_gradient, True)
         self.assertEqual(var.shape, self.shape)
         self.assertEqual(var.dtype, paddle.float32)
-        self.assertEqual(var.type, core.VarDesc.VarType.LOD_TENSOR)
+        self.assertEqual(var.type, core.VarDesc.VarType.DENSE_TENSOR)
 
     def test_list_to_tensor(self):
         array = [[[1, 2], [1, 2], [1.0, 2]], [[1, 2], [1, 2], [1, 2]]]
@@ -381,7 +381,7 @@ class TestEagerTensor(unittest.TestCase):
         np.testing.assert_array_equal(var.numpy(), array)
         self.assertEqual(var.shape, [2, 3, 2])
         self.assertEqual(var.dtype, paddle.int32)
-        self.assertEqual(var.type, core.VarDesc.VarType.LOD_TENSOR)
+        self.assertEqual(var.type, core.VarDesc.VarType.DENSE_TENSOR)
 
     def test_tuple_to_tensor(self):
         array = (((1, 2), (1, 2), (1, 2)), ((1, 2), (1, 2), (1, 2)))
@@ -389,7 +389,7 @@ class TestEagerTensor(unittest.TestCase):
         np.testing.assert_array_equal(var.numpy(), array)
         self.assertEqual(var.shape, [2, 3, 2])
         self.assertEqual(var.dtype, paddle.float32)
-        self.assertEqual(var.type, core.VarDesc.VarType.LOD_TENSOR)
+        self.assertEqual(var.type, core.VarDesc.VarType.DENSE_TENSOR)
 
     def test_tensor_to_tensor(self):
         t = base.Tensor()

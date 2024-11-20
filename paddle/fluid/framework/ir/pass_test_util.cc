@@ -140,7 +140,7 @@ ProgramDesc BuildProgramDesc(const std::vector<std::string>& transient_vars,
 
   auto add_var_to_prog = [&prog](const std::string& var_name) -> VarDesc* {
     auto var = prog.MutableBlock(0)->Var(var_name);
-    var->SetType(proto::VarType::LOD_TENSOR);
+    var->SetType(proto::VarType::DENSE_TENSOR);
     return var;
   };
 

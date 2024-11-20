@@ -27,7 +27,7 @@ limitations under the License. */
 namespace paddle::framework {
 
 void InitializeVariable(Variable *var, proto::VarType::Type var_type) {
-  if (var_type == proto::VarType::LOD_TENSOR) {
+  if (var_type == proto::VarType::DENSE_TENSOR) {
     var->GetMutable<phi::DenseTensor>();
   } else if (var_type == proto::VarType::SELECTED_ROWS) {
     var->GetMutable<phi::SelectedRows>();
@@ -56,7 +56,7 @@ void InitializeVariable(Variable *var, proto::VarType::Type var_type) {
   } else {
     PADDLE_THROW(common::errors::Unavailable(
         "Variable type %d is not in "
-        "[LOD_TENSOR, SELECTED_ROWS, FEED_MINIBATCH, FETCH_LIST, "
+        "[DENSE_TENSOR, SELECTED_ROWS, FEED_MINIBATCH, FETCH_LIST, "
         "LOD_RANK_TABLE, PLACE_LIST, READER, RAW].",
         var_type));
   }

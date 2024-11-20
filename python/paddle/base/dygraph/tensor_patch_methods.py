@@ -1392,7 +1392,7 @@ def monkey_patch_tensor():
                 prefix = 'paddle.'
                 return prefix + numpy_dtype
             else:
-                # for example, paddle.base.core.VarDesc.VarType.LOD_TENSOR
+                # for example, paddle.base.core.VarDesc.VarType.DENSE_TENSOR
                 return origin(dtype)
 
         core.VarDesc.VarType.__str__ = dtype_str

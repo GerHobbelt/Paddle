@@ -376,7 +376,7 @@ void BindMultiDeviceReader(py::module *module, const char *reader_name) {
                       "generated_var");
               auto new_var = std::make_shared<imperative::VarBase>(act_name);
               new_var->SetPersistable(false);
-              new_var->SetType(framework::proto::VarType::LOD_TENSOR);
+              new_var->SetType(framework::proto::VarType::DENSE_TENSOR);
               new_var->SetDataType(
                   framework::TransToProtoVarType(lod_tensor.dtype()));
               auto *tensor =

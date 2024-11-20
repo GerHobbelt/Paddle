@@ -1002,7 +1002,7 @@ class OpTest(unittest.TestCase):
                     v = block.create_var(
                         name=name,
                         dtype=np.float32,
-                        type=core.VarDesc.VarType.LOD_TENSOR,
+                        type=core.VarDesc.VarType.DENSE_TENSOR,
                         persistable=False,
                         stop_gradient=False,
                     )
@@ -1010,7 +1010,7 @@ class OpTest(unittest.TestCase):
                     v = block.create_var(
                         name=name,
                         dtype=np_value_temp.dtype,
-                        type=core.VarDesc.VarType.LOD_TENSOR,
+                        type=core.VarDesc.VarType.DENSE_TENSOR,
                         persistable=False,
                         stop_gradient=False,
                     )
@@ -1028,7 +1028,7 @@ class OpTest(unittest.TestCase):
             if name not in np_list:
                 assert var_proto.intermediate, f"{name} not found"
                 v = block.create_var(
-                    dtype='float32', type=core.VarDesc.VarType.LOD_TENSOR
+                    dtype='float32', type=core.VarDesc.VarType.DENSE_TENSOR
                 )
                 var_dict[name].append(v)
                 if if_return_inputs_grad_dict:
@@ -2865,7 +2865,7 @@ class OpTest(unittest.TestCase):
                     lod_level_runtime = 0
 
                 var = self.program.global_block().var(var_name)
-                if var.type == core.VarDesc.VarType.LOD_TENSOR:
+                if var.type == core.VarDesc.VarType.DENSE_TENSOR:
                     lod_level_compile = var.lod_level
                 else:
                     lod_level_compile = 0

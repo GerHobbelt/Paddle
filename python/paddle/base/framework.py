@@ -1488,7 +1488,7 @@ def _debug_string_(proto, throw_on_error=True):
 
 
 def _create_tensor(
-    type=core.VarDesc.VarType.LOD_TENSOR,
+    type=core.VarDesc.VarType.DENSE_TENSOR,
     name=None,
     shape=None,
     dtype=None,
@@ -1504,7 +1504,7 @@ def _create_tensor(
         dtype,
         list(shape) if shape else [],
         name,
-        type if type else core.VarDesc.VarType.LOD_TENSOR,
+        type if type else core.VarDesc.VarType.DENSE_TENSOR,
         True if persistable else False,
     )
     eager_tensor.retain_grads()
@@ -1689,7 +1689,7 @@ class Variable(metaclass=VariableMetaClass):
     def __init__(
         self,
         block,
-        type=core.VarDesc.VarType.LOD_TENSOR,
+        type=core.VarDesc.VarType.DENSE_TENSOR,
         name=None,
         shape=None,
         dtype=None,
@@ -1831,8 +1831,8 @@ class Variable(metaclass=VariableMetaClass):
 
         assert (
             self.type == core.VarDesc.VarType.SELECTED_ROWS
-            or self.type == core.VarDesc.VarType.LOD_TENSOR
-        ), "only support a variable with SELECTED_ROWS or LOD_TENSOR to be detached"
+            or self.type == core.VarDesc.VarType.DENSE_TENSOR
+        ), "only support a variable with SELECTED_ROWS or DENSE_TENSOR to be detached"
 
         with unique_name.guard(self.block.program._name_generator):
             output = self.block.create_var(
@@ -2065,6 +2065,7 @@ class Variable(metaclass=VariableMetaClass):
         Examples:
             .. code-block:: python
 
+                >>> # doctest: +SKIP("This has diff in xdoctest env")
                 >>> import paddle
                 >>> import paddle.static as static
 
@@ -2076,13 +2077,13 @@ class Variable(metaclass=VariableMetaClass):
                 ...                                     shape=[-1, 23, 48],
                 ...                                     dtype='float32')
                 >>> print(new_variable._to_readable_code())
-                var X : LOD_TENSOR.shape(-1, 23, 48).dtype(float32).stop_gradient(False)
+                var X : DENSE_TENSOR.shape(-1, 23, 48).dtype(float32).stop_gradient(False)
         """
-        # VarType.LOD_TENSOR -> LOD_TENSOR
+        # VarType.DENSE_TENSOR -> DENSE_TENSOR
         type_str = str(self.type).split(".")[1]
         if (
             self.type == core.VarDesc.VarType.SELECTED_ROWS
-            or self.type == core.VarDesc.VarType.LOD_TENSOR
+            or self.type == core.VarDesc.VarType.DENSE_TENSOR
         ):
             dtype_str = str(self.dtype).split(".")[1]
             var_str = f"{self.name} : {type_str}.shape{self.shape}.dtype({dtype_str}).stop_gradient({self.stop_gradient})"
@@ -2129,6 +2130,7 @@ class Variable(metaclass=VariableMetaClass):
         Examples:
             .. code-block:: python
 
+                >>> # doctest: +SKIP("This has diff in xdoctest env")
                 >>> import paddle.base as base
                 >>> import paddle
 
@@ -2143,7 +2145,7 @@ class Variable(metaclass=VariableMetaClass):
                 >>> print(new_variable.to_string(True, True))
                 name: "X"
                 type {
-                  type: LOD_TENSOR
+                  type: DENSE_TENSOR
                   lod_tensor {
                     tensor {
                       data_type: FP32
@@ -2427,6 +2429,7 @@ class Variable(metaclass=VariableMetaClass):
         Examples:
             .. code-block:: python
 
+                >>> # doctest: +SKIP("This has diff in xdoctest env")
                 >>> import paddle.base as base
                 >>> cur_program = base.Program()
                 >>> cur_block = cur_program.current_block()
@@ -2434,7 +2437,7 @@ class Variable(metaclass=VariableMetaClass):
                 ...                                     shape=[-1, 23, 48],
                 ...                                     dtype='float32')
                 >>> print("Type of current Var is: {}".format(new_variable.type))
-                Type of current Var is: VarType.LOD_TENSOR
+                Type of current Var is: VarType.DENSE_TENSOR
         """
         return self.desc.type()
 
@@ -2482,7 +2485,7 @@ class Variable(metaclass=VariableMetaClass):
                     self.name + ".tmp"
                 ),
                 dtype=self.dtype,
-                type=core.VarDesc.VarType.LOD_TENSOR,
+                type=core.VarDesc.VarType.DENSE_TENSOR,
                 persistable=False,
                 stop_gradient=False,
             )
@@ -4929,7 +4932,7 @@ class Block:
                     type=v.type,
                     lod_level=(
                         v.lod_level
-                        if v.type == core.VarDesc.VarType.LOD_TENSOR
+                        if v.type == core.VarDesc.VarType.DENSE_TENSOR
                         else None
                     ),
                     stop_gradient=p.stop_gradient,
@@ -6029,7 +6032,7 @@ class Program:
                         new_var_desc,
                         "shape",
                         [
-                            core.VarDesc.VarType.LOD_TENSOR,
+                            core.VarDesc.VarType.DENSE_TENSOR,
                             core.VarDesc.VarType.SELECTED_ROWS,
                             core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
                         ],
@@ -6038,7 +6041,7 @@ class Program:
                         new_var_desc,
                         "dtype",
                         [
-                            core.VarDesc.VarType.LOD_TENSOR,
+                            core.VarDesc.VarType.DENSE_TENSOR,
                             core.VarDesc.VarType.SELECTED_ROWS,
                             core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
                         ],
@@ -6047,7 +6050,7 @@ class Program:
                         new_var_desc,
                         "lod_level",
                         [
-                            core.VarDesc.VarType.LOD_TENSOR,
+                            core.VarDesc.VarType.DENSE_TENSOR,
                             core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
                         ],
                     ),
@@ -7312,6 +7315,7 @@ class Program:
         Examples:
             .. code-block:: python
 
+                >>> # doctest: +SKIP("This has diff in xdoctest env")
                 >>> import paddle
                 >>> import paddle.static as static
 
@@ -7323,8 +7327,8 @@ class Program:
                 >>> for var in prog.list_vars():
                 ...     print(var)
 
-                >>> # var img : LOD_TENSOR.shape(-1, 1, 28, 28).dtype(float32).stop_gradient(True)
-                >>> # var label : LOD_TENSOR.shape(-1, 1).dtype(int64).stop_gradient(True)
+                >>> # var img : DENSE_TENSOR.shape(-1, 1, 28, 28).dtype(float32).stop_gradient(True)
+                >>> # var label : DENSE_TENSOR.shape(-1, 1).dtype(int64).stop_gradient(True)
         """
         for each_block in self.blocks:
             yield from list(each_block.vars.values())
@@ -7339,6 +7343,7 @@ class Program:
         Examples:
             .. code-block:: python
 
+                >>> # doctest: +SKIP("This has diff in xdoctest env")
                 >>> import paddle
                 >>> import paddle.static as static
 
@@ -7356,8 +7361,8 @@ class Program:
                 >>> # Here will print all parameters in current program, in this example,
                 >>> # the result is like:
                 >>> #
-                >>> # persist trainable param fc_0.w_0 : LOD_TENSOR.shape(13, 10).dtype(float32).stop_gradient(False)
-                >>> # persist trainable param fc_0.b_0 : LOD_TENSOR.shape(10,).dtype(float32).stop_gradient(False)
+                >>> # persist trainable param fc_0.w_0 : DENSE_TENSOR.shape(13, 10).dtype(float32).stop_gradient(False)
+                >>> # persist trainable param fc_0.b_0 : DENSE_TENSOR.shape(10,).dtype(float32).stop_gradient(False)
                 >>> #
                 >>> # Here print(param) will print out all the properties of a parameter,
                 >>> # including name, type and persistable, you can access to specific
@@ -7568,7 +7573,7 @@ class Parameter(Variable, metaclass=ParameterMetaClass):
         block,
         shape,
         dtype,
-        type=core.VarDesc.VarType.LOD_TENSOR,
+        type=core.VarDesc.VarType.DENSE_TENSOR,
         **kwargs,
     ):
         if shape is None:
@@ -7705,7 +7710,7 @@ class EagerParamBase(core.eager.Tensor):
             dtype,
             list(shape) if shape else [],
             name,
-            core.VarDesc.VarType.LOD_TENSOR,
+            core.VarDesc.VarType.DENSE_TENSOR,
             True,
         )
         self.retain_grads()

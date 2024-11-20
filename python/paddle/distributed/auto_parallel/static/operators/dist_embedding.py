@@ -143,7 +143,7 @@ def adopt_lookup_table_v1(ctx, main_block, src_op, Ids_var):
         ),
         dtype=Ids_var.dtype,
         shape=target_shape,
-        type=core.VarDesc.VarType.LOD_TENSOR,
+        type=core.VarDesc.VarType.DENSE_TENSOR,
         persistable=False,
         stop_gradient=True,
     )
@@ -155,7 +155,7 @@ def adopt_lookup_table_v1(ctx, main_block, src_op, Ids_var):
         ),
         dtype=Ids_var.dtype,
         shape=target_shape,
-        type=core.VarDesc.VarType.LOD_TENSOR,
+        type=core.VarDesc.VarType.DENSE_TENSOR,
         persistable=False,
         stop_gradient=True,
     )

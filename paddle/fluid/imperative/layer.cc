@@ -99,7 +99,7 @@ static std::string DebugString(
       ss << "NOT_INITED_VAR";
     } else if (var.IsType<phi::DenseTensor>()) {
       auto& tensor = var.Get<phi::DenseTensor>();
-      ss << "LoDTensor<";
+      ss << "DenseTensor<";
       if (tensor.IsInitialized()) {
         ss << framework::DataTypeToString(
                   framework::TransToProtoVarType(tensor.dtype()))

@@ -36,7 +36,7 @@ class TestCollectiveAllGather(TestCollectiveRunnerBase):
             toutdata = main_prog.current_block().create_var(
                 name="outofgather",
                 dtype='float32',
-                type=core.VarDesc.VarType.LOD_TENSOR,
+                type=core.VarDesc.VarType.DENSE_TENSOR,
                 persistable=False,
                 stop_gradient=False,
             )
@@ -70,7 +70,7 @@ class TestCollectiveAllGatherComplex64(TestCollectiveRunnerBase):
             toutdata = main_prog.current_block().create_var(
                 name="outofgather",
                 dtype='complex64',
-                type=core.VarDesc.VarType.LOD_TENSOR,
+                type=core.VarDesc.VarType.DENSE_TENSOR,
                 persistable=False,
                 stop_gradient=False,
             )
