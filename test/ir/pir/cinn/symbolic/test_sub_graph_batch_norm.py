@@ -63,6 +63,7 @@ class LayerCase(paddle.nn.Layer):
 
 def create_paddle_inputs():
     inputs = (paddle.rand(shape=[16, 32, 12, 12], dtype=paddle.float32),)
+    inputs[0].stop_gradient = False
     return inputs
 
 
@@ -86,6 +87,8 @@ class TestLayer(unittest.TestCase):
                 net = paddle.jit.to_static(net, full_graph=True)
 
         outs = net(*self.inputs)
+        loss = outs[0]
+        loss.backward()
         return (
             outs,
             net.state_dict()["parameter_0"],

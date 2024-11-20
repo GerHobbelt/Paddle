@@ -19,7 +19,6 @@ limitations under the License. */
 #include "glog/logging.h"
 
 COMMON_DECLARE_bool(enable_pir_in_executor);
-COMMON_DECLARE_bool(enable_pir_api);
 
 namespace phi {
 class DenseTensor;

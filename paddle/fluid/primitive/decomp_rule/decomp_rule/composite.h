@@ -15,8 +15,8 @@
 #pragma once
 
 #include <numeric>
-#include "paddle/fluid/primitive/type/lazy_tensor.h"
-#include "paddle/fluid/primitive/utils/utils.h"
+#include "paddle/fluid/primitive/base/lazy_tensor.h"
+#include "paddle/fluid/primitive/decomp_utils/decomp_utils.h"
 
 namespace paddle {
 namespace primitive {
@@ -264,149 +264,64 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> batch_norm_decomp(
   auto org_dtype = x.dtype();
   Tensor x_cast = ConverToMT<T>(x);
 
-  int rank = x_cast.shape().size();
-  DataLayout data_layout_ = common::StringToDataLayout(data_layout);
-  int feature_axis;
-  if (data_layout_ == DataLayout::kNCHW) {
-    feature_axis = 1;
-  } else if (data_layout_ == DataLayout::kNHWC) {
-    feature_axis = rank - 1;
-  } else {
-    PADDLE_THROW(common::errors::InvalidArgument("Unknown storage order: %s",
-                                                 data_layout));
-  }
-  std::vector<int64_t> reduce_axes;
-  for (int i = 0; i < rank; ++i) {
-    if (i != feature_axis) {
-      reduce_axes.push_back(i);
-    }
-  }
-  Tensor half = full_scalar<T>(-0.5, x_cast.dtype());
+  BatchNormDecompHelper<T> decomp_help(x, scale, bias, data_layout);
+
+  auto reduce_axes = decomp_help.GetReduceAxis();
+  auto scale_bias_new_shape = decomp_help.GetScaleBiasNewShape();
+
   bool use_run_stat = (is_test && (!trainable_statistics)) || use_global_stats;
 
   Tensor y, run_mean_, run_var_, batch_mean_, inv_std_, reserve_space;
-  if (has_dynamic_shape(x.shape())) {
-    Tensor x_dim = shape<T>(x_cast);
-    Tensor one_tensor = full<T>({1}, 1.0, x_dim.dtype());
-    std::vector<Tensor> stats_shape;
-    for (int i = 0; i < rank; i++) {
-      if (find_value(reduce_axes, i) == false) {
-        stats_shape.push_back(get_slice<T>(x_dim, i));
-      } else {
-        stats_shape.push_back(one_tensor);
-      }
-    }
-    Tensor stats_shape_tensor = concat<T>(stats_shape, 0);
-    Tensor x_hat;
-    Tensor batch_mean;
-    Tensor inv_std;
 
-    if (!use_run_stat) {
-      batch_mean = mean_decomp<T>(x_cast, reduce_axes, false);
-      auto temp = mean_decomp<T>(x_cast * x_cast, reduce_axes, false);
-      auto batch_var = temp - batch_mean * batch_mean;
-      auto eps = full_scalar<T>(epsilon, batch_var.dtype());
-      inv_std = elementwise_pow<T>((batch_var + eps), half);
-      if (data_layout_ == DataLayout::kNHWC) {
-        x_hat = (x_cast - batch_mean) * inv_std;
-      } else {
-        x_hat = (x_cast - backend::reshape<T>(batch_mean, stats_shape_tensor)) *
-                backend::reshape<T>(inv_std, stats_shape_tensor);
-      }
-      auto momentum_tensor = full_scalar<T>(momentum, run_mean.dtype());
-      auto momentum_sub_tensor =
-          full_scalar<T>(1. - momentum, run_mean.dtype());
-      run_mean_ = run_mean * momentum_tensor + batch_mean * momentum_sub_tensor;
-      run_var_ = run_var * momentum_tensor + batch_var * momentum_sub_tensor;
-      assign_out_<T>(run_mean_, run_mean);
-      assign_out_<T>(run_var_, run_var);
-    } else {
-      batch_mean =
-          backend::full_with_tensor<T>(shape<T>(run_mean), 0, run_mean.dtype());
-      auto batch_var =
-          backend::full_with_tensor<T>(shape<T>(run_var), 0, run_var.dtype());
-      auto eps = full_scalar<T>(epsilon, batch_var.dtype());
-      inv_std = elementwise_pow<T>((batch_var + eps), half);
-      if (data_layout_ == DataLayout::kNHWC) {
-        x_hat = (x_cast - run_mean) * elementwise_pow<T>((run_var + eps), half);
-      } else {
-        x_hat =
-            (x_cast - backend::reshape<T>(run_mean, stats_shape_tensor)) *
-            elementwise_pow<T>(
-                (backend::reshape<T>(run_var, stats_shape_tensor) + eps), half);
-      }
-      run_mean_ = assign<T>(run_mean);
-      run_var_ = assign<T>(run_var);
-    }
+  std::vector<int64_t> x_dim = x_cast.shape();
+  std::vector<int64_t> stats_shape;
 
-    Tensor new_scale = scale ? scale.get() : full_scalar<T>(1, x_cast.dtype());
-    Tensor new_bias = bias ? bias.get() : full_scalar<T>(0, x_cast.dtype());
-    if (data_layout_ == DataLayout::kNHWC) {
-      y = x_hat * new_scale + new_bias;
-    } else {
-      y = x_hat * backend::reshape<T>(new_scale, stats_shape_tensor) +
-          backend::reshape<T>(new_bias, stats_shape_tensor);
-    }
-    batch_mean_ = assign<T>(batch_mean);
-    inv_std_ = assign<T>(inv_std);
-    y = ConverToOrig<T>(y, org_dtype);
-  } else {
-    std::vector<int64_t> x_dim = x_cast.shape();
-    std::vector<int64_t> stats_shape;
-    for (int i = 0; i < rank; ++i) {
-      if (find_value(reduce_axes, i) == false) {
-        stats_shape.push_back(x_dim[i]);
-      } else {
-        stats_shape.push_back(1);
-      }
-    }
-    Tensor x_hat;
-    Tensor batch_mean;
-    Tensor inv_std;
-    if (!use_run_stat) {
-      batch_mean = mean_decomp<T>(x_cast, reduce_axes, false);
-      auto temp = mean_decomp<T>(x_cast * x_cast, reduce_axes, false);
-      auto batch_var = temp - batch_mean * batch_mean;
-      inv_std = elementwise_pow<T>((batch_var + epsilon), half);
-      if (data_layout_ == DataLayout::kNHWC) {
-        x_hat = (x_cast - batch_mean) * inv_std;
-      } else {
-        x_hat = (x_cast - reshape<T>(batch_mean, stats_shape)) *
-                reshape<T>(inv_std, stats_shape);
-      }
-      run_mean_ = run_mean * momentum + batch_mean * (1. - momentum);
-      run_var_ = run_var * momentum + batch_var * (1. - momentum);
-      assign_out_<T>(run_mean_, run_mean);
-      assign_out_<T>(run_var_, run_var);
-    } else {
-      batch_mean = full<T>(run_mean.shape(), 0, run_mean.dtype());
-      auto batch_var = full<T>(run_var.shape(), 0, run_var.dtype());
-      inv_std = elementwise_pow<T>((batch_var + epsilon), half);
-      if (data_layout_ == DataLayout::kNHWC) {
-        x_hat =
-            (x_cast - run_mean) * elementwise_pow<T>((run_var + epsilon), half);
-      } else {
-        x_hat = (x_cast - reshape<T>(run_mean, stats_shape)) *
-                elementwise_pow<T>((reshape<T>(run_var, stats_shape) + epsilon),
-                                   half);
-      }
-      run_mean_ = assign<T>(run_mean);
-      run_var_ = assign<T>(run_var);
-    }
-    Tensor new_scale = scale ? scale.get() : full_scalar<T>(1, x_cast.dtype());
-    Tensor new_bias = bias ? bias.get() : full_scalar<T>(0, x_cast.dtype());
-    if (data_layout_ == DataLayout::kNHWC) {
-      y = x_hat * new_scale + new_bias;
-    } else {
-      y = x_hat * reshape<T>(new_scale, stats_shape) +
-          reshape<T>(new_bias, stats_shape);
-    }
-
-    batch_mean_ = assign<T>(batch_mean);
-    inv_std_ = assign<T>(inv_std);
-    y = ConverToOrig<T>(y, org_dtype);
-  }
+  Tensor x_hat;
+  Tensor batch_mean;
+  Tensor inv_std;
   if (!use_run_stat) {
+    batch_mean = mean_decomp<T>(x_cast, reduce_axes, true);
+    auto temp = mean_decomp<T>(x_cast * x_cast, reduce_axes, true);
+    auto batch_var = temp - batch_mean * batch_mean;
+    inv_std = rsqrt<T>(batch_var + epsilon);
+
+    x_hat = (x_cast - batch_mean) * inv_std;
+
+    run_mean_ = reshape<T>(run_mean, scale_bias_new_shape) * momentum +
+                batch_mean * (1. - momentum);
+    run_var_ = reshape<T>(run_var, scale_bias_new_shape) * momentum +
+               batch_var * (1. - momentum);
+
+    run_mean_ = squeeze<T>(run_mean_, reduce_axes);
+    run_var_ = squeeze<T>(run_var_, reduce_axes);
+    assign_out_<T>(run_mean_, run_mean);
+    assign_out_<T>(run_var_, run_var);
+  } else {
+    x_hat = (x_cast - reshape<T>(run_mean, scale_bias_new_shape)) *
+            rsqrt<T>(reshape<T>(run_var, scale_bias_new_shape) + epsilon);
+
+    run_mean_ = run_mean;
+    run_var_ = run_var;
+  }
+
+  y = x_hat;
+  if (scale) {
+    y = y * (scale_bias_new_shape.size() > 1
+                 ? reshape<T>(scale.get(), scale_bias_new_shape)
+                 : scale.get());
+  }
+
+  if (bias) {
+    y = y + (scale_bias_new_shape.size() > 1
+                 ? reshape<T>(bias.get(), scale_bias_new_shape)
+                 : bias.get());
+  }
+
+  y = ConverToOrig<T>(y, org_dtype);
+
+  if (!use_run_stat) {
+    batch_mean_ = squeeze<T>(batch_mean, reduce_axes);
+    inv_std_ = squeeze<T>(inv_std, reduce_axes);
     return std::make_tuple(
         y, run_mean_, run_var_, batch_mean_, inv_std_, reserve_space);
   } else {
@@ -619,87 +534,39 @@ std::tuple<Tensor, Tensor, Tensor> layer_norm_decomp(
     const paddle::optional<Tensor>& bias,
     float epsilon,
     int begin_norm_axis) {
-  if (has_dynamic_shape(x.shape())) {
-    std::vector<int64_t> axis;
-    auto org_dtype = x.dtype();
-    Tensor x_cast = ConverToMT<T>(x);
-
-    auto x_dim = x.shape();
-    for (size_t i = begin_norm_axis; i < x_dim.size(); i++) {
-      axis.push_back(static_cast<int64_t>(i));
-    }
-    auto mean_ = mean_decomp<T>(x_cast, axis, true);
-    auto difference = x_cast - mean_;
-    auto var_tmp1 = difference * difference;
-    auto variance = mean_decomp<T>(var_tmp1, axis, true);
-    auto var_tmp3 = variance + full_scalar<T>(epsilon, variance.dtype());
-    auto rsqrt_var = rsqrt<T>(var_tmp3);
-    auto out = difference * rsqrt_var;
-
-    Tensor slice_shape_l = get_slice_vec<T>(shape<T>(x), 0, begin_norm_axis);
-    Tensor slice_shape_r =
-        get_slice_vec<T>(shape<T>(x), begin_norm_axis, x_dim.size());
-    Tensor scale_cast;
-    if (scale) {
-      scale_cast = backend::reshape_with_tensor<T>(scale.get(), slice_shape_r);
-      scale_cast = ConverToMT<T>(scale_cast);
-      out = out * scale_cast;
-    }
-    Tensor bias_cast;
-    if (bias) {
-      bias_cast = backend::reshape_with_tensor<T>(bias.get(), slice_shape_r);
-      bias_cast = ConverToMT<T>(bias_cast);
-      out = out + bias_cast;
-    }
-    mean_ = backend::reshape_with_tensor<T>(mean_, slice_shape_l);
-    variance = backend::reshape_with_tensor<T>(variance, slice_shape_l);
-
-    // same as LayerNormInferMeta
-    // x: float32 --> out: float32, mean: float32, variance: float32
-    // x: float16 --> out: float16, mean: float32, variance: float32
-    out = ConverToOrig<T>(out, org_dtype);
-    return std::make_tuple(out, mean_, variance);
-  }
-
-  std::vector<int64_t> axis;
+  std::vector<int64_t> reduce_axis;
   auto org_dtype = x.dtype();
   Tensor x_cast = ConverToMT<T>(x);
 
-  auto x_dim = x.shape();
-  for (size_t i = begin_norm_axis; i < x_dim.size(); i++) {
-    axis.push_back(static_cast<int64_t>(i));
+  auto x_dims = x.dims();
+
+  LayerNormDecompHelper decomp_helper(x, scale, bias, begin_norm_axis);
+
+  for (int i = begin_norm_axis; i < x_dims.size(); i++) {
+    reduce_axis.push_back(static_cast<int64_t>(i));
   }
-  auto mean_ = mean_decomp<T>(x_cast, axis, true);
+  auto mean_ = mean_decomp<T>(x_cast, reduce_axis, true);
   auto difference = x_cast - mean_;
   auto var_tmp1 = difference * difference;
-  auto variance = mean_decomp<T>(var_tmp1, axis, true);
-  auto var_tmp3 = variance + epsilon;
+  auto variance = mean_decomp<T>(var_tmp1, reduce_axis, true);
+  auto var_tmp3 = variance + full_scalar<T>(epsilon, variance.dtype());
   auto rsqrt_var = rsqrt<T>(var_tmp3);
   auto out = difference * rsqrt_var;
 
-  std::vector<int64_t> slice_shape_l;
-  std::vector<int64_t> slice_shape_r;
-  for (int64_t i = 0; i < static_cast<int64_t>(x_dim.size()); i++) {
-    if (i < begin_norm_axis) {
-      slice_shape_l.push_back(x_dim[i]);
-    } else {
-      slice_shape_r.push_back(x_dim[i]);
-    }
-  }
   Tensor scale_cast;
   if (scale) {
-    scale_cast = reshape<T>(scale.get(), slice_shape_r);
+    scale_cast = decomp_helper.Process<T>(scale.get(), x_cast);
     scale_cast = ConverToMT<T>(scale_cast);
     out = out * scale_cast;
   }
   Tensor bias_cast;
   if (bias) {
-    bias_cast = reshape<T>(bias.get(), slice_shape_r);
+    bias_cast = decomp_helper.Process<T>(bias.get(), x_cast);
     bias_cast = ConverToMT<T>(bias_cast);
     out = out + bias_cast;
   }
-  mean_ = reshape<T>(mean_, slice_shape_l);
-  variance = reshape<T>(variance, slice_shape_l);
+  mean_ = squeeze<T>(mean_, reduce_axis);
+  variance = squeeze<T>(variance, reduce_axis);
 
   // same as LayerNormInferMeta
   // x: float32 --> out: float32, mean: float32, variance: float32

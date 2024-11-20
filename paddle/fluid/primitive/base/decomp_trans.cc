@@ -161,10 +161,16 @@ bool has_decomp_rule(const pir::Operation& op) {
   pir::OpInfo op_info = ctx->GetRegisteredOpInfo(op.name());
   auto decomp_interface_impl =
       op_info.GetInterfaceImpl<paddle::dialect::DecompInterface>();
-  if (decomp_interface_impl == nullptr) return false;
-  return true;
+  return decomp_interface_impl != nullptr;
 }
 
+bool has_decomp_vjp(const pir::Operation& vjp_op) {
+  pir::IrContext* ctx = pir::IrContext::Instance();
+  pir::OpInfo vjp_op_info = ctx->GetRegisteredOpInfo(vjp_op.name());
+  auto decomp_vjp_interface_impl =
+      vjp_op_info.GetInterfaceImpl<paddle::dialect::DecompVjpInterface>();
+  return decomp_vjp_interface_impl != nullptr;
+}
 void DecompProgram::check_ops() {
   auto primitives_set = GetPrimitiveOpNames();
   std::set<std::string> undecomposed_set;
@@ -378,6 +384,18 @@ std::vector<std::vector<pir::Value>> call_decomp_rule(pir::Operation* op) {
   return decomp_res;
 }
 
+std::vector<std::vector<pir::Value>> call_decomp_vjp(pir::Operation* vjp_op) {
+  paddle::dialect::DecompVjpInterface decomp_vjp_interface =
+      vjp_op->dyn_cast<paddle::dialect::DecompVjpInterface>();
+  PADDLE_ENFORCE(
+      decomp_vjp_interface,
+      common::errors::InvalidArgument(
+          "[Prim] The decomp_vjp function is not registered in %s vjp_op ",
+          vjp_op->name()));
+  std::vector<std::vector<pir::Value>> decomp_res =
+      decomp_vjp_interface.DecompVjp(vjp_op);
+  return decomp_res;
+}
 std::vector<pir::Operation*> DecompProgram::parse_block_ops(pir::Block* block) {
   std::vector<pir::Operation*> ops_list;
   for (auto& op : *block) {

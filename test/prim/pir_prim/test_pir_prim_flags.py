@@ -133,6 +133,14 @@ class TestPrimBackwardBlacklistFlags(unittest.TestCase):
         self.train()
         core._set_prim_all_enabled(False)
 
+    def test_prim_backward_blacklist_flag(self):
+        core._set_prim_all_enabled(True)
+        paddle.set_flags(
+            {"FLAGS_prim_backward_blacklist": "tanh_grad;exp_grad"}
+        )
+        self.train()
+        core._set_prim_all_enabled(False)
+
 
 if __name__ == '__main__':
     unittest.main()

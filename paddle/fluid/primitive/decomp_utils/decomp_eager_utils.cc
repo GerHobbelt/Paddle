@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include "paddle/fluid/eager/api/generated/eager_generated/forwards/dygraph_functions.h"
-#include "paddle/fluid/primitive/utils/utils.h"
+#include "paddle/fluid/primitive/decomp_utils/decomp_utils.h"
 
 namespace paddle {
 namespace primitive {

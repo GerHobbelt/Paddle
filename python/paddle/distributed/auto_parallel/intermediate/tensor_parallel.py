@@ -21,6 +21,9 @@ from .parallel_base import ParallelModel, ParallelOptimizer
 
 
 class PlanBase:
+    def __init__(self):
+        pass
+
     def apply(self, param, process_mesh, shard_weight, shard_bias):
         raise NotImplementedError("Don't call the PlanBase directly.")
 
@@ -123,6 +126,36 @@ class RowWiseParallel(PlanBase):
             )
 
 
+class PrepareLayerInput(PlanBase):
+    """
+    Prepare the input of specific layer. User should provide one callable function.
+    The function should take exactly one parameter named `process_mesh` and return the pre hook.
+    """
+
+    def __init__(self, fn=None):
+        super().__init__()
+        assert callable(fn)
+        self.fn = fn
+
+    def apply(self, layer, process_mesh, shard_weight=None, shard_bias=None):
+        layer.register_forward_pre_hook(self.fn(process_mesh=process_mesh))
+
+
+class PrepareLayerOutput(PlanBase):
+    """
+    Prepare the output of specific layer. User should provide one callable function.
+    The function should take exactly one parameter named `process_mesh` and return the post hook.
+    """
+
+    def __init__(self, fn=None):
+        super().__init__()
+        assert callable(fn)
+        self.fn = fn
+
+    def apply(self, layer, process_mesh, shard_weight=None, shard_bias=None):
+        layer.register_forward_post_hook(self.fn(process_mesh=process_mesh))
+
+
 class TensorParallel(ParallelModel):
     def __init__(self, model, parallelize_plan=None):
         super().__init__(model)
@@ -132,9 +165,12 @@ class TensorParallel(ParallelModel):
                 assert isinstance(
                     key, str
                 ), "The key of the parallelize plan should be a string."
-                assert isinstance(
-                    plan, PlanBase
-                ), "The value the the parallelize plan should be a instance of PlanBase."
+                if not isinstance(plan, list):
+                    plan = [plan]
+                for p in plan:
+                    assert isinstance(
+                        p, PlanBase
+                    ), "The value the the parallelize plan should be a instance of PlanBase or a list of PlanBase."
 
             self.global_mesh = dist.auto_parallel.get_mesh()
             self.parallelize_plan = parallelize_plan
@@ -157,6 +193,7 @@ class TensorParallel(ParallelModel):
     def match_layer(self, name):
         # Match the layer to a plan.
         # Will return the plan if the layer hits one, otherwise return None.
+        plans = []
         for key, plan in self.parallelize_plan.items():
             shard_weight = True
             shard_bias = True
@@ -171,17 +208,24 @@ class TensorParallel(ParallelModel):
                 shard_weight = False
             re_find = re.match(key, name)
             if key == name or (re_find is not None and re_find.string == name):
-                return plan, shard_weight, shard_bias
-        return None, None, None
+                if isinstance(plan, PlanBase):
+                    plan = [plan]
+                plans.append([plan, shard_weight, shard_bias])
+        return plans
 
     def tensor_parallelizer_fn(self, model):
         if self.parallelize_plan is None:
             return
         for name, layer in model.named_sublayers():
             if len(layer.sublayers()) == 0:
-                plan, shard_weight, shard_bias = self.match_layer(name)
-                if plan is not None:
-                    plan.apply(layer, self.get_mesh(), shard_weight, shard_bias)
+                plans = self.match_layer(name)
+                if len(plans) > 0:
+                    for plan in plans:
+                        real_plan, shard_weight, shard_bias = plan
+                        for p in real_plan:
+                            p.apply(
+                                layer, self.get_mesh(), shard_weight, shard_bias
+                            )
         return model
 
 

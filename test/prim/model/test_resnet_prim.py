@@ -46,31 +46,32 @@ epoch_num = 1
 # note: Version 2.0 momentum is fused to OP when L2Decay is available, and the results are different from the base version.
 # The results in ci as as follows:
 DY2ST_PRIM_GT = [
-    8.852442741394043,
-    8.403523445129395,
-    7.158264636993408,
-    8.538503646850586,
-    7.026732921600342,
-    7.603669166564941,
-    7.809482097625732,
-    8.743914604187012,
-    8.434671401977539,
-    8.021540641784668,
+    8.852441787719727,
+    8.403528213500977,
+    7.157894134521484,
+    8.536691665649414,
+    7.061797142028809,
+    7.612838268280029,
+    7.831070423126221,
+    8.562232971191406,
+    8.49091911315918,
+    7.967043876647949,
 ]
 
 # IN V100, 16G, CUDA 12.0, the results are as follows:
 DY2ST_PRIM_GT_CUDA12 = [
     8.852442741394043,
-    8.403524398803711,
-    7.158257484436035,
-    8.538562774658203,
-    7.0259857177734375,
-    7.612443923950195,
-    7.8350419998168945,
-    8.743268013000488,
-    8.371030807495117,
-    8.006532669067383,
+    8.40353012084961,
+    7.157838344573975,
+    8.537829399108887,
+    7.063560485839844,
+    7.615252494812012,
+    7.805097579956055,
+    8.546052932739258,
+    8.456424713134766,
+    7.971644401550293,
 ]
+
 
 if core.is_compiled_with_cuda():
     paddle.set_flags({'FLAGS_cudnn_deterministic': True})
@@ -215,6 +216,7 @@ class TestResnet(unittest.TestCase):
     def test_prim(self):
         dy2st_prim = train(to_static=True, enable_prim=True, enable_cinn=False)
         standard_prim = DY2ST_PRIM_GT
+
         if paddle.version.cuda() == "12.0":
             standard_prim = DY2ST_PRIM_GT_CUDA12
         np.testing.assert_allclose(dy2st_prim, standard_prim, rtol=1e-5)

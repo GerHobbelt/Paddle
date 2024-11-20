@@ -46,6 +46,8 @@ vartype_to_datatype = {
     VarDesc.VarType.COMPLEX128: DataType.COMPLEX128,
     VarDesc.VarType.FP8_E4M3FN: DataType.FLOAT8_E4M3FN,
     VarDesc.VarType.FP8_E5M2: DataType.FLOAT8_E5M2,
+    VarDesc.VarType.STRING: DataType.PSTRING,
+    VarDesc.VarType.RAW: DataType.ALL_DTYPE,
 }
 
 datatype_to_vartype = {v: k for k, v in vartype_to_datatype.items()}

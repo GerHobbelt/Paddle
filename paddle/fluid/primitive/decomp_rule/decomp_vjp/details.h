@@ -22,8 +22,8 @@
 #include <vector>
 #include "paddle/common/ddim.h"
 #include "paddle/fluid/prim/api/generated_prim/prim_generated_api.h"
-#include "paddle/fluid/primitive/type/lazy_tensor.h"
-#include "paddle/fluid/primitive/utils/utils.h"
+#include "paddle/fluid/primitive/base/lazy_tensor.h"
+#include "paddle/fluid/primitive/decomp_utils/decomp_utils.h"
 #include "paddle/phi/common/amp_type_traits.h"
 
 namespace paddle {
@@ -813,38 +813,43 @@ void layer_norm_grad(const Tensor& x,
                      Tensor* scale_grad,
                      Tensor* bias_grad) {
   auto x_dims = x.dims();
-  auto shape_1 = 1;  // front part
-  auto shape_2 = 1;  // back part
-  for (int i = 0; i < begin_norm_axis; ++i) {
-    shape_1 *= x_dims[i];
-  }
-  for (int i = begin_norm_axis; i < x.dims().size(); ++i) {
-    shape_2 *= x_dims[i];
-  }
+
   auto scale_ptr = scale.get_ptr();
   auto bias_ptr = bias.get_ptr();
+  LayerNormDecompHelper decomp_help(x, scale, bias, begin_norm_axis);
 
-  auto x_cast = reshape<T>(x, std::vector<int64_t>({shape_1, shape_2}));
-  auto out_grad_cast =
-      reshape<T>(out_grad, std::vector<int64_t>({shape_1, shape_2}));
-  auto mean_ = reshape<T>(mean, std::vector<int64_t>({shape_1, 1}));
-  auto variance_ = reshape<T>(variance, std::vector<int64_t>({shape_1, 1}));
+  std::vector<int64_t> normlized_axis;
+  std::vector<int64_t> unsqueeze_axis;
+  for (int i = begin_norm_axis; i < x_dims.size(); ++i) {
+    unsqueeze_axis.push_back(-1);
+    normlized_axis.push_back(i);
+  }
 
+  std::vector<int64_t> un_normlized_axis;
+  for (int i = 0; i < begin_norm_axis; ++i) {
+    un_normlized_axis.push_back(i);
+  }
+
+  auto mean_ = unsqueeze<T>(mean, unsqueeze_axis);
+  auto variance_ = unsqueeze<T>(variance, unsqueeze_axis);
+
+  auto x_cast = ConverToMT<T>(x);
   Tensor scale_cast;
   if (scale_ptr) {
-    scale_cast = reshape<T>(*scale_ptr, std::vector<int64_t>({1, shape_2}));
+    scale_cast = decomp_help.Process<T>(*scale_ptr, x_cast);
   }
 
   // cast dtype to float32 if dtype =float16 or bfloat16
-  x_cast = ConverToMT<T>(x_cast);
-  out_grad_cast = ConverToMT<T>(out_grad_cast);
+
+  auto out_grad_cast = ConverToMT<T>(out_grad);
   if (scale_ptr) {
     scale_cast = ConverToMT<T>(scale_cast);
   }
 
-  auto x_sub_mean = x_cast - mean_;          // M,N
-  auto tmp = (1.0 / (variance_ + epsilon));  // M,1
-  auto sqrt_var_1 = sqrt<T>(tmp);            // M,1
+  auto x_sub_mean = x_cast - mean_;  // M,N
+  auto tmp = (full_scalar<T>(1.0, variance_.dtype()) /
+              (variance_ + full_scalar<T>(epsilon, variance_.dtype())));  // M,1
+  auto sqrt_var_1 = sqrt<T>(tmp);                                         // M,1
   auto x_sub_mean_mul_sqrt_var_1 = x_sub_mean * sqrt_var_1;
 
   if (x_grad) {
@@ -854,17 +859,16 @@ void layer_norm_grad(const Tensor& x,
     }
 
     auto dx_end = sqrt_var_1 * out_grad_scale;
-    auto d_mean =
-        dx_end.sum(std::vector<int64_t>({1}), x_cast.dtype(), true);  // M,1
+    auto d_mean = dx_end.sum(normlized_axis, x_cast.dtype(), true);  // M,1
 
-    auto d_std_1 =
-        (tmp * x_sub_mean * out_grad_scale)
-            .sum(std::vector<int64_t>({1}), x_cast.dtype(), true);  // M,1
+    auto d_std_1 = (tmp * x_sub_mean * out_grad_scale)
+                       .sum(normlized_axis, x_cast.dtype(), true);  // M,1
     auto d_std = d_std_1 * x_sub_mean_mul_sqrt_var_1;  // M,1 * M,N = M,N
 
-    auto d_mean_d_std = (1.0 / shape_2) * (d_mean + d_std);
+    auto d_mean_d_std =
+        (d_mean + d_std) / decomp_help.GetNormlizedNumel<T>(d_std);
+
     auto x_grad_tmp = dx_end - d_mean_d_std;
-    x_grad_tmp = reshape<T>(x_grad_tmp, common::vectorize(x.dims()));
     x_grad_tmp = ConverToOrig<T>(x_grad_tmp, x.dtype());
 
     set_output<T>(x_grad_tmp, x_grad);
@@ -872,10 +876,9 @@ void layer_norm_grad(const Tensor& x,
 
   if (scale_grad) {
     if (scale_ptr) {
-      auto scale_grad_tmp =
-          (x_sub_mean_mul_sqrt_var_1 * out_grad_cast)
-              .sum(std::vector<int64_t>({0}), x_cast.dtype(), true);
-      scale_grad_tmp = reshape<T>(scale_grad_tmp, scale_ptr->shape());
+      auto scale_grad_tmp = (x_sub_mean_mul_sqrt_var_1 * out_grad_cast)
+                                .sum(un_normlized_axis, x_cast.dtype(), true);
+      scale_grad_tmp = reshape<T>(scale_grad_tmp, {-1});
       scale_grad_tmp = ConverToOrig<T>(scale_grad_tmp, scale_ptr->dtype());
 
       set_output<T>(scale_grad_tmp, scale_grad);
@@ -887,8 +890,8 @@ void layer_norm_grad(const Tensor& x,
   if (bias_grad) {
     if (bias_ptr) {
       auto bias_grad_tmp =
-          out_grad_cast.sum(std::vector<int64_t>({0}), x_cast.dtype(), true);
-      bias_grad_tmp = reshape<T>(bias_grad_tmp, bias_ptr->shape());
+          out_grad_cast.sum(un_normlized_axis, x_cast.dtype(), true);
+      bias_grad_tmp = reshape<T>(bias_grad_tmp, {-1});
       bias_grad_tmp = ConverToOrig<T>(bias_grad_tmp, bias_ptr->dtype());
 
       set_output<T>(bias_grad_tmp, bias_grad);
@@ -1815,289 +1818,69 @@ void batch_norm_grad(const Tensor& x,
                      Tensor* bias_grad) {
   use_global_stats = is_test || use_global_stats;
 
-  bool has_dynamic_shape_for_x = has_dynamic_shape(x.shape());
-  bool has_dynamic_shape_for_out_grad = has_dynamic_shape(out_grad.shape());
-  bool dim_three = x.dims().size() == 3;
-  bool dim_two = x.dims().size() == 2;
-  DataLayout data_layout_ = common::StringToDataLayout(data_layout);
-
   Tensor x_data = ConverToMT<T>(x);
   Tensor out_grad_data = ConverToMT<T>(out_grad);
-  auto run_var = variance_out.get();
-  auto run_mean = mean_out.get();
+
   Tensor mean_data;
   Tensor rsqrt_var;
-  std::vector<int> nchw_to_nhwc_dim = {0, 2, 3, 1};
-  std::vector<int> nhwc_to_nchw_dim = {0, 3, 1, 2};
-  auto reduce_axis = IntArray(std::vector<int64_t>{0, 1, 2});
-
-  if (dim_two) {
-    if (data_layout_ == DataLayout::kNCHW) {
-      data_layout_ = DataLayout::kNHWC;
-    }
-
-    if (has_dynamic_shape_for_x) {
-      x_data = backend::reshape<T>(
-          x_data, get_unsqueeze_dims<T>(shape<T>(x_data), {1, 2}));
-    } else {
-      x_data = reshape<T>(x_data, get_unsqueeze_dims(x_data, {1, 2}));
-    }
-
-    if (has_dynamic_shape_for_out_grad) {
-      out_grad_data = backend::reshape<T>(
-          out_grad_data,
-          get_unsqueeze_dims<T>(shape<T>(out_grad_data), {1, 2}));
-    } else {
-      out_grad_data =
-          reshape<T>(out_grad_data, get_unsqueeze_dims(out_grad_data, {1, 2}));
-    }
-  } else if (dim_three) {
-    // Add an additional axis to accommodate NCHW or NHWC formats.
-    switch (data_layout_) {
-      case DataLayout::kNCHW: {
-        if (has_dynamic_shape_for_x) {
-          x_data = backend::reshape<T>(
-              x_data, get_unsqueeze_dims<T>(shape<T>(x_data), {3}));
-        } else {
-          x_data = reshape<T>(x_data, get_unsqueeze_dims(x_data, {3}));
-        }
-
-        if (has_dynamic_shape_for_out_grad) {
-          out_grad_data = backend::reshape<T>(
-              out_grad_data,
-              get_unsqueeze_dims<T>(shape<T>(out_grad_data), {3}));
-        } else {
-          out_grad_data =
-              reshape<T>(out_grad_data, get_unsqueeze_dims(out_grad_data, {3}));
-        }
-        break;
-      }
-      case DataLayout::kNHWC: {
-        if (has_dynamic_shape_for_x) {
-          x_data = backend::reshape<T>(
-              x_data, get_unsqueeze_dims<T>(shape<T>(x_data), {2}));
-        } else {
-          x_data = reshape<T>(x_data, get_unsqueeze_dims(x_data, {2}));
-        }
-
-        if (has_dynamic_shape_for_out_grad) {
-          out_grad_data = backend::reshape<T>(
-              out_grad_data,
-              get_unsqueeze_dims<T>(shape<T>(out_grad_data), {2}));
-        } else {
-          out_grad_data =
-              reshape<T>(out_grad_data, get_unsqueeze_dims(out_grad_data, {2}));
-        }
-        break;
-      }
-      default:
-        PADDLE_THROW(common::errors::InvalidArgument(
-            "Unknown storage order: %s", data_layout));
-    }
-  }
-
   auto dtype = x_data.dtype();
 
+  BatchNormDecompHelper<T> decomp_help(x, scale, bias, data_layout);
+
+  auto reduce_axes = decomp_help.GetReduceAxis();
+  auto scale_bias_new_shape = decomp_help.GetScaleBiasNewShape();
+
   if (use_global_stats) {
-    if (has_dynamic_shape(run_var.shape())) {
-      auto eps = backend::full_with_tensor<T>(
-          shape<T>(run_var), epsilon, run_var.dtype());
-      mean_data = run_mean;
-      rsqrt_var = rsqrt<T>(run_var + eps);
-    } else {
-      auto eps =
-          full<T>(common::vectorize(run_var.dims()), epsilon, run_var.dtype());
-      mean_data = run_mean;
-      rsqrt_var = rsqrt<T>(run_var + eps);
-    }
+    auto run_var = variance_out.get();
+    auto run_mean = mean_out.get();
+
+    run_var = reshape<T>(run_var, scale_bias_new_shape);
+    run_mean = reshape<T>(run_mean, scale_bias_new_shape);
+    auto eps = full_scalar<T>(epsilon, run_var.dtype());
+    mean_data = run_mean;
+    rsqrt_var = rsqrt<T>(run_var + eps);
   } else {
-    mean_data = saved_mean;
-    rsqrt_var = saved_variance;
+    mean_data = reshape<T>(saved_mean, scale_bias_new_shape);
+    rsqrt_var = reshape<T>(saved_variance, scale_bias_new_shape);
   }
 
-  // inv_var = 1 / sqrt(var + eps)
-  // reduce_axis = [0, 2, 3] (NCHW) [0, 1, 2] (NHWC)
-  //
-  // d_bias = np.sum(d_y, reduce_axis)
-  // d_scale = np.sum((X - mean) / inv_var * dy, reduce_axis)
-  //
-  // train mode
-  // d_x = (1. / nhw) * scale * inv_var
-  // *(nhw * d_y - np.sum(d_y, reduce_axis) - (X - mean) * inv_var * inv_var *
-  // np.sum(d_y * (X - mean), reduce_axis))
-  //
-  // test mode
-  // d_x = d_y * scale * inv_var
+  if (x_grad) {
+    auto out_grad_data_sum = sum<T>(out_grad_data, reduce_axes, dtype, true);
+    auto sum_dout_mul_diff =
+        sum<T>(out_grad_data * (x_data - mean_data), reduce_axes, dtype, true);
 
-  switch (data_layout_) {
-    case DataLayout::kNCHW: {
-      auto nhwc_x = transpose<T>(x_data, nchw_to_nhwc_dim);
-      auto nhwc_out_grad = transpose<T>(out_grad_data, nchw_to_nhwc_dim);
-      auto nhwc_out_grad_sum = sum<T>(nhwc_out_grad, reduce_axis, dtype, false);
-
-      auto sum_dout_mul_diff = sum<T>(
-          nhwc_out_grad * (nhwc_x - mean_data), reduce_axis, dtype, false);
-
-      if (x_grad) {
-        if (use_global_stats) {
-          auto nhwc_x_grad = rsqrt_var * nhwc_out_grad;
-          if (scale) {
-            nhwc_x_grad = scale.get() * nhwc_x_grad;
-          }
-          auto nchw_x_grad = transpose<T>(nhwc_x_grad, nhwc_to_nchw_dim);
-          nchw_x_grad = ConverToOrig<T>(nchw_x_grad, x.dtype());
-
-          if (dim_three) {
-            if (has_dynamic_shape_for_x) {
-              nchw_x_grad = backend::reshape<T>(nchw_x_grad, shape<T>(x));
-            } else {
-              nchw_x_grad = reshape<T>(nchw_x_grad, x.shape());
-            }
-          }
-          set_output<T>(nchw_x_grad, x_grad);
-        } else {
-          auto part1 = rsqrt_var;
-          if (scale) {
-            part1 = scale.get() * part1;
-          }
-          Tensor mean_temp1, mean_temp2;
-          if (has_dynamic_shape_for_x) {
-            Tensor x_dims = shape<T>(x_data);
-            const Tensor C =
-                (data_layout_ == DataLayout::kNCHW
-                     ? get_slice<T>(x_dims, 1)
-                     : get_slice<T>(x_dims, x_data.dims().size() - 1));
-            Tensor nume = full<T>({1}, 1.0, x_dims.dtype());
-            for (auto i = 0; i < x_dims.size(); i++) {
-              nume = nume * get_slice<T>(x_dims, i);
-            }
-            Tensor nhw = nume / C;
-            mean_temp1 = nhwc_out_grad_sum / nhw;
-            mean_temp2 = sum_dout_mul_diff / nhw * rsqrt_var * rsqrt_var;
-          } else {
-            auto x_dims = x_data.dims();
-            const int C =
-                (data_layout_ == DataLayout::kNCHW ? x_dims[1]
-                                                   : x_dims[x_dims.size() - 1]);
-            int nume = 1;
-            for (auto i = 0; i < x_dims.size(); i++) {
-              nume = nume * x_dims[i];
-            }
-
-            const int nhw = nume / C;
-            mean_temp1 = nhwc_out_grad_sum / nhw;
-            mean_temp2 = sum_dout_mul_diff / nhw * rsqrt_var * rsqrt_var;
-          }
-
-          auto part2 =
-              nhwc_out_grad - mean_temp1 - (nhwc_x - mean_data) * mean_temp2;
-
-          auto x_grad_data = part1 * part2;
-          auto nchw_x_grad = transpose<T>(x_grad_data, nhwc_to_nchw_dim);
-          nchw_x_grad = ConverToOrig<T>(nchw_x_grad, x.dtype());
-
-          if (dim_three) {
-            if (has_dynamic_shape_for_x) {
-              nchw_x_grad = backend::reshape<T>(nchw_x_grad, shape<T>(x));
-            } else {
-              nchw_x_grad = reshape<T>(nchw_x_grad, x.shape());
-            }
-          }
-          set_output<T>(nchw_x_grad, x_grad);
-        }
+    if (use_global_stats) {
+      auto x_grad_data = rsqrt_var * out_grad_data;
+      if (scale) {
+        x_grad_data =
+            reshape<T>(scale.get(), scale_bias_new_shape) * x_grad_data;
       }
-      if (scale_grad) {
-        auto scale_grad_data = sum_dout_mul_diff * rsqrt_var;
-        set_output<T>(scale_grad_data, scale_grad);
+      x_grad_data = ConverToOrig<T>(x_grad_data, x.dtype());
+      set_output<T>(x_grad_data, x_grad);
+    } else {
+      auto part1 = rsqrt_var;
+      if (scale) {
+        part1 = reshape<T>(scale.get(), scale_bias_new_shape) * part1;
       }
-      if (bias_grad) {
-        set_output<T>(assign<T>(nhwc_out_grad_sum), bias_grad);
-      }
-      break;
+      auto mean_temp1 = out_grad_data_sum / decomp_help.GetNHW(x_data);
+      auto mean_temp2 = sum_dout_mul_diff / decomp_help.GetNHW(x_data) *
+                        rsqrt_var * rsqrt_var;
+
+      auto part2 =
+          out_grad_data - mean_temp1 - (x_data - mean_data) * mean_temp2;
+
+      auto x_grad_data = part1 * part2;
+      x_grad_data = ConverToOrig<T>(x_grad_data, x.dtype());
+      set_output<T>(x_grad_data, x_grad);
     }
-    case DataLayout::kNHWC: {
-      if (x_grad) {
-        auto out_grad_data_sum =
-            sum<T>(out_grad_data, reduce_axis, dtype, false);
-        auto nhwc_sum_dout_mul_diff = sum<T>(
-            out_grad_data * (x_data - mean_data), reduce_axis, dtype, false);
-        if (use_global_stats) {
-          auto x_grad_data = rsqrt_var * out_grad_data;
-          if (scale) {
-            x_grad_data = scale.get() * x_grad_data;
-          }
-          if (dim_two || dim_three) {
-            if (has_dynamic_shape_for_x) {
-              x_grad_data = backend::reshape<T>(x_grad_data, shape<T>(x));
-            } else {
-              x_grad_data = reshape<T>(x_grad_data, x.shape());
-            }
-          }
-          x_grad_data = ConverToOrig<T>(x_grad_data, x.dtype());
-          set_output<T>(x_grad_data, x_grad);
-        } else {
-          auto part1 = rsqrt_var;
-          if (scale) {
-            part1 = scale.get() * part1;
-          }
-          Tensor mean_temp1, mean_temp2;
-
-          if (has_dynamic_shape_for_x) {
-            Tensor x_dims = shape<T>(x_data);
-            const Tensor C =
-                (data_layout_ == DataLayout::kNCHW
-                     ? get_slice<T>(x_dims, 1)
-                     : get_slice<T>(x_dims, x_data.dims().size() - 1));
-            Tensor nume = full<T>({1}, 1.0, x_dims.dtype());
-            for (auto i = 0; i < x_dims.size(); i++) {
-              nume = nume * get_slice<T>(x_dims, i);
-            }
-            Tensor nhw = nume / C;
-            mean_temp1 = out_grad_data_sum / nhw;
-            mean_temp2 = nhwc_sum_dout_mul_diff / nhw * rsqrt_var * rsqrt_var;
-          } else {
-            auto x_dims = x_data.dims();
-            const int C =
-                (data_layout_ == DataLayout::kNCHW ? x_dims[1]
-                                                   : x_dims[x_dims.size() - 1]);
-            int nume = 1;
-            for (auto i = 0; i < x_dims.size(); i++) {
-              nume = nume * x_dims[i];
-            }
-
-            const int nhw = nume / C;
-            mean_temp1 = out_grad_data_sum / nhw;
-            mean_temp2 = nhwc_sum_dout_mul_diff / nhw * rsqrt_var * rsqrt_var;
-          }
-
-          auto part2 =
-              out_grad_data - mean_temp1 - (x_data - mean_data) * mean_temp2;
-
-          auto x_grad_data = part1 * part2;
-          x_grad_data = ConverToOrig<T>(x_grad_data, x.dtype());
-          if (dim_two || dim_three) {
-            if (has_dynamic_shape_for_x) {
-              x_grad_data = backend::reshape<T>(x_grad_data, shape<T>(x));
-            } else {
-              x_grad_data = reshape<T>(x_grad_data, x.shape());
-            }
-          }
-          set_output<T>(x_grad_data, x_grad);
-        }
-        if (scale_grad) {
-          auto scale_grad_data = nhwc_sum_dout_mul_diff * rsqrt_var;
-          set_output<T>(scale_grad_data, scale_grad);
-        }
-        if (bias_grad) {
-          set_output<T>(assign<T>(out_grad_data_sum), bias_grad);
-        }
-      }
-      break;
+    if (scale_grad) {
+      auto scale_grad_data = sum_dout_mul_diff * rsqrt_var;
+      scale_grad_data = reshape<T>(scale_grad_data, {-1});
+      set_output<T>(scale_grad_data, scale_grad);
     }
-
-    default:
-      PADDLE_THROW(common::errors::InvalidArgument("Unknown storage order: %s",
-                                                   data_layout));
+    if (bias_grad) {
+      set_output<T>(reshape<T>(out_grad_data_sum, {-1}), bias_grad);
+    }
   }
 }
 

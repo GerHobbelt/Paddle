@@ -98,8 +98,10 @@ ScoreType WeightedSamplingTrailObjectiveFunc::operator()(
   auto tile_config_database = std::make_shared<NaiveTileConfigDatabase>();
   VLOG(3) << "Bucket_info_.space.size is " << bucket_info_.space.size();
   if (candidate.size() != 0) {
-    ScheduleConfig::TileConfig config{
-        candidate[0], candidate[1], candidate[2], NoneReduceMethod()};
+    ScheduleConfig::TileConfig config;
+    config.warp_num = candidate[0];
+    config.tree_reduce_num = candidate[1];
+    config.spatial_inner_num = candidate[2];
     tile_config_database->AddConfig(
         cinn::common::DefaultTarget(), bucket_info_, config);
     auto& schedule_config_manager = ScheduleConfigManager::Instance();

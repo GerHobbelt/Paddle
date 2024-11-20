@@ -148,11 +148,11 @@ class Categorical(distribution.Distribution):
         dist_sum = paddle.sum(self.logits, axis=-1, keepdim=True)
         self._prob = self.logits / dist_sum
 
-    def sample(self, shape: Sequence[int]) -> Tensor:
+    def sample(self, shape: Sequence[int] = ()) -> Tensor:
         """Generate samples of the specified shape.
 
         Args:
-            shape (list): Shape of the generated samples.
+            shape (list, optional): Shape of the generated samples.
 
         Returns:
             Tensor: A tensor with prepended dimensions shape.

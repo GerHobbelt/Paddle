@@ -288,10 +288,15 @@ class AddGroupNormFusePattern : public paddle::drr::DrrPatternBase {
  private:
   const bool extra_add_;
   const bool trans_extra_add_;
+  const bool enable_gpu_mixed_;
 
  public:
-  AddGroupNormFusePattern(bool extra_add, bool trans_extra_add)
-      : extra_add_(extra_add), trans_extra_add_{trans_extra_add} {}
+  AddGroupNormFusePattern(bool extra_add,
+                          bool trans_extra_add,
+                          bool enable_gpu_mixed)
+      : extra_add_(extra_add),
+        trans_extra_add_{trans_extra_add},
+        enable_gpu_mixed_(enable_gpu_mixed) {}
 
   uint32_t benefit() const override { return extra_add_ ? 4 : 3; }
   std::string name() const override { return "AddGroupNormFusePattern"; }
@@ -318,9 +323,9 @@ class AddGroupNormFusePattern : public paddle::drr::DrrPatternBase {
               ? add1(pat.Tensor("any_tensor"), pat.Tensor("add_out"))
               : add1(pat.Tensor("add_out"), pat.Tensor("any_tensor"));
     }
-    pat.AddConstraint([](const paddle::drr::MatchContext &match_ctx) {
+    pat.AddConstraint([this](const paddle::drr::MatchContext &match_ctx) {
       auto x_dtype = pir::GetDataTypeFromValue(match_ctx.Tensor("x"));
-      if (!x_dtype.isa<pir::Float16Type>() &&
+      if (!this->enable_gpu_mixed_ && !x_dtype.isa<pir::Float16Type>() &&
           !x_dtype.isa<pir::BFloat16Type>()) {
         return false;
       }
@@ -346,7 +351,13 @@ class AddGroupNormFusePattern : public paddle::drr::DrrPatternBase {
 };
 
 class AddGroupNormWithActPattern : public paddle::drr::DrrPatternBase {
+ private:
+  const bool enable_gpu_mixed_;
+
  public:
+  explicit AddGroupNormWithActPattern(bool enable_gpu_mixed)
+      : enable_gpu_mixed_(enable_gpu_mixed) {}
+
   uint32_t benefit() const override { return 2; }
   std::string name() const override { return "AddGroupNormWithActPattern"; }
 
@@ -368,9 +379,9 @@ class AddGroupNormWithActPattern : public paddle::drr::DrrPatternBase {
                             &pat.Tensor("mean_out_0"),
                             &pat.Tensor("variance_out_0")});
     pat.Tensor("silu_out") = silu(pat.Tensor("group_out"));
-    pat.AddConstraint([](const paddle::drr::MatchContext &match_ctx) {
+    pat.AddConstraint([this](const paddle::drr::MatchContext &match_ctx) {
       auto x_dtype = pir::GetDataTypeFromValue(match_ctx.Tensor("x"));
-      if (!x_dtype.isa<pir::Float16Type>() &&
+      if (!this->enable_gpu_mixed_ && !x_dtype.isa<pir::Float16Type>() &&
           !x_dtype.isa<pir::BFloat16Type>()) {
         return false;
       }
@@ -404,6 +415,12 @@ class AddNormFusePass : public pir::PatternRewritePass {
 
   pir::RewritePatternSet InitializePatterns(pir::IrContext *context) override {
     pir::RewritePatternSet ps(context);
+
+    bool enable_gpu_mixed = false;
+    if (Has("enable_gpu_mixed")) {
+      enable_gpu_mixed = Get<bool>("enable_gpu_mixed");
+    }
+
     // x-pow-mean-scale->rsqrt-
     //                          mul--
     // x-----------------------
@@ -437,14 +454,15 @@ class AddNormFusePass : public pir::PatternRewritePass {
     //           add-group_norm ----> add_group_norm_silu
     // residual-
     ps.Add(paddle::drr::Create<AddGroupNormFusePattern>(
-        context, !extra_add, true));
-    ps.Add(
-        paddle::drr::Create<AddGroupNormFusePattern>(context, extra_add, true));
+        context, !extra_add, true, enable_gpu_mixed));
     ps.Add(paddle::drr::Create<AddGroupNormFusePattern>(
-        context, extra_add, false));
+        context, extra_add, true, enable_gpu_mixed));
+    ps.Add(paddle::drr::Create<AddGroupNormFusePattern>(
+        context, extra_add, false, enable_gpu_mixed));
 
     // add_group_norm_silu-silu --->add_group_norm_silu
-    ps.Add(paddle::drr::Create<AddGroupNormWithActPattern>(context));
+    ps.Add(paddle::drr::Create<AddGroupNormWithActPattern>(context,
+                                                           enable_gpu_mixed));
     // group-silu->add_group_norm_silu moved to group_norm_silu_fuse_pass
     return ps;
   }

@@ -1,4 +1,4 @@
-// Copyright (c) 2021 CINN Authors. All Rights Reserved.
+// Copyright (c) 2024 CINN Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,28 +14,14 @@
 
 #pragma once
 
-#include <map>
-
-#include "paddle/cinn/ir/ir.h"
+#include <optional>
+#include <string>
+#include "paddle/cinn/ir/group_schedule/tactic/schedule_tactic.h"
 
 namespace cinn {
-namespace backends {
+namespace ir {
 
-// borrowed from Halide and TVM.
-struct ModularEntry {
-  int base;
-  int coeff;
+std::unique_ptr<ScheduleTactic> CreateComputeAtReductionTactic();
 
-  ModularEntry() = default;
-  ModularEntry(int base, int coeff) : base(base), coeff(coeff) {}
-
-  static ModularEntry everything() { return ModularEntry{0, 1}; }
-
-  static ModularEntry Add(const ModularEntry& a, const ModularEntry& b);
-};
-
-ModularEntry EvalModular(const Expr& e,
-                         const std::map<Var, ModularEntry>& mod_map);
-
-}  // namespace backends
+}  // namespace ir
 }  // namespace cinn

@@ -121,14 +121,16 @@ class Cauchy(distribution.Distribution):
         """Standard Deviation of Cauchy distribution."""
         raise ValueError("Cauchy distribution has no stddev.")
 
-    def sample(self, shape: Sequence[int], name: str | None = None) -> Tensor:
+    def sample(
+        self, shape: Sequence[int] = (), name: str | None = None
+    ) -> Tensor:
         """Sample from Cauchy distribution.
 
         Note:
             `sample` method has no grad, if you want so, please use `rsample` instead.
 
         Args:
-            shape (Sequence[int]): Sample shape.
+            shape (Sequence[int], optional): Sample shape.
             name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
         Returns:
@@ -169,11 +171,13 @@ class Cauchy(distribution.Distribution):
         with paddle.no_grad():
             return self.rsample(shape, name)
 
-    def rsample(self, shape: Sequence[int], name: str | None = None) -> Tensor:
+    def rsample(
+        self, shape: Sequence[int] = (), name: str | None = None
+    ) -> Tensor:
         """Sample from Cauchy distribution (reparameterized).
 
         Args:
-            shape (Sequence[int]): Sample shape.
+            shape (Sequence[int], optional): Sample shape.
             name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
         Returns:

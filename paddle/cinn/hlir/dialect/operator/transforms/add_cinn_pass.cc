@@ -169,14 +169,11 @@ void ApplyGroupOpPass(::pir::Program* program,
   std::shared_ptr<pir::PassManager> pass_manager = CreatePassManager();
   pass_manager->AddPass(
       cinn::dialect::ir::CreateAddBroadcastToElementwisePass());
-  if (HasDynamicShape(*program)) {
-    pass_manager->AddPass(cinn::dialect::ir::CreateInsertBroadcastPass());
-    pass_manager->AddPass(cinn::dialect::ir::CreateSimplifyDimExprPass());
-    pass_manager->AddPass(
-        cinn::dialect::ir::CreateFuseShapeOpsIntoGenerateShapeOpPass());
-    pass_manager->AddPass(
-        cinn::dialect::ir::CreateMoveGenerateShapeOpsToProloguePass());
-  }
+  pass_manager->AddPass(cinn::dialect::ir::CreateInsertBroadcastPass());
+  pass_manager->AddPass(
+      cinn::dialect::ir::CreateFuseShapeOpsIntoGenerateShapeOpPass());
+  pass_manager->AddPass(
+      cinn::dialect::ir::CreateMoveGenerateShapeOpsToProloguePass());
 
   pass_manager->AddPass(cinn::dialect::ir::CreateDynamicReshapeOpPass());
   pass_manager->AddPass(cinn::dialect::ir::CreateFoldManipulationOpsPass());

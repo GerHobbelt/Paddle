@@ -53,8 +53,36 @@ __global__ void MaskLabelByIndex(T* predicted_logits,
                                  const int64_t end_index,
                                  const int64_t N,
                                  const int64_t D,
-                                 const int64_t C,
                                  const int nranks) {
+  CUDA_KERNEL_LOOP_TYPE(i, N, int64_t) {
+    auto real_label = label[i];
+    PADDLE_ENFORCE(((real_label < D * nranks) && (real_label >= 0)) ||
+                       (real_label == ignore_index),
+                   "The index is out of bounds, "
+                   "please check whether the value of label and "
+                   "input meet the class number. It should "
+                   "be less than [%ld] or equal to [%ld], but received [%ld]",
+                   static_cast<int64_t>(D * nranks),
+                   static_cast<int64_t>(ignore_index),
+                   static_cast<int64_t>(real_label));
+
+    if (real_label >= start_index && real_label < end_index) {
+      predicted_logits[i] = logit[i * D + real_label - start_index];
+    }
+  }
+}
+
+template <typename T, typename IndexT>
+__global__ void SoftMaskLabelByIndex(T* predicted_logits,
+                                     const T* logit,
+                                     const IndexT* label,
+                                     const IndexT ignore_index,
+                                     const int64_t start_index,
+                                     const int64_t end_index,
+                                     const int64_t N,
+                                     const int64_t D,
+                                     const int64_t C,
+                                     const int nranks) {
   CUDA_KERNEL_LOOP_TYPE(i, N, int64_t) {
     for (int j = 0; j < C; ++j) {
       auto real_label = label[i * C + j];
@@ -81,8 +109,26 @@ __global__ void CaculateLoss(T* loss,
                              const T* sum_exp_logits,
                              const IndexT* label,
                              const int64_t ignore_index,
-                             const int64_t N,
-                             const int64_t C) {
+                             const int64_t N) {
+  CUDA_KERNEL_LOOP_TYPE(i, N, int64_t) {
+    auto real_label = static_cast<int64_t>(label[i]);
+    loss[i] = ignore_index == real_label
+                  ? static_cast<T>(0)
+                  : phi::funcs::TolerableValue<T>()(
+                        phi::funcs::TolerableValue<T>()(
+                            phi::funcs::real_log(sum_exp_logits[i])) -
+                        predict_logits[i]);
+  }
+}
+
+template <typename T, typename IndexT>
+__global__ void CaculateSoftLoss(T* loss,
+                                 const T* predict_logits,
+                                 const T* sum_exp_logits,
+                                 const IndexT* label,
+                                 const int64_t ignore_index,
+                                 const int64_t N,
+                                 const int64_t C) {
   const T prob = static_cast<T>(1.0 / C);
 
   CUDA_KERNEL_LOOP_TYPE(i, N, int64_t) {
@@ -308,29 +354,57 @@ struct CSoftmaxWithCrossEntropyFunctor<phi::GPUContext, T> {
     const auto& label_type = framework::TransToProtoVarType(labels->dtype());
 
     if (label_type == framework::proto::VarType::INT32) {
-      MaskLabelByIndex<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
-          predicted_logits.data<T>(),
-          softmax_2d.data<T>(),
-          labels->data<int32_t>(),
-          static_cast<int32_t>(ignore_index),
-          start_index,
-          end_index,
-          N,
-          D,
-          C,
-          nranks);
+      if (C > 1) {
+        SoftMaskLabelByIndex<T, int32_t>
+            <<<blocks, threads, 0, dev_ctx.stream()>>>(
+                predicted_logits.data<T>(),
+                softmax_2d.data<T>(),
+                labels->data<int32_t>(),
+                static_cast<int32_t>(ignore_index),
+                start_index,
+                end_index,
+                N,
+                D,
+                C,
+                nranks);
+      } else {
+        MaskLabelByIndex<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            predicted_logits.data<T>(),
+            softmax_2d.data<T>(),
+            labels->data<int32_t>(),
+            static_cast<int32_t>(ignore_index),
+            start_index,
+            end_index,
+            N,
+            D,
+            nranks);
+      }
     } else if (label_type == framework::proto::VarType::INT64) {
-      MaskLabelByIndex<T, int64_t>
-          <<<blocks, threads, 0, dev_ctx.stream()>>>(predicted_logits.data<T>(),
-                                                     softmax_2d.data<T>(),
-                                                     labels->data<int64_t>(),
-                                                     ignore_index,
-                                                     start_index,
-                                                     end_index,
-                                                     N,
-                                                     D,
-                                                     C,
-                                                     nranks);
+      if (C > 1) {
+        SoftMaskLabelByIndex<T, int64_t>
+            <<<blocks, threads, 0, dev_ctx.stream()>>>(
+                predicted_logits.data<T>(),
+                softmax_2d.data<T>(),
+                labels->data<int64_t>(),
+                ignore_index,
+                start_index,
+                end_index,
+                N,
+                D,
+                C,
+                nranks);
+      } else {
+        MaskLabelByIndex<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            predicted_logits.data<T>(),
+            softmax_2d.data<T>(),
+            labels->data<int64_t>(),
+            ignore_index,
+            start_index,
+            end_index,
+            N,
+            D,
+            nranks);
+      }
     }
 
     predicted_logits.mutable_data<T>(place);
@@ -374,23 +448,44 @@ struct CSoftmaxWithCrossEntropyFunctor<phi::GPUContext, T> {
     }
 
     if (label_type == framework::proto::VarType::INT32) {
-      CaculateLoss<T, int32_t>
-          <<<blocks, threads, 0, dev_ctx.stream()>>>(loss_2d.data<T>(),
-                                                     predicted_logits.data<T>(),
-                                                     sum_exp_logits.data<T>(),
-                                                     labels->data<int32_t>(),
-                                                     ignore_index,
-                                                     N,
-                                                     C);
+      if (C > 1) {
+        CaculateSoftLoss<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            loss_2d.data<T>(),
+            predicted_logits.data<T>(),
+            sum_exp_logits.data<T>(),
+            labels->data<int32_t>(),
+            ignore_index,
+            N,
+            C);
+      } else {
+        CaculateLoss<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            loss_2d.data<T>(),
+            predicted_logits.data<T>(),
+            sum_exp_logits.data<T>(),
+            labels->data<int32_t>(),
+            ignore_index,
+            N);
+      }
+
     } else {
-      CaculateLoss<T, int64_t>
-          <<<blocks, threads, 0, dev_ctx.stream()>>>(loss_2d.data<T>(),
-                                                     predicted_logits.data<T>(),
-                                                     sum_exp_logits.data<T>(),
-                                                     labels->data<int64_t>(),
-                                                     ignore_index,
-                                                     N,
-                                                     C);
+      if (C > 1) {
+        CaculateSoftLoss<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            loss_2d.data<T>(),
+            predicted_logits.data<T>(),
+            sum_exp_logits.data<T>(),
+            labels->data<int64_t>(),
+            ignore_index,
+            N,
+            C);
+      } else {
+        CaculateLoss<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            loss_2d.data<T>(),
+            predicted_logits.data<T>(),
+            sum_exp_logits.data<T>(),
+            labels->data<int64_t>(),
+            ignore_index,
+            N);
+      }
     }
 
     auto eigen_sum_exp_logits =
@@ -478,29 +573,57 @@ struct CSoftmaxWithCrossEntropyProcessGroupFunctor<phi::GPUContext, T> {
     const auto& label_type = framework::TransToProtoVarType(labels->dtype());
 
     if (label_type == framework::proto::VarType::INT32) {
-      MaskLabelByIndex<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
-          predicted_logits.data<T>(),
-          softmax_2d.data<T>(),
-          labels->data<int32_t>(),
-          static_cast<int32_t>(ignore_index),
-          start_index,
-          end_index,
-          N,
-          D,
-          C,
-          nranks);
+      if (C > 1) {
+        SoftMaskLabelByIndex<T, int32_t>
+            <<<blocks, threads, 0, dev_ctx.stream()>>>(
+                predicted_logits.data<T>(),
+                softmax_2d.data<T>(),
+                labels->data<int32_t>(),
+                static_cast<int32_t>(ignore_index),
+                start_index,
+                end_index,
+                N,
+                D,
+                C,
+                nranks);
+      } else {
+        MaskLabelByIndex<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            predicted_logits.data<T>(),
+            softmax_2d.data<T>(),
+            labels->data<int32_t>(),
+            static_cast<int32_t>(ignore_index),
+            start_index,
+            end_index,
+            N,
+            D,
+            nranks);
+      }
     } else if (label_type == framework::proto::VarType::INT64) {
-      MaskLabelByIndex<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
-          predicted_logits.data<T>(),
-          softmax_2d.data<T>(),
-          labels->data<int64_t>(),
-          static_cast<int32_t>(ignore_index),
-          start_index,
-          end_index,
-          N,
-          D,
-          C,
-          nranks);
+      if (C > 1) {
+        SoftMaskLabelByIndex<T, int64_t>
+            <<<blocks, threads, 0, dev_ctx.stream()>>>(
+                predicted_logits.data<T>(),
+                softmax_2d.data<T>(),
+                labels->data<int64_t>(),
+                static_cast<int32_t>(ignore_index),
+                start_index,
+                end_index,
+                N,
+                D,
+                C,
+                nranks);
+      } else {
+        MaskLabelByIndex<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            predicted_logits.data<T>(),
+            softmax_2d.data<T>(),
+            labels->data<int64_t>(),
+            static_cast<int32_t>(ignore_index),
+            start_index,
+            end_index,
+            N,
+            D,
+            nranks);
+      }
     }
 
     opts.reduce_op = distributed::ReduceOp::SUM;
@@ -521,23 +644,44 @@ struct CSoftmaxWithCrossEntropyProcessGroupFunctor<phi::GPUContext, T> {
     pg->AllReduce(&sum_exp_logits, sum_exp_logits, opts, true, true);
 
     if (label_type == framework::proto::VarType::INT32) {
-      CaculateLoss<T, int32_t>
-          <<<blocks, threads, 0, dev_ctx.stream()>>>(loss_2d.data<T>(),
-                                                     predicted_logits.data<T>(),
-                                                     sum_exp_logits.data<T>(),
-                                                     labels->data<int32_t>(),
-                                                     ignore_index,
-                                                     N,
-                                                     C);
+      if (C > 1) {
+        CaculateSoftLoss<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            loss_2d.data<T>(),
+            predicted_logits.data<T>(),
+            sum_exp_logits.data<T>(),
+            labels->data<int32_t>(),
+            ignore_index,
+            N,
+            C);
+      } else {
+        CaculateLoss<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            loss_2d.data<T>(),
+            predicted_logits.data<T>(),
+            sum_exp_logits.data<T>(),
+            labels->data<int32_t>(),
+            ignore_index,
+            N);
+      }
+
     } else {
-      CaculateLoss<T, int64_t>
-          <<<blocks, threads, 0, dev_ctx.stream()>>>(loss_2d.data<T>(),
-                                                     predicted_logits.data<T>(),
-                                                     sum_exp_logits.data<T>(),
-                                                     labels->data<int64_t>(),
-                                                     ignore_index,
-                                                     N,
-                                                     C);
+      if (C > 1) {
+        CaculateSoftLoss<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            loss_2d.data<T>(),
+            predicted_logits.data<T>(),
+            sum_exp_logits.data<T>(),
+            labels->data<int64_t>(),
+            ignore_index,
+            N,
+            C);
+      } else {
+        CaculateLoss<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+            loss_2d.data<T>(),
+            predicted_logits.data<T>(),
+            sum_exp_logits.data<T>(),
+            labels->data<int64_t>(),
+            ignore_index,
+            N);
+      }
     }
 
     auto eigen_sum_exp_logits =

@@ -26,27 +26,15 @@ namespace ir {
 using cinn::ir::analyzer::IsReductionSBlock;
 
 bool UseContinuousDataTile(const ScheduleConfig& config) {
-  if (config.base_info->reduce_axis.empty()) {
+  // use continuous data tile for [S] and [...R]
+  if (config.base_info->iter_space_type.size() == 1 &&
+      config.base_info->iter_space_type.back().first == "S") {
     return true;
   }
-  int64_t min_stride = INT_MAX;
-  int64_t min_reduce_stride = INT_MAX;
-  int64_t last_axis = 0;
-  int64_t last_reduce_axis = 0;
-  for (size_t i = 0; i < config.base_info->loop_strides.size(); i++) {
-    if (config.base_info->loop_strides[i] < min_stride &&
-        config.base_info->loop_strides[i] != 0) {
-      min_stride = config.base_info->loop_strides[i];
-      last_axis = i;
-    }
+  if (config.base_info->iter_space_type.back().first == "R") {
+    return true;
   }
-  for (int64_t axis : config.base_info->reduce_axis) {
-    if (config.base_info->loop_strides[axis] < min_reduce_stride) {
-      min_reduce_stride = config.base_info->loop_strides[axis];
-      last_reduce_axis = axis;
-    }
-  }
-  return last_axis == last_reduce_axis;
+  return false;
 }
 
 class TileFirstGeneralTactic final : public ScheduleTactic {

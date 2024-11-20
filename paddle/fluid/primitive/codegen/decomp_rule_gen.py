@@ -27,7 +27,7 @@ sys.path.append(
 )
 import filters as op_gen_filters
 import tests_utils as op_gen_tests
-from gen import extend_compat_info, filter_compat_info
+from decomp_vjp_gen import extend_compat_info, filter_compat_info
 from parse_utils import to_named_dict
 from type_mapping import output_type_map
 

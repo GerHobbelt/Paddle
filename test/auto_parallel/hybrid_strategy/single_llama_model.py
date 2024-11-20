@@ -52,7 +52,6 @@ class LlamaAttention(nn.Layer):
         )
 
     def forward(self, hidden_states):
-        bsz, q_len, _ = hidden_states.shape
         query_states = self.q_proj(hidden_states).reshape(
             shape=[0, 0, self.num_heads, self.head_dim]
         )
@@ -62,6 +61,8 @@ class LlamaAttention(nn.Layer):
         value_states = self.v_proj(hidden_states).reshape(
             shape=[0, 0, self.num_heads, self.head_dim]
         )
+
+        bsz, q_len, _, _ = query_states.shape
 
         outputs, _ = _math_attention(
             query_states,

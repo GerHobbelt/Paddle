@@ -3430,6 +3430,15 @@ void PSendArrayInferMeta(const MetaTensor& x, int peer) {
           "The peer (%d) for p_send op must be non-negative.", peer));
 }
 
+void SetInferMeta(const MetaTensor& x,
+                  const std::vector<int64_t>& shape,
+                  const std::vector<int64_t>& stride,
+                  MetaTensor* out) {
+  out->set_dtype(x.dtype());
+  out->set_dims(common::make_ddim(shape));
+  out->set_strides(common::make_ddim(stride));
+}
+
 void SendV2InferMeta(const int peer, const int ring_id) {
   PADDLE_ENFORCE_GE(
       peer,
@@ -5343,8 +5352,7 @@ void UnchangedArrayInferMeta(const MetaTensor& x, MetaTensor* out) {
 void UnchangedVectorInferMeta(const std::vector<const MetaTensor*>& xs,
                               std::vector<MetaTensor*> outs) {
   for (size_t i = 0; i < xs.size(); ++i) {
-    outs[i]->set_dtype(xs[i]->dtype());
-    outs[i]->set_layout(xs[i]->layout());
+    outs[i]->share_meta(*xs[i]);
   }
 }
 

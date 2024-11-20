@@ -18,7 +18,7 @@ limitations under the License. */
 #include "paddle/fluid/pir/dialect/operator/ir/ir_sparse_tensor.h"
 #include "paddle/fluid/pir/dialect/operator/ir/ir_tensor.h"
 #include "paddle/fluid/prim/utils/static/desc_tensor.h"
-#include "paddle/fluid/primitive/type/lazy_tensor.h"
+#include "paddle/fluid/primitive/base/lazy_tensor.h"
 #include "paddle/phi/core/raw_tensor.h"
 #include "paddle/phi/core/vocab/string_array.h"
 

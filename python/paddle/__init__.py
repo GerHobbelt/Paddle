@@ -75,6 +75,8 @@ from .framework.dtype import (
     int16,
     int32,
     int64,
+    pstring,
+    raw,
     uint8,
 )
 
@@ -768,6 +770,8 @@ __all__ = [
     'bool',
     'complex64',
     'complex128',
+    'pstring',
+    'raw',
     'addmm',
     'addmm_',
     'allclose',

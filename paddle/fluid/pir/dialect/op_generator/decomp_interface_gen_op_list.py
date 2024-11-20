@@ -71,7 +71,7 @@ decomp_interface_declare_gen_op_list = [
     "unstack",
 ]
 
-# come into effect in generated file op_decomp.cc
+# come into effect in generated file op_decomp_rule.cc
 # manual decomp interface implementation are located in manual_op_decomp.cc
 decomp_interface_implementation_gen_op_list = [
     "any",

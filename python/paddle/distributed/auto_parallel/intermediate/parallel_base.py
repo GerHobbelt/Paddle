@@ -81,6 +81,12 @@ class ParallelModel:
 
         self.is_parallelized = False
 
+    def get_mesh(self, pp_idx=0):
+        mesh = fleet.auto.get_mesh()
+        if "pp" in mesh.dim_names:
+            mesh = mesh.get_mesh_with_dim("pp", pp_idx)
+        return mesh
+
     def parallelize_model(self):
         assert self.model is not None
         if self.is_parallelized:

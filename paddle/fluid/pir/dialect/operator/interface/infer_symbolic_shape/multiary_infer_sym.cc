@@ -2344,7 +2344,35 @@ bool GroupNormOpInferSymbolicShape(
   const symbol::ShapeOrDataDimExprs &x_shape =
       infer_context->GetShapeOrDataForValue(op->operand_source(0));
 
+  const auto &scale_shape_or_data =
+      infer_context->GetShapeOrDataForValue(op->operand_source(1));
+  const auto &bias_shape_or_data =
+      infer_context->GetShapeOrDataForValue(op->operand_source(2));
+
   infer_context->SetShapeOrDataForValue(op->result(0), x_shape);
+
+  int64_t channel_idx;
+  std::string data_format =
+      op->attribute<pir::StrAttribute>("data_format").AsString();
+  if (data_format == "NHWC") {
+    channel_idx = x_shape.shape().size() - 1;
+  } else if (data_format == "NCHW") {
+    channel_idx = 1;
+  } else {
+    PADDLE_THROW(common::errors::Unimplemented(
+        "GroupNorm only suport NHWC and NCHW data formt"));
+  }
+
+  symbol::DimExpr channel_dim = x_shape.shape()[channel_idx];
+
+  if (!scale_shape_or_data.isa<symbol::NullShapeOrDataDimExpr>()) {
+    std::vector<symbol::DimExpr> scale_dims = scale_shape_or_data.shape();
+    infer_context->AddEqualCstr(scale_dims[0], channel_dim);
+  }
+  if (!bias_shape_or_data.isa<symbol::NullShapeOrDataDimExpr>()) {
+    std::vector<symbol::DimExpr> bias_dims = bias_shape_or_data.shape();
+    infer_context->AddEqualCstr(bias_dims[0], channel_dim);
+  }
 
   const symbol::DimExpr &batch_size = x_shape.shape()[0];
   int groups = op->attribute<pir::Int32Attribute>("groups").data();

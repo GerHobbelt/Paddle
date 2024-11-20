@@ -93,9 +93,6 @@ std::vector<Expr> GetLoops(const std::vector<Expr>& exprs, const Expr& block) {
     }
   }
 
-  if (result.empty()) {
-    result.push_back(AddUnitLoop(exprs, block));
-  }
   return result;
 }
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2021 CINN Authors. All Rights Reserved.
+// Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,4 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "paddle/cinn/backends/_generated1.cu"
+#pragma once
+
+#include "paddle/fluid/primitive/vjp_interface/generated/generated_vjp.h"
+#include "paddle/fluid/primitive/vjp_interface/manual/manual_vjp.h"

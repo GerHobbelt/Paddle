@@ -25,7 +25,7 @@ paddle::onednn::dialect::ExpandOp
 #include "paddle/fluid/pir/dialect/operator/ir/op_attribute.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_type.h"
 #include "paddle/fluid/pir/dialect/operator/ir/pd_op.h"
-#include "paddle/fluid/primitive/rule/vjp/vjp.h"
+#include "paddle/fluid/primitive/vjp_interface/vjp.h"
 #include "paddle/phi/api/lib/data_type_set.h"
 #include "paddle/phi/api/lib/utils/allocator.h"
 #include "paddle/phi/core/dense_tensor.h"

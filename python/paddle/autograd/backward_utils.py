@@ -53,6 +53,7 @@ ALLOW_DYNAMIC_SHAPE_VJP_OPS = [
     "pd_op.gelu",
     "pd_op.hardswish",
     "pd_op.kthvalue",
+    "pd_op.layer_norm",
     "pd_op.leaky_relu",
     "pd_op.log",
     "pd_op.logcumsumexp",

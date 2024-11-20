@@ -1234,8 +1234,7 @@ struct FindLoopsVisitor {
       Visit(&(expr->As<ir::For>()->body));
       father_loops.pop_back();
     } else if (expr->As<ir::ScheduleBlockRealize>()) {
-      if (!expr->As<ir::ScheduleBlockRealize>()->iter_values.empty() &&
-          (*expr == block_)) {
+      if (*expr == block_) {
         result = father_loops;
         visit_end = true;
         return;

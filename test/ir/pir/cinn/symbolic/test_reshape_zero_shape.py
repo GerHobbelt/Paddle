@@ -46,6 +46,7 @@ class ReshapeZeroShapeNet(nn.Layer):
     def forward(self, x):
         # "O" represents COPY semantics.
         out = paddle.reshape(x, shape=[0, 0, 32, 128])
+        out = paddle.sin(out)
         return out
 
 
@@ -60,7 +61,7 @@ class TestReshapeZeroShape(unittest.TestCase):
         self.x.stop_gradient = False
 
     def check_jit_kernel_info(self, static_fn):
-        utils.check_jit_kernel_number(static_fn, 0)
+        utils.check_jit_kernel_number(static_fn, 1)
 
     def eval(self, use_cinn):
         net = ReshapeZeroShapeNet()

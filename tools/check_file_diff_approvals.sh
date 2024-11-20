@@ -186,10 +186,10 @@ if [ "${HAS_MODIFIED_API_FW_BW_YAML}" != "" ] && [ "${GIT_PR_ID}" != "" ]; then
     check_approval 1 zyfncg heavyrain-lzy gongshaotian Hongqing-work
 fi
 
-HAS_MODIFIED_PRIMITIVE_YAML=`git diff --name-only upstream/$BRANCH | grep "paddle/fluid/primitive/primitive.yaml" || true`
+HAS_MODIFIED_PRIMITIVE_YAML=`git diff --name-only upstream/$BRANCH | grep "paddle/fluid/primitive/primitive/primitive.yaml" || true`
 if [ "${HAS_MODIFIED_PRIMITIVE_YAML}" != "" ] && [ "${GIT_PR_ID}" != "" ]; then
-    echo_line="You must be approved by jeff41404(gaoxiang) or cyber-pioneer(chenzhuo) for paddle/fluid/primitive/primitive.yaml changes.\n"
-    check_approval 1 jeff41404 cyber-pioneer
+    echo_line="You must be approved by jeff41404(gaoxiang) or xiaoguoguo626807(wangruting) or cubehan3(hanqiukun) for paddle/fluid/primitive/primitive/primitive.yaml changes.\n"
+    check_approval 1 jeff41404 xiaoguoguo626807 cubehan3
 fi
 
 HAS_MODIFIED_FRAMEWORK_EXECUTOR=`git diff --name-only upstream/$BRANCH | grep "paddle/fluid/framework/new_executor" || true`

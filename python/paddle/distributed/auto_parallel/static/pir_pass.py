@@ -18,9 +18,10 @@ import re
 from dataclasses import dataclass
 
 import paddle
+import paddle.distributed as dist
 from paddle import pir
 from paddle.autograd.backward_utils import ValueDict
-from paddle.base.framework import pir_op_role_guard
+from paddle.base.framework import EagerParamBase, pir_op_role_guard
 from paddle.base.log_helper import get_logger
 from paddle.distributed.fleet.meta_optimizers.common import OpRole
 from paddle.distributed.passes.pass_base import PassContext, new_pass
@@ -569,16 +570,18 @@ def replace_moe_global_mesh_tensor(op):
 
 # Note: this is the pass in the dense program
 comm_ops = [
-    "pd_op.c_allreduce_sum",
     "pd_op.all_gather",
-    "pd_op.c_allreduce_max",
     "pd_op.reduce_scatter",
 ]
 
 
 def remove_unuseful_comm_op_pass(program):
     for op in program.global_block().ops:
-        if op.name() in comm_ops:
+        if op.name() in comm_ops or (
+            op.name() == "pd_op.all_reduce"
+            and op.int_attr("reduce_type")
+            in [dist.ReduceOp.SUM, dist.ReduceOp.MAX]
+        ):
             ring_id = op.int_attr("ring_id")
             process_group = get_process_group(ring_id)
             if process_group.nranks == 1:
@@ -1189,6 +1192,8 @@ def fuse_attention_ffn_qkv_pass(
                     i = i + 12
                     continue
 
+    name2pir_param_map = {}
+
     # 2. Replace all ffn and qkv patterns with fusion patterns, and record the weights after replacement.
     for pat in fused_pattern_map['ffn']:
         if len(pat) == 5:
@@ -1229,6 +1234,7 @@ def fuse_attention_ffn_qkv_pass(
                 ],
                 initializer=paddle.nn.initializer.Constant(value=0),
             )
+            name2pir_param_map[fusion_w_name] = fused_w
         if add_gate is not None and add_up is not None:
             fusion_bias_name = f"fused_{add_gate.operand_source(1).name}_{add_up.operand_source(1).name}"
             fusion_map["ffn"].append(
@@ -1261,6 +1267,7 @@ def fuse_attention_ffn_qkv_pass(
                     ],
                     initializer=paddle.nn.initializer.Constant(value=0),
                 )
+                name2pir_param_map[fusion_bias_name] = fused_bias
 
         # Insert dst pattern
         paddle.pir.set_insertion_point_after(pat[-1])
@@ -1349,6 +1356,7 @@ def fuse_attention_ffn_qkv_pass(
                 ],
                 initializer=paddle.nn.initializer.Constant(value=0),
             )
+            name2pir_param_map[fusion_w_name] = fused_w
         if add_q is not None and add_k is not None and add_v is not None:
             fusion_bias_name = f"fused_{add_q.operand_source(1).name}_{add_k.operand_source(1).name}_{add_v.operand_source(1).name}"
             fusion_map["qkv"].append(
@@ -1395,6 +1403,7 @@ def fuse_attention_ffn_qkv_pass(
                     ],
                     initializer=paddle.nn.initializer.Constant(value=0),
                 )
+                name2pir_param_map[fusion_bias_name] = fused_bias
         # insert dst pattern
         paddle.pir.set_insertion_point_after(pat[-1])
         fused_o = paddle.matmul(
@@ -1424,6 +1433,12 @@ def fuse_attention_ffn_qkv_pass(
             ],
         )
         out.get_defining_op().copy_attrs_from(reshape_q)
+        reshape_op = out.get_defining_op()
+        if reshape_op.has_attr("struct_name"):
+            full_int_array_op = reshape_op.operand_source(1).get_defining_op()
+            full_int_array_op.set_str_attr(
+                "struct_name", reshape_op.attrs()["struct_name"]
+            )
         out_q, out_k, out_v = paddle.split(
             out,
             num_or_sections=[
@@ -1439,6 +1454,23 @@ def fuse_attention_ffn_qkv_pass(
             ],
             axis=-1,
         )
+        if reshape_op.has_attr("struct_name"):
+            builtin_split_op = out_q.get_defining_op()
+            split_op = builtin_split_op.operand_source(0).get_defining_op()
+            builtin_split_op.set_str_attr(
+                "struct_name", reshape_op.attrs()["struct_name"]
+            )
+            split_op.set_str_attr(
+                "struct_name", reshape_op.attrs()["struct_name"]
+            )
+            full_int_array_op = split_op.operand_source(1).get_defining_op()
+            full_int_array_op.set_str_attr(
+                "struct_name", reshape_op.attrs()["struct_name"]
+            )
+            full_op = split_op.operand_source(2).get_defining_op()
+            full_op.set_str_attr(
+                "struct_name", reshape_op.attrs()["struct_name"]
+            )
         if reshape_q.result(0).shape[-2] != reshape_k.result(0).shape[-2]:
             out_q = paddle.reshape(
                 out_q,
@@ -1449,6 +1481,17 @@ def fuse_attention_ffn_qkv_pass(
                     reshape_q.result(0).shape[-1],
                 ],
             )
+            if builtin_split_op.has_attr("struct_name"):
+                reshape_op = out_q.get_defining_op()
+                reshape_op.set_str_attr(
+                    "struct_name", builtin_split_op.attrs()["struct_name"]
+                )
+                full_int_array_op = reshape_op.operand_source(
+                    1
+                ).get_defining_op()
+                full_int_array_op.set_str_attr(
+                    "struct_name", builtin_split_op.attrs()["struct_name"]
+                )
 
         reshape_q.result(0).replace_all_uses_with(out_q)
         reshape_k.result(0).replace_all_uses_with(out_k)
@@ -1505,9 +1548,28 @@ def fuse_attention_ffn_qkv_pass(
                         dy_param_init = False
                         break
 
-                if dy_param_init:
-                    # Fuse params and init pir program fusion params.
-                    with paddle.base.dygraph.guard():
+                # Fuse params and init pir program fusion params.
+                with paddle.base.dygraph.guard():
+
+                    dyparam_dtype = concated_dy_param_list[0].dtype
+                    for param in concated_dy_param_list:
+                        assert (
+                            dyparam_dtype == param.dtype
+                        ), "The dtypes of dy parameters to be fused are not the same."
+
+                    dtensor = paddle.zeros(
+                        shape=name2pir_param_map[pir_param].shape,
+                        dtype=dyparam_dtype,
+                    )
+                    fused_dy_param = EagerParamBase.from_tensor(dtensor)
+                    fused_dy_param = dist.shard_tensor(
+                        fused_dy_param,
+                        concated_dy_param_list[0].process_mesh,
+                        concated_dy_param_list[0].placements,
+                    )
+                    fused_dy_param.name = pir_param
+
+                    if dy_param_init:
                         if len(dy_param_list) == 3:
                             is_qkv = True
                             num_heads = dy_param_list[0].local_num_head
@@ -1527,16 +1589,20 @@ def fuse_attention_ffn_qkv_pass(
                             num_heads=num_heads,
                             num_key_value_heads=num_key_value_heads,
                         )
+                        paddle.assign(
+                            concated_param, fused_dy_param._local_value()
+                        )
+                        concated_param._clear()
 
-                    pir_scope_param = (
-                        paddle.static.global_scope().var(pir_param).get_tensor()
-                    )
-                    pir_scope_param._share_data_with(
-                        concated_param.get_tensor()
-                    )
                     # Pop and relase original params from concrete_program
                     for param in concated_dy_param_list:
                         param.get_tensor()._clear()
+
+                concrete_program.parameters[0].append(fused_dy_param)
+                concrete_program.parameters[1].append(
+                    name2pir_param_map[pir_param]
+                )
+
     concated_dy_param_index.sort(reverse=True)
     for index in concated_dy_param_index:
         concrete_program.parameters[0].pop(index)

@@ -492,11 +492,11 @@ void FusedMultiTransformerOpKernel(
     }
   }
 
-  int timestep = src_mask->dims()[3] - 1;
+  int time_step_value = out_seq_len - 1;
   int multi_block_attention_min_partition_size =
       static_cast<int>(FLAGS_multi_block_attention_min_partition_size);
   int max_num_partitions =
-      (timestep + multi_block_attention_min_partition_size - 1) /
+      (time_step_value + multi_block_attention_min_partition_size - 1) /
       multi_block_attention_min_partition_size;
 
   phi::DenseTensor partial_max_logits_tensor;
@@ -578,7 +578,7 @@ void FusedMultiTransformerOpKernel(
                                max_seq_len,
                                num_head,
                                dim_head,
-                               src_mask->dims()[3] - 1,
+                               time_step_value,
                                rotary_emb_dims,
                                1. / sqrt(dim_head),
                                mask_broadcast_num_heads,
@@ -606,7 +606,7 @@ void FusedMultiTransformerOpKernel(
                              max_seq_len,
                              num_head,
                              dim_head,
-                             src_mask->dims()[3] - 1,
+                             time_step_value,
                              rotary_emb_dims,
                              1. / sqrt(dim_head),
                              mask_broadcast_num_heads,

@@ -926,10 +926,13 @@ class TestFusedMultiTransformerOp(OpTest):
             )
             pre_caches = []
 
-        attn_mask = paddle.static.data(
-            'src_mask', self.attn_mask.shape, self.attn_mask.dtype
-        )
-        attn_mask_feed = self.attn_mask
+        attn_mask = None
+        attn_mask_feed = None
+        if self.has_attn_mask:
+            attn_mask = paddle.static.data(
+                'src_mask', self.attn_mask.shape, self.attn_mask.dtype
+            )
+            attn_mask_feed = self.attn_mask
         epsilon = 1e-05
         ln2_epsilon = 1e-05
 
@@ -1880,7 +1883,7 @@ class TestFusedMultiTransformerOpVariableGQADecoder3(
 class TestFusedMultiTransformerOpPreCacheStatic1(TestFusedMultiTransformerOp):
     def config(self):
         super().config()
-        self.has_attn_mask = True
+        self.has_attn_mask = False
         self.x_type = np.float16
         self.weight_attr = paddle.ParamAttr(
             initializer=paddle.nn.initializer.Constant(0.0)

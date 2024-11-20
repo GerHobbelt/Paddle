@@ -195,6 +195,18 @@
     param: [x, nranks]
   traits : paddle::dialect::ForwardOnlyTrait
 
+- op : all_reduce
+  args : (Tensor x, int ring_id = 0, int reduce_type = 0)
+  output : Tensor(out)
+  infer_meta :
+    func : AllReduceInferMeta
+    param: [x]
+  kernel :
+    func : all_reduce
+    param: [x, reduce_type]
+  inplace : (x -> out)
+  traits : paddle::dialect::ForwardOnlyTrait
+
 - op : all_to_all
   args : (Tensor x, int ring_id = 0)
   output : Tensor(out)
@@ -2084,6 +2096,7 @@
   kernel :
     func : frame
   backward : frame_grad
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : frobenius_norm
   args : (Tensor x, IntArray axis,  bool keep_dim,  bool reduce_all)
@@ -3856,6 +3869,7 @@
   kernel :
     func : prune_gate_by_capacity
     data_type : gate_idx
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
   traits : paddle::dialect::ForwardOnlyTrait
 
 - op : psroi_pool
@@ -4110,7 +4124,7 @@
     func : repeat_interleave_with_tensor_index
     data_type : x
   backward: repeat_interleave_with_tensor_index_grad
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : reshape
   args : (Tensor x, IntArray shape)
@@ -4407,6 +4421,16 @@
   backward: sequence_pool_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
 
+- op : set
+  args : (Tensor x, Tensor source, int64_t[] dims = {}, int64_t[] stride = {}, int64_t offset = 0)
+  output : Tensor (out)
+  infer_meta :
+    func : SetInferMeta
+    param : [x, dims, stride]
+  kernel :
+    func : set
+  inplace : (x -> out)
+
 - op : set_value_with_tensor
   args : (Tensor x, Tensor values, IntArray starts, IntArray ends, IntArray steps, int64_t[] axes, int64_t[] decrease_axes, int64_t[] none_axes)
   output : Tensor(out)
@@ -4624,7 +4648,7 @@
     func : solve
     data_type : x
   backward : solve_grad
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : sparse_attention
   args: (Tensor q, Tensor k, Tensor v, Tensor offset, Tensor columns, Tensor key_padding_mask,
