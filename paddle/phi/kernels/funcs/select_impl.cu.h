@@ -268,7 +268,7 @@ __device__ void SelectKernelImpl(OutT *out,
   using IdT = int64_t;
   // Set index data type
   using Add = kps::AddFunctor<IdT>;  // for cumsum
-  using Cast = NonZeroFunctor<InT>;  // for mask
+  using Cast = NonZeroFunctor<MT>;   // for mask
 
   IdT init_idx = static_cast<IdT>(0.0f);
   MT init_mask = static_cast<MT>(0.0f);
@@ -389,8 +389,8 @@ void SelectKernel(const KPDevice &dev_ctx,
   using CT = int64_t;  // set Count_data Type
   const int t_size = sizeof(CT);
 
-  const paddle::platform::CUDAPlace &cuda_place = dev_ctx.GetPlace();
-  paddle::platform::CPUPlace cpu_place = paddle::platform::CPUPlace();
+  const phi::GPUPlace &cuda_place = dev_ctx.GetPlace();
+  phi::CPUPlace cpu_place = phi::CPUPlace();
 
   // 1.1 get stored data num of per block
   const int kVecSize = 4;

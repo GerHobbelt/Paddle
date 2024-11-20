@@ -15,6 +15,8 @@ limitations under the License. */
 #include <set>
 #include <vector>
 
+#include "glog/logging.h"
+
 #include "paddle/phi/backends/gpu/gpu_primitives.h"
 #include "paddle/phi/common/bfloat16.h"
 #include "paddle/phi/common/float16.h"
@@ -76,17 +78,17 @@ struct SelectedRowsAdd<phi::GPUContext, T> {
     auto* in1_data = in1_value.data<T>();
 
     auto in1_place = input1.place();
-    PADDLE_ENFORCE_EQ(paddle::platform::is_gpu_place(in1_place),
+    PADDLE_ENFORCE_EQ(in1_place.GetType() == phi::AllocationType::GPU,
                       true,
                       phi::errors::InvalidArgument(
                           "The running environment is not on the GPU place."));
     auto in2_place = input2.place();
-    PADDLE_ENFORCE_EQ(paddle::platform::is_gpu_place(in2_place),
+    PADDLE_ENFORCE_EQ(in2_place.GetType() == phi::AllocationType::GPU,
                       true,
                       phi::errors::InvalidArgument(
                           "The running environment is not on the GPU place."));
     auto out_place = context.GetPlace();
-    PADDLE_ENFORCE_EQ(paddle::platform::is_gpu_place(out_place),
+    PADDLE_ENFORCE_EQ(out_place.GetType() == phi::AllocationType::GPU,
                       true,
                       phi::errors::InvalidArgument(
                           "The running environment is not on the GPU place."));
@@ -237,12 +239,12 @@ struct SelectedRowsAddTo<phi::GPUContext, T> {
     }
 
     auto in1_place = input1.place();
-    PADDLE_ENFORCE_EQ(paddle::platform::is_gpu_place(in1_place),
+    PADDLE_ENFORCE_EQ(in1_place.GetType() == phi::AllocationType::GPU,
                       true,
                       phi::errors::InvalidArgument(
                           "The running environment is not on the GPU place."));
     auto in2_place = input2->place();
-    PADDLE_ENFORCE_EQ(paddle::platform::is_gpu_place(in1_place),
+    PADDLE_ENFORCE_EQ(in1_place.GetType() == phi::AllocationType::GPU,
                       true,
                       phi::errors::InvalidArgument(
                           "The running environment is not on the GPU place."));

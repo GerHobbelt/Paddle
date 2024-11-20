@@ -60,13 +60,13 @@ class ElementwiseSubCompositeGradOpMaker
 
  public:
   void Apply() override {
-    paddle::experimental::Tensor x = this->GetSingleForwardInput("X");
-    paddle::experimental::Tensor y = this->GetSingleForwardInput("Y");
-    paddle::experimental::Tensor out_grad = this->GetSingleOutputGrad("Out");
-    paddle::experimental::Tensor dx = this->GetSingleInputGrad("X");
+    paddle::Tensor x = this->GetSingleForwardInput("X");
+    paddle::Tensor y = this->GetSingleForwardInput("Y");
+    paddle::Tensor out_grad = this->GetSingleOutputGrad("Out");
+    paddle::Tensor dx = this->GetSingleInputGrad("X");
     auto dx_ptr = this->GetOutputPtr(&dx);
     std::string dx_name = this->GetOutputName(dx);
-    paddle::experimental::Tensor dy = this->GetSingleInputGrad("Y");
+    paddle::Tensor dy = this->GetSingleInputGrad("Y");
     auto dy_ptr = this->GetOutputPtr(&dy);
     std::string dy_name = this->GetOutputName(dy);
     int axis = static_cast<int>(this->Attr<int>("axis"));
@@ -102,6 +102,42 @@ class ElementwiseSubDoubleGradMaker : public framework::SingleGradOpMaker<T> {
   }
 };
 
+class ElementwiseSubCompositeDoubleGradOpMaker
+    : public prim::CompositeGradOpMakerBase {
+  using prim::CompositeGradOpMakerBase::CompositeGradOpMakerBase;
+
+ public:
+  void Apply() override {
+    // get input
+    paddle::Tensor y = this->GetSingleForwardInput("Y");
+    paddle::Tensor out_grad = this->GetSingleOutputGrad("Out");
+    paddle::optional<paddle::Tensor> ddx =
+        this->GetOptionalSingleOutputGrad(framework::GradVarName("X"));
+    paddle::optional<paddle::Tensor> ddy =
+        this->GetOptionalSingleOutputGrad(framework::GradVarName("Y"));
+    // get output
+    paddle::Tensor grad_out_grad_t =
+        this->GetSingleInputGrad(framework::GradVarName("Out"));
+
+    // get attr
+    int axis = static_cast<int>(this->Attr<int>("axis"));
+    PADDLE_ENFORCE_EQ(
+        axis,
+        -1,
+        phi::errors::InvalidArgument("We only support axis = -1 in composite "
+                                     "subtract_doubel_grad but we got: ",
+                                     axis));
+
+    paddle::Tensor* grad_out_grad = this->GetOutputPtr(&grad_out_grad_t);
+    std::string grad_out_grad_name = this->GetOutputName(grad_out_grad_t);
+
+    VLOG(6) << "Runing subtract_double_grad composite func";
+    prim::subtract_double_grad<prim::DescTensor>(
+        y, out_grad, ddx, ddy, axis, grad_out_grad);
+    this->RecoverOutputName(grad_out_grad_t, grad_out_grad_name);
+  }
+};
+
 }  // namespace operators
 }  // namespace paddle
 
@@ -124,7 +160,9 @@ REGISTER_OPERATOR(
     ops::ElementwiseGradOpInplaceInferer,
     ops::ElementwiseGradNoBufVarsInferer,
     ops::ElementwiseSubDoubleGradMaker<paddle::framework::OpDesc>,
-    ops::ElementwiseSubDoubleGradMaker<paddle::imperative::OpBase>);
+    ops::ElementwiseSubDoubleGradMaker<paddle::imperative::OpBase>,
+    ops::ElementwiseSubCompositeDoubleGradOpMaker);
+
 REGISTER_OPERATOR(elementwise_sub_grad_grad,
                   ops::ElementwiseOpDoubleGradWithoutDXDY,
                   ops::ElementwiseDoubleGradOpInplaceInferer,

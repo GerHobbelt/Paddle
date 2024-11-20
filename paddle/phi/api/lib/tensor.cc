@@ -36,7 +36,9 @@ limitations under the License. */
 #include "paddle/phi/core/tensor_utils.h"
 
 namespace paddle {
-namespace experimental {
+
+using DeviceContextPool = experimental::DeviceContextPool;
+using DefaultAllocator = experimental::DefaultAllocator;
 
 /////// Tensor Methods ////////
 
@@ -95,7 +97,7 @@ int64_t Tensor::size() const { return impl_->numel(); }
 const phi::DDim &Tensor::dims() const { return impl_->dims(); }
 
 std::vector<int64_t> Tensor::shape() const {
-  auto dims = impl_->dims();
+  const auto &dims = impl_->dims();
   return phi::vectorize<int64_t>(dims);
 }
 
@@ -439,5 +441,4 @@ void Tensor::reset_inplace_version(bool set_to_zero) {
   }
 }
 
-}  // namespace experimental
 }  // namespace paddle

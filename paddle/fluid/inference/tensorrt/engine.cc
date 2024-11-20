@@ -25,6 +25,7 @@ limitations under the License. */
 #include "paddle/fluid/platform/device/gpu/gpu_info.h"
 #include "paddle/fluid/platform/enforce.h"
 #include "paddle/phi/common/data_type.h"
+#include "paddle/phi/core/enforce.h"
 
 namespace paddle {
 namespace inference {
@@ -129,12 +130,60 @@ void TensorRTEngine::Execute(int batch_size,
                 phi::Stream(reinterpret_cast<phi::StreamId>(stream)));
     infer_context->setDeviceMemory(context_memory);
   }
+
+  // TODO(wilber): Is cudaGraph has conflict with memory sharing?
+  if (startup_with_cudagraph_ && !cudagraph_inited_) {
+    // Avoid capturing initialization calls by executing the enqueue function at
+    // least once before starting CUDA graph capture.
+    const auto ret = Enqueue(infer_context, buffers, batch_size, stream);
+    PADDLE_ENFORCE_EQ(
+        ret,
+        true,
+        phi::errors::PreconditionNotMet("Trt CudaGraph test run failed."));
+    cudaStreamSynchronize(stream);
+
+    cuda_graph_.BeginCapture(stream);
+    // The built TRT engine may contain operations that are not permitted under
+    // CUDA graph capture mode. When the stream is capturing, the call may
+    // return false if the current CUDA graph capture fails.
+    if (Enqueue(infer_context, buffers, batch_size, stream)) {
+      cuda_graph_.EndCapture(stream);
+      cudagraph_inited_ = true;
+    } else {
+      cuda_graph_.EndCaptureOnError(stream);
+      // Ensure any CUDA error has been cleaned up.
+      PADDLE_ENFORCE_GPU_SUCCESS(cudaGetLastError());
+      LOG(WARNING) << "The built TensorRT engine contains operations that are "
+                      "not permitted under "
+                      "CUDA graph capture mode. The specified UseCudaGraph "
+                      "flag has been ignored. The inference will be "
+                      "launched without using CUDA graph launch.";
+      cudagraph_inited_ = false;
+    }
+    startup_with_cudagraph_ = false;
+  }
+
+  Enqueue(infer_context, buffers, batch_size, stream);
+}
+
+bool TensorRTEngine::Enqueue(nvinfer1::IExecutionContext *context,
+                             std::vector<void *> *buffers,
+                             int batch_size,
+                             cudaStream_t stream) {
+  if (cudagraph_inited_) {
+    VLOG(1) << "cuda_graph init success, so we will use cuda graph launch the "
+               "entire graph.";
+    return cuda_graph_.Launch(stream);
+  }
+
+  bool ret;
   if (!with_dynamic_shape()) {
-    infer_context->enqueue(batch_size, buffers->data(), stream, nullptr);
+    ret = context->enqueue(batch_size, buffers->data(), stream, nullptr);
   } else {
-    infer_context->enqueueV2(buffers->data(), stream, nullptr);
+    ret = context->enqueueV2(buffers->data(), stream, nullptr);
   }
   SetRuntimeBatch(batch_size);
+  return ret;
 }
 
 void TensorRTEngine::FreezeNetwork() {
@@ -157,6 +206,13 @@ void TensorRTEngine::FreezeNetwork() {
 #else
   infer_builder_config_->setMaxWorkspaceSize(max_workspace_);
 #endif
+
+#if IS_TRT_VERSION_GE(8500)
+  infer_builder_config_->setPreviewFeature(
+      nvinfer1::PreviewFeature::kFASTER_DYNAMIC_SHAPES_0805, true);
+#else
+#endif
+
   bool enable_fp16 = (precision_ == AnalysisConfig::Precision::kHalf);
   if (enable_fp16) {
     bool support_fp16 = infer_builder_->platformHasFastFp16();
@@ -236,8 +292,8 @@ void TensorRTEngine::FreezeNetwork() {
     LOG(INFO) << "Run Paddle-TRT Dynamic Shape mode.";
     for (int i = 0; i < max_profile_num_; i++) {
       for (auto &input : min_input_shape_) {
-#if IS_TRT_VERSION_LT(7000)
-        // trt6 will check all_of input > 0
+#if IS_TRT_VERSION_LT(7100)
+        // trt6/trt7011 will check all_of input > 0
         if (!(std::all_of(input.second.begin(),
                           input.second.end(),
                           [](int x) { return x > 0; }) &&
@@ -588,8 +644,7 @@ TensorRTEngine::Weight TensorRTEngine::GetFp16TrtWeight(
     bf16_tensor.clear();
     paddle::framework::TensorCopySync(
         weight_tensor, platform::CPUPlace(), &bf16_tensor);
-    weight_map[name_with_suffix]->set_type(
-        paddle::experimental::DataType::FLOAT16);
+    weight_map[name_with_suffix]->set_type(phi::DataType::FLOAT16);
     auto *fp16_data = weight_map[name_with_suffix]->mutable_data<float16>(
         platform::CPUPlace());
     auto *bf16_data = bf16_tensor.mutable_data<bfloat16>(platform::CPUPlace());
@@ -603,8 +658,7 @@ TensorRTEngine::Weight TensorRTEngine::GetFp16TrtWeight(
     fp32_tensor.clear();
     paddle::framework::TensorCopySync(
         weight_tensor, platform::CPUPlace(), &fp32_tensor);
-    weight_map[name_with_suffix]->set_type(
-        paddle::experimental::DataType::FLOAT16);
+    weight_map[name_with_suffix]->set_type(phi::DataType::FLOAT16);
     auto *fp16_data = weight_map[name_with_suffix]->mutable_data<float16>(
         platform::CPUPlace());
     auto *fp32_data = fp32_tensor.mutable_data<float>(platform::CPUPlace());
@@ -618,8 +672,7 @@ TensorRTEngine::Weight TensorRTEngine::GetFp16TrtWeight(
     int64_tensor.clear();
     paddle::framework::TensorCopySync(
         weight_tensor, platform::CPUPlace(), &int64_tensor);
-    weight_map[name_with_suffix]->set_type(
-        paddle::experimental::DataType::INT32);
+    weight_map[name_with_suffix]->set_type(phi::DataType::INT32);
     auto *int32_data = weight_map[name_with_suffix]->mutable_data<int32_t>(
         platform::CPUPlace());
     auto *int64_data = int64_tensor.mutable_data<int64_t>(platform::CPUPlace());
@@ -664,8 +717,7 @@ TensorRTEngine::Weight TensorRTEngine::GetFp32TrtWeight(
     bf16_tensor.clear();
     paddle::framework::TensorCopySync(
         weight_tensor, platform::CPUPlace(), &bf16_tensor);
-    weight_map[name_with_suffix]->set_type(
-        paddle::experimental::DataType::FLOAT32);
+    weight_map[name_with_suffix]->set_type(phi::DataType::FLOAT32);
     auto *fp32_data =
         weight_map[name_with_suffix]->mutable_data<float>(platform::CPUPlace());
     auto *bf16_data = bf16_tensor.mutable_data<bfloat16>(platform::CPUPlace());
@@ -679,8 +731,7 @@ TensorRTEngine::Weight TensorRTEngine::GetFp32TrtWeight(
     fp16_tensor.clear();
     paddle::framework::TensorCopySync(
         weight_tensor, platform::CPUPlace(), &fp16_tensor);
-    weight_map[name_with_suffix]->set_type(
-        paddle::experimental::DataType::FLOAT32);
+    weight_map[name_with_suffix]->set_type(phi::DataType::FLOAT32);
     auto *fp32_data =
         weight_map[name_with_suffix]->mutable_data<float>(platform::CPUPlace());
     auto *fp16_data = fp16_tensor.mutable_data<float16>(platform::CPUPlace());
@@ -694,8 +745,7 @@ TensorRTEngine::Weight TensorRTEngine::GetFp32TrtWeight(
     int64_tensor.clear();
     paddle::framework::TensorCopySync(
         weight_tensor, platform::CPUPlace(), &int64_tensor);
-    weight_map[name_with_suffix]->set_type(
-        paddle::experimental::DataType::INT32);
+    weight_map[name_with_suffix]->set_type(phi::DataType::INT32);
     auto *int32_data = weight_map[name_with_suffix]->mutable_data<int32_t>(
         platform::CPUPlace());
     auto *int64_data = int64_tensor.mutable_data<int64_t>(platform::CPUPlace());
@@ -743,8 +793,7 @@ TensorRTEngine::Weight TensorRTEngine::GetTrtWeight(
     bf16_tensor.clear();
     paddle::framework::TensorCopySync(
         weight_tensor, platform::CPUPlace(), &bf16_tensor);
-    weight_map[name_with_suffix]->set_type(
-        paddle::experimental::DataType::FLOAT32);
+    weight_map[name_with_suffix]->set_type(phi::DataType::FLOAT32);
     auto *fp32_data =
         weight_map[name_with_suffix]->mutable_data<float>(platform::CPUPlace());
     auto *bf16_data = bf16_tensor.mutable_data<bfloat16>(platform::CPUPlace());
@@ -758,8 +807,7 @@ TensorRTEngine::Weight TensorRTEngine::GetTrtWeight(
     int64_tensor.clear();
     paddle::framework::TensorCopySync(
         weight_tensor, platform::CPUPlace(), &int64_tensor);
-    weight_map[name_with_suffix]->set_type(
-        paddle::experimental::DataType::INT32);
+    weight_map[name_with_suffix]->set_type(phi::DataType::INT32);
     auto *int32_data = weight_map[name_with_suffix]->mutable_data<int32_t>(
         platform::CPUPlace());
     auto *int64_data = int64_tensor.mutable_data<int64_t>(platform::CPUPlace());

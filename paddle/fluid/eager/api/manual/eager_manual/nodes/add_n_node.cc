@@ -22,12 +22,13 @@
 #include "paddle/fluid/imperative/tracer.h"
 #include "paddle/phi/api/all.h"
 #include "paddle/phi/api/lib/api_custom_impl.h"
-DECLARE_bool(check_nan_inf);
+#include "paddle/phi/core/flags.h"
 
-paddle::small_vector<std::vector<paddle::experimental::Tensor>,
-                     egr::kSlotSmallVectorSize>
+PHI_DECLARE_bool(check_nan_inf);
+
+paddle::small_vector<std::vector<paddle::Tensor>, egr::kSlotSmallVectorSize>
 AddNGradNodeFinal::operator()(
-    paddle::small_vector<std::vector<paddle::experimental::Tensor>,
+    paddle::small_vector<std::vector<paddle::Tensor>,
                          egr::kSlotSmallVectorSize>& grads,
     bool create_graph,
     bool is_new_grad) {
@@ -42,15 +43,14 @@ AddNGradNodeFinal::operator()(
   // Prepare Grad function call
 
   const auto& out_metas = OutputMeta();
-  paddle::small_vector<std::vector<paddle::experimental::Tensor>,
-                       egr::kSlotSmallVectorSize>
+  paddle::small_vector<std::vector<paddle::Tensor>, egr::kSlotSmallVectorSize>
       returns(1);
   for (int i = 0; i < 1; ++i) {
     out_metas[i].size() == 0 ? returns[i].resize(1)
                              : returns[i].resize(out_metas[i].size());
   }
 
-  std::vector<paddle::experimental::Tensor*> api_output_0;
+  std::vector<paddle::Tensor*> api_output_0;
   api_output_0.reserve(returns[0].size());
   for (size_t i = 0; i < returns[0].size(); ++i) {
     if (out_metas[0].empty() || out_metas[0][i].IsStopGradient()) {

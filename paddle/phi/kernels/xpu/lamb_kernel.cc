@@ -57,7 +57,7 @@ void LambKernel(const Context& dev_ctx,
   }
   bool cpu_skip_update = false;
   if (skip_update && skip_update->IsInitialized()) {
-    if (paddle::platform::is_cpu_place(skip_update->place())) {
+    if (skip_update->place().GetType() == phi::AllocationType::CPU) {
       cpu_skip_update = *(skip_update->data<bool>());
     } else {
       const bool* skip_update_flag = skip_update->data<bool>();
@@ -225,4 +225,9 @@ PD_REGISTER_KERNEL(
     lamb, XPU, ALL_LAYOUT, phi::LambKernel, float, phi::dtype::float16) {
   kernel->InputAt(5).SetBackend(phi::Backend::ALL_BACKEND);
   kernel->InputAt(6).SetBackend(phi::Backend::ALL_BACKEND);
+  kernel->OutputAt(1).SetDataType(phi::DataType::UNDEFINED);
+  kernel->OutputAt(2).SetDataType(phi::DataType::UNDEFINED);
+  kernel->OutputAt(3).SetDataType(phi::DataType::UNDEFINED);
+  kernel->OutputAt(4).SetDataType(phi::DataType::UNDEFINED);
+  kernel->OutputAt(5).SetDataType(phi::DataType::UNDEFINED);
 }

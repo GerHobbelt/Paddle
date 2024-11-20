@@ -14,7 +14,9 @@ limitations under the License. */
 
 #pragma once
 
-#include "paddle/phi/backends/all_context.h"
+#include "glog/logging.h"
+
+#include "paddle/phi/backends/context_pool.h"
 #include "paddle/phi/backends/gpu/gpu_info.h"
 #include "paddle/phi/common/memory_utils.h"
 #include "paddle/phi/core/dense_tensor.h"
@@ -380,12 +382,12 @@ template <typename DeviceContext,
           typename Tout = T>
 void ElemwiseGradComputeNoBroadcast(const DeviceContext &dev_ctx,
                                     const DDim &x_dim,
-                                    const DDim &y_dim,
+                                    const DDim &y_dim UNUSED,
                                     const DenseTensor &x,
                                     const DenseTensor &y,
                                     const DenseTensor &out,
                                     const DenseTensor &dout,
-                                    int axis,
+                                    int axis UNUSED,
                                     DenseTensor *dx,
                                     DenseTensor *dy,
                                     DX_OP dx_op,
@@ -986,7 +988,7 @@ static void ElemwiseGradBroadcast1CUDA(gpuStream_t stream,
     dim3 grid_size = dim3((w + BLOCK_X - 1) / BLOCK_X);
     auto gplace = phi::GPUPlace(phi::backends::gpu::GetCurrentDeviceId());
     auto *ctx = static_cast<GPUContext *>(
-        paddle::platform::DeviceContextPool::Instance().Get(gplace));
+        phi::DeviceContextPool::Instance().Get(gplace));
     phi::backends::gpu::LimitGridDim(*ctx, &grid_size);
     FastElemwiseGradBroadcast1CUDAKernel<<<grid_size, block_size, 0, stream>>>(
         x, y, out, dout, h, w, is_xsize_larger, dx_op, dy_op, dx, dy);
@@ -1010,8 +1012,8 @@ static void ElemwiseGradBroadcast2CUDA(gpuStream_t stream,
   int block_size = std::min(ELEMWISE_MAX_BLOCK_DIM, pre * post);
   dim3 grid_size = dim3(n);
   auto gplace = phi::GPUPlace(phi::backends::gpu::GetCurrentDeviceId());
-  auto *ctx = static_cast<GPUContext *>(
-      paddle::platform::DeviceContextPool::Instance().Get(gplace));
+  auto *ctx =
+      static_cast<GPUContext *>(phi::DeviceContextPool::Instance().Get(gplace));
   phi::backends::gpu::LimitGridDim(*ctx, &grid_size);
   ElemwiseGradBroadcast2CUDAKernel<<<grid_size, block_size, 0, stream>>>(
       x, y, out, dout, pre, n, post, is_xsize_larger, dx_op, dy_op, dx, dy);
