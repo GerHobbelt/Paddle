@@ -19,9 +19,9 @@ limitations under the License. */
 #include "paddle/fluid/framework/eigen.h"
 #include "paddle/fluid/framework/op_registry.h"
 #include "paddle/fluid/framework/operator.h"
-#include "paddle/fluid/operators/eigen/eigen_function.h"
+#include "paddle/phi/kernels/funcs/eigen/eigen_function.h"
 
-#define MAX_RANK_SUPPORTED 6
+#define MAX_RANK_SUPPORTED 8
 
 namespace paddle {
 namespace operators {
@@ -43,36 +43,36 @@ inline std::vector<int> get_expand_times(
       expand_data = cpu_expand_tensor.data<int>();
     }
 #endif
-    auto vec_epxand_times =
+    auto vec_expand_times =
         std::vector<int>(expand_data, expand_data + expand_tensor->numel());
-    return vec_epxand_times;
+    return vec_expand_times;
   }
 
   auto list_expand_times_tensor =
       ctx.MultiInput<phi::DenseTensor>("expand_times_tensor");
   if (list_expand_times_tensor.size() > 0) {
     // get tensor from
-    std::vector<int> vec_epxand_times;
+    std::vector<int> vec_expand_times;
     for (size_t i = 0; i < list_expand_times_tensor.size(); ++i) {
       auto tensor = list_expand_times_tensor[i];
       if (platform::is_gpu_place(tensor->place())) {
         phi::DenseTensor temp;
         paddle::framework::TensorCopySync(*tensor, platform::CPUPlace(), &temp);
-        vec_epxand_times.push_back(*temp.data<int32_t>());
+        vec_expand_times.push_back(*temp.data<int32_t>());
       }
 #ifdef PADDLE_WITH_XPU
       else if (platform::is_xpu_place(tensor->place())) {  // NOLINT
         phi::DenseTensor temp;
         paddle::framework::TensorCopySync(*tensor, platform::CPUPlace(), &temp);
-        vec_epxand_times.push_back(*temp.data<int32_t>());
+        vec_expand_times.push_back(*temp.data<int32_t>());
       }
 #endif
       else {  // NOLINT
-        vec_epxand_times.push_back(*tensor->data<int32_t>());
+        vec_expand_times.push_back(*tensor->data<int32_t>());
       }
     }
 
-    return vec_epxand_times;
+    return vec_expand_times;
   } else {
     return ctx.Attr<std::vector<int>>("expand_times");
   }
@@ -128,6 +128,12 @@ class ExpandKernel : public framework::OpKernel<T> {
       case 6:
         Expand<6>(context);
         break;
+      case 7:
+        Expand<7>(context);
+        break;
+      case 8:
+        Expand<8>(context);
+        break;
     }
   }
 
@@ -166,10 +172,10 @@ class ExpandKernel : public framework::OpKernel<T> {
     // use 32-bit index to speed up
     bool use_32bit_index = y.size() < Eigen::NumTraits<int>::highest();
     if (use_32bit_index) {
-      EigenBroadcast<std::decay_t<decltype(place)>, T, Rank>::Eval(
+      phi::funcs::EigenBroadcast<std::decay_t<decltype(place)>, T, Rank>::Eval(
           place, To32BitIndex(y), To32BitIndex(x), bcast_dims);
     } else {
-      EigenBroadcast<std::decay_t<decltype(place)>, T, Rank>::Eval(
+      phi::funcs::EigenBroadcast<std::decay_t<decltype(place)>, T, Rank>::Eval(
           place, y, x, bcast_dims);
     }
   }
@@ -249,10 +255,17 @@ class ExpandGradKernel : public framework::OpKernel<T> {
         case 6:
           ExpandBackward<6>(context, reshape_dims_vec, reduce_dims_vec);
           break;
+        case 7:
+          ExpandBackward<7>(context, reshape_dims_vec, reduce_dims_vec);
+          break;
+        case 8:
+          ExpandBackward<8>(context, reshape_dims_vec, reduce_dims_vec);
+          break;
         default:
           PADDLE_THROW(platform::errors::InvalidArgument(
-              "Only support tensor with rank being between 1 and 6. But "
+              "Only support tensor with rank being between 1 and %d. But "
               "received tensor's rank = %d.",
+              MAX_RANK_SUPPORTED,
               dims));
       }
     }
@@ -294,8 +307,8 @@ class ExpandGradKernel : public framework::OpKernel<T> {
     auto out_grad = EigenVector<T>::Flatten(*in0);
     auto& place =
         *context.template device_context<DeviceContext>().eigen_device();
-    EigenBroadcastGrad<std::decay_t<decltype(place)>, T, Dims>::Eval(
-        place, x_grad, out_grad, reduce_dims, reshape_dims);
+    phi::funcs::EigenBroadcastGrad<std::decay_t<decltype(place)>, T, Dims>::
+        Eval(place, x_grad, out_grad, reduce_dims, reshape_dims);
   }
 };
 

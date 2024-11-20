@@ -24,12 +24,12 @@
 #include "paddle/fluid/framework/operator.h"
 #include "paddle/fluid/framework/tensor.h"
 #include "paddle/fluid/operators/diag_op.h"
-#include "paddle/fluid/operators/eigen/eigen_function.h"
 #include "paddle/fluid/operators/elementwise/elementwise_op_function.h"
 #include "paddle/fluid/platform/device_context.h"
 #include "paddle/fluid/platform/for_range.h"
 #include "paddle/phi/kernels/funcs/blas/blas.h"
 #include "paddle/phi/kernels/funcs/complex_functors.h"
+#include "paddle/phi/kernels/funcs/eigen/eigen_function.h"
 #include "paddle/phi/kernels/funcs/lapack/lapack_function.h"
 #include "paddle/phi/kernels/funcs/math_function.h"
 
@@ -271,7 +271,7 @@ struct DiagAndFillFunctor {
 
 template <typename DeviceContext, typename T, typename ValueType = T>
 struct DeviceIndependenceTensorOperations {
-  // 1. Device indenpendence, for kernel reuse.
+  // 1. Device independence, for kernel reuse.
   // 2. Input and output is always tensor type.
   // 3. output phi::DenseTensor is alway allocated
   // 4. Basic phi::DenseTensor operator is supported
@@ -315,7 +315,7 @@ struct DeviceIndependenceTensorOperations {
   }
 
   phi::DenseTensor Transpose(const phi::DenseTensor& x) {
-    // transpose the last two dimision
+    // transpose the last two dimension
     phi::DenseTensor ret;
     auto x_dim = x.dims();
     auto x_vec = common::vectorize<int>(x_dim);
@@ -584,22 +584,6 @@ struct DeviceIndependenceTensorOperations {
     return ret;
   }
 
-  phi::DenseTensor TrilTriu(const phi::DenseTensor& x,
-                            int diagonal,
-                            bool lower) {
-    framework::AttributeMap attrs;
-    attrs["diagonal"] = diagonal;
-    attrs["lower"] = lower;
-    NameInTensorMap inputs({{"X", {&x}}});
-    int x_rank = x.dims().size();
-    PADDLE_ENFORCE_GE(
-        x_rank,
-        2,
-        platform::errors::InvalidArgument("Rank must be at least 2."));
-    std::vector<int> out_shape = common::vectorize<int>(x.dims());
-    return CreateOpRunAndReturnTensor("tril_triu", inputs, attrs, out_shape);
-  }
-
   phi::DenseTensor TriangularSolve(const phi::DenseTensor& x,
                                    const phi::DenseTensor& y,
                                    bool upper,
@@ -732,7 +716,7 @@ struct DeviceIndependenceTensorOperations {
       offsets_32bit[i] = start[i];
       extents_32bit[i] = end[i];
     }
-    EigenSlice<std::decay_t<decltype(eigen_place)>, T, D>::Eval(
+    phi::funcs::EigenSlice<std::decay_t<decltype(eigen_place)>, T, D>::Eval(
         eigen_place,
         framework::To32BitIndex(out_t),
         framework::To32BitIndex(in_t),
@@ -745,7 +729,7 @@ struct DeviceIndependenceTensorOperations {
       const framework::AttributeMap& attrs,
       std::vector<int> out_shape,
       NameOutTensor out_str = {"Out"}) {
-    // varialble set dims must be phi::DenseTensor / SelectedRowTensor
+    // variable set dims must be phi::DenseTensor / SelectedRowTensor
     framework::Scope& local_scope = context.scope().NewScope();
     framework::VariableNameMap op_outputs;
     for (auto out_name : out_str) {
@@ -753,7 +737,7 @@ struct DeviceIndependenceTensorOperations {
       op_outputs[out_name].emplace_back("tmp_" + out_name);
     }
     auto out_var = local_scope.Var("tmp_Out");  // return the Out
-    // create Out phi::DenseTensor and allocat memory
+    // create Out phi::DenseTensor and allocate memory
     out_var->GetMutable<phi::DenseTensor>()->mutable_data<T>(
         common::make_ddim(out_shape), context.GetPlace());
     // common::make_ddim(out_shape)

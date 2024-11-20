@@ -76,7 +76,7 @@ class IgnoreReasons(enum.Enum):
     TRT_NOT_SUPPORT = 1
     # Accuracy is abnormal after enabling pass.
     PASS_ACCURACY_ERROR = 2
-    # Accuracy is abnormal after enabling mkldnn.
+    # Accuracy is abnormal after enabling onednn.
     MKLDNN_ACCURACY_ERROR = 3
     # Accuracy is abnormal after enabling cutlass.
     CUTLASS_ACCURACY_ERROR = 3
@@ -352,13 +352,13 @@ class PirMkldnnAutoScanTest(MkldnnAutoScanTest):
         """
         Test a single case.
         """
-        paddle.set_flags({'FLAGS_enable_pir_in_executor': True})
+        pred_config.enable_new_ir(True)
         pred_config.switch_ir_optim(False)
         pred_config.enable_new_executor()
         result = super().run_test_config(
             model, params, prog_config, pred_config, feed_data
         )
-        paddle.set_flags({'FLAGS_enable_pir_in_executor': False})
+        pred_config.enable_new_ir(False)
         return result
 
 
