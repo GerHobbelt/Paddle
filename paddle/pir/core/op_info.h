@@ -26,6 +26,7 @@ class Type;
 class Attribute;
 class Dialect;
 class Operation;
+class InterfaceValue;
 
 typedef void (*VerifyPtr)(Operation *op);
 
@@ -54,6 +55,10 @@ class IR_API OpInfo {
 
   void Verify(Operation *) const;
 
+  void VerifySig(Operation *) const;
+
+  void VerifyRegion(Operation *) const;
+
   template <typename Trait>
   bool HasTrait() const {
     return HasTrait(TypeId::get<Trait>());
@@ -67,6 +72,8 @@ class IR_API OpInfo {
   }
 
   bool HasInterface(TypeId interface_id) const;
+
+  void AttachInterface(InterfaceValue &&interface_value);
 
   template <typename InterfaceT>
   typename InterfaceT::Concept *GetInterfaceImpl() const;

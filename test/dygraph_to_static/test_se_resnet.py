@@ -20,7 +20,7 @@ import time
 import unittest
 
 import numpy as np
-from dygraph_to_static_util import ast_only_test
+from dygraph_to_static_utils import Dy2StTestBase, test_ast_only, test_pt_only
 from predictor_utils import PredictorTools
 
 import paddle
@@ -29,6 +29,7 @@ from paddle.base.dygraph.base import to_variable
 from paddle.jit.api import to_static
 from paddle.jit.translated_layer import INFER_MODEL_SUFFIX, INFER_PARAMS_SUFFIX
 from paddle.nn import BatchNorm, Linear
+from paddle.static import InputSpec
 
 SEED = 2020
 np.random.seed(SEED)
@@ -38,13 +39,15 @@ EPOCH_NUM = 1
 PRINT_STEP = 2
 STEP_NUM = 10
 
-place = base.CUDAPlace(0) if base.is_compiled_with_cuda() else base.CPUPlace()
+place = (
+    paddle.CUDAPlace(0) if paddle.is_compiled_with_cuda() else paddle.CPUPlace()
+)
 
 # Note: Set True to eliminate randomness.
 #     1. For one operation, cuDNN has several algorithms,
 #        some algorithm results are non-deterministic, like convolution algorithms.
-if base.is_compiled_with_cuda():
-    base.set_flags({'FLAGS_cudnn_deterministic': True})
+if paddle.is_compiled_with_cuda():
+    paddle.set_flags({'FLAGS_cudnn_deterministic': True})
 
 train_parameters = {
     "learning_strategy": {
@@ -316,7 +319,7 @@ class SeResNeXt(paddle.nn.Layer):
             ),
         )
 
-    @to_static
+    @to_static(full_graph=True)
     def forward(self, inputs, label):
         if self.layers == 50 or self.layers == 101:
             y = self.conv0(inputs)
@@ -346,7 +349,7 @@ class SeResNeXt(paddle.nn.Layer):
         return out, avg_loss, acc_top1, acc_top5
 
 
-class TestSeResnet(unittest.TestCase):
+class TestSeResnet(Dy2StTestBase):
     def setUp(self):
         self.train_reader = paddle.batch(
             paddle.dataset.flowers.train(use_xmap=False, cycle=True),
@@ -450,9 +453,15 @@ class TestSeResnet(unittest.TestCase):
                             paddle.jit.save(
                                 se_resnext,
                                 self.model_save_prefix,
-                                [img, label],
                                 output_spec=[pred],
-                                input_names_after_prune=[img.name],
+                                input_names_after_prune=['x'],
+                                input_spec=[
+                                    InputSpec(
+                                        shape=[None, 3, 224, 224], name='x'
+                                    ),
+                                    InputSpec(shape=[None, 1], name='y'),
+                                ],
+                                clip_extra=False,
                             )
                         else:
                             paddle.save(
@@ -556,7 +565,8 @@ class TestSeResnet(unittest.TestCase):
                 ),
             )
 
-    @ast_only_test
+    @test_ast_only
+    @test_pt_only
     def test_check_result(self):
         pred_1, loss_1, acc1_1, acc5_1 = self.train(
             self.train_reader, to_static=False

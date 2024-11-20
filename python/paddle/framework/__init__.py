@@ -23,6 +23,7 @@ from ..base.core import (  # noqa: F401
     IPUPlace,
     XPUPlace,
 )
+from .io import async_save, clear_async_save_task_queue  # noqa: F401
 from ..base.dygraph import base, to_variable  # noqa: F401
 from ..base.dygraph.base import disable_dygraph as enable_static  # noqa: F401
 from ..base.dygraph.base import enable_dygraph as disable_static  # noqa: F401
@@ -37,6 +38,7 @@ from ..base.framework import (  # noqa: F401
     _apply_pass,
     _create_tensor,
     _current_expected_place,
+    _current_expected_place_,
     _dygraph_tracer,
     _get_paddle_place,
     _global_flags,

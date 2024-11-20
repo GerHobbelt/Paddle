@@ -20,7 +20,7 @@
 namespace pir {
 
 // Helper class to query and manipulate shape constraint IR on buffer level.
-class ShapeAnalysis {
+class IR_API ShapeAnalysis {
  public:
   virtual ~ShapeAnalysis() = default;
 
@@ -50,11 +50,10 @@ class ShapeAnalysis {
 
 // A subclass to impement `ShapeAnalysis` on buffer level.
 // The implementation is based on shape constraint ir.
-class ShapeConstraintIRAnalysis : public ShapeAnalysis {
+class IR_API ShapeConstraintIRAnalysis : public ShapeAnalysis {
  public:
   explicit ShapeConstraintIRAnalysis(ModuleOp m);
-
-  // auto-save updated shape constriant ir when destroying.
+  // Auto-save updated shape constriant ir when destroying.
   ~ShapeConstraintIRAnalysis();
 
   // Returns the `SymbolicDimMgr` this object holds.
@@ -76,8 +75,18 @@ class ShapeConstraintIRAnalysis : public ShapeAnalysis {
   SymbolicDimMgr mgr_;
   // Map a ranked memref value to an array of symbolicDims, each represents one
   // dimension size of the memref value.
-  std::unordered_map<Value, std::vector<dialect::SymbolicDim>>
+  std::unordered_map<Value, std::vector<shape::SymbolicDimOp>>
       value_to_sym_dims_;
+};
+
+class IR_API ShapeAnalysisManager {
+ public:
+  static ShapeAnalysisManager& Instance();
+  ShapeConstraintIRAnalysis& Get(pir::Program* program);
+
+ private:
+  ShapeAnalysisManager() {}
+  std::unordered_map<uint64_t, ShapeConstraintIRAnalysis> tables_;
 };
 
 }  // namespace pir
