@@ -283,6 +283,10 @@ class OpcodeInlineExecutor(OpcodeExecutorBase):
         self.return_value = self.stack.pop()
         return Stop(state="Return")
 
+    def RETURN_CONST(self, instr: Instruction):
+        self.return_value = self._co_consts[instr.arg]
+        return Stop(state="Return")
+
     def _break_graph_when_if(self, result, instr: Instruction):
         """
         Helper method to raise a BreakGraphError when breaking the graph in a jump operation.
@@ -311,7 +315,7 @@ class OpcodeInlineExecutor(OpcodeExecutorBase):
 
         self._graph.add_global_guarded_variable(iterator)
 
-        # simplely get next
+        # simply get next
         if isinstance(
             iterator,
             SequenceIterVariable,

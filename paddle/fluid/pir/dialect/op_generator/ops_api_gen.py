@@ -106,6 +106,7 @@ NEED_GEN_STATIC_ONLY_APIS = [
     'share_data',
     'onednn_to_paddle_layout',
     'lrn',
+    'multi_gru',
 ]
 
 NO_NEED_GEN_STATIC_ONLY_APIS = [
@@ -113,13 +114,18 @@ NO_NEED_GEN_STATIC_ONLY_APIS = [
     'add_n_with_kernel',
     'c_allgather',
     'c_allreduce_max',
+    'c_allreduce_min',
+    'c_allreduce_min_',
     'c_allreduce_sum',
+    'c_allreduce_prod',
+    'c_allreduce_prod_',
     'c_embedding',
     'c_identity',
     'c_reduce_sum',
     'c_reducescatter',
     'c_softmax_with_cross_entropy',
     'decayed_adagrad',
+    'distributed_lookup_table',
     'dpsgd',
     'embedding_grad_sparse',
     'ftrl',
@@ -132,6 +138,7 @@ NO_NEED_GEN_STATIC_ONLY_APIS = [
     'fused_dot_product_attention',
     'nce',
     'lars_momentum',
+    'lars_momentum_',
     'max_pool2d_v2',
     'recv_v2',
     'rnn_',
@@ -141,10 +148,15 @@ NO_NEED_GEN_STATIC_ONLY_APIS = [
     'shadow_feed',
     'shuffle_batch',
     'sparse_momentum',
+    'tdm_sampler',
     'soft_relu',
     'uniform_random_batch_size_like',
+    'match_matrix_tensor',
     'c_reduce_min',
     'c_reduce_min_',
+    'push_sparse_v2',
+    'push_sparse_v2_',
+    'partial_send',
 ]
 
 
