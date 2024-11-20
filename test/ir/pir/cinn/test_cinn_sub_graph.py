@@ -84,6 +84,15 @@ class CINNSliceSubGraphNet(paddle.nn.Layer):
         return out
 
 
+class CINNAddSubGraphNet(paddle.nn.Layer):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        t = x.sum(axis=[-1], keepdim=True)
+        return x + t
+
+
 class CINNLayerNormSubGraphNet(paddle.nn.Layer):
     def __init__(self, hidden_size):
         super().__init__()
@@ -153,21 +162,21 @@ class TestCinnSubGraphBase(unittest.TestCase):
         utils.check_jit_kernel_structure(static_fn, {utils.JIT_KERNEL_NAME: 1})
 
 
-# class TestCinnExpSubNet(TestCinnSubGraphBase):
-#     def eval(self, use_cinn):
-#         paddle.seed(2022)
-#         net = CINNSubGraphNet()
-#         net = utils.apply_to_static(net, use_cinn)
-#         net.eval()
-#         out = net(self.x)
-#         if use_cinn:
-#             self.check_jit_kernel_info(net.forward)
-#         return out
+class TestCinnExpSubNet(TestCinnSubGraphBase):
+    def eval(self, use_cinn):
+        paddle.seed(2022)
+        net = CINNSubGraphNet()
+        net = utils.apply_to_static(net, use_cinn)
+        net.eval()
+        out = net(self.x)
+        if use_cinn:
+            self.check_jit_kernel_info(net.forward)
+        return out
 
-#     def test_eval(self):
-#         cinn_out = self.eval(use_cinn=True)
-#         dy_out = self.eval(use_cinn=False)
-#         np.testing.assert_allclose(cinn_out.numpy(), dy_out.numpy(), atol=1e-8)
+    def test_eval(self):
+        cinn_out = self.eval(use_cinn=True)
+        dy_out = self.eval(use_cinn=False)
+        np.testing.assert_allclose(cinn_out.numpy(), dy_out.numpy(), atol=1e-8)
 
 
 class TestCinnSoftmax(TestCinnSubGraphBase):
@@ -226,6 +235,32 @@ class TestCinnSmallSoftmax(TestCinnSoftmax):
         self.axis = -1
         self.x = paddle.uniform(self.shape, dtype="float64", min=-0.5, max=0.5)
         self.x.stop_gradient = False
+
+
+class TestReduceAs(TestCinnSubGraphBase):
+    def train(self, use_cinn):
+        paddle.seed(2022)
+        net = CINNAddSubGraphNet()
+
+        input_spec = [
+            paddle.static.InputSpec(shape=[-1, -1], dtype='float32', name='x')
+        ]
+
+        self.x = paddle.uniform([16, 256], dtype="float64", min=-0.5, max=0.5)
+        self.x.stop_gradient = False
+
+        net = utils.apply_to_static(net, use_cinn, input_spec=input_spec)
+        out = net(self.x)
+
+        loss = out.sum()
+        loss.backward()
+
+        return out
+
+    def test_forward(self):
+        cinn_out = self.train(use_cinn=True)
+        dy_out = self.train(use_cinn=False)
+        np.testing.assert_allclose(cinn_out.numpy(), dy_out.numpy(), atol=1e-8)
 
 
 # class TestCinnLayerNorm(TestCinnSubGraphBase):
