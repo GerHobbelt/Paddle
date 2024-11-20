@@ -27,9 +27,9 @@ template <class T>
 class Point_ {
  public:
   // default constructor
-  Point_() {}
+  Point_() = default;
   Point_(T _x, T _y) {}
-  Point_(const Point_& pt) {}
+  Point_(const Point_& pt UNUSED) {}
 
   Point_& operator=(const Point_& pt);
   // conversion to another data type
@@ -116,7 +116,7 @@ T GetContourArea(const std::vector<Point_<T>>& vec) {
 }
 
 template <class T>
-T PolyArea(const T* box, const size_t box_size, const bool normalized) {
+T PolyArea(const T* box, const size_t box_size, const bool normalized UNUSED) {
   // If coordinate values are is invalid
   // if area size <= 0,  return 0.
   std::vector<Point_<T>> vec;
@@ -128,7 +128,7 @@ template <class T>
 T PolyOverlapArea(const T* box1,
                   const T* box2,
                   const size_t box_size,
-                  const bool normalized) {
+                  const bool normalized UNUSED) {
   phi::funcs::gpc_polygon poly1;
   phi::funcs::gpc_polygon poly2;
   Array2Poly<T>(box1, box_size, &poly1);
@@ -295,12 +295,11 @@ void NMSFast(const DenseTensor& bbox,
   T adaptive_threshold = nms_threshold;
   const T* bbox_data = bbox.data<T>();
 
-  while (sorted_indices.size() != 0) {
+  while (!sorted_indices.empty()) {
     const int idx = sorted_indices.front().second;
     bool keep = true;
-    for (size_t k = 0; k < selected_indices->size(); ++k) {
+    for (const auto kept_idx : *selected_indices) {
       if (keep) {
-        const int kept_idx = (*selected_indices)[k];
         T overlap = T(0.);
         // 4: [xmin ymin xmax ymax]
         if (box_size == 4) {
@@ -393,8 +392,7 @@ void MultiClassNMS(const Context& ctx,
         sdata = score_slice.data<T>();
       }
       const std::vector<int>& label_indices = it.second;
-      for (size_t j = 0; j < label_indices.size(); ++j) {
-        int idx = label_indices[j];
+      for (auto idx : label_indices) {
         score_index_pairs.push_back(
             std::make_pair(sdata[idx], std::make_pair(label, idx)));
       }
@@ -407,9 +405,9 @@ void MultiClassNMS(const Context& ctx,
 
     // Store the new indices.
     std::map<int, std::vector<int>> new_indices;
-    for (size_t j = 0; j < score_index_pairs.size(); ++j) {
-      int label = score_index_pairs[j].second.first;
-      int idx = score_index_pairs[j].second.second;
+    for (auto& score_index_pair : score_index_pairs) {
+      int label = score_index_pair.second.first;
+      int idx = score_index_pair.second.second;
       new_indices[label].push_back(idx);
     }
     if (scores_size == 2) {
@@ -455,8 +453,7 @@ void MultiClassOutput(const Context& ctx,
       sdata = scores_data + label * predict_dim;
     }
 
-    for (size_t j = 0; j < indices.size(); ++j) {
-      int idx = indices[j];
+    for (auto idx : indices) {
       odata[count * out_dim] = label;  // label
       const T* bdata;
       if (scores_size == 3) {

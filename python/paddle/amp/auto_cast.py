@@ -274,6 +274,7 @@ def amp_guard(
     custom_black_list=None,
     level='O1',
     dtype='float16',
+    use_promote=True,
 ):
     """
     Create a context which enables auto-mixed-precision(AMP) of operators executed in dynamic graph mode.
@@ -369,6 +370,7 @@ def amp_guard(
                 "For float16, amp only support NVIDIA GPU with Compute Capability 7.0 or higher, current GPU is: %s, with Compute Capability: %d.%d."
                 % (paddle.device.cuda.get_device_name(), prop[0], prop[1])
             )
+            enable = False
         elif (dtype == 'bfloat16') and not _is_gpu_bfloat16_supported():
             prop = paddle.device.cuda.get_device_capability()
             cuda_version = paddle.version.cuda()
@@ -381,6 +383,7 @@ def amp_guard(
                     cuda_version,
                 )
             )
+            enable = False
 
     amp_dtype = dtype
     amp_global_state().amp_dtype = amp_dtype
@@ -438,6 +441,11 @@ def amp_guard(
         original_amp_dtype = tracer._amp_dtype
         tracer._amp_dtype = amp_dtype
 
+        # switch promote
+        if amp_level == AMP_LEVEL.O2:
+            original_use_promote = tracer._use_promote
+            tracer._use_promote = use_promote
+
     # restore status
     try:
         yield
@@ -448,6 +456,8 @@ def amp_guard(
             tracer._set_amp_op_list(original_white_list, original_black_list)
             # set_flags(original_flags)
             tracer._amp_dtype = original_amp_dtype
+            if amp_level == AMP_LEVEL.O2:
+                tracer._use_promote = original_use_promote
 
 
 class StateDictHook:
@@ -469,7 +479,7 @@ def _set_multi_precision(optimizer, multi_precision):
     )
 
     optimizer = (
-        optimizer._inner_optimizer
+        optimizer._inner_opt
         if isinstance(optimizer, DygraphShardingOptimizer)
         else optimizer
     )
@@ -564,6 +574,46 @@ def amp_decorate(
         else:
             return models, optimizers
 
+    # check tracer
+    tracer = _dygraph_tracer()
+    if not tracer:
+        raise ValueError(
+            "current_tracer is None, maybe it is not in imperative mode."
+        )
+
+    # check device_type:
+    if not (
+        tracer._expected_place.is_gpu_place()
+        or tracer._expected_place.is_xpu_place()
+        or tracer._expected_place.is_custom_place()
+    ):
+        if optimizers is None:
+            return models
+        else:
+            return models, optimizers
+    # For xpu:
+    if tracer._expected_place.is_xpu_place() and (dtype == 'bfloat16'):
+        if optimizers is None:
+            return models
+        else:
+            return models, optimizers
+    # For custom device:
+    if tracer._expected_place.is_custom_place() and (dtype == 'bfloat16'):
+        if optimizers is None:
+            return models
+        else:
+            return models, optimizers
+    # For gpu float16: Compute Capability should >= 7.
+    # For gpu bfloat16: Compute Capability should >= 8 & CUDA Version should >= 11.
+    if tracer._expected_place.is_gpu_place():
+        if (dtype == 'float16' and not _is_gpu_float16_supported()) or (
+            dtype == 'bfloat16' and not _is_gpu_bfloat16_supported()
+        ):
+            if optimizers is None:
+                return models
+            else:
+                return models, optimizers
+
     models_is_list = False
     if isinstance(models, paddle.nn.Layer):
         models_is_list = False
@@ -641,6 +691,7 @@ def auto_cast(
     custom_black_list=None,
     level='O1',
     dtype='float16',
+    use_promote=True,
 ):
     """
     Create a context which enables auto-mixed-precision(AMP) of operators executed in dynamic graph mode.
@@ -663,6 +714,7 @@ def auto_cast(
              will be converted to float16/bfloat16, and that have any float32 input will be converted to float32. For the OD level, operators in
              default white list will compute in float16/bfloat16, and the others will compute in float32. Default is O1.
         dtype(str, optional): Whether to use 'float16' or 'bfloat16'. Default is 'float16'.
+        use_promote(bool, optional): Whether to promotes to fp32 when op has any float32 inputs. It is only supported when amp level is O2. Default is True.
 
     Examples:
 
@@ -696,7 +748,9 @@ def auto_cast(
             print(d.dtype) # paddle.float16
 
     """
-    return amp_guard(enable, custom_white_list, custom_black_list, level, dtype)
+    return amp_guard(
+        enable, custom_white_list, custom_black_list, level, dtype, use_promote
+    )
 
 
 def decorate(

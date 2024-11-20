@@ -27,13 +27,13 @@ class BarrierOp : public framework::OperatorWithKernel {
 
 class BarrierOpMaker : public framework::OpProtoAndCheckerMaker {
  public:
-  void Make() {
+  void Make() override {
     AddInput("X", "(Tensor) Input data (only used in CUDAKernel).");
     AddOutput("Out", "(Tensor) Output data (only used in CUDAKernel).");
     AddAttr<int>("ring_id", "(int default 0) communication ring id.")
         .SetDefault(0);
     AddComment(R"DOC(
-Barrier Operator - Barrier among all pariticapitors.)DOC");
+Barrier Operator - Barrier among all participators.)DOC");
   }
 };
 

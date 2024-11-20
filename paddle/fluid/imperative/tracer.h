@@ -31,6 +31,8 @@
 #include "paddle/fluid/imperative/layout_autotune.h"
 #include "paddle/fluid/platform/macros.h"
 #include "paddle/phi/core/compat/arg_map_context.h"
+
+DECLARE_bool(use_stride_kernel);
 namespace paddle {
 namespace imperative {
 
@@ -156,6 +158,13 @@ class Tracer {
 
   void SetHasGrad(bool has_grad) { has_grad_ = has_grad; }
 
+  void SetUsePromote(bool use_promote) {
+    VLOG(4) << "set use_promote to " << use_promote;
+    use_promote_ = use_promote;
+  }
+
+  bool GetUsePromote() const { return use_promote_; }
+
   void SetAmpLevel(AmpLevel level) {
     VLOG(4) << "set amp_level to " << static_cast<unsigned int>(level);
     amp_level_ = level;
@@ -188,7 +197,16 @@ class Tracer {
 
   void DisableLayoutAutoTune() { use_layout_autotune_ = false; }
 
-  void EnableLayoutAutoTune() { use_layout_autotune_ = true; }
+  void EnableLayoutAutoTune() {
+    use_layout_autotune_ = true;
+    if (FLAGS_use_stride_kernel) {
+      LOG(WARNING) << "When the layout_autotune policy is on, Paddle will turn "
+                      "off the Stride policy. This will cause the input and "
+                      "output of the Strided API no longer share memory, which "
+                      "may cause problems with model accuracy.";
+      FLAGS_use_stride_kernel = false;
+    }
+  }
 
   bool UseLayoutAutoTune() {
 #if defined(PADDLE_WITH_CUDA)
@@ -220,6 +238,7 @@ class Tracer {
   static thread_local bool enable_program_desc_tracing_;
   static thread_local bool use_layout_autotune_;
   static thread_local bool has_grad_;
+  static thread_local bool use_promote_;
   static thread_local AmpLevel amp_level_;
   static thread_local phi::DataType amp_dtype_;
 };

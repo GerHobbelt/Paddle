@@ -17,6 +17,7 @@ import tempfile
 import unittest
 
 import numpy as np
+from dygraph_to_static_util import ast_only_test
 
 import paddle
 from paddle import fluid
@@ -53,6 +54,7 @@ class TestDyToStaticSaveInferenceModel(unittest.TestCase):
     def tearDown(self):
         self.temp_dir.cleanup()
 
+    @ast_only_test
     def test_save_inference_model(self):
         fc_size = 20
         x_data = np.random.random((fc_size, fc_size)).astype('float32')
@@ -97,7 +99,6 @@ class TestDyToStaticSaveInferenceModel(unittest.TestCase):
     def check_save_inference_model(
         self, model, inputs, gt_out, feed=None, fetch=None
     ):
-
         expected_persistable_vars = {p.name for p in model.parameters()}
 
         infer_model_prefix = os.path.join(
@@ -145,6 +146,7 @@ class TestDyToStaticSaveInferenceModel(unittest.TestCase):
 
 
 class TestPartialProgramRaiseError(unittest.TestCase):
+    @ast_only_test
     def test_param_type(self):
         paddle.jit.enable_to_static(True)
         x_data = np.random.random((20, 20)).astype('float32')

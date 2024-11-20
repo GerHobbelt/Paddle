@@ -21,18 +21,21 @@
 #include "paddle/fluid/inference/analysis/passes/ir_graph_to_program_pass.h"
 #include "paddle/fluid/inference/analysis/passes/ir_params_sync_among_devices_pass.h"
 #include "paddle/fluid/inference/analysis/passes/memory_optimize_pass.h"
+#include "paddle/fluid/inference/analysis/passes/save_optimized_model_pass.h"
 
 namespace paddle {
 namespace inference {
 namespace analysis {
 
-PassRegistry::PassRegistry() {
+PassRegistry::PassRegistry() {  // NOLINT
   // Register manually to avoid the trivial `USE_OP` like macro for easier use
   // and link.
   passes_.emplace("ir_analysis_pass",
                   std::unique_ptr<AnalysisPass>(new IrAnalysisPass));
   passes_.emplace("ir_graph_build_pass",
                   std::unique_ptr<AnalysisPass>(new IrGraphBuildPass));
+  passes_.emplace("save_optimized_model_pass",
+                  std::unique_ptr<AnalysisPass>(new SaveOptimizedModelPass));
   passes_.emplace("memory_optimize_pass",
                   std::unique_ptr<AnalysisPass>(new MemoryOptimizePass));
   passes_.emplace(

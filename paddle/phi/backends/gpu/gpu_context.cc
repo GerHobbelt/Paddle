@@ -25,10 +25,10 @@ limitations under the License. */
 
 #include "glog/logging.h"
 #include "paddle/phi/api/ext/exception.h"
+#include "paddle/phi/backends/context_pool.h"
 #include "paddle/phi/backends/gpu/gpu_decls.h"
 #include "paddle/phi/backends/gpu/gpu_info.h"
 #include "paddle/phi/backends/gpu/gpu_resources.h"
-#include "paddle/phi/common/float16.h"
 #include "paddle/phi/common/place.h"
 #include "paddle/phi/core/allocator.h"
 #include "paddle/phi/core/cuda_stream.h"
@@ -66,7 +66,7 @@ class EigenGpuStreamDevice : public Eigen::StreamInterface {
   EigenGpuStreamDevice() : scratch_(nullptr), semaphore_(nullptr) {
     Eigen::initializeDeviceProp();
   }
-  ~EigenGpuStreamDevice() override {}
+  ~EigenGpuStreamDevice() override = default;
 
   void Reinitialize(gpuStream_t cuda_stream,
                     Allocator* allocator,
@@ -601,7 +601,7 @@ struct GPUContext::Impl {
 #endif
 #endif
     });
-    if (blas_tf32_tensor_core_handle_ != nullptr) {
+    if (blas_tf32_tensor_core_handle_ && phi::AllowTF32Cublas()) {
       std::lock_guard<std::mutex> guard(blas_tf32_mtx_);
       callback(blas_tf32_tensor_core_handle_);
     } else {
@@ -1048,11 +1048,11 @@ void GPUContext::ClearDnnAttr() { return impl_->ClearDnnAttr(); }
 
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 GPUPinnedContext::GPUPinnedContext() {
-  eigen_device_.reset(new Eigen::DefaultDevice());
+  eigen_device_ = std::make_unique<Eigen::DefaultDevice>();
 }
 
 GPUPinnedContext::GPUPinnedContext(GPUPinnedPlace place) : place_(place) {
-  eigen_device_.reset(new Eigen::DefaultDevice());
+  eigen_device_ = std::make_unique<Eigen::DefaultDevice>();
 }
 
 Eigen::DefaultDevice* GPUPinnedContext::eigen_device() const {

@@ -384,11 +384,18 @@ void InstanceNormInferMeta(const MetaTensor& x,
   y->share_lod(x);
   y->set_dtype(x.dtype());
   y->set_layout(x.layout());
+  phi::DataType x_dtype = x.dtype();
+  phi::DataType param_type =
+      (x_dtype == phi::DataType::BFLOAT16 || x_dtype == phi::DataType::FLOAT16)
+          ? phi::DataType::FLOAT32
+          : x_dtype;
   if (saved_mean) {
     saved_mean->set_dims({NxC});
+    saved_mean->set_dtype(param_type);
   }
   if (saved_variance) {
     saved_variance->set_dims({NxC});
+    saved_variance->set_dtype(param_type);
   }
 }
 
@@ -529,6 +536,12 @@ void LayerNormInferMeta(const MetaTensor& x,
                         MetaTensor* variance,
                         MetaConfig config) {
   auto x_dim = x.dims();
+  PADDLE_ENFORCE_GT(begin_norm_axis,
+                    0,
+                    phi::errors::InvalidArgument(
+                        "'begin_norm_axis' in Op(LayerNorm) should be"
+                        "greater than zero. But received [%d].",
+                        begin_norm_axis));
   PADDLE_ENFORCE_LT(
       begin_norm_axis,
       x_dim.size(),
@@ -587,6 +600,13 @@ void LayerNormInferMeta(const MetaTensor& x,
             bias.dims()[0],
             right));
   }
+
+  PADDLE_ENFORCE_EQ(epsilon >= 0.0f && epsilon <= 0.001f,
+                    true,
+                    phi::errors::InvalidArgument(
+                        "'epsilon' in Op(LayerNorm) should be between"
+                        "0.0 and 0.001, But received [%s].",
+                        epsilon));
 
   phi::DataType x_dtype = x.dtype();
   out->set_dims(x_dim);
@@ -818,7 +838,7 @@ void NllLossRawInferMeta(const MetaTensor& input,
     if (reduction == "none") {
       out->set_dims({x_dims[0]});
     } else {
-      out->set_dims({1});
+      out->set_dims(phi::make_ddim({}));
     }
   } else if (x_dims.size() == 4) {
     PADDLE_ENFORCE_EQ(label_dims.size(),
@@ -841,10 +861,10 @@ void NllLossRawInferMeta(const MetaTensor& input,
     if (reduction == "none") {
       out->set_dims({x_dims[0], x_dims[2], x_dims[3]});
     } else {
-      out->set_dims({1});
+      out->set_dims(phi::make_ddim({}));
     }
   }
-  total_weight->set_dims({1});
+  total_weight->set_dims(phi::make_ddim({}));
   out->set_dtype(input.dtype());
   total_weight->set_dtype(input.dtype());
 }
@@ -1040,7 +1060,7 @@ void ScatterInferMeta(const MetaTensor& x,
         (ref_dims.size() == updates_dims.size()),
         true,
         phi::errors::InvalidArgument(
-            "When the Input(Updates) is not a 0D tensor, the "
+            "When the Input(Index) is not a 0D tensor, the "
             "Input(X) and Input(Updates) should have the same shape size, "
             "but received the size of Input(x)'s shape is %d, the size of "
             "Input(Updates)'s shape is %d.",
@@ -1055,6 +1075,17 @@ void ScatterInferMeta(const MetaTensor& x,
             "batch-size is %d.",
             updates_dims[0],
             index_dims[0]));
+  } else {
+    PADDLE_ENFORCE_EQ(
+        (ref_dims.size() - 1 == updates_dims.size()),
+        true,
+        phi::errors::InvalidArgument(
+            "When the Input(Index) is a 0D tensor, the "
+            "Input(Updates) should have the shape size as Input(X)'s "
+            "shape size - 1. But received the size of Input(x)'s shape is %d, "
+            " the size of Input(Updates)'s shape is %d.",
+            ref_dims.size(),
+            updates_dims.size()));
   }
   out->set_dims(ref_dims);
   out->share_lod(x);

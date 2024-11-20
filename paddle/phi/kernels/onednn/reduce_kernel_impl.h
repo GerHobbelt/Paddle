@@ -118,7 +118,7 @@ void ReduceGradKernel(const Context& dev_ctx,
                       bool reduce_all,
                       DenseTensor* x_grad,
                       dnnl::algorithm binary_type,
-                      dnnl::algorithm reduction_type,
+                      dnnl::algorithm reduction_type UNUSED,
                       float scale_x,
                       float scale_y) {
   reduce_all = recompute_reduce_all(x, dims, reduce_all);
@@ -143,7 +143,11 @@ void ReduceGradKernel(const Context& dev_ctx,
   const std::unordered_map<int, dnnl::memory> args = {
       {DNNL_ARG_SRC_0, *dst_memory_p},
       {DNNL_ARG_SRC_1, *src_memory_p},
-      {DNNL_ARG_DST, *dst_memory_p}};
+      {DNNL_ARG_DST, *dst_memory_p},
+      {DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC_0,
+       handler.Get_Scale_Memory(scale_x)},
+      {DNNL_ARG_ATTR_SCALES | DNNL_ARG_SRC_1,
+       handler.Get_Scale_Memory(scale_y)}};
 
   auto& astream = OneDNNContext::tls().get_stream();
   binary_prim->execute(astream, args);

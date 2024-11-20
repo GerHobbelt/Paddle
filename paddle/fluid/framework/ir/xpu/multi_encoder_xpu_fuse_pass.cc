@@ -19,6 +19,7 @@
 #include "paddle/fluid/framework/ir/xpu/quant_utils.h"
 #include "paddle/fluid/framework/op_version_registry.h"
 #include "paddle/fluid/platform/enforce.h"
+#include "paddle/phi/api/lib/data_transform.h"
 #include "paddle/phi/kernels/concat_kernel.h"
 
 namespace paddle {
@@ -553,6 +554,9 @@ void MultiEncoderXPUFusePass::PrepareQKVWeight(Graph* graph,
   qkv_w_int16_t.set_type(q_w_fp32_t.type());
   auto* cpu_ctx = static_cast<phi::CPUContext*>(
       platform::DeviceContextPool::Instance().Get(phi::CPUPlace()));
+  paddle::experimental::CheckAndTrans2Contiguous(&q_w_fp32_t);
+  paddle::experimental::CheckAndTrans2Contiguous(&k_w_fp32_t);
+  paddle::experimental::CheckAndTrans2Contiguous(&v_w_fp32_t);
   std::vector<const phi::DenseTensor*> in_tensors{
       &q_w_fp32_t, &k_w_fp32_t, &v_w_fp32_t};
   phi::ConcatKernel<float>(*cpu_ctx, in_tensors, 0, &qkv_w_int16_t);
@@ -1205,7 +1209,11 @@ std::vector<PatternParam> MultiEncoderXPUFusePass::GeneratePatternParams()
     const {
   return std::vector<PatternParam>{
       // Params are arranged in alphabetic order
-      {"gelu", "matmul_v2", "matmul", "matmul_v2", false, false, true}};
+      {"gelu", "matmul_v2", "matmul", "matmul_v2", false, false, true},
+      {"gelu", "matmul_v2", "matmul_v2", "matmul_v2", false, true, true},
+      {"gelu", "mul", "matmul", "matmul", false, true, true},
+      {"relu", "mul", "matmul", "matmul", false, true, true},
+  };
 }
 
 }  // namespace ir

@@ -96,6 +96,17 @@ struct Cosine<dtype::bfloat16> {
   }
 };
 
+template <typename T>
+using ComplexType = phi::dtype::complex<T>;
+
+// T is phi::dtype::complex<float> or phi::dtype::complex<double>
+template <typename T>
+struct Conj {
+  HOSTDEVICE ComplexType<T> operator()(const ComplexType<T>& val) const {
+    return ComplexType<T>(val.real, -val.imag);
+  }
+};
+
 // sine'(x) = cos(x)
 template <typename T>
 struct SinGradFunctor : public BaseActivationFunctor<T> {
@@ -104,19 +115,37 @@ struct SinGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * x.unaryExpr(Cosine<T>());
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() { return kDepX; }
 };
 
+template <typename T>
+struct SinGradFunctor<ComplexType<T>>
+    : public BaseActivationFunctor<ComplexType<T>> {
+  template <typename Device,
+            typename X,
+            typename Out,
+            typename dOut,
+            typename dX>
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
+    dx.device(d) =
+        dout * x.unaryExpr(Cosine<ComplexType<T>>()).unaryExpr(Conj<T>());
+  }
+
+  static constexpr ActBwdOpFwdDeps FwdDeps() { return kDepX; }
+};
 // sine(x) = sin(x)
 template <typename T>
 struct SinFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Sine<T>());
+    // Note(GGBond8488): Since Eigen3.3, Behavior like {A = (B * A).cwiseAbs()}
+    // will give wrong result, details see
+    // http://eigen.tuxfamily.org/dox/group__TopicAliasing.html
+    out.device(d) = x.unaryExpr(Sine<T>()).eval();
   }
 };
 
@@ -277,7 +306,7 @@ struct ReciprocalGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x UNUSED, Out out, dOut dout, dX dx) const {
     dx.device(d) = dout * static_cast<T>(-1) * out * out;
   }
 
@@ -310,8 +339,24 @@ struct CosGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = -dout * x.unaryExpr(Sine<T>());
+  }
+
+  static constexpr ActBwdOpFwdDeps FwdDeps() { return kDepX; }
+};
+
+template <typename T>
+struct CosGradFunctor<ComplexType<T>>
+    : public BaseActivationFunctor<ComplexType<T>> {
+  template <typename Device,
+            typename X,
+            typename Out,
+            typename dOut,
+            typename dX>
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
+    dx.device(d) =
+        -dout * x.unaryExpr(Sine<ComplexType<T>>()).unaryExpr(Conj<T>());
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() { return kDepX; }
@@ -448,7 +493,7 @@ template <typename T>
 struct CosFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Cosine<T>());
+    out.device(d) = x.unaryExpr(Cosine<T>()).eval();
   }
 };
 
@@ -505,7 +550,7 @@ struct MishGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto sp = (x > static_cast<T>(threshold))
                   .select(x, (static_cast<T>(1) + x.exp()).log());
     auto gsp = static_cast<T>(1) - (-sp).exp();
@@ -544,7 +589,7 @@ struct STanhGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto a = static_cast<T>(scale_a);
     auto b = static_cast<T>(scale_b);
     auto temp = (a * x).tanh() * (a * x).tanh();
@@ -574,8 +619,29 @@ struct TanGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout / x.unaryExpr(Cosine<T>()).square();
+  }
+
+  static constexpr ActBwdOpFwdDeps FwdDeps() { return kDepX; }
+};
+
+template <typename T>
+struct TanGradFunctor<ComplexType<T>>
+    : public BaseActivationFunctor<ComplexType<T>> {
+  template <typename Device,
+            typename X,
+            typename Out,
+            typename dOut,
+            typename dX>
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
+    // auto dx_ =
+    // static_cast<ComplexType<T>>(x.unaryExpr(Cosine<T>()).square());
+    // ComplexType<T> dx_conj_(dx_.real, -dx_.imag);
+    // dx.device(d) = dout / dx_conj_;
+    dx.device(d) =
+        dout /
+        x.unaryExpr(Cosine<ComplexType<T>>()).square().unaryExpr(Conj<T>());
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() { return kDepX; }
@@ -620,7 +686,7 @@ struct SqrtGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x UNUSED, Out out, dOut dout, dX dx) const {
     dx.device(d) = static_cast<T>(0.5) * dout / out;
   }
 
@@ -645,7 +711,7 @@ struct RsqrtGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x UNUSED, Out out, dOut dout, dX dx) const {
     dx.device(d) = static_cast<T>(-0.5) * dout * out * out * out;
   }
 
@@ -697,7 +763,7 @@ struct SoftplusGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto x_beta = static_cast<T>(beta) * x;
     dx.device(d) =
         (x_beta > static_cast<T>(threshold))
@@ -762,7 +828,10 @@ template <typename T>
 struct TanFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Tangent<T>());
+    // Note(GGBond8488): Since Eigen3.3, Behavior like {A = (B * A).cwiseAbs()}
+    // will give wrong result, details see
+    // http://eigen.tuxfamily.org/dox/group__TopicAliasing.html
+    out.device(d) = x.unaryExpr(Tangent<T>()).eval();
   }
 };
 
@@ -795,7 +864,7 @@ template <typename T>
 struct SinhFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Sinh<T>());
+    out.device(d) = x.unaryExpr(Sinh<T>()).eval();
   }
 };
 
@@ -804,7 +873,7 @@ template <typename T>
 struct CoshFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Cosh<T>());
+    out.device(d) = x.unaryExpr(Cosh<T>()).eval();
   }
 };
 
@@ -816,7 +885,7 @@ struct SinhGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * x.unaryExpr(Cosh<T>());
   }
 
@@ -831,7 +900,7 @@ struct CoshGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * x.unaryExpr(Sinh<T>());
   }
 
@@ -855,7 +924,7 @@ template <typename T>
 struct AcosFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Acos<T>());
+    out.device(d) = x.unaryExpr(Acos<T>()).eval();
   }
 };
 
@@ -867,7 +936,7 @@ struct AcosGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) =
         -dout * static_cast<T>(1) / (static_cast<T>(1) - x.square()).sqrt();
   }
@@ -892,7 +961,7 @@ template <typename T>
 struct AsinFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Asin<T>());
+    out.device(d) = x.unaryExpr(Asin<T>()).eval();
   }
 };
 
@@ -904,7 +973,7 @@ struct AsinGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) =
         dout * static_cast<T>(1) / (static_cast<T>(1) - x.square()).sqrt();
   }
@@ -929,7 +998,7 @@ template <typename T>
 struct AtanFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Atan<T>());
+    out.device(d) = x.unaryExpr(Atan<T>()).eval();
   }
 };
 
@@ -941,7 +1010,7 @@ struct AtanGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * static_cast<T>(1) / (static_cast<T>(1) + x.square());
   }
 
@@ -977,7 +1046,7 @@ template <typename T>
 struct AcoshFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Acosh<T>());
+    out.device(d) = x.unaryExpr(Acosh<T>()).eval();
   }
 };
 
@@ -989,7 +1058,7 @@ struct AcoshGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) =
         dout * static_cast<T>(1) / (x * x - static_cast<T>(1)).sqrt();
   }
@@ -1014,7 +1083,7 @@ template <typename T>
 struct AsinhFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Asinh<T>());
+    out.device(d) = x.unaryExpr(Asinh<T>()).eval();
   }
 };
 
@@ -1026,7 +1095,7 @@ struct AsinhGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) =
         dout * static_cast<T>(1) / (x.square() + static_cast<T>(1)).sqrt();
   }
@@ -1051,7 +1120,7 @@ template <typename T>
 struct AtanhFunctor : public BaseActivationFunctor<T> {
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.unaryExpr(Atanh<T>());
+    out.device(d) = x.unaryExpr(Atanh<T>()).eval();
   }
 };
 
@@ -1063,7 +1132,7 @@ struct AtanhGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * static_cast<T>(1) / (static_cast<T>(1) - x.square());
   }
 
@@ -1074,9 +1143,11 @@ struct AtanhGradFunctor : public BaseActivationFunctor<T> {
 // exp(x) = e^x
 template <typename T>
 struct ExpFunctor : public BaseActivationFunctor<T> {
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
+
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.exp();
+    out.device(d) = x.template cast<U>().exp();
   }
 };
 
@@ -1099,9 +1170,11 @@ struct ExpGradFunctor : public BaseActivationFunctor<T> {
 // expm1(x) = e^x - 1
 template <typename T>
 struct Expm1Functor : public BaseActivationFunctor<T> {
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
+
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.expm1();
+    out.device(d) = x.template cast<U>().expm1();
   }
 };
 
@@ -1112,7 +1185,7 @@ struct Expm1GradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x UNUSED, Out out, dOut dout, dX dx) const {
     dx.device(d) = dout * out + dout;
   }
 
@@ -1160,12 +1233,12 @@ template <typename T>
 struct ReluGradGradFunctor : public BaseActivationFunctor<T> {
   template <typename Device>
   void operator()(const Device& dev,
-                  const DenseTensor* X,
+                  const DenseTensor* X UNUSED,
                   const DenseTensor* Out,
                   const DenseTensor* ddX,
                   DenseTensor* ddOut,
-                  DenseTensor* dOut,
-                  DenseTensor* dX) const {
+                  DenseTensor* dOut UNUSED,
+                  DenseTensor* dX UNUSED) const {
     auto* d = dev.eigen_device();
     auto ddx = EigenVector<T>::Flatten(
         GET_DATA_SAFELY(ddX, "Input", "DDX", "ReluGradGrad"));
@@ -1200,6 +1273,28 @@ struct TanhGradFunctor : public BaseActivationFunctor<T> {
             typename dX>
   void operator()(Device d, X x UNUSED, Out out, dOut dout, dX dx) const {
     dx.device(d) = dout * (static_cast<T>(1) - out * out);
+  }
+
+  static constexpr ActBwdOpFwdDeps FwdDeps() {
+    return ActBwdOpFwdDeps::kDepOut;
+  }
+};
+
+template <typename T>
+struct TanhGradFunctor<ComplexType<T>>
+    : public BaseActivationFunctor<ComplexType<T>> {
+  template <typename Device,
+            typename X,
+            typename Out,
+            typename dOut,
+            typename dX>
+  void operator()(Device d, X x UNUSED, Out out, dOut dout, dX dx) const {
+    // auto dx_ = static_cast<ComplexType<T>>(1) - out * out;
+    // ComplexType<T> dx_conj_(dx_.real, -dx_.imag);
+    // dx.device(d) = dout * dx_conj_;
+    dx.device(d) =
+        dout *
+        (static_cast<ComplexType<T>>(1) - out * out).unaryExpr(Conj<T>());
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() {
@@ -1375,7 +1470,7 @@ struct HardTanhGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) =
         dout * ((x > static_cast<T>(t_min)) * (x < static_cast<T>(t_max)))
                    .template cast<T>();
@@ -1412,7 +1507,7 @@ struct LeakyReluGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto temp1 =
         static_cast<T>(alpha) * (x < static_cast<T>(0)).template cast<T>();
     auto temp2 = (x >= static_cast<T>(0)).template cast<T>();
@@ -1431,11 +1526,11 @@ struct LeakyReluGradGradFunctor : public BaseActivationFunctor<T> {
   template <typename Device>
   void operator()(const Device& dev,
                   const DenseTensor* X,
-                  const DenseTensor* Out,
+                  const DenseTensor* Out UNUSED,
                   const DenseTensor* ddX,
                   DenseTensor* ddOut,
-                  DenseTensor* dOut,
-                  DenseTensor* dX) const {
+                  DenseTensor* dOut UNUSED,
+                  DenseTensor* dX UNUSED) const {
     if (ddOut) {
       auto* d = dev.eigen_device();
       auto ddx = EigenVector<T>::Flatten(
@@ -1479,7 +1574,7 @@ struct ThresholdedReluGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto th = static_cast<T>(threshold);
     dx.device(d) = dout * (x > th).template cast<T>();
   }
@@ -1511,7 +1606,7 @@ struct Relu6GradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x UNUSED, Out out, dOut dout, dX dx) const {
     float threshold = 6;
     dx.device(d) =
         dout * ((out > static_cast<T>(0)) * (out < static_cast<T>(threshold)))
@@ -1540,7 +1635,7 @@ struct TanhShrinkGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * (x.tanh() * x.tanh());
   }
 
@@ -1577,7 +1672,7 @@ struct HardShrinkGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto temp1 = x < static_cast<T>(threshold * -1.f);
     auto temp2 = x > static_cast<T>(threshold);
     dx.device(d) = dout * (temp1 || temp2).template cast<T>();
@@ -1615,7 +1710,7 @@ struct SoftShrinkGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto lambdaT = static_cast<T>(lambda);
     auto temp1 = (x > lambdaT).template cast<T>();
     auto temp2 = (x < -lambdaT).template cast<T>();
@@ -1651,7 +1746,7 @@ struct ELUGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x UNUSED, Out out, dOut dout, dX dx) const {
     // case 1: alpha >= 0
     // dx = dout, if out > 0
     // dx = dout * (out + alpha), if out <= 0
@@ -1673,7 +1768,7 @@ struct ELUGradNegativeAlphaFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     // case 2: alpha < 0
     // dx = dout, if x > 0
     // dx = dout * (out + alpha), if x <=0
@@ -1742,7 +1837,7 @@ struct SiluGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto temp1 = static_cast<T>(1) + (-x).exp();  // 1+e^(-x)
     auto temp2 = x * (-x).exp();                  // x*e^(-x)
     dx.device(d) = dout * ((static_cast<T>(1) / temp1) *
@@ -1770,7 +1865,7 @@ struct SoftsignGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) =
         dout * (static_cast<T>(1) / (static_cast<T>(1) + x.abs()).square());
   }
@@ -1947,7 +2042,7 @@ struct LogSigmoidGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto temp = (-x).cwiseMax(static_cast<T>(0));  // temp = max(-x, 0)
     dx.device(d) =
         dout * ((-x - temp).exp() / ((-temp).exp() + (-x - temp).exp()));
@@ -1984,7 +2079,7 @@ struct HardSigmoidGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x UNUSED, Out out, dOut dout, dX dx) const {
     dx.device(d) = dout *
                    ((out > static_cast<T>(0)) * (out < static_cast<T>(1)))
                        .template cast<T>() *
@@ -1996,12 +2091,33 @@ struct HardSigmoidGradFunctor : public BaseActivationFunctor<T> {
   }
 };
 
+template <typename T>
+struct Log {
+  HOSTDEVICE T operator()(const T& val) const { return std::log(val); }
+};
+
+template <>
+struct Log<dtype::float16> {
+  HOSTDEVICE dtype::float16 operator()(const dtype::float16& val) const {
+    return dtype::float16(std::log(static_cast<float>(val)));
+  }
+};
+
+template <>
+struct Log<dtype::bfloat16> {
+  HOSTDEVICE dtype::bfloat16 operator()(const dtype::bfloat16& val) const {
+    return dtype::bfloat16(std::log(static_cast<float>(val)));
+  }
+};
+
 // log(x) = natural logarithm of x
 template <typename T>
 struct LogFunctor : public BaseActivationFunctor<T> {
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
+
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.log();
+    out.device(d) = x.template cast<U>().unaryExpr(Log<U>()).eval();
   }
 };
 
@@ -2012,19 +2128,40 @@ struct LogGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * (static_cast<T>(1) / x);
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() { return ActBwdOpFwdDeps::kDepX; }
 };
 
+template <typename T>
+struct Log2 {
+  HOSTDEVICE T operator()(const T& val) const { return std::log2(val); }
+};
+
+template <>
+struct Log2<dtype::float16> {
+  HOSTDEVICE dtype::float16 operator()(const dtype::float16& val) const {
+    return dtype::float16(std::log2(static_cast<float>(val)));
+  }
+};
+
+template <>
+struct Log2<dtype::bfloat16> {
+  HOSTDEVICE dtype::bfloat16 operator()(const dtype::bfloat16& val) const {
+    return dtype::bfloat16(std::log2(static_cast<float>(val)));
+  }
+};
+
 // log2(x) = logarithm to the base 2 of the elements of x
 template <typename T>
 struct Log2Functor : public BaseActivationFunctor<T> {
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
+
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.log() / static_cast<T>(log(2));
+    out.device(d) = x.template cast<U>().unaryExpr(Log2<U>()).eval();
   }
 };
 
@@ -2036,19 +2173,40 @@ struct Log2GradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * static_cast<T>(1) / (x * static_cast<T>(log(2)));
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() { return ActBwdOpFwdDeps::kDepX; }
 };
 
+template <typename T>
+struct Log10 {
+  HOSTDEVICE T operator()(const T& val) const { return std::log10(val); }
+};
+
+template <>
+struct Log10<dtype::float16> {
+  HOSTDEVICE dtype::float16 operator()(const dtype::float16& val) const {
+    return dtype::float16(std::log10(static_cast<float>(val)));
+  }
+};
+
+template <>
+struct Log10<dtype::bfloat16> {
+  HOSTDEVICE dtype::bfloat16 operator()(const dtype::bfloat16& val) const {
+    return dtype::bfloat16(std::log10(static_cast<float>(val)));
+  }
+};
+
 // log10(x) = logarithm to the base 10 of the elements of x
 template <typename T>
 struct Log10Functor : public BaseActivationFunctor<T> {
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
+
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = x.log() / static_cast<T>(log(10));
+    out.device(d) = x.template cast<U>().unaryExpr(Log10<U>()).eval();
   }
 };
 
@@ -2060,19 +2218,40 @@ struct Log10GradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * static_cast<T>(1) / (x * static_cast<T>(log(10)));
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() { return ActBwdOpFwdDeps::kDepX; }
 };
 
+template <typename T>
+struct Log1p {
+  HOSTDEVICE T operator()(const T& val) const { return std::log1p(val); }
+};
+
+template <>
+struct Log1p<dtype::float16> {
+  HOSTDEVICE dtype::float16 operator()(const dtype::float16& val) const {
+    return dtype::float16(std::log1p(static_cast<float>(val)));
+  }
+};
+
+template <>
+struct Log1p<dtype::bfloat16> {
+  HOSTDEVICE dtype::bfloat16 operator()(const dtype::bfloat16& val) const {
+    return dtype::bfloat16(std::log1p(static_cast<float>(val)));
+  }
+};
+
 // log1p(x) = natural logarithm of x+1
 template <typename T>
 struct Log1pFunctor : public BaseActivationFunctor<T> {
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
+
   template <typename Device, typename X, typename Out>
   void operator()(Device d, X x, Out out) const {
-    out.device(d) = (static_cast<T>(1) + x).log();
+    out.device(d) = x.template cast<U>().unaryExpr(Log1p<U>()).eval();
   }
 };
 
@@ -2083,7 +2262,7 @@ struct Log1pGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * (static_cast<T>(1) / (x + static_cast<T>(1)));
   }
 
@@ -2157,7 +2336,7 @@ struct HardSwishGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto tmp = ((x + static_cast<T>(offset)) < static_cast<T>(threshold))
                    .template cast<T>();
     dx.device(d) =
@@ -2193,7 +2372,7 @@ struct SwishGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out fake_out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out fake_out UNUSED, dOut dout, dX dx) const {
     float beta = 1.0;
     auto temp1 = static_cast<T>(1) /
                  (static_cast<T>(1) + (static_cast<T>(-beta) * x).exp());
@@ -2229,7 +2408,7 @@ struct PowGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     dx.device(d) = dout * static_cast<T>(factor) *
                    x.pow(static_cast<T>(factor) - static_cast<T>(1));
   }
@@ -2279,7 +2458,8 @@ struct ZeroGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(
+      Device d, X x UNUSED, Out out, dOut dout UNUSED, dX dx) const {
     dx.device(d) = static_cast<T>(0) * out;
   }
 
@@ -2384,7 +2564,7 @@ struct CELUGradFunctor : public BaseActivationFunctor<T> {
             typename Out,
             typename dOut,
             typename dX>
-  void operator()(Device d, X x, Out out, dOut dout, dX dx) const {
+  void operator()(Device d, X x, Out out UNUSED, dOut dout, dX dx) const {
     auto temp_a_pos = static_cast<T>(alpha > 0);
     auto temp_a_neg = static_cast<T>(alpha <= 0);
     auto temp_x_pos = (x > static_cast<T>(0)).template cast<T>();
@@ -2581,10 +2761,24 @@ struct CudaCosGradFunctor : public BaseActivationFunctor<T> {
 };
 
 template <typename T>
+struct CudaCosGradFunctor<ComplexType<T>>
+    : public BaseActivationFunctor<ComplexType<T>> {
+  // dx = dout * (-sin(x))
+  __device__ __forceinline__ ComplexType<T> operator()(
+      const ComplexType<T> dout, const ComplexType<T> x) const {
+    return static_cast<ComplexType<T>>(-dout * conj(sin(x)));
+  }
+
+  static constexpr ActBwdOpFwdDeps FwdDeps() { return ActBwdOpFwdDeps::kDepX; }
+};
+
+template <typename T>
 struct CudaExpFunctor : public BaseActivationFunctor<T> {
   // exp(x) = expf(x)
-  __device__ __forceinline__ T operator()(const T x) const {
-    return static_cast<T>(expf(static_cast<float>(x)));
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
+
+  __device__ __forceinline__ U operator()(const T x) const {
+    return static_cast<U>(expf(static_cast<float>(x)));
   }
 };
 
@@ -2696,12 +2890,19 @@ struct CudaReciprocalGradFunctor : public BaseActivationFunctor<T> {
 
 template <typename T>
 struct CudaExpm1Functor : public BaseActivationFunctor<T> {
-  using MPType = typename phi::dtype::MPTypeTrait<T>::Type;
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
 
+  // expm1(x) = expm1f(x)
+  __device__ __forceinline__ U operator()(const T x) const {
+    return static_cast<U>(::expm1f(static_cast<float>(x)));
+  }
+};
+
+template <>
+struct CudaExpm1Functor<double> : public BaseActivationFunctor<double> {
   // expm1(x) = expm1(x)
-  __device__ __forceinline__ T operator()(const T arg_x) const {
-    MPType x = static_cast<MPType>(arg_x);
-    return static_cast<T>(expm1(x));
+  __device__ __forceinline__ double operator()(const double x) const {
+    return ::expm1(x);
   }
 };
 
@@ -2744,6 +2945,18 @@ struct CudaSinGradFunctor : public BaseActivationFunctor<T> {
 };
 
 template <typename T>
+struct CudaSinGradFunctor<ComplexType<T>>
+    : public BaseActivationFunctor<ComplexType<T>> {
+  // dx = dout * cos(x)
+  __device__ __forceinline__ ComplexType<T> operator()(
+      const ComplexType<T> dout, const ComplexType<T> x) const {
+    return static_cast<ComplexType<T>>(dout * conj(cos(x)));
+  }
+
+  static constexpr ActBwdOpFwdDeps FwdDeps() { return ActBwdOpFwdDeps::kDepX; }
+};
+
+template <typename T>
 struct CudaTanFunctor : public BaseActivationFunctor<T> {
   using MPType = typename phi::dtype::MPTypeTrait<T>::Type;
 
@@ -2764,6 +2977,18 @@ struct CudaTanGradFunctor : public BaseActivationFunctor<T> {
     MPType dout = static_cast<MPType>(arg_dout);
     MPType x = static_cast<MPType>(arg_x);
     return static_cast<T>(dout / (cos(x) * cos(x)));
+  }
+
+  static constexpr ActBwdOpFwdDeps FwdDeps() { return ActBwdOpFwdDeps::kDepX; }
+};
+
+template <typename T>
+struct CudaTanGradFunctor<ComplexType<T>>
+    : public BaseActivationFunctor<ComplexType<T>> {
+  // dx = dout / cos(x)^2
+  __device__ __forceinline__ ComplexType<T> operator()(
+      const ComplexType<T> dout, const ComplexType<T> x) const {
+    return static_cast<ComplexType<T>>(dout / conj(cos(x) * cos(x)));
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() { return ActBwdOpFwdDeps::kDepX; }
@@ -3082,11 +3307,15 @@ struct CudaRsqrtFunctor : public BaseActivationFunctor<T> {
 
 template <typename T>
 struct CudaRsqrtGradFunctor : public BaseActivationFunctor<T> {
-  T minus_one_half = static_cast<T>(-0.5f);
+  using MPType = typename phi::dtype::MPTypeTrait<T>::Type;
+  MPType minus_one_half = static_cast<MPType>(-0.5f);
 
   // dx = -0.5 * dout * out^3
-  __device__ __forceinline__ T operator()(const T dout, const T out) const {
-    return minus_one_half * dout * out * out * out;
+  __device__ __forceinline__ T operator()(const T arg_dout,
+                                          const T arg_out) const {
+    MPType dout = static_cast<MPType>(arg_dout);
+    MPType out = static_cast<MPType>(arg_out);
+    return static_cast<T>(minus_one_half * dout * out * out * out);
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() {
@@ -3135,6 +3364,22 @@ struct CudaTanhGradFunctor : public BaseActivationFunctor<T> {
   // dx = dout * (1 - out^2)
   __device__ __forceinline__ T operator()(const T dout, const T out) const {
     return dout * (one - out * out);
+  }
+
+  static constexpr ActBwdOpFwdDeps FwdDeps() {
+    return ActBwdOpFwdDeps::kDepOut;
+  }
+};
+
+template <typename T>
+struct CudaTanhGradFunctor<ComplexType<T>>
+    : public BaseActivationFunctor<ComplexType<T>> {
+  ComplexType<T> one = static_cast<ComplexType<T>>(1.0f);
+
+  // dx = dout * (1 - out^2)
+  __device__ __forceinline__ ComplexType<T> operator()(
+      const ComplexType<T> dout, const ComplexType<T> out) const {
+    return dout * conj(one - out * out);
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() {
@@ -3661,13 +3906,34 @@ struct CudaHardSigmoidGradFunctor : public BaseActivationFunctor<T> {
 };
 
 template <typename T>
+__device__ __forceinline__
+    std::conditional_t<std::is_integral<T>::value, float, T>
+    log_local(T x) {
+  static_assert(!std::is_same<T, double>::value,
+                "this template must be used with float or less precise type");
+
+#if defined(__CUDA_ARCH__) || defined(__HIP_ARCH__)
+  // use __logf fast approximation for peak bandwidth
+  return __logf(x);
+#else
+  return ::log(x);
+#endif
+}
+
+template <>
+__device__ __forceinline__ double log_local<double>(double x) {
+  return ::log(x);
+}
+
+template <typename T>
 struct CudaLogFunctor : public BaseActivationFunctor<T> {
   using MPType = typename phi::dtype::MPTypeTrait<T>::Type;
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
 
   // log(x) = log(x)
-  __device__ __forceinline__ T operator()(const T arg_x) const {
+  __device__ __forceinline__ U operator()(const T arg_x) const {
     MPType x = static_cast<MPType>(arg_x);
-    return static_cast<T>(log(x));
+    return static_cast<U>(log_local(x));
   }
 };
 
@@ -3685,11 +3951,12 @@ template <typename T>
 struct CudaLog1pFunctor : public BaseActivationFunctor<T> {
   using MPType = typename phi::dtype::MPTypeTrait<T>::Type;
   MPType one = static_cast<MPType>(1.0f);
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
 
   // log1p(x) = log(1 + x)
-  __device__ __forceinline__ T operator()(const T arg_x) const {
+  __device__ __forceinline__ U operator()(const T arg_x) const {
     MPType x = static_cast<MPType>(arg_x);
-    return static_cast<T>(log(one + x));
+    return static_cast<U>(log_local(one + x));
   }
 };
 
@@ -3706,13 +3973,34 @@ struct CudaLog1pGradFunctor : public BaseActivationFunctor<T> {
 };
 
 template <typename T>
+__device__ __forceinline__
+    std::conditional_t<std::is_integral<T>::value, float, T>
+    log2_local(T x) {
+  static_assert(!std::is_same<T, double>::value,
+                "this template must be used with float or less precise type");
+
+#if defined(__CUDA_ARCH__) || defined(__HIP_ARCH__)
+  // use __logf fast approximation for peak bandwidth
+  return __log2f(x);
+#else
+  return ::log2(x);
+#endif
+}
+
+template <>
+__device__ __forceinline__ double log2_local<double>(double x) {
+  return ::log2(x);
+}
+
+template <typename T>
 struct CudaLog2Functor : public BaseActivationFunctor<T> {
   using MPType = typename phi::dtype::MPTypeTrait<T>::Type;
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
 
   // log2(x) = log2(x)
-  __device__ __forceinline__ T operator()(const T arg_x) const {
+  __device__ __forceinline__ U operator()(const T arg_x) const {
     MPType x = static_cast<MPType>(arg_x);
-    return static_cast<T>(log2(x));
+    return static_cast<U>(log2_local(x));
   }
 };
 
@@ -3730,13 +4018,34 @@ struct CudaLog2GradFunctor : public BaseActivationFunctor<T> {
 };
 
 template <typename T>
+__device__ __forceinline__
+    std::conditional_t<std::is_integral<T>::value, float, T>
+    log10_local(T x) {
+  static_assert(!std::is_same<T, double>::value,
+                "this template must be used with float or less precise type");
+
+#if defined(__CUDA_ARCH__) || defined(__HIP_ARCH__)
+  // use __logf fast approximation for peak bandwidth
+  return __log10f(x);
+#else
+  return ::log10(x);
+#endif
+}
+
+template <>
+__device__ __forceinline__ double log10_local(double x) {
+  return ::log10(x);
+}
+
+template <typename T>
 struct CudaLog10Functor : public BaseActivationFunctor<T> {
   using MPType = typename phi::dtype::MPTypeTrait<T>::Type;
+  using U = typename std::conditional_t<std::is_integral<T>::value, float, T>;
 
   // log10(x) = log10(x)
-  __device__ __forceinline__ T operator()(const T arg_x) const {
+  __device__ __forceinline__ U operator()(const T arg_x) const {
     MPType x = static_cast<MPType>(arg_x);
-    return static_cast<T>(log10(x));
+    return static_cast<U>(log10_local(x));
   }
 };
 
@@ -3757,7 +4066,7 @@ template <typename T>
 struct CudaSwishFunctor : public BaseActivationFunctor<T> {
   using MPType = typename phi::dtype::MPTypeTrait<T>::Type;
   MPType one = static_cast<MPType>(1.0f);
-  float beta;
+  float beta = 1.0;
 
   typename BaseActivationFunctor<T>::AttrPair GetAttrs() {
     return {{"beta", &beta}};

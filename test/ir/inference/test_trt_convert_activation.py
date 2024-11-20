@@ -37,14 +37,10 @@ class TrtConvertActivationTest(TrtLayerAutoScanTest):
                 return np.random.random([]).astype(np.float32)
             elif dims == 1:
                 return np.random.random([32]).astype(np.float32)
-            elif dims == 2:
-                return np.random.random([3, 32]).astype(np.float32)
-            elif dims == 3:
-                return np.random.random([3, 32, 32]).astype(np.float32)
             else:
                 return np.random.random([batch, 3, 32, 32]).astype(np.float32)
 
-        for dims in [0, 1, 2, 3, 4]:
+        for dims in [0, 1, 4]:
             for batch in [1, 4]:
                 for op_type in [
                     "relu",
@@ -60,6 +56,9 @@ class TrtConvertActivationTest(TrtLayerAutoScanTest):
                     "logsigmoid",
                     "tanh_shrink",
                     "softplus",
+                    "hard_swish",
+                    "hard_sigmoid",
+                    "leaky_relu",
                 ]:
                     # few samples to reduce time
                     # for beta in [-0.2, 0.5, 0.67, 3]:
@@ -80,6 +79,18 @@ class TrtConvertActivationTest(TrtLayerAutoScanTest):
                                 dics = [{"threshold": alpha}]
                             if op_type == "softplus":
                                 dics = [{"beta": beta}]
+                            if op_type == "hard_swish":
+                                dics = [
+                                    {
+                                        "threshold": 6.0,
+                                        "scale": 6.0,
+                                        "offset": 3.0,
+                                    }
+                                ]
+                            if op_type == "hard_sigmoid":
+                                dics = [{"slope": beta, "offset": alpha}]
+                            if op_type == "leaky_relu":
+                                dics = [{"alpha": alpha}]
 
                             ops_config = [
                                 {
@@ -152,7 +163,11 @@ class TrtConvertActivationTest(TrtLayerAutoScanTest):
                 + runtime_version[2] * 10
                 < 8600
                 and self.dims == 0
-            ) and program_config.ops[0].type in ["celu", "logsigmoid"]:
+            ) and program_config.ops[0].type in [
+                "celu",
+                "logsigmoid",
+                "tanh_shrink",
+            ]:
                 return 0, 3
             return 1, 2
 

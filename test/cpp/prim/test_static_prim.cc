@@ -41,6 +41,7 @@ PD_DECLARE_KERNEL(multiply, CPU, ALL_LAYOUT);
 PD_DECLARE_KERNEL(concat, CPU, ALL_LAYOUT);
 PD_DECLARE_KERNEL(less_equal, CPU, ALL_LAYOUT);
 PD_DECLARE_KERNEL(less_than, CPU, ALL_LAYOUT);
+PD_DECLARE_KERNEL(less_than_raw, CPU, ALL_LAYOUT);
 PD_DECLARE_KERNEL(equal, CPU, ALL_LAYOUT);
 PD_DECLARE_KERNEL(not_equal, CPU, ALL_LAYOUT);
 PD_DECLARE_KERNEL(greater_equal, CPU, ALL_LAYOUT);
@@ -60,6 +61,7 @@ PD_DECLARE_KERNEL(multiply, KPS, ALL_LAYOUT);
 PD_DECLARE_KERNEL(concat, GPU, ALL_LAYOUT);
 PD_DECLARE_KERNEL(less_equal, KPS, ALL_LAYOUT);
 PD_DECLARE_KERNEL(less_than, KPS, ALL_LAYOUT);
+PD_DECLARE_KERNEL(less_than_raw, KPS, ALL_LAYOUT);
 PD_DECLARE_KERNEL(equal, KPS, ALL_LAYOUT);
 PD_DECLARE_KERNEL(not_equal, KPS, ALL_LAYOUT);
 PD_DECLARE_KERNEL(greater_equal, KPS, ALL_LAYOUT);
@@ -206,6 +208,11 @@ TEST(StaticPrim, TanhBackwardComposite) {
   auto* forward_opdesc = target_block->AllOps()[0];
   std::unordered_map<std::string, std::string> grad_to_var;
   std::vector<framework::BlockDesc*> grad_sub_block;
+  Tensor out_grad = prim::empty<prim::DescTensor>(
+      shape, phi::DataType::FLOAT32, paddle::Place());
+  framework::VarDesc* out_grad_desc =
+      static_cast<prim::DescTensor*>(out_grad.impl().get())->get_ptr();
+  target_block->RenameVar(out_grad_desc->Name(), "b@GRAD");
   std::vector<std::unique_ptr<framework::OpDesc>> grad_ops =
       std::move(framework::OpInfoMap::Instance()
                     .Get(forward_opdesc->Type())
@@ -288,6 +295,11 @@ TEST(StaticCompositeGradMaker, TestMutiInputMethod) {
   auto* forward_opdesc = target_block->AllOps()[0];
   std::unordered_map<std::string, std::string> grad_to_var;
   std::vector<framework::BlockDesc*> grad_sub_block;
+  Tensor out_grad = prim::empty<prim::DescTensor>(
+      shape, phi::DataType::FLOAT32, paddle::Place());
+  framework::VarDesc* out_grad_desc =
+      static_cast<prim::DescTensor*>(out_grad.impl().get())->get_ptr();
+  target_block->RenameVar(out_grad_desc->Name(), "out@GRAD");
   auto test = TestCompositeGradMaker(*forward_opdesc,
                                      std::unordered_set<std::string>(),
                                      &grad_to_var,
@@ -353,6 +365,19 @@ TEST(StaticCompositeGradMaker, TestMutiOutputMethod) {
   auto* forward_opdesc = target_block->AllOps()[0];
   std::unordered_map<std::string, std::string> grad_to_var;
   std::vector<framework::BlockDesc*> grad_sub_block;
+
+  Tensor out1_grad = prim::empty<prim::DescTensor>(
+      shape, phi::DataType::FLOAT32, paddle::Place());
+  framework::VarDesc* out1_grad_desc =
+      static_cast<prim::DescTensor*>(out1_grad.impl().get())->get_ptr();
+  target_block->RenameVar(out1_grad_desc->Name(), "out1@GRAD");
+
+  Tensor out2_grad = prim::empty<prim::DescTensor>(
+      shape, phi::DataType::FLOAT32, paddle::Place());
+  framework::VarDesc* out2_grad_desc =
+      static_cast<prim::DescTensor*>(out2_grad.impl().get())->get_ptr();
+  target_block->RenameVar(out2_grad_desc->Name(), "out2@GRAD");
+
   auto test = TestCompositeGradMaker(*forward_opdesc,
                                      std::unordered_set<std::string>(),
                                      &grad_to_var,

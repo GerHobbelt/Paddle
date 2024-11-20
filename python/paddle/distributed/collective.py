@@ -19,7 +19,7 @@ import paddle
 
 # (TODO: GhostScreaming) It will be removed later.
 from paddle.fluid import core
-from paddle.framework import in_dygraph_mode
+from paddle.framework import in_dynamic_mode
 
 from .communication.group import Group, _add_new_group, is_initialized
 from .fleet.layers.mpu.mp_ops import _c_concat  # noqa: F401
@@ -128,7 +128,7 @@ def _set_group_map_backend(group, backend):
 
 def _new_ring_id():
     # NOTE(liyurui): For compatible reason, auto parallel and eager mode relay on previous syntax.
-    if in_dygraph_mode():
+    if in_dynamic_mode():
         global _start_ring_id
         _start_ring_id += 1
         return _start_ring_id + max(_get_global_env().nrings, 9)
@@ -152,6 +152,7 @@ def _new_process_group_impl(
         pg = core.ProcessGroupGloo.create(store, rank, world_size, group_id)
     elif backend == "nccl":
         pg = core.ProcessGroupNCCL.create(store, rank, world_size, group_id)
+
     elif backend == "xccl":
         pg = core.ProcessGroupCustom.create(
             store, genv.device_type, rank, world_size, group_id
@@ -198,7 +199,7 @@ def new_group(ranks=None, backend=None, timeout=_default_timeout):
     """
     global _custom_gid
     global _group_map
-    if in_dygraph_mode():
+    if in_dynamic_mode():
         global _default_group_name
         gid = _custom_gid if _custom_gid else _new_ring_id()
         group_name = _default_group_name + str(gid)
@@ -292,7 +293,7 @@ def new_group(ranks=None, backend=None, timeout=_default_timeout):
     # hang caused by cross-creation of new_group
     tmp = (
         paddle.to_tensor([1], dtype="int32")
-        if in_dygraph_mode()
+        if in_dynamic_mode()
         else paddle.full([0], 1, dtype="int32")
     )
     paddle.distributed.all_reduce(tmp, sync_op=True)
@@ -320,6 +321,11 @@ def is_available():
 
 def _init_parallel_env(backend):
     master_endpoint = os.getenv("PADDLE_MASTER", None)
+    if master_endpoint is None:
+        master_endpoint = os.getenv("PADDLE_TRAINER_ENDPOINTS").split(',')[0]
+        assert (
+            master_endpoint is not None
+        ), "Please set PADDLE_MASTER enviroment variable."
     if master_endpoint:
         master_addr = master_endpoint.split(":")[0]
         master_port = int(master_endpoint.split(":")[1])
@@ -336,9 +342,10 @@ def _init_parallel_env(backend):
         )
         if backend == "gloo":
             core.CommContextManager.create_gloo_comm_context(
-                store, 0, rank, world_size
+                store, "0", rank, world_size
             )
         elif backend == "nccl":
+            core.CommContextManager.set_cuda_device_id(dev_id)
             core.CommContextManager.create_nccl_comm_context(
-                store, dev_id, 0, rank, world_size
+                store, "0", rank, world_size
             )

@@ -69,6 +69,7 @@ def _compute_numerical_jacobian(func, xs, delta, np_dtype):
     for j in range(fin_size):
         for q in range(_product(xs[j].shape)):
             orig = _get_item(xs[j], q)
+            orig = paddle.assign(orig)
             x_pos = orig + delta
             xs[j] = _set_item(xs[j], q, x_pos)
             ys_pos = as_tensors(func(*xs))
@@ -105,6 +106,7 @@ def _compute_numerical_hessian(func, xs, delta, np_dtype):
             for j in range(fin_size):
                 for q in range(_product(xs[j].shape)):
                     orig = _get_item(xs[j], q)
+                    orig = paddle.assign(orig)
                     x_pos = orig + delta
                     xs[j] = _set_item(xs[j], q, x_pos)
                     jacobian_pos = _compute_numerical_jacobian(
@@ -398,6 +400,7 @@ def _np_concat_matrix_sequence(src, src_format=MatrixFormat.NM):
         return src
     if not isinstance(src[0], typing.Sequence):
         src = [src]
+
     return concat_row(tuple(concat_col(xs) for xs in src))
 
 

@@ -148,11 +148,10 @@ void CPUQuantizePass::QuantizeInputs(Graph* g,
   auto inputs = op->inputs;
   auto var_names = op->Op()->Inputs().at(input_name);
   std::vector<std::string> unique_var_names;
-  for (unsigned i = 0; i < var_names.size(); i++)
-    if (std::find(unique_var_names.begin(),
-                  unique_var_names.end(),
-                  var_names[i]) == unique_var_names.end())
-      unique_var_names.push_back(var_names[i]);
+  for (auto& var_name : var_names)
+    if (std::find(unique_var_names.begin(), unique_var_names.end(), var_name) ==
+        unique_var_names.end())
+      unique_var_names.push_back(var_name);
 
   auto output = op->outputs[0];
   PADDLE_ENFORCE_GE(inputs.size(),
@@ -725,9 +724,9 @@ void CPUQuantizePass::QuantizeConcat(Graph* graph) const {
     // if all inputs were unsigned, then the output was set to unsigned
     // during the scale calculation step
     auto inputs = concat_op->inputs;
-    for (size_t i = 0; i < inputs.size(); i++) {
-      if (AreScalesPresentForVarNames({inputs[i]->Name()})) {
-        auto scale_data = GetScaleDataByName(inputs[i]->Name());
+    for (auto& input : inputs) {
+      if (AreScalesPresentForVarNames({input->Name()})) {
+        auto scale_data = GetScaleDataByName(input->Name());
         if (scale_data.first == false) {
           are_all_inputs_unsigned = false;
           break;
@@ -1045,14 +1044,14 @@ void CPUQuantizePass::QuantizeElementwise(
                   "X",
                   input_x_scale,
                   is_x_unsigned,
-                  "Scale_x");
+                  "scale_x");
     QuantizeInput(g,
                   elementwise_op,
                   elementwise_y,
                   "Y",
                   input_y_scale,
                   is_y_unsigned,
-                  "Scale_y");
+                  "scale_y");
 
     bool is_output_unsigned{false};
     auto output_scale =
@@ -1064,7 +1063,7 @@ void CPUQuantizePass::QuantizeElementwise(
                      "Out",
                      output_scale,
                      is_output_unsigned,
-                     "Scale_out");
+                     "scale_out");
 
     ++quantize_elementwise_count;
   };
@@ -1314,9 +1313,9 @@ void CPUQuantizePass::ApplyImpl(ir::Graph* graph) const {
   QuantizeImmutable(graph, "nearest_interp", "X");
   QuantizeImmutable(graph, "nearest_interp_v2", "X");
   QuantizeImmutable(graph, "split", "X");
-  QuantizeElementwise(graph, "elementwise_add");
-  QuantizeElementwise(graph, "elementwise_mul");
-  QuantizeElementwise(graph, "elementwise_sub");
+  QuantizeElementwise(graph, "fused_elementwise_add");
+  QuantizeElementwise(graph, "fused_elementwise_mul");
+  QuantizeElementwise(graph, "fused_elementwise_sub");
   QuantizeFusionGru(graph);
   QuantizeMultiGru(graph);
   QuantizeFusionLSTM(graph);

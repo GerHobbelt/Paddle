@@ -31,10 +31,14 @@
 #include <cuda_bf16.h>
 #endif
 
+#ifndef PADDLE_WITH_HIP
 #if !defined(_WIN32)
 #define PADDLE_ALIGN(x) __attribute__((aligned(x)))
 #else
 #define PADDLE_ALIGN(x) __declspec(align(x))
+#endif
+#else
+#define PADDLE_ALIGN(x)
 #endif
 
 namespace phi {
@@ -144,7 +148,7 @@ struct PADDLE_ALIGN(2) bfloat16 {
     return *this;
   }
 
-  // Conversion opertors
+  // Conversion operators
   HOSTDEVICE inline operator float() const {
 #ifdef PADDLE_WITH_HIP
     uint32_t res = 0;

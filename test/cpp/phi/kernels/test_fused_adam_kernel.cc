@@ -34,7 +34,7 @@
 #include "paddle/phi/kernels/full_kernel.h"
 #include "paddle/phi/kernels/fused_adam_kernel.h"
 #include "paddle/phi/kernels/gaussian_kernel.h"
-#include "paddle/phi/kernels/reduce_max_kernel.h"
+#include "paddle/phi/kernels/legacy/reduce_max_kernel.h"
 
 namespace phi {
 
@@ -89,7 +89,7 @@ static auto ToMutableTensorPtrVector(
 static auto ToMetaTensorVector(const std::vector<DenseTensor> &tensors) {
   std::vector<MetaTensor> results;
   for (auto &t : tensors) {
-    results.push_back(t);
+    results.emplace_back(t);
   }
   return results;
 }

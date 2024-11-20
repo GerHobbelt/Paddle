@@ -25,7 +25,7 @@ namespace math {
 template <typename T>
 class BeamSearchFunctor<phi::CPUContext, T> {
  public:
-  void operator()(const phi::CPUContext &context,
+  void operator()(const phi::CPUContext &context UNUSED,
                   const phi::DenseTensor *pre_ids,
                   const phi::DenseTensor *pre_scores,
                   const phi::DenseTensor *ids,
@@ -113,7 +113,7 @@ class BeamSearchFunctor<phi::CPUContext, T> {
    * The basic items help to sort.
    */
   struct Item {
-    Item() {}
+    Item() = default;
     Item(size_t offset, size_t id, float score)
         : offset(offset), id(id), score(score) {}
     // offset in the higher lod level.

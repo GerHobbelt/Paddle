@@ -77,7 +77,6 @@ class TrtConvertConv2dTransposeTest(TrtLayerAutoScanTest):
                             ]:
                                 for dilations in [[2, 2], [1, 2]]:
                                     for data_format in ['NCHW']:
-
                                         self.num_channels = num_channels
                                         dics = [
                                             {
@@ -253,10 +252,15 @@ class TrtConvertConv2dTransposeTest2(TrtLayerAutoScanTest):
         self.trt_param.workspace_size = 1073741824
 
         def generate_input1(batch, num_channels, attrs: List[Dict[str, Any]]):
-            return np.ones([batch, num_channels, 20, 30]).astype(np.float32)
+            return (
+                np.ones([batch, num_channels, 20, 30]).astype(np.float32) / 100
+            )
 
         def generate_weight1(num_channels, attrs: List[Dict[str, Any]]):
-            return np.random.random([num_channels, 64, 3, 3]).astype(np.float32)
+            return (
+                np.random.random([num_channels, 64, 3, 3]).astype(np.float32)
+                / 100
+            )
 
         num_channels = 128
         batch = 1

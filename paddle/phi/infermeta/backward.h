@@ -184,6 +184,15 @@ void FusedDropoutAddGradInferMeta(const MetaTensor& seed_offset,
                                   MetaTensor* x_grad,
                                   MetaTensor* y_grad);
 
+void FusedRopeGradInferMeta(const MetaTensor& sin,
+                            const MetaTensor& cos,
+                            const MetaTensor& dout_q,
+                            const MetaTensor& dout_k,
+                            const MetaTensor& dout_v,
+                            MetaTensor* dq,
+                            MetaTensor* dk,
+                            MetaTensor* dv);
+
 void GatherNdGradInferMeta(const MetaTensor& x,
                            const MetaTensor& index,
                            const MetaTensor& out_grad,
@@ -413,6 +422,14 @@ void StackGradInferMeta(const MetaTensor& out_grad,
                         int axis,
                         std::vector<MetaTensor*> x_grad);
 
+void TransposeInferMeta(const MetaTensor& x,
+                        const std::vector<int>& axis,
+                        MetaTensor* out);
+
+void TransLayoutGradInferMeta(const MetaTensor& x,
+                              const MetaTensor& out_grad,
+                              const std::vector<int>& axis,
+                              MetaTensor* out);
 void UniformRandomInplaceGradInferMeta(const MetaTensor& out_grad,
                                        float min,
                                        float max,
@@ -452,4 +469,11 @@ void IndexAddGradInferMeta(const MetaTensor& index,
                            MetaTensor* x_grad,
                            MetaTensor* add_tensor_grad);
 
+void IndexPutGradInferMeta(const MetaTensor& x,
+                           const std::vector<const MetaTensor*>& indices,
+                           const MetaTensor& value,
+                           const MetaTensor& out_grad,
+                           bool accumulate,
+                           MetaTensor* x_grad,
+                           MetaTensor* value_grad);
 }  // namespace phi

@@ -37,7 +37,7 @@ from . import unique_name
 import paddle.version as fluid_version
 import warnings
 import functools
-from .variable_index import _getitem_impl_, _setitem_impl_
+from .variable_index import _getitem_static, _setitem_static, _setitem_impl_
 import threading
 
 __all__ = [
@@ -52,7 +52,6 @@ __all__ = [
     'cpu_places',
     'xpu_places',
     'cuda_pinned_places',
-    '_non_static_mode',
     'in_dygraph_mode',
     'is_compiled_with_cinn',
     'is_compiled_with_cuda',
@@ -63,6 +62,7 @@ __all__ = [
     'device_guard',
     'set_flags',
     'get_flags',
+    '_stride_in_no_check_dy2st_diff',
 ]
 
 EMPTY_VAR_NAME = core.kEmptyVarName()
@@ -83,7 +83,6 @@ class GlobalThreadLocal(threading.local):
         self._in_declarative_mode_ = False
         self._functional_dygraph_context_manager = None
         self._dygraph_tracer_ = _dygraph_tracer_
-        self._in_eager_mode_ = True
 
     def __str__(self):
         strings = []
@@ -95,7 +94,6 @@ class GlobalThreadLocal(threading.local):
             + str(self._functional_dygraph_context_manager)
         )
         strings.append("_dygraph_tracer_:" + str(self._dygraph_tracer_))
-        strings.append("_in_eager_mode_:" + str(self._in_eager_mode_))
         return "\n".join(strings)
 
     def __setattr__(self, name, val):
@@ -114,7 +112,7 @@ global_prog_seed = 0
 _current_pipeline_stage = None
 _current_cuda_graph_mode = None
 _global_flags_ = core.globals()
-
+_stride_in_no_check_dy2st_diff_mode = False
 
 # special_op_attrs, extra_op_attrs are prepared for printing warnings
 # when turning on FLAGS_print_extra_attrs
@@ -158,32 +156,6 @@ extra_op_attrs = {
     "unique": ["is_sorted"],
 }
 
-# Some explanation of our execution system 2022.03
-# For now we have 3 kinds of execution system, since we refactored dygraph mode to
-# build a fast execution system for dynamic mode. But we can't just remove all legacy
-# code once we present the new system for some historical reason. That's why we have
-# these flags.
-#
-# 1. _non_static_mode():
-# _non_static_mode means  we are now running in legacy dygraph mode or dygraph mode.
-# 2. dygraph_mode():
-# This flags inidicates we are now running in dygraph mode which called eager mode before.
-# 3. _in_legacy_dygraph():
-# This flags has been deprecated
-#
-# They have a relation ship as below:
-# Since _in_legacy_graph is deprecated, so dygraph_mode is _non_static_mode
-#
-# Why we have to make different of _in_legacy_dygraph and dygraph_mode?
-# In some performance issue, we find that python if statement cause server performance problem
-# and we need our new dygraph mode becomes as fast as it could be. That's why we make these flags
-# to make sure in most case, we find new dygraph mode first with only one if statement.
-
-
-def _in_eager_without_dygraph_check():
-    return global_var._in_eager_mode_
-
-
 # FIXME(dev): We haven't fully verified eager mode on XPU et.al but
 # only GPU/CPU. Remove this after we improve this feature.
 _is_first_import_ = True
@@ -216,12 +188,6 @@ def in_dygraph_mode():
             print(paddle.in_dynamic_mode())  # True, Now we are in dynamic mode
 
     """
-    return (
-        global_var._dygraph_tracer_ is not None
-    ) and global_var._in_eager_mode_
-
-
-def _non_static_mode():
     return global_var._dygraph_tracer_ is not None
 
 
@@ -467,7 +433,7 @@ def require_version(min_version, max_version=None):
 
 def _dygraph_not_support_(func):
     def __impl__(*args, **kwargs):
-        assert not _non_static_mode(), (
+        assert not in_dygraph_mode(), (
             "We don't support %s in dynamic graph mode" % func.__name__
         )
         return func(*args, **kwargs)
@@ -477,7 +443,7 @@ def _dygraph_not_support_(func):
 
 def _dygraph_only_(func):
     def __impl__(*args, **kwargs):
-        assert _non_static_mode(), (
+        assert in_dygraph_mode(), (
             "We only support '%s()' in dynamic graph mode, please call 'paddle.disable_static()' to enter dynamic graph mode."
             % func.__name__
         )
@@ -490,7 +456,7 @@ def _non_static_only_(func):
     def __impl__(*args, **kwargs):
         from .dygraph.base import in_declarative_mode
 
-        assert _non_static_mode() or in_declarative_mode(), (
+        assert in_dygraph_mode() or in_declarative_mode(), (
             "We only support '%s()' in dynamic graph mode, please call 'paddle.disable_static()' to enter dynamic graph mode."
             % func.__name__
         )
@@ -501,7 +467,7 @@ def _non_static_only_(func):
 
 def _static_only_(func):
     def __impl__(*args, **kwargs):
-        assert not _non_static_mode(), (
+        assert not in_dygraph_mode(), (
             "In PaddlePaddle 2.x, we turn on dynamic graph mode by default, and '%s()' is only supported in static graph mode. So if you want to use this api, please call 'paddle.enable_static()' before this api to enter static graph mode."
             % func.__name__
         )
@@ -597,19 +563,19 @@ def _current_expected_place():
                     "You are using XPU version Paddle, but your XPU device is not set properly. CPU device will be used by default."
                 )
                 _global_expected_place_ = core.CPUPlace()
-        elif core.is_compiled_with_custom_device("npu"):
-            # TODO(duanyanhui): Optimize DeviceManager and Return all expected places when device registered in DeviceManager is greater than 1.
+        elif len(core.get_all_custom_device_type()) > 0:
+            dev_type = core.get_all_custom_device_type()[0]
             try:
-                device_count = core.get_custom_device_count("npu")
+                device_count = core.get_custom_device_count(dev_type)
             except Exception as e:
                 device_count = 0
             if device_count > 0:
                 _global_expected_place_ = core.CustomPlace(
-                    "npu", _custom_device_ids("npu")[0]
+                    dev_type, _custom_device_ids(dev_type)[0]
                 )
             else:
                 warnings.warn(
-                    "You are using NPU version Paddle, but your NPU device is not set properly. CPU device will be used by default."
+                    "You are using CUSTOM_DEVICE version Paddle, but your custom device is not set properly. CPU device will be used by default."
                 )
                 _global_expected_place_ = core.CPUPlace()
         else:
@@ -994,7 +960,7 @@ def name_scope(prefix=None):
     """
     # TODO(panyx0718): Only [0-9a-z].
     # in dygraph we don't need namescope since it will cause mem leak
-    if _non_static_mode():
+    if in_dygraph_mode():
         yield
     else:
         assert prefix, "namescope prefix can not be empty."
@@ -1295,6 +1261,7 @@ class Variable(metaclass=VariableMetaClass):
         In Static Graph Mode:
 
         .. code-block:: python
+            :name: code-example-1
 
             import paddle.fluid as fluid
             cur_program = fluid.Program()
@@ -1306,6 +1273,7 @@ class Variable(metaclass=VariableMetaClass):
         In Dygraph  Mode:
 
         .. code-block:: python
+            :name: code-example-2
 
             import paddle.fluid as fluid
             import numpy as np
@@ -1431,6 +1399,7 @@ class Variable(metaclass=VariableMetaClass):
         self.op = None
         self.stop_gradient = stop_gradient
         self.is_data = is_data
+        self.is_view_var = False
 
     def detach(self):
         """
@@ -1716,7 +1685,7 @@ class Variable(metaclass=VariableMetaClass):
         if self.persistable:
             var_str = "persist " + var_str
 
-        from paddle.distributed.auto_parallel.dist_context import (
+        from paddle.distributed.auto_parallel.static.dist_context import (
             get_default_distributed_context,
         )
 
@@ -2325,10 +2294,20 @@ class Variable(metaclass=VariableMetaClass):
             raise IndexError("Valid index accept int or slice or tuple")
 
     def __getitem__(self, item):
-        return _getitem_impl_(self, item)
+        return _getitem_static(self, item)
 
     def __setitem__(self, item, value):
-        return _setitem_impl_(self, item, value)
+        from .dygraph.base import in_declarative_mode
+
+        if in_declarative_mode():
+            if is_compiled_with_xpu():
+                # (NOTE): Currently, there is no index_put_xpu kernel.
+                return _setitem_impl_(self, item, value)
+            return _setitem_static(self, item, value)
+        else:
+            raise RuntimeError(
+                "In static mode, the __setitem__ (looks like: x[indices] = values) should not be used. Please use x = paddle.static.setitem(x, indices, values)"
+            )
 
     def get_value(self, scope=None):
         """
@@ -2489,6 +2468,12 @@ class Variable(metaclass=VariableMetaClass):
             p = core.Place()
             p.set_place(t._place())
             place = core.XPUPlace(p.xpu_device_id())
+        elif p.is_custom_place():
+            p = core.Place()
+            p.set_place(t._place())
+            place = core.CustomPlace(
+                p.custom_device_type(), p.custom_device_id()
+            )
         else:
             p = core.Place()
             p.set_place(t._place())
@@ -2499,7 +2484,7 @@ class Variable(metaclass=VariableMetaClass):
     def size(self):
         """
 
-        Returns the number of elements for current Variable, which is a int64 Variable with shape [1]
+        Returns the number of elements for current Variable, which is a int64 Variable with shape [] .
 
         Returns:
             Variable, the number of elements for current Variable
@@ -2761,7 +2746,7 @@ class Operator:
         except ValueError:
             pass
 
-        if _non_static_mode():
+        if in_dygraph_mode():
             if type is None:
                 raise ValueError(
                     "`type` to initialized an Operator can not be None."
@@ -2769,7 +2754,6 @@ class Operator:
             self._type = type
             self.attrs = attrs if attrs else {}
         else:
-
             self.block = block
             self.desc = desc
             # note: not add self.attrs here:
@@ -2947,7 +2931,7 @@ class Operator:
                         else:
                             out_arg_names.append(arg.name)
                         # TODO(minqiyang): could we remove variable's op in static graph mode?
-                        if not _non_static_mode():
+                        if not in_dygraph_mode():
                             if isinstance(arg, str):
                                 block.var(arg).op = self
                             else:
@@ -3172,7 +3156,7 @@ class Operator:
             if i != len(attr_names) - 1:
                 attrs_str += ", "
 
-        from paddle.distributed.auto_parallel.dist_context import (
+        from paddle.distributed.auto_parallel.static.dist_context import (
             get_default_distributed_context,
         )
 
@@ -3571,6 +3555,224 @@ class Operator:
         self.desc.dist_attr = dist_attr
 
 
+@signature_safe_contextmanager
+def _stride_in_no_check_dy2st_diff():
+    global _stride_in_no_check_dy2st_diff_mode
+    _stride_in_no_check_dy2st_diff_mode = True
+    try:
+        yield
+    finally:
+        _stride_in_no_check_dy2st_diff_mode = False
+
+
+def check_if_to_static_diff_with_dygraph(op_type, inplace_map, outputs):
+    if outputs is not None:
+        for k, v in outputs.items():
+            if isinstance(v, Variable):
+                if v.is_view_var and not (
+                    op_type == "set_value"
+                    and inplace_map.get("Input", None) == "Out"
+                ):
+                    raise ValueError(
+                        'Sorry about what\'s happend. In to_static mode, %s\'s output variable %s is a viewed Tensor in dygraph. This will result in inconsistent calculation behavior between dynamic and static graphs. If you are sure it is safe, you can call with paddle.fluid.framework._stride_in_no_check_dy2st_diff() in your safe code block.'
+                        % (op_type, k)
+                    )
+            elif isinstance(v, list):
+                for var in v:
+                    if isinstance(var, Variable):
+                        if var.is_view_var and not (
+                            op_type == "set_value"
+                            and inplace_map.get("Input", None) == "Out"
+                        ):
+                            raise ValueError(
+                                'Sorry about what\'s happend. In to_static mode, %s\'s output variable %s is a viewed Tensor in dygraph. This will result in inconsistent calculation behavior between dynamic and static graphs. If you are sure it is safe, you can call with paddle.fluid.framework._stride_in_no_check_dy2st_diff() in your safe code block.'
+                                % (op_type, k)
+                            )
+
+
+def record_is_view_var(op_type, inputs, outputs):
+    if op_type == "slice":
+        if inputs is not None and isinstance(inputs["Input"], list):
+            if hasattr(inputs["Input"][0], "is_view_var"):
+                inputs["Input"][0].is_view_var = True
+        else:
+            if hasattr(inputs["Input"], "is_view_var"):
+                inputs["Input"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "strided_slice":
+        if inputs is not None and isinstance(inputs["Input"], list):
+            if hasattr(inputs["Input"][0], "is_view_var"):
+                inputs["Input"][0].is_view_var = True
+        else:
+            if hasattr(inputs["Input"], "is_view_var"):
+                inputs["Input"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "index_select":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "split":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None:
+            for out in outputs["Out"]:
+                if hasattr(out, "is_view_var"):
+                    out.is_view_var = True
+    elif op_type == "unsqueeze" or op_type == "unsqueeze2":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "squeeze" or op_type == "squeeze2":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "transpose" or op_type == "transpose2":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "unbind":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "diagonal":
+        if inputs is not None and isinstance(inputs["Input"], list):
+            if hasattr(inputs["Input"][0], "is_view_var"):
+                inputs["Input"][0].is_view_var = True
+        else:
+            if hasattr(inputs["Input"], "is_view_var"):
+                inputs["Input"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "flatten":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "imag":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "real":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "reshape" or op_type == "reshape2":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+    elif op_type == "as_real":
+        if inputs is not None and isinstance(inputs["X"], list):
+            if hasattr(inputs["X"][0], "is_view_var"):
+                inputs["X"][0].is_view_var = True
+        else:
+            if hasattr(inputs["X"], "is_view_var"):
+                inputs["X"].is_view_var = True
+        if outputs is not None and isinstance(outputs["Out"], list):
+            if hasattr(outputs["Out"][0], "is_view_var"):
+                outputs["Out"][0].is_view_var = True
+        else:
+            if hasattr(outputs["Out"], "is_view_var"):
+                outputs["Out"].is_view_var = True
+
+
 class Block:
     """
     In Fluid, a Program is consistence of multi-Block, and Block stores
@@ -3822,7 +4024,7 @@ class Block:
         )
 
     def create_var(self, *args, **kwargs):
-        if _non_static_mode():
+        if in_dygraph_mode():
             var = _create_tensor(*args, **kwargs)
         else:
             var = Variable(block=self, *args, **kwargs)
@@ -3978,10 +4180,10 @@ class Block:
         Returns:
             Operator: the append Operator.
         """
+        inplace_map = kwargs.get("inplace_map", None)
         op_type = kwargs.get("type", None)
-        if _non_static_mode():
+        if in_dygraph_mode():
             attrs = kwargs.get("attrs", {})
-            inplace_map = kwargs.get("inplace_map", None)
             warnings.warn(
                 "Op `%s` is executed through `append_op` under the dynamic mode, "
                 "the corresponding API implementation needs to be upgraded to "
@@ -4042,6 +4244,15 @@ class Block:
                 'while',
                 'while_grad',
             }
+            from .dygraph.base import in_declarative_mode
+
+            if (
+                in_declarative_mode()
+                and not _stride_in_no_check_dy2st_diff_mode
+            ):
+                check_if_to_static_diff_with_dygraph(
+                    op_type, inplace_map, outputs
+                )
             if op_type not in ignore_ops:
                 pass_stop_gradient(inputs, outputs)
             with param_guard(inputs), param_guard(outputs):
@@ -4055,6 +4266,8 @@ class Block:
                 )
 
             self.ops.append(op)
+            if in_declarative_mode():
+                record_is_view_var(op_type, inputs, outputs)
 
         return op
 
@@ -4116,7 +4329,7 @@ class Block:
         return self.ops[start:end]
 
     def _prepend_op(self, *args, **kwargs):
-        if _non_static_mode():
+        if in_dygraph_mode():
             type = kwargs.get("type", None)
             attrs = kwargs.get("attrs", {})
             op = Operator(
@@ -5779,21 +5992,22 @@ class Program:
           use :code:`clone` after :code:`Opimizer.minimize`, but we still
           recommend you to use :code:`clone` before using :code:`Opimizer.minimize`.
 
-        For Example:
-          ::
+        Examples:
+            .. code-block:: python
+                :name: code-example-1
 
-            import paddle
-            import paddle.static as static
+                import paddle
+                import paddle.static as static
 
-            paddle.enable_static()
+                paddle.enable_static()
 
-            img = static.data(name='image', shape=[None, 784])
-            pred = static.nn.fc(x=img, size=10, actvation='relu')
-            loss = paddle.mean(pred)
-            # Here we use clone before Momentum
-            test_program = static.default_main_program().clone(for_test=True)
-            optimizer = paddle.optimizer.Momentum(learning_rate=0.01, momentum=0.9)
-            optimizer.minimize(loss)
+                img = static.data(name='image', shape=[None, 784])
+                pred = static.nn.fc(x=img, size=10, actvation='relu')
+                loss = paddle.mean(pred)
+                # Here we use clone before Momentum
+                test_program = static.default_main_program().clone(for_test=True)
+                optimizer = paddle.optimizer.Momentum(learning_rate=0.01, momentum=0.9)
+                optimizer.minimize(loss)
 
         Args:
 
@@ -5814,6 +6028,7 @@ class Program:
                 after :code:`clone`:
 
             .. code-block:: python
+                :name: code-example-2
 
                 import paddle
 
@@ -5831,6 +6046,7 @@ class Program:
 
             1. To clone a test program, the sample code is:
                 .. code-block:: python
+                    :name: code-example-3
 
                     import paddle
                     import paddle.static as static
@@ -5883,6 +6099,7 @@ class Program:
 
             2. The clone method can be avoid if you create program for training and program for testing individually.
                 .. code-block:: python
+                    :name: code-example-4
 
                     import paddle
                     import paddle.static as static
@@ -5957,6 +6174,8 @@ class Program:
             p._appending_grad_times = self._appending_grad_times
             if hasattr(self, 'lr_scheduler'):
                 p.lr_scheduler = self.lr_scheduler
+            if hasattr(self, '_pipeline_opt'):
+                p._pipeline_opt = self._pipeline_opt
 
             # NOTE(zhiqiu): we sync the cloned program, to update its program by
             # its desc.
@@ -6757,7 +6976,6 @@ class Program:
             return False
 
         def condition(var):
-
             if mode == 'param':
                 return is_parameter(var)
             elif mode == 'opt':
@@ -7270,30 +7488,32 @@ def program_guard(main_program, startup_program=None):
             Default: None.
 
     Examples:
-       .. code-block:: python
+        .. code-block:: python
+            :name: code-example-1
 
-          import paddle
+            import paddle
 
-          paddle.enable_static()
-          main_program = paddle.static.Program()
-          startup_program = paddle.static.Program()
-          with paddle.static.program_guard(main_program, startup_program):
-              data = paddle.static.data(name='image', shape=[None, 784, 784], dtype='float32')
-              hidden = paddle.static.nn.fc(x=data, size=10, activation='relu')
+            paddle.enable_static()
+            main_program = paddle.static.Program()
+            startup_program = paddle.static.Program()
+            with paddle.static.program_guard(main_program, startup_program):
+                data = paddle.static.data(name='image', shape=[None, 784, 784], dtype='float32')
+                hidden = paddle.static.nn.fc(x=data, size=10, activation='relu')
 
     Notes: The temporary :code:`Program` can be used if the user does not need
     to construct either of startup program or main program.
 
     Examples:
-       .. code-block:: python
+        .. code-block:: python
+            :name: code-example-2
 
-          import paddle
+            import paddle
 
-          paddle.enable_static()
-          main_program = paddle.static.Program()
-          # does not care about startup program. Just pass a temporary value.
-          with paddle.static.program_guard(main_program, paddle.static.Program()):
-              data = paddle.static.data(name='image', shape=[None, 784, 784], dtype='float32')
+            paddle.enable_static()
+            main_program = paddle.static.Program()
+            # does not care about startup program. Just pass a temporary value.
+            with paddle.static.program_guard(main_program, paddle.static.Program()):
+                data = paddle.static.data(name='image', shape=[None, 784, 784], dtype='float32')
 
     """
     from .data_feeder import check_type
@@ -7454,9 +7674,12 @@ def device_guard(device=None):
         device, index = device.split(':')
         if device == 'cpu':
             raise ValueError("Should not set device id for cpu.")
-    if device not in ['cpu', 'gpu', 'xpu', 'npu', '', None]:
+    if (
+        device not in ['cpu', 'gpu', 'xpu', '', None]
+        and device not in core.get_all_custom_device_type()
+    ):
         raise ValueError(
-            "The Attr(device) should be 'cpu' 'npu' or 'gpu', and it can also be empty string or None "
+            "The Attr(device) should be 'cpu', 'xpu', 'gpu' or custom device, and it can also be empty string or None "
             "when there is no need to specify device. But received %s" % device
         )
     if index:
@@ -7489,7 +7712,7 @@ def _cuda_graph_guard(cuda_graph_attr=None):
                                    cuda_graph_capture_mode;memory_pool_id;cuda_graph_id
     """
     assert (
-        not _non_static_mode()
+        not in_dygraph_mode()
     ), "cuda_graph_guard only works under static graph mode"
     assert (
         core.is_compiled_with_cuda()
@@ -7647,13 +7870,19 @@ def _get_paddle_place(place):
         device_id = int(device_id)
         return core.IPUPlace(device_id)
 
+    place_info_list = place.split(':', 1)
+    device_type = place_info_list[0]
+    if device_type in core.get_all_custom_device_type():
+        device_id = place_info_list[1]
+        device_id = int(device_id)
+        return core.CustomPlace(device_type, device_id)
+
     raise ValueError(
-        f"Paddle supports CPUPlace, CUDAPlace, CUDAPinnedPlace, XPUPlace and IPUPlace, but received {place}."
+        f"Paddle supports CPUPlace, CUDAPlace, CUDAPinnedPlace, XPUPlace, IPUPlace and CustomPlace, but received {place}."
     )
 
 
 def _get_paddle_place_list(places):
-
     if not isinstance(places, (list, tuple)):
         raise TypeError("places must to be List or Tuple")
 

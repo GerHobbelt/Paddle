@@ -57,6 +57,9 @@ void ReshapeInferKernel<phi::XPUContext>(const XPUContext& dev_ctx,
                                          DenseTensor* out) {
   MetaTensor meta_out(out);
   InferMetaFromVecValue(x, shape.GetData(), &meta_out);
+  if (x.numel() == 0) {
+    return;
+  }
   if (x.initialized() && x.Holder() == out->Holder()) {
     dev_ctx.Alloc(out, x.dtype());
     return;
@@ -81,7 +84,7 @@ void ReshapeKernel(const Context& dev_ctx,
                    const DenseTensor& x,
                    const IntArray& shape,
                    DenseTensor* out,
-                   DenseTensor* xshape) {
+                   DenseTensor* xshape UNUSED) {
   ReshapeInferKernel(dev_ctx, x, shape, out);
 }
 
@@ -92,4 +95,6 @@ PD_REGISTER_KERNEL_FOR_ALL_BACKEND_DTYPE(reshape_infer,
                                          phi::ReshapeInferKernel) {}
 PD_REGISTER_KERNEL_FOR_ALL_BACKEND_DTYPE(reshape,
                                          ALL_LAYOUT,
-                                         phi::ReshapeKernel) {}
+                                         phi::ReshapeKernel) {
+  kernel->OutputAt(1).SetBackend(phi::Backend::UNDEFINED);
+}

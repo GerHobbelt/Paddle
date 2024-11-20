@@ -16,14 +16,18 @@ include(ExternalProject)
 
 set(CBLAS_PREFIX_DIR ${THIRD_PARTY_PATH}/openblas)
 set(CBLAS_INSTALL_DIR ${THIRD_PARTY_PATH}/install/openblas)
-set(CBLAS_REPOSITORY ${GIT_URL}/xianyi/OpenBLAS.git)
+set(CBLAS_SOURCE_DIR ${PADDLE_SOURCE_DIR}/third_party/openblas)
 set(CBLAS_TAG v0.3.7)
 
-# Please refer to
-# https://github.com/PaddlePaddle/Paddle/pull/52983
-if(UNIX
-   AND NOT APPLE
-   AND NOT WITH_ROCM)
+# Why use v0.3.18?  The IDG business line encountered a random openblas error,
+# which can be resolved after upgrading openblas.
+# And why compile when gcc>8.2? Please refer to
+# https://github.com/spack/spack/issues/19932#issuecomment-733452619
+# v0.3.18 only support gcc>=8.3 or gcc>=7.4
+if((CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+   AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 8.2
+   AND NOT WITH_XPU)
+  # We only compile with openblas 0.3.18 when gcc >= 8.3
   set(CBLAS_TAG v0.3.18)
 endif()
 
@@ -37,6 +41,27 @@ endif()
 
 if(WITH_LOONGARCH)
   set(CBLAS_TAG v0.3.18)
+endif()
+
+file(GLOB CBLAS_SOURCE_FILE_LIST ${CBLAS_SOURCE_DIR})
+list(LENGTH CBLAS_SOURCE_FILE_LIST RES_LEN)
+if(RES_LEN EQUAL 0)
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} clone -b ${CBLAS_TAG}
+            "https://github.com/xianyi/OpenBLAS.git" ${CBLAS_SOURCE_DIR})
+else()
+  # check git tag
+  execute_process(
+    COMMAND ${GIT_EXECUTABLE} describe --abbrev=6 --always --tags
+    OUTPUT_VARIABLE VERSION
+    OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET
+    WORKING_DIRECTORY ${CBLAS_SOURCE_DIR})
+  if(NOT ${VERSION} STREQUAL ${CBLAS_TAG})
+    message(
+      WARNING "openblas version is not ${VERSION}, checkout to ${CBLAS_TAG}")
+    execute_process(COMMAND ${GIT_EXECUTABLE} checkout ${CBLAS_TAG}
+                    WORKING_DIRECTORY ${CBLAS_SOURCE_DIR})
+  endif()
 endif()
 
 if(NOT WIN32)
@@ -57,16 +82,18 @@ if(NOT WIN32)
     set(OPTIONAL_ARGS DYNAMIC_ARCH=1 NUM_THREADS=64)
   endif()
 
+  if(WITH_ARM)
+    set(ARM_ARGS TARGET=ARMV8)
+  endif()
   set(COMMON_ARGS CC=${OPENBLAS_CC} NO_SHARED=1 NO_LAPACK=1 libs)
   ExternalProject_Add(
     extern_openblas
-    ${EXTERNAL_PROJECT_LOG_ARGS} ${SHALLOW_CLONE}
-    GIT_REPOSITORY ${CBLAS_REPOSITORY}
-    GIT_TAG ${CBLAS_TAG}
+    ${EXTERNAL_PROJECT_LOG_ARGS}
+    SOURCE_DIR ${CBLAS_SOURCE_DIR}
     PREFIX ${CBLAS_PREFIX_DIR}
     INSTALL_DIR ${CBLAS_INSTALL_DIR}
     BUILD_IN_SOURCE 1
-    BUILD_COMMAND make -j${NPROC} ${COMMON_ARGS} ${OPTIONAL_ARGS}
+    BUILD_COMMAND make ${ARM_ARGS} -j${NPROC} ${COMMON_ARGS} ${OPTIONAL_ARGS}
     INSTALL_COMMAND make install NO_SHARED=1 NO_LAPACK=1 PREFIX=<INSTALL_DIR>
     UPDATE_COMMAND ""
     CONFIGURE_COMMAND ""
@@ -81,8 +108,7 @@ else()
   ExternalProject_Add(
     extern_openblas
     ${EXTERNAL_PROJECT_LOG_ARGS}
-    GIT_REPOSITORY ${CBLAS_REPOSITORY}
-    GIT_TAG ${CBLAS_TAG}
+    SOURCE_DIR ${CBLAS_SOURCE_DIR}
     PREFIX ${CBLAS_PREFIX_DIR}
     INSTALL_DIR ${CBLAS_INSTALL_DIR}
     BUILD_IN_SOURCE 0

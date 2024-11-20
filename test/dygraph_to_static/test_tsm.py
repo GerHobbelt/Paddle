@@ -45,7 +45,9 @@ def parse_args():
         default=fluid.is_compiled_with_cuda(),
         help='default use gpu.',
     )
-    args = parser.parse_args(['--config', 'tsm.yaml'])
+    args = parser.parse_args(
+        ['--config', __file__.rpartition('/')[0] + '/tsm.yaml']
+    )
     return args
 
 
@@ -281,7 +283,7 @@ def create_optimizer(cfg, params):
     optimizer = fluid.optimizer.Momentum(
         learning_rate=fluid.layers.piecewise_decay(boundaries=bd, values=lr),
         momentum=momentum,
-        regularization=fluid.regularizer.L2Decay(l2_weight_decay),
+        regularization=paddle.regularizer.L2Decay(l2_weight_decay),
         parameter_list=params,
     )
 

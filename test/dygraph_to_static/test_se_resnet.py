@@ -20,6 +20,7 @@ import time
 import unittest
 
 import numpy as np
+from dygraph_to_static_util import ast_only_test
 from predictor_utils import PredictorTools
 
 import paddle
@@ -82,7 +83,7 @@ def optimizer_setting(params, parameter_list):
             learning_rate=lr, step_each_epoch=step, epochs=num_epochs
         ),
         momentum=momentum_rate,
-        regularization=fluid.regularizer.L2Decay(l2_decay),
+        regularization=paddle.regularizer.L2Decay(l2_decay),
         parameter_list=parameter_list,
     )
 
@@ -122,7 +123,6 @@ class ConvBNLayer(paddle.nn.Layer):
 
 class SqueezeExcitation(paddle.nn.Layer):
     def __init__(self, num_channels, reduction_ratio):
-
         super().__init__()
         self._num_channels = num_channels
         self._pool = paddle.nn.AdaptiveAvgPool2D(1)
@@ -561,6 +561,7 @@ class TestSeResnet(unittest.TestCase):
                 ),
             )
 
+    @ast_only_test
     def test_check_result(self):
         pred_1, loss_1, acc1_1, acc5_1 = self.train(
             self.train_reader, to_static=False

@@ -22,6 +22,42 @@ namespace phi {
 // Common InferMeta Functions for fusion operators.
 // NOTE: The InferMeta Functions in this file are arranged in alphabetic order.
 
+void AddActXPUInferMeta(const MetaTensor& x,
+                        const MetaTensor& x_max,
+                        const MetaTensor& y,
+                        const MetaTensor& y_max,
+                        int act_type,
+                        MetaTensor* out,
+                        MetaTensor* out_max);
+
+void AddLayernormXPUInferMeta(const MetaTensor& x,
+                              const MetaTensor& y,
+                              const MetaTensor& scale,
+                              const MetaTensor& bias,
+                              int begin_norm_axis,
+                              float epsilon,
+                              MetaTensor* out,
+                              MetaTensor* mean,
+                              MetaTensor* variance,
+                              MetaTensor* z_add);
+
+void Conv1dXPUInferMeta(const MetaTensor& x,
+                        const MetaTensor& x_max,
+                        const MetaTensor& filter,
+                        const MetaTensor& filter_max,
+                        const MetaTensor& bias,
+                        const MetaTensor& branch,
+                        const MetaTensor& branch_max,
+                        const std::vector<int>& paddings,
+                        const std::string& padding_algorithm,
+                        int dilations,
+                        int strides,
+                        int groups,
+                        int act_type,
+                        float act_param,
+                        MetaTensor* out,
+                        MetaTensor* out_max);
+
 void Conv2dXPUInferMeta(const MetaTensor& x,
                         const MetaTensor& x_max,
                         const MetaTensor& filter,
@@ -34,17 +70,19 @@ void Conv2dXPUInferMeta(const MetaTensor& x,
                         const std::vector<int>& strides,
                         const std::string& padding_algorithm,
                         int groups,
-                        bool has_bias,
-                        bool has_branch,
                         int act_type,
                         float act_param,
+                        DataType out_dtype,
                         MetaTensor* out,
                         MetaTensor* out_max);
 
 void EmbeddingWithEltwiseAddXPUInferMeta(
     const std::vector<const MetaTensor*>& ids,
     const std::vector<const MetaTensor*>& tables,
-    MetaTensor* out);
+    const MetaTensor& mask,
+    MetaTensor* out,
+    MetaTensor* seq_lod,
+    MetaTensor* max_seq_len);
 
 void FcXPUInferMeta(const MetaTensor& x,
                     const MetaTensor& x_max,
@@ -57,6 +95,7 @@ void FcXPUInferMeta(const MetaTensor& x,
                     float beta,
                     int act_type,
                     float act_alpha,
+                    DataType out_dtype,
                     MetaTensor* out,
                     MetaTensor* out_max);
 
@@ -72,6 +111,8 @@ void MultiEncoderXPUInferMeta(
     const std::vector<const MetaTensor*>& ln_scale,
     const std::vector<const MetaTensor*>& ln_bias,
     const MetaTensor& mask,
+    const MetaTensor& seq_lod,
+    const MetaTensor& max_seq_len,
     int layer_num,
     bool norm_before,
     int hidden_dim,
@@ -122,4 +163,38 @@ void FusedMultiTransformerXpuInferMeta(
     int gather_axis,
     MetaTensor* out,
     std::vector<MetaTensor*> cache_kv_out);
+
+void YoloBoxXPUInferMeta(const MetaTensor& x,
+                         const MetaTensor& x_max,
+                         const MetaTensor& grid,
+                         const MetaTensor& stride,
+                         const MetaTensor& anchor_grid,
+                         float offset,
+                         MetaTensor* out,
+                         MetaTensor* out_max);
+
+void Conv2dTransposeXPUInferMeta(const MetaTensor& x,
+                                 const MetaTensor& x_max,
+                                 const MetaTensor& filter,
+                                 const MetaTensor& filter_max,
+                                 const MetaTensor& bias,
+                                 const std::vector<int>& strides,
+                                 const std::vector<int>& paddings,
+                                 const std::vector<int>& output_padding,
+                                 const IntArray& output_size,
+                                 const std::string& padding_algorithm,
+                                 int groups,
+                                 const std::vector<int>& dilations,
+                                 const std::string& data_format,
+                                 bool has_bias,
+                                 bool with_act,
+                                 const std::string& act_type,
+                                 MetaTensor* out,
+                                 MetaTensor* out_max);
+
+void FastWhereXPUInferMeta(const MetaTensor& condition,
+                           const MetaTensor& x,
+                           const MetaTensor& y,
+                           MetaTensor* out);
+
 }  // namespace phi

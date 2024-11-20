@@ -34,25 +34,6 @@ class Scope;
 }  // namespace framework
 }  // namespace paddle
 
-namespace {
-
-template <typename T1, typename T2>
-void ConvertTensorType(phi::DenseTensor* tensor) {
-  phi::DenseTensor tmp_tensor;
-  tmp_tensor.set_type(phi::CppTypeToDataType<T2>::Type());
-  tmp_tensor.Resize(tensor->dims());
-  auto* tmp_data = tmp_tensor.mutable_data<T2>(paddle::platform::CPUPlace());
-  auto* data = tensor->mutable_data<T1>(paddle::platform::CPUPlace());
-  for (int i = 0; i < tensor->numel(); i++) {
-    tmp_data[i] = static_cast<T2>(data[i]);
-  }
-  tensor->clear();
-  paddle::framework::TensorCopySync(
-      tmp_tensor, paddle::platform::CPUPlace(), tensor);
-}
-
-}  // namespace
-
 namespace paddle {
 namespace framework {
 namespace ir {
@@ -448,10 +429,13 @@ int Conv2dXPUFusePass::ApplyImpl(ir::Graph* graph,
     auto* filter_t =
         scope->FindVar(conv_filter->Name())->GetMutable<phi::DenseTensor>();
     // conv_filter fp16 --> fp32
-    auto tensor_type = filter_t->dtype();
-    if (tensor_type == phi::DataType::FLOAT16) {
-      ConvertTensorType<float16, float>(filter_t);
+    auto filter_dtype = filter_t->dtype();
+    int out_dtype = proto::VarType::Type::VarType_Type_FP32;
+    if (filter_dtype == phi::DataType::FLOAT16) {
+      out_dtype = proto::VarType::Type::VarType_Type_FP16;
+      CastToFp32(filter_t, nullptr);
     }
+
     auto filter_dims = filter_t->dims();
     bool has_bias = with_bn || with_conv_bias;
     // Create conv_fusion_bias (conv bias) variable
@@ -529,15 +513,11 @@ int Conv2dXPUFusePass::ApplyImpl(ir::Graph* graph,
         }
       }
     }
-    if (tensor_type == phi::DataType::FLOAT16) {
-      ConvertTensorType<float, float16>(filter_t);
-    }
     // filter max
     Node* filter_int16 = nullptr;
     Node* filter_max = nullptr;
     PrepareWeight<int16_t>(
         graph, scope, block, conv_filter, &filter_int16, &filter_max, false);
-    bool has_branch = with_branch_x || with_branch_y;
     // output && output max
     std::string conv2d_xpu_out_name;
     if (!act_type.empty()) {
@@ -582,18 +562,9 @@ int Conv2dXPUFusePass::ApplyImpl(ir::Graph* graph,
     }
     conv2d_xpu_op_desc.SetAttr("act_type", ConvertActivationType(act_type));
     conv2d_xpu_op_desc.SetAttr("act_param", act_param_);
-    std::vector<int> conv_bias;
-    if (has_bias) {
-      conv_bias.push_back(1);
-    } else {
-      conv_bias.push_back(0);
-    }
-    if (conv->Op()->HasAttr("padding_algorithm")) {
-      conv2d_xpu_op_desc.SetAttr(
-          "padding_algorithm",
-          PADDLE_GET_CONST(std::string,
-                           conv->Op()->GetAttr("padding_algorithm")));
-    }
+    conv2d_xpu_op_desc.SetAttr(
+        "padding_algorithm",
+        conv->Op()->GetAttrIfExists<std::string>("padding_algorithm"));
     auto conv_paddings =
         PADDLE_GET_CONST(std::vector<int>, conv->Op()->GetAttr("paddings"));
     if (conv_paddings.size() == 2) {
@@ -615,15 +586,8 @@ int Conv2dXPUFusePass::ApplyImpl(ir::Graph* graph,
     conv2d_xpu_op_desc.SetAttr(
         "strides",
         PADDLE_GET_CONST(std::vector<int>, conv->Op()->GetAttr("strides")));
-    conv2d_xpu_op_desc.SetAttr("conv_bias", conv_bias);
-    conv2d_xpu_op_desc.SetAttr("op_type", std::vector<int>{0});
-    conv2d_xpu_op_desc.SetAttr("place_x", std::vector<int>{0});
-    conv2d_xpu_op_desc.SetAttr("place_y", std::vector<int>{9});
-    conv2d_xpu_op_desc.SetAttr("place_z", std::vector<int>{10});
     conv2d_xpu_op_desc.SetAttr("paddings", conv_paddings);
-    conv2d_xpu_op_desc.SetAttr("block_lod", std::vector<int>{1});
-    conv2d_xpu_op_desc.SetAttr("has_branch", has_branch);
-    conv2d_xpu_op_desc.SetAttr("has_bias", has_bias);
+    conv2d_xpu_op_desc.SetAttr("out_dtype", out_dtype);
 
     auto* conv2d_xpu = graph->CreateOpNode(&conv2d_xpu_op_desc);
     IR_NODE_LINK_TO(input, conv2d_xpu);

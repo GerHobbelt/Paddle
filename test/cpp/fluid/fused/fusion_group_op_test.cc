@@ -17,8 +17,8 @@ limitations under the License. */
 #include "paddle/fluid/framework/op_proto_maker.h"
 #include "paddle/fluid/framework/op_registry.h"
 #include "paddle/fluid/framework/program_desc.h"
-#include "paddle/fluid/platform/device_code.h"
 #include "paddle/fluid/platform/init.h"
+#include "paddle/phi/backends/device_code.h"
 
 namespace paddle {
 namespace operators {
@@ -32,7 +32,7 @@ phi::DenseTensor* CreateTensor(framework::Scope* scope,
                                const std::vector<int64_t>& shape) {
   auto* var = scope->Var(name);
   auto* tensor = var->GetMutable<phi::DenseTensor>();
-  if (shape.size() > 0) {
+  if (!shape.empty()) {
     tensor->mutable_data<T>(phi::make_ddim(shape), place);
   }
   return tensor;
@@ -71,8 +71,8 @@ framework::OpDesc* CreateFusionGroupOp(
     var->SetDataType(framework::proto::VarType::FP32);
     var->SetShape(input_shapes[i]);
   }
-  for (size_t j = 0; j < output_names.size(); ++j) {
-    auto* var = program->MutableBlock(0)->Var(output_names[j]);
+  for (const auto& output_name : output_names) {
+    auto* var = program->MutableBlock(0)->Var(output_name);
     var->SetType(framework::proto::VarType::LOD_TENSOR);
     var->SetDataType(framework::proto::VarType::FP32);
   }
@@ -93,11 +93,10 @@ framework::OpDesc* CreateFusionGroupOp(
 void PrepareDeviceCode(platform::Place place,
                        std::string func_name,
                        std::string cuda_kernel_str) {
-  paddle::platform::DeviceCodePool& pool =
-      paddle::platform::DeviceCodePool::Init({place});
+  phi::DeviceCodePool& pool = phi::DeviceCodePool::Init({place});
 
-  std::unique_ptr<paddle::platform::DeviceCode> code(
-      new paddle::platform::CUDADeviceCode(place, func_name, cuda_kernel_str));
+  std::unique_ptr<phi::DeviceCode> code(
+      new phi::GPUDeviceCode(place, func_name, cuda_kernel_str));
   code->Compile();
   pool.Set(std::move(code));
 }
@@ -121,8 +120,8 @@ void CheckOutputs(framework::Scope* scope,
 
   size_t n = cpu_tensors->at(0).numel();
   std::vector<void*> args;
-  for (size_t i = 0; i < cpu_tensors->size(); ++i) {
-    args.push_back(cpu_tensors->at(i).data<float>());
+  for (auto& cpu_tensor : *cpu_tensors) {
+    args.push_back(cpu_tensor.data<float>());
   }
   cpu_kernel_func(n, args);
 
@@ -168,8 +167,8 @@ void TestMain(const std::vector<std::string>& input_names,
   }
   // Create output tensors.
   std::vector<int64_t> empty_shape;
-  for (size_t j = 0; j < output_names.size(); ++j) {
-    CreateTensor<float>(&scope, place, output_names[j], empty_shape);
+  for (const auto& output_name : output_names) {
+    CreateTensor<float>(&scope, place, output_name, empty_shape);
   }
 
   fusion_group_op->Run(scope, place);
@@ -183,7 +182,7 @@ void TestMain(const std::vector<std::string>& input_names,
 }
 
 TEST(FusionGroupOp, elementwise) {
-  if (!platform::dynload::HasNVRTC() || !platform::dynload::HasCUDADriver()) {
+  if (!phi::dynload::HasNVRTC() || !phi::dynload::HasCUDADriver()) {
     return;
   }
 

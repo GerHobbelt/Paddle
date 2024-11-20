@@ -36,6 +36,7 @@
 #include "paddle/fluid/inference/api/paddle_infer_contrib.h"
 #include "paddle/fluid/inference/api/paddle_inference_api.h"
 #include "paddle/fluid/inference/api/paddle_pass_builder.h"
+#include "paddle/fluid/inference/api/paddle_tensor.h"
 #include "paddle/fluid/inference/utils/io_utils.h"
 #include "paddle/fluid/pybind/eager.h"
 #include "paddle/fluid/pybind/eager_utils.h"
@@ -107,6 +108,7 @@ void BindPaddlePredictor(py::module *m);
 void BindNativeConfig(py::module *m);
 void BindNativePredictor(py::module *m);
 void BindLiteNNAdapterConfig(py::module *m);
+void BindXpuConfig(py::module *m);
 void BindAnalysisConfig(py::module *m);
 void BindAnalysisPredictor(py::module *m);
 void BindZeroCopyTensor(py::module *m);
@@ -241,6 +243,8 @@ paddle_infer::PlaceType ToPaddleInferPlace(
     return paddle_infer::PlaceType::kCPU;
   } else if (allocation_type == phi::AllocationType::GPU) {
     return paddle_infer::PlaceType::kGPU;
+  } else if (allocation_type == phi::AllocationType::XPU) {
+    return paddle_infer::PlaceType::kXPU;
   } else {
     return paddle_infer::PlaceType::kCPU;
   }
@@ -475,6 +479,7 @@ void BindInferenceApi(py::module *m) {
   BindNativeConfig(m);
   BindNativePredictor(m);
   BindLiteNNAdapterConfig(m);
+  BindXpuConfig(m);
   BindAnalysisConfig(m);
   BindAnalysisPredictor(m);
   BindPaddleInferPredictor(m);
@@ -645,6 +650,9 @@ void BindPaddlePredictor(py::module *m) {
   paddle_predictor
       .def("run",
            [](PaddlePredictor &self, const std::vector<PaddleTensor> &inputs) {
+#if defined(PADDLE_WITH_CUSTOM_DEVICE) && !defined(PADDLE_NO_PYTHON)
+             pybind11::gil_scoped_release release;
+#endif
              std::vector<PaddleTensor> outputs;
              self.Run(inputs, &outputs);
              return outputs;
@@ -673,7 +681,6 @@ void BindNativeConfig(py::module *m) {
       .def(py::init<>())
       .def_readwrite("use_gpu", &NativeConfig::use_gpu)
       .def_readwrite("use_xpu", &NativeConfig::use_xpu)
-      .def_readwrite("use_npu", &NativeConfig::use_npu)
       .def_readwrite("device", &NativeConfig::device)
       .def_readwrite("fraction_of_gpu_memory",
                      &NativeConfig::fraction_of_gpu_memory)
@@ -694,6 +701,9 @@ void BindNativePredictor(py::module *m) {
       .def("run",
            [](NativePaddlePredictor &self,
               const std::vector<PaddleTensor> &inputs) {
+#if defined(PADDLE_WITH_CUSTOM_DEVICE) && !defined(PADDLE_NO_PYTHON)
+             pybind11::gil_scoped_release release;
+#endif
              std::vector<PaddleTensor> outputs;
              self.Run(inputs, &outputs);
              return outputs;
@@ -756,21 +766,21 @@ void BindAnalysisConfig(py::module *m) {
 #endif
       .def("enable_xpu",
            &AnalysisConfig::EnableXpu,
-           py::arg("l3_workspace_size") = 16 * 1024 * 1024,
-           py::arg("locked") = false,
-           py::arg("autotune") = true,
-           py::arg("autotune_file") = "",
-           py::arg("precision") = "int16",
-           py::arg("adaptive_seqlen") = false,
+           py::arg("l3_size") = 16 * 1024 * 1024,
+           py::arg("l3_locked") = false,
+           py::arg("conv_autotune") = true,
+           py::arg("conv_autotune_file") = "",
+           py::arg("transformer_encoder_precision") = "int16",
+           py::arg("transformer_encoder_adaptive_seqlen") = false,
            py::arg("enable_multi_stream") = false)
       .def("set_xpu_device_id",
            &AnalysisConfig::SetXpuDeviceId,
            py::arg("device_id") = 0)
-      .def(
-          "set_xpu_config",
-          &AnalysisConfig::SetXpuConfig,
-          py::arg("quant_post_dynamic_weight_bits") = -1,
-          py::arg("quant_post_dynamic_op_types") = std::vector<std::string>({}))
+      .def("set_xpu_config",
+           [](AnalysisConfig &self, const paddle_infer::XpuConfig &xpu_config) {
+             self.SetXpuConfig(xpu_config);
+           })
+      .def("xpu_config", &AnalysisConfig::xpu_config)
       .def("enable_custom_device",
            &AnalysisConfig::EnableCustomDevice,
            py::arg("device_type"),
@@ -805,10 +815,8 @@ void BindAnalysisConfig(py::module *m) {
       .def("enable_ort_optimization", &AnalysisConfig::EnableORTOptimization)
       .def("use_gpu", &AnalysisConfig::use_gpu)
       .def("use_xpu", &AnalysisConfig::use_xpu)
-      .def("use_npu", &AnalysisConfig::use_npu)
       .def("gpu_device_id", &AnalysisConfig::gpu_device_id)
       .def("xpu_device_id", &AnalysisConfig::xpu_device_id)
-      .def("npu_device_id", &AnalysisConfig::npu_device_id)
       .def("memory_pool_init_size_mb",
            &AnalysisConfig::memory_pool_init_size_mb)
       .def("fraction_of_gpu_memory_for_pool",
@@ -823,6 +831,9 @@ void BindAnalysisConfig(py::module *m) {
       .def("enable_profile", &AnalysisConfig::EnableProfile)
       .def("disable_glog_info", &AnalysisConfig::DisableGlogInfo)
       .def("glog_info_disabled", &AnalysisConfig::glog_info_disabled)
+      .def("enable_save_optim_model",
+           &AnalysisConfig::EnableSaveOptimModel,
+           py::arg("save_optimized_model") = false)
       .def("set_optim_cache_dir", &AnalysisConfig::SetOptimCacheDir)
       .def("switch_use_feed_fetch_ops",
            &AnalysisConfig::SwitchUseFeedFetchOps,
@@ -833,6 +844,9 @@ void BindAnalysisConfig(py::module *m) {
            &AnalysisConfig::SwitchSpecifyInputNames,
            py::arg("x") = true)
       .def("specify_input_name", &AnalysisConfig::specify_input_name)
+      .def("enable_low_precision_io",
+           &AnalysisConfig::EnableLowPrecisionIO,
+           py::arg("x") = true)
       .def("enable_tensorrt_engine",
            &AnalysisConfig::EnableTensorRtEngine,
            py::arg("workspace_size") = 1 << 30,
@@ -996,6 +1010,40 @@ void BindLiteNNAdapterConfig(py::module *m) {
       .def("disable", &LiteNNAdapterConfig::Disable);
 }
 
+void BindXpuConfig(py::module *m) {
+  py::class_<XpuConfig>(*m, "XpuConfig")
+      .def(py::init<>())
+      .def_readwrite("device_id", &XpuConfig::device_id)
+      .def_readwrite("l3_ptr", &XpuConfig::l3_ptr)
+      .def_readwrite("l3_size", &XpuConfig::l3_size)
+      .def_readwrite("l3_autotune_size", &XpuConfig::l3_autotune_size)
+      .def_readwrite("context_gm_size", &XpuConfig::context_gm_size)
+      .def_readwrite("context", &XpuConfig::context)
+      .def_readwrite("stream", &XpuConfig::stream)
+      .def_readwrite("conv_autotune_level", &XpuConfig::conv_autotune_level)
+      .def_readwrite("conv_autotune_file", &XpuConfig::conv_autotune_file)
+      .def_readwrite("conv_autotune_file_writeback",
+                     &XpuConfig::conv_autotune_file_writeback)
+      .def_readwrite("fc_autotune_level", &XpuConfig::fc_autotune_level)
+      .def_readwrite("fc_autotune_file", &XpuConfig::fc_autotune_file)
+      .def_readwrite("fc_autotune_file_writeback",
+                     &XpuConfig::fc_autotune_file_writeback)
+      .def_readwrite("gemm_compute_precision",
+                     &XpuConfig::gemm_compute_precision)
+      .def_readwrite("transformer_softmax_optimize_level",
+                     &XpuConfig::transformer_softmax_optimize_level)
+      .def_readwrite("transformer_encoder_adaptive_seqlen",
+                     &XpuConfig::transformer_encoder_adaptive_seqlen)
+      .def_readwrite("quant_post_static_gelu_out_threshold",
+                     &XpuConfig::quant_post_static_gelu_out_threshold)
+      .def_readwrite("quant_post_dynamic_activation_method",
+                     &XpuConfig::quant_post_dynamic_activation_method)
+      .def_readwrite("quant_post_dynamic_weight_precision",
+                     &XpuConfig::quant_post_dynamic_weight_precision)
+      .def_readwrite("quant_post_dynamic_op_types",
+                     &XpuConfig::quant_post_dynamic_op_types);
+}
+
 #ifdef PADDLE_WITH_MKLDNN
 void BindMkldnnQuantizerConfig(py::module *m) {
   py::class_<MkldnnQuantizerConfig> quantizer_config(*m,
@@ -1022,6 +1070,9 @@ void BindAnalysisPredictor(py::module *m) {
       .def(
           "run",
           [](AnalysisPredictor &self, const std::vector<PaddleTensor> &inputs) {
+#if defined(PADDLE_WITH_CUSTOM_DEVICE) && !defined(PADDLE_NO_PYTHON)
+            pybind11::gil_scoped_release release;
+#endif
             std::vector<PaddleTensor> outputs;
             self.Run(inputs, &outputs);
             return outputs;
@@ -1072,6 +1123,9 @@ void BindPaddleInferPredictor(py::module *m) {
       .def(
           "run",
           [](paddle_infer::Predictor &self, py::handle py_in_tensor_list) {
+#if defined(PADDLE_WITH_CUSTOM_DEVICE) && !defined(PADDLE_NO_PYTHON)
+            pybind11::gil_scoped_release release;
+#endif
             auto in_tensor_list =
                 CastPyArg2VectorOfTensor(py_in_tensor_list.ptr(), 0);
             std::vector<paddle::Tensor> outputs;
@@ -1079,7 +1133,13 @@ void BindPaddleInferPredictor(py::module *m) {
             return py::handle(ToPyObject(outputs));
           },
           py::arg("inputs"))
-      .def("run", [](paddle_infer::Predictor &self) { self.Run(); })
+      .def("run",
+           [](paddle_infer::Predictor &self) {
+#if defined(PADDLE_WITH_CUSTOM_DEVICE) && !defined(PADDLE_NO_PYTHON)
+             pybind11::gil_scoped_release release;
+#endif
+             self.Run();
+           })
       .def("clone",
            [](paddle_infer::Predictor &self) { return self.Clone(nullptr); })
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)

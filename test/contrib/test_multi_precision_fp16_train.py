@@ -134,7 +134,7 @@ def train(use_pure_fp16=True, use_nesterov=False, optimizer=""):
                 learning_rate=0.001,
                 momentum=0.9,
                 use_nesterov=use_nesterov,
-                weight_decay=fluid.regularizer.L2Decay(1e-4),
+                weight_decay=paddle.regularizer.L2Decay(1e-4),
                 multi_precision=use_pure_fp16,
             )
 
@@ -282,12 +282,6 @@ class TestAmpWithNonIterableDataLoader(unittest.TestCase):
                 )
                 label = paddle.static.data(
                     name='label', shape=[-1, 1], dtype='int64'
-                )
-                py_reader = fluid.io.DataLoader.from_generator(
-                    feed_list=[image, label],
-                    capacity=4,
-                    iterable=False,
-                    use_double_buffer=False,
                 )
                 zero_var = paddle.tensor.fill_constant(
                     shape=[1], dtype='int64', value=0

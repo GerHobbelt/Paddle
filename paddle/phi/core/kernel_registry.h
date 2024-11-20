@@ -1401,6 +1401,14 @@ struct KernelRegistrar {
                                             meta_kernel_fn,        \
                                             BACKEND_LIST)
 
+#define PD_REGISTER_KERNEL_FOR_ALL_BACKEND_DTYPE_EXCEPT_CUSTOM(    \
+    kernel_name, layout, meta_kernel_fn)                           \
+  _PD_REGISTER_KERNEL_FOR_ALL_BACKEND_DTYPE(::phi::RegType::INNER, \
+                                            kernel_name,           \
+                                            layout,                \
+                                            meta_kernel_fn,        \
+                                            BACKEND_LIST_EXCEPT_CUSTOM)
+
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 #define _DEVICE GPU,
 #elif defined(PADDLE_WITH_XPU)
@@ -1415,6 +1423,7 @@ struct KernelRegistrar {
 #endif
 
 #define BACKEND_LIST _DEVICE _CUSTOM CPU
+#define BACKEND_LIST_EXCEPT_CUSTOM _DEVICE CPU
 
 #define _PD_REGISTER_KERNEL_FOR_ALL_BACKEND_DTYPE(                            \
     reg_type, kernel_name, layout, meta_kernel_fn, ...)                       \
@@ -1433,16 +1442,16 @@ struct KernelRegistrar {
     reg_type, kernel_name, layout, meta_kernel_fn, N, ...)        \
   static void __PD_KERNEL_args_def_FN_##kernel_name##_##layout(   \
       const ::phi::KernelKey& kernel_key, ::phi::Kernel* kernel); \
-  PD_EXPAND(                                                      \
-      PD_CONCATENATE(_PD_FOR_ALL_BACKEND_DTYPE_, N)(              \
-          reg_type,                                               \
-          kernel_name,                                            \
-          layout,                                                 \
-          meta_kernel_fn,                                         \
-          __PD_KERNEL_args_def_FN_##kernel_name##_##layout,       \
-          __VA_ARGS__) void                                       \
-          __PD_KERNEL_args_def_FN_##kernel_name##_##layout(       \
-              const ::phi::KernelKey& kernel_key, ::phi::Kernel* kernel))
+  PD_EXPAND(PD_CONCATENATE(_PD_FOR_ALL_BACKEND_DTYPE_, N)(        \
+      reg_type,                                                   \
+      kernel_name,                                                \
+      layout,                                                     \
+      meta_kernel_fn,                                             \
+      __PD_KERNEL_args_def_FN_##kernel_name##_##layout,           \
+      __VA_ARGS__) void                                           \
+                __PD_KERNEL_args_def_FN_##kernel_name##_##layout( \
+                    const ::phi::KernelKey& kernel_key UNUSED,    \
+                    ::phi::Kernel* kernel UNUSED))
 #ifndef _WIN32
 #define ___PD_REGISTER_KERNEL_FOR_ALL_BACKEND_DTYPE(                  \
     reg_type, kernel_name, backend, layout, kernel_fn, args_def_fn)   \

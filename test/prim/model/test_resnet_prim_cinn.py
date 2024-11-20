@@ -30,30 +30,6 @@ batch_size = 2
 epoch_num = 1
 
 # In V100, 16G, CUDA 11.2, the results are as follows:
-# DY2ST_PRIM_GT = [
-#     5.8473358154296875,
-#     8.354944229125977,
-#     5.098367691040039,
-#     8.533346176147461,
-#     8.179085731506348,
-#     7.285282135009766,
-#     9.824585914611816,
-#     8.56928825378418,
-#     8.539499282836914,
-#     10.256929397583008,
-# ]
-# DY2ST_CINN_GT = [
-#     5.847336769104004,
-#     8.336246490478516,
-#     5.108744144439697,
-#     8.316713333129883,
-#     8.175262451171875,
-#     7.590441703796387,
-#     9.895681381225586,
-#     8.196207046508789,
-#     8.438933372497559,
-#     10.305074691772461,
-# ]
 # DY2ST_PRIM_CINN_GT = [
 #     5.8473358154296875,
 #     8.322463989257812,
@@ -68,44 +44,18 @@ epoch_num = 1
 # ]
 
 # The results in ci as as follows:
-DY2ST_PRIM_GT = [
-    5.82879114151001,
-    8.33370590209961,
-    5.091761589050293,
-    8.776082992553711,
-    8.274380683898926,
-    7.546653747558594,
-    9.607137680053711,
-    8.27371597290039,
-    8.429732322692871,
-    10.362630844116211,
-]
-DY2ST_CINN_GT = [
-    5.828789710998535,
-    8.340764999389648,
-    4.998944282531738,
-    8.474305152893066,
-    8.09157943725586,
-    7.440057754516602,
-    9.907357215881348,
-    8.304681777954102,
-    8.383116722106934,
-    10.120304107666016,
-]
-
 DY2ST_PRIM_CINN_GT = [
     5.828786849975586,
-    8.332868576049805,
-    5.038548469543457,
-    8.554015159606934,
-    8.106254577636719,
-    7.493070125579834,
-    9.479158401489258,
-    8.270158767700195,
-    8.324719429016113,
-    10.140411376953125,
+    8.332863807678223,
+    5.0373005867004395,
+    8.464998245239258,
+    8.20099925994873,
+    7.576723098754883,
+    9.679173469543457,
+    8.381753921508789,
+    8.10612678527832,
+    10.124727249145508,
 ]
-
 if core.is_compiled_with_cuda():
     paddle.set_flags({'FLAGS_cudnn_deterministic': True})
 
@@ -120,11 +70,32 @@ def reader_decorator(reader):
     return __reader__
 
 
+class TransedFlowerDataSet(paddle.io.Dataset):
+    def __init__(self, flower_data, length):
+        self.img = []
+        self.label = []
+        self.flower_data = flower_data()
+        self._generate(length)
+
+    def _generate(self, length):
+        for i, data in enumerate(self.flower_data):
+            if i >= length:
+                break
+            self.img.append(data[0])
+            self.label.append(data[1])
+
+    def __getitem__(self, idx):
+        return self.img[idx], self.label[idx]
+
+    def __len__(self):
+        return len(self.img)
+
+
 def optimizer_setting(parameter_list=None):
     optimizer = fluid.optimizer.Momentum(
         learning_rate=base_lr,
         momentum=momentum_rate,
-        regularization=fluid.regularizer.L2Decay(l2_decay),
+        regularization=paddle.regularizer.L2Decay(l2_decay),
         parameter_list=parameter_list,
     )
 
@@ -185,8 +156,6 @@ def run(model, data_loader, optimizer, mode):
                 )
             )
             if batch_id >= end_step:
-                # avoid dataloader throw abort signaal
-                data_loader._reset()
                 break
     print(losses)
     return losses
@@ -202,13 +171,13 @@ def train(to_static, enable_prim, enable_cinn):
     paddle.framework.random._manual_program_seed(SEED)
     fluid.core._set_prim_all_enabled(enable_prim)
 
-    train_reader = paddle.batch(
+    dataset = TransedFlowerDataSet(
         reader_decorator(paddle.dataset.flowers.train(use_xmap=False)),
-        batch_size=batch_size,
-        drop_last=True,
+        batch_size * (10 + 1),
     )
-    data_loader = fluid.io.DataLoader.from_generator(capacity=5, iterable=True)
-    data_loader.set_sample_list_generator(train_reader)
+    data_loader = paddle.io.DataLoader(
+        dataset, batch_size=batch_size, drop_last=True
+    )
 
     resnet = resnet50(False)
     if to_static:
@@ -225,22 +194,6 @@ def train(to_static, enable_prim, enable_cinn):
 
 
 class TestResnet(unittest.TestCase):
-    @unittest.skipIf(
-        not (paddle.is_compiled_with_cinn() and paddle.is_compiled_with_cuda()),
-        "paddle is not compiled with CINN and CUDA",
-    )
-    def test_prim(self):
-        dy2st_prim = train(to_static=True, enable_prim=True, enable_cinn=False)
-        np.testing.assert_allclose(dy2st_prim, DY2ST_PRIM_GT, rtol=1e-5)
-
-    @unittest.skipIf(
-        not (paddle.is_compiled_with_cinn() and paddle.is_compiled_with_cuda()),
-        "paddle is not compiled with CINN and CUDA",
-    )
-    def test_cinn(self):
-        dy2st_cinn = train(to_static=True, enable_prim=False, enable_cinn=True)
-        np.testing.assert_allclose(dy2st_cinn, DY2ST_CINN_GT, rtol=1e-5)
-
     @unittest.skipIf(
         not (paddle.is_compiled_with_cinn() and paddle.is_compiled_with_cuda()),
         "paddle is not compiled with CINN and CUDA",

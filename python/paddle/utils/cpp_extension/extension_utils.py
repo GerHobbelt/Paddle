@@ -16,6 +16,7 @@ import atexit
 import collections
 import glob
 import hashlib
+import importlib.abc
 import importlib.util
 import json
 import logging
@@ -173,6 +174,7 @@ def custom_write_stub(resource, pyfile):
         import sys
         import types
         import paddle
+        import importlib.abc
         import importlib.util
 
         cur_dir = os.path.dirname(os.path.abspath(__file__))
@@ -562,8 +564,6 @@ def normalize_extension_kwargs(kwargs, use_cuda=False):
                 extra_compile_args[compiler] = []
 
     if IS_WINDOWS:
-        # TODO(zhouwei): may append compile flags in future
-        pass
         # append link flags
         extra_link_args = kwargs.get('extra_link_args', [])
         extra_link_args.extend(MSVC_LINK_FLAGS)
@@ -887,7 +887,6 @@ def add_compile_flag(extra_compile_args, flags):
 
 
 def is_cuda_file(path):
-
     cuda_suffix = {'.cu'}
     items = os.path.splitext(path)
     assert len(items) > 1
@@ -1144,13 +1143,13 @@ def _custom_api_content(op_name):
     API_TEMPLATE = textwrap.dedent(
         """
         import paddle.fluid.core as core
-        from paddle.fluid.framework import in_dygraph_mode
+        from paddle.framework import in_dynamic_mode
         from paddle.fluid.layer_helper import LayerHelper
 
         def {op_name}({params_list}):
             # The output variable's dtype use default value 'float32',
             # and the actual dtype of output variable will be inferred in runtime.
-            if in_dygraph_mode():
+            if in_dynamic_mode():
                 outs = core.eager._run_custom_op("{op_name}", {params_list})
                 {dynamic_content}
             else:
@@ -1269,7 +1268,7 @@ def _write_setup_file(
     ).lstrip()
 
     with_cuda = False
-    if any([is_cuda_file(source) for source in sources]):
+    if any(is_cuda_file(source) for source in sources):
         with_cuda = True
     log_v(f"with_cuda: {with_cuda}", verbose)
 

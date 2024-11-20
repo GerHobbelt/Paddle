@@ -46,6 +46,9 @@ void BindCommContextManager(py::module *m) {
               "create_nccl_comm_context",
               &phi::distributed::CommContextManager::CreateNCCLCommContext,
               py::call_guard<py::gil_scoped_release>())
+          .def_static("set_cuda_device_id",
+                      &phi::distributed::CommContextManager::SetCUDADeviceId,
+                      py::call_guard<py::gil_scoped_release>())
 #endif
 #if defined(PADDLE_WITH_GLOO)
           .def_static(
@@ -78,8 +81,9 @@ void BindTCPStore(py::module *m) {
                        [](phi::distributed::Store &self,
                           const std::string &key) -> py::bytes {
                          auto data = self.get(key);
-                         return py::bytes(reinterpret_cast<char *>(data.data()),
-                                          data.size());
+                         std::string s(data.begin(), data.end());
+                         py::gil_scoped_acquire acquire;
+                         return py::bytes(s);
                        },
                        py::arg("key"),
                        py::call_guard<py::gil_scoped_release>())

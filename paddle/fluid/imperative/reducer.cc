@@ -29,8 +29,9 @@
 namespace paddle {
 namespace imperative {
 
-#if defined(PADDLE_WITH_NCCL) || defined(PADDLE_WITH_RCCL) || \
-    defined(PADDLE_WITH_XPU_BKCL) || defined(PADDLE_WITH_GLOO)
+#if defined(PADDLE_WITH_NCCL) || defined(PADDLE_WITH_RCCL) ||     \
+    defined(PADDLE_WITH_XPU_BKCL) || defined(PADDLE_WITH_GLOO) || \
+    defined(PADDLE_WITH_CUSTOM_DEVICE)
 // div the nranks
 void Group::DivNRanks(const platform::DeviceContext &context, int64_t nranks) {
   phi::DenseTensor *tensor =
@@ -376,7 +377,7 @@ void Reducer::InitializeDenseGroups(
     p_group->length_.push_back(size);
 
     // for concat operator
-    p_group->dense_tensors_.push_back(phi::DenseTensor());
+    p_group->dense_tensors_.emplace_back();
 
     // check the dtype and place, it must be same.
     const auto &dtype = var->DataType();
@@ -466,9 +467,9 @@ void Reducer::PrepareDeps(const std::unordered_set<GradOpNode *> &init_nodes) {
   std::queue<GradOpNode *> q;
   std::unordered_set<GradOpNode *> visited;
 
-  for (auto pos = init_nodes.begin(); pos != init_nodes.end(); pos++) {
-    q.push(*pos);
-    visited.insert(*pos);
+  for (auto init_node : init_nodes) {
+    q.push(init_node);
+    visited.insert(init_node);
   }
 
   while (!q.empty()) {
@@ -818,8 +819,6 @@ void Reducer::MarkVarReady(const size_t var_index, const bool is_used_var) {
   }
 }
 
-// TODO(liuyuhui): If BKCL support non-blocking communication, it should be
-// fixed as same as multi gpus card training.
 void Reducer::MarkGroupReady(size_t group_index) {
   PADDLE_ENFORCE_GE(
       group_index,

@@ -19,9 +19,14 @@
 #include "paddle/fluid/distributed/auto_parallel/dist_attr.h"
 #include "paddle/fluid/framework/details/nan_inf_utils.h"
 #include "paddle/fluid/framework/executor_gc_helper.h"
+#include "paddle/fluid/framework/new_executor/instruction/instruction_base.h"
 #include "paddle/fluid/framework/new_executor/interpreter/data_transfer.h"
 #include "paddle/fluid/framework/new_executor/interpreter/execution_config.h"
 #include "paddle/fluid/framework/new_executor/interpreter/static_build.h"
+#include "paddle/fluid/ir/dialect/pd_dialect.h"
+#include "paddle/fluid/ir/interface/op_yaml_info.h"
+#include "paddle/fluid/ir/interface/op_yaml_info_parser.h"
+#include "paddle/fluid/ir/phi_kernel_adaptor/phi_kernel_util.h"
 #include "paddle/fluid/memory/stats.h"
 #include "paddle/fluid/operators/controlflow/conditional_block_op_helper.h"
 #include "paddle/fluid/operators/controlflow/recurrent_op_helper.h"
@@ -36,6 +41,9 @@
 #include "paddle/fluid/platform/mkldnn_helper.h"
 #endif
 
+#ifdef PADDLE_WITH_CUSTOM_DEVICE
+#include "paddle/phi/backends/device_manager.h"
+#endif
 PADDLE_DEFINE_EXPORTED_bool(
     new_executor_log_memory_stats,
     false,
@@ -119,7 +127,8 @@ void AsyncWorkQueue::AddTask(const OpFuncType& op_func_type,
   queue_group_->AddTask(op_func_type == OpFuncType::kGpuAsync, std::move(fn));
 }
 
-bool IsCommunicationOp(const std::string& op_name) {
+bool IsCommunicationOp(const OperatorBase* op) {
+  const std::string& op_name = op->Type();
   const std::set<std::string> special_comm_op_set = {
       "send",
       "recv",
@@ -131,15 +140,33 @@ bool IsCommunicationOp(const std::string& op_name) {
       special_comm_op_set.count(op_name)) {
     return true;
   }
+  if (op->HasAttr("ring_id")) {
+    return true;
+  }
   return false;
 }
 
 bool IsCommunicationOp(const Instruction& instr) {
-  return IsCommunicationOp(instr.OpBase()->Type());
+  if (!instr.OpBaseValid()) {
+    return false;
+  }
+  return IsCommunicationOp(instr.OpBase());
 }
 
 bool IsCpuOp(const Instruction& instr) {
   return platform::is_cpu_place(instr.DeviceContext().GetPlace());
+}
+
+bool IsCpuOp(Instruction* instr) {
+  return platform::is_cpu_place(instr->DeviceContext().GetPlace());
+}
+
+bool IsCpuOp(const paddle::framework::InstructionBase& instr) {
+  return platform::is_cpu_place(instr.DeviceContext().GetPlace());
+}
+
+bool IsCpuOp(paddle::framework::InstructionBase* instr) {
+  return platform::is_cpu_place(instr->DeviceContext().GetPlace());
 }
 
 bool IsGradOp(const std::string& op_name) {
@@ -157,6 +184,14 @@ bool IsMemcpyD2H(const Instruction& instr) {
 
 bool IsMemcpyH2D(const Instruction& instr) {
   return instr.OpBase()->Type() == kMemcpyH2D;
+}
+
+bool IsMemcpyH2D(Instruction* instr) {
+  return instr->OpBase()->Type() == kMemcpyH2D;
+}
+
+bool IsMemcpyH2D(paddle::framework::InstructionBase* instr) {
+  return instr->Name() == "pd.memcpy_h2d";
 }
 
 bool IsMemcpyOp(const Instruction& instr) {
@@ -400,6 +435,40 @@ void ApplyDeviceGuard(const OperatorBase* op_base,
       }
       VLOG(3) << "Switch into " << expected_kernel_key->place_
               << " by device_guard.";
+    } else if (platform::is_custom_place(place)) {
+#ifdef PADDLE_WITH_CUSTOM_DEVICE
+      auto device_types = phi::DeviceManager::GetAllCustomDeviceTypes();
+      bool is_custom_device_op = false;
+      for (auto dev_type : device_types) {
+        if (op_device.find(dev_type) != std::string::npos) {
+          is_custom_device_op = true;
+          break;
+        }
+      }
+      PADDLE_ENFORCE_EQ(
+          is_custom_device_op,
+          true,
+          phi::errors::Unimplemented(
+              "Unsupported current device %s with Paddle CustomDevice ",
+              op_device));
+#else
+      VLOG(1) << string::Sprintf(
+          "Cannot use get_all_custom_device_type because you have installed"
+          "CPU/GPU version PaddlePaddle.\n"
+          "If you want to use get_all_custom_device_type, please try to "
+          "install CustomDevice version "
+          "PaddlePaddle by: pip install paddlepaddle\n");
+#endif
+      if (op_base->SupportCustomDevice()) {
+        expected_kernel_key->place_ = place;
+      } else {
+        expected_kernel_key->place_ = platform::CPUPlace();
+        LOG_FIRST_N(WARNING, 1) << "Op(" << op_base->Type()
+                                << ") has no Custom Place implementation. It "
+                                   "will be assigned to CPUPlace.";
+      }
+      VLOG(3) << "Switch into " << expected_kernel_key->place_
+              << " by device_guard.";
     } else {
       PADDLE_THROW(
           platform::errors::Fatal("Unsupported current place %s", op_device));
@@ -445,7 +514,7 @@ void BuildOpFuncList(const platform::Place& place,
   // Step 1: create all ops for current block.
   CreateAllOps(block, &ops_unique);
 
-  VLOG(4) << "Static build: " << static_build;
+  VLOG(1) << "Static build: " << static_build;
 
   if (!execution_config.used_for_jit) {
     // If gc is enabled and block size > 1
@@ -536,7 +605,7 @@ void BuildOpFuncList(const platform::Place& place,
       op_func_node.stream_priority_ = dist_attr->stream_priority();
       op_func_node.scheduling_priority_ = dist_attr->scheduling_priority();
     } else {
-      if (interpreter::IsCommunicationOp(op_type)) {
+      if (interpreter::IsCommunicationOp(op)) {
         // NOTE(Ruibiao): Dispatching computation before communication improves
         // multi-stream overlap when the time cost of communication less than
         // that of the calculation (e.g., ResNet50_bs128_pure_fp16 N4C32
@@ -736,10 +805,6 @@ void BuildOpFuncList(const platform::Place& place,
         }
 
         // for debug nan/inf
-        if (FLAGS_check_nan_inf) {
-          VLOG(4) << "Check nan/inf";
-          framework::details::CheckOpHasNanOrInf(*op, *runtime_scope, place);
-        }
 
         vec_func_list->emplace_back(op_func_node);
 
@@ -811,6 +876,35 @@ void BuildOpFuncList(const platform::Place& place,
       std::rethrow_exception(std::current_exception());
     }
 
+    if (FLAGS_check_nan_inf) {
+      VLOG(4) << "Check nan/inf";
+      try {
+        framework::details::CheckOpHasNanOrInf(*op, *local_scope, place);
+      } catch (...) {
+        const std::vector<std::string>* callstack = nullptr;
+        auto attrs = op->Attrs();
+        auto iter =
+            attrs.find(OpProtoAndCheckerMaker::OpCreationCallstackAttrName());
+        if (iter != attrs.end()) {
+          callstack = &PADDLE_GET_CONST(std::vector<std::string>, iter->second);
+          if (callstack->empty()) callstack = nullptr;
+        }
+        std::ostringstream sout;
+        if (callstack) {
+          if (FLAGS_call_stack_level > 1) {
+            sout << "\n\n  Compile Traceback (most recent call last):";
+          } else {
+            sout << "In user code:\n";
+          }
+          for (auto& line : *callstack) {
+            sout << "\n  " << line;
+          }
+        }
+        std::cout << sout.str() << std::endl;
+        std::rethrow_exception(std::current_exception());
+      }
+    }
+
     VLOG(4) << "End run " << place << " "
             << op_func_node.operator_base_->DebugStringEx(local_scope);
 
@@ -860,6 +954,115 @@ void BuildOpFuncList(const platform::Place& place,
     }
   }
   delete garbages;
+}
+
+void BuildOpFuncList(
+    const platform::Place& place,
+    ::ir::Block* block,
+    std::vector<OpFuncNode>* vec_func_list,
+    framework::Scope* scope,
+    framework::Scope* local_scope,
+    const std::unordered_map<::ir::Value, std::string>& value_2_name_map,
+    const ExecutionConfig& execution_config) {
+  vec_func_list->reserve(block->size());
+  ::ir::IrContext* ctx = ir::IrContext::Instance();
+
+  ctx->GetOrRegisterDialect<paddle::dialect::PaddleDialect>();
+
+  for (auto op : *block) {
+    OpFuncNode op_func_node;
+    auto attr_map = op->attributes();
+
+    auto op_name =
+        attr_map.at("op_name").dyn_cast<::ir::StrAttribute>().AsString();
+    op_func_node.phi_op_name_ = op_name;
+
+    if (GetSpecialOpNames().count(op_name)) {
+      VLOG(6) << "skip process " << op_name;
+      continue;
+    }
+
+    ::ir::OpInfo op_info = ctx->GetRegisteredOpInfo(op_name);
+
+    auto impl =
+        op_info.GetInterfaceImpl<paddle::dialect::OpYamlInfoInterface>();
+
+    op_func_node.infer_meta_interface_ =
+        op_info.GetInterfaceImpl<paddle::dialect::InferMetaInterface>();
+
+    VLOG(6) << "op name" << op_func_node.phi_op_name_;
+    dialect::OpYamlInfoParser op_yaml_info_parser(impl->get_op_info_());
+    if (op_func_node.infer_meta_interface_) {
+      ::ir::BuildPhiContext<
+          phi::InferMetaContext,
+          phi::MetaTensor,
+          phi::MetaTensor,
+          paddle::small_vector<phi::MetaTensor, phi::kInputSmallVectorSize>,
+          paddle::small_vector<phi::MetaTensor, phi::kInputSmallVectorSize>,
+          false>(op,
+                 value_2_name_map,
+                 scope,
+                 local_scope,
+                 op_yaml_info_parser,
+                 &(op_func_node.infer_meta_context_));
+    }
+
+    auto kernel_name =
+        attr_map.at("kernel_name").dyn_cast<ir::StrAttribute>().AsString();
+    auto kernel_key = attr_map.at("kernel_key")
+                          .dyn_cast<paddle::dialect::KernelAttribute>()
+                          .data();
+
+    VLOG(6) << "finish process infer meta context";
+    auto t1 = phi::KernelFactory::Instance().SelectKernelOrThrowError(
+        kernel_name, kernel_key);
+    op_func_node.phi_kernel_ = new phi::Kernel(t1.kernel);
+
+    PADDLE_ENFORCE_EQ(op_func_node.phi_kernel_->IsValid(),
+                      true,
+                      "not found kernel for [%s]",
+                      kernel_name);
+
+    if (kernel_name == "fused_softmax_mask_upper_triangle" ||
+        kernel_name == "fused_softmax_mask_upper_triangle_grad") {
+      // builder operator
+      op_func_node.operator_base_ =
+          ir::BuildOperatorBase(op, value_2_name_map, op_yaml_info_parser);
+      paddle::framework::VariableValueMap in_map;
+      paddle::framework::VariableValueMap out_map;
+      op_func_node.runtime_ctx_ =
+          std::make_shared<paddle::framework::RuntimeContext>(
+              paddle::framework::RuntimeContext(in_map, out_map));
+      ir::BuildRuntimeContext(op,
+                              value_2_name_map,
+                              scope,
+                              local_scope,
+                              op_yaml_info_parser,
+                              op_func_node.runtime_ctx_.get());
+      op_func_node.fluid_op = true;
+    } else {
+      ::ir::BuildPhiContext<phi::KernelContext,
+                            const phi::TensorBase*,
+                            phi::TensorBase*,
+                            paddle::small_vector<const phi::TensorBase*>,
+                            paddle::small_vector<phi::TensorBase*>,
+                            true>(op,
+                                  value_2_name_map,
+                                  scope,
+                                  local_scope,
+                                  op_yaml_info_parser,
+                                  &(op_func_node.kernel_context_));
+    }
+
+    VLOG(6) << "finish process kernel context";
+    op_func_node.kernel_context_.SetDeviceContext(
+        phi::DeviceContextPool::Instance().Get(
+            phi::TransToPhiPlace(kernel_key.backend())));
+    op_func_node.dev_ctx_ = phi::DeviceContextPool::Instance().Get(
+        phi::TransToPhiPlace(kernel_key.backend()));
+
+    vec_func_list->emplace_back(op_func_node);
+  }
 }
 
 void BuildVariableScope(const framework::BlockDesc& block,
@@ -930,8 +1133,8 @@ void SetDeviceCommContext(framework::OperatorBase* operator_base,
     int ring_id = operator_base->Attr<int>("ring_id");
     const auto& comm_context_manager =
         phi::distributed::CommContextManager::GetInstance();
-    if (comm_context_manager.Has(ring_id)) {
-      auto comm_context = comm_context_manager.Get(ring_id);
+    if (comm_context_manager.Has(std::to_string(ring_id))) {
+      auto comm_context = comm_context_manager.Get(std::to_string(ring_id));
       if (!dev_ctx->GetCommContext()) {
         dev_ctx->SetCommContext(comm_context);
       }
@@ -940,6 +1143,41 @@ void SetDeviceCommContext(framework::OperatorBase* operator_base,
               << ", get comm_context failed!";
     }
   }
+}
+
+void SetDeviceCommContext(::ir::Operation* op,
+                          platform::DeviceContext* dev_ctx) {
+  auto op_attributes = op->attributes();
+  if (op_attributes.count("ring_id") != 0) {
+    int ring_id =
+        op_attributes.at("ring_id").dyn_cast<::ir::Int32Attribute>().data();
+    const auto& comm_context_manager =
+        phi::distributed::CommContextManager::GetInstance();
+    if (comm_context_manager.Has(std::to_string(ring_id))) {
+      auto comm_context = comm_context_manager.Get(std::to_string(ring_id));
+      if (!dev_ctx->GetCommContext()) {
+        dev_ctx->SetCommContext(comm_context);
+      }
+    } else {
+      VLOG(3) << "op: "
+              << op_attributes.at("op_name")
+                     .dyn_cast<::ir::StrAttribute>()
+                     .AsString()
+              << ", ring_id: " << ring_id << ", get comm_context failed!";
+    }
+  }
+}
+
+std::unordered_set<std::string> GetSpecialOpNames() {
+  return {
+      "builtin.combine",
+      "builtin.slice",
+      "pd.feed",
+      "builtin.set_parameter",
+      "builtin.get_parameter",
+      "pd.data",
+      "pd.shadow_output",
+  };
 }
 
 }  // namespace interpreter

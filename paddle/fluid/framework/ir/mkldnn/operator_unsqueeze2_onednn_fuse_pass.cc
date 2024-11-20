@@ -16,7 +16,6 @@
 
 #include "paddle/fluid/framework/ir/mkldnn/mkldnn_pass_util.h"
 #include "paddle/fluid/framework/op_version_registry.h"
-#include "paddle/phi/backends/onednn/onednn_reuse.h"
 #include "paddle/utils/string/pretty_log.h"
 
 namespace paddle {
@@ -77,8 +76,7 @@ void FuseOperatorUnsqueeze2OneDNNPass::FuseUnsqueeze2(
     bool has_axes_tensor_list =
         std::find(names.begin(), names.end(), "AxesTensorList") != names.end();
 
-    if (has_axes_tensor &&
-        unsqueeze2_op->Op()->Input("AxesTensor").size() > 0) {
+    if (has_axes_tensor && !unsqueeze2_op->Op()->Input("AxesTensor").empty()) {
       VLOG(4) << "Cannot fuse " << op_type
               << " and unsqueeze2 because unsqueeze2 dims are specified by "
                  "AxesTensor!";
@@ -86,7 +84,7 @@ void FuseOperatorUnsqueeze2OneDNNPass::FuseUnsqueeze2(
     }
 
     if (has_axes_tensor_list &&
-        unsqueeze2_op->Op()->Input("AxesTensorList").size() > 0) {
+        !unsqueeze2_op->Op()->Input("AxesTensorList").empty()) {
       VLOG(4) << "Cannot fuse " << op_type
               << " and unsqueeze2 because unsqueeze2 dims are specified by "
                  "AxesTensorList!";

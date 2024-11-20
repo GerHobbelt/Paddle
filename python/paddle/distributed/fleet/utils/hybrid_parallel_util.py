@@ -17,7 +17,7 @@ from paddle import framework
 from paddle.distributed.parallel import (
     _split_tensors,
     build_groups,
-    in_dygraph_mode,
+    in_dynamic_mode,
     sync_params_buffers,
 )
 
@@ -27,6 +27,20 @@ from paddle.fluid import core
 from .log_util import logger
 
 __all__ = []
+
+
+def obtain_optimizer_parameters_list(optimizer):
+    if getattr(optimizer, '_param_groups', None) and isinstance(
+        optimizer._param_groups[0], dict
+    ):
+        parameters_list = []
+        for group in optimizer._param_groups:
+            for param in group['params']:
+                parameters_list.append(param)
+    else:
+        parameters_list = list(optimizer._parameter_list)
+
+    return parameters_list
 
 
 def _apply_collective_grads(parameters, comm_group, bucket_size, scale=None):
@@ -131,7 +145,7 @@ def _broadcast_data_help(data, shape, dtype, hcg):
     )
 
     if mp_rank != 0:
-        if in_dygraph_mode():
+        if in_dynamic_mode():
             data._clear_data()
             input_data._share_buffer_to(data)
         else:
@@ -167,13 +181,14 @@ def broadcast_input_data(hcg, *inputs, **kwargs):
         place = paddle.CUDAPlace(dev_idx)
     elif dev in paddle.device.get_all_custom_device_type():
         place = paddle.CustomPlace(dev, dev_idx)
+        dev = 'custom'
     else:
         place = eval(f"paddle.{dev.upper()}Place")(dev_idx)
 
     for v in inputs:
         if isinstance(v, core.eager.Tensor):
             with framework.no_grad():
-                if in_dygraph_mode() and not eval(f"v.place.is_{dev}_place")():
+                if in_dynamic_mode() and not eval(f"v.place.is_{dev}_place")():
                     v_gpu = v._copy_to(place, True)
                     v._clear_data()
                     v_gpu._share_buffer_to(v)
@@ -184,7 +199,7 @@ def broadcast_input_data(hcg, *inputs, **kwargs):
     for k, v in kwargs.items():
         if isinstance(v, core.eager.Tensor):
             with framework.no_grad():
-                if in_dygraph_mode() and not eval(f"v.place.is_{dev}_place")():
+                if in_dynamic_mode() and not eval(f"v.place.is_{dev}_place")():
                     v_gpu = v._copy_to(place, True)
                     v._clear_data()
                     v_gpu._share_buffer_to(v)
@@ -216,7 +231,7 @@ def fused_allreduce_gradients_with_group(
 ):
     apply_func = (
         _apply_collective_grads_eager
-        if in_dygraph_mode()
+        if in_dynamic_mode()
         else _apply_collective_grads
     )
     with framework.no_grad():
@@ -229,31 +244,6 @@ def fused_allreduce_gradients(parameter_list, hcg):
     fused_allreduce_gradients_with_group(parameter_list, data_parallel_group)
 
 
-def sharding_reduce_gradients(parameter_list, hcg):
-    # TODO allreduce --> reduce
-    # TODO merge grad / nrank with dp
-    logger.debug("sharding start gradients sync")
-    with framework.no_grad():
-
-        sharding_nrank = hcg.get_sharding_parallel_group().nranks
-        for param in parameter_list:
-            g_var = None
-            if param.trainable and (param._grad_ivar() is not None):
-                g_var = param._grad_ivar()
-            if param.trainable and hasattr(param, "main_grad"):
-                assert (
-                    param._grad_ivar() is None
-                ), "param.grad should be None when using main_grad"
-                g_var = param.main_grad
-            if g_var is not None:
-                g_var.scale_(1.0 / sharding_nrank)
-                paddle.distributed.all_reduce(
-                    g_var,
-                    group=hcg.get_sharding_parallel_group(),
-                    sync_op=True,
-                )
-
-
 def broadcast_sharding_parameters(model, hcg):
     # TODO TO save memory, use un-fused broadcast to avoid potentional OOM
     logger.debug("sharding start init parameters sync")
@@ -262,3 +252,10 @@ def broadcast_sharding_parameters(model, hcg):
     sync_params_buffers(
         model, sharding_parallel_group, src_rank, is_model_parallel=False
     )
+
+
+def unwrap_optimizer(optimizer, optimizer_instances=()):
+    _inner_opt = optimizer
+    while isinstance(_inner_opt, optimizer_instances):
+        _inner_opt = _inner_opt._inner_opt
+    return _inner_opt

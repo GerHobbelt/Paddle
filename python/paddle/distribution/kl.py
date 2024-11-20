@@ -27,7 +27,7 @@ from paddle.distribution.laplace import Laplace
 from paddle.distribution.lognormal import LogNormal
 from paddle.distribution.normal import Normal
 from paddle.distribution.uniform import Uniform
-from paddle.fluid.framework import _non_static_mode
+from paddle.framework import in_dynamic_mode
 
 __all__ = ["register_kl", "kl_divergence"]
 
@@ -53,14 +53,14 @@ def kl_divergence(p, q):
 
         .. code-block:: python
 
-            import paddle
+            >>> import paddle
 
-            p = paddle.distribution.Beta(alpha=0.5, beta=0.5)
-            q = paddle.distribution.Beta(alpha=0.3, beta=0.7)
+            >>> p = paddle.distribution.Beta(alpha=0.5, beta=0.5)
+            >>> q = paddle.distribution.Beta(alpha=0.3, beta=0.7)
 
-            print(paddle.distribution.kl_divergence(p, q))
-            # Tensor(shape=[], dtype=float32, place=CUDAPlace(0), stop_gradient=True,
-            #        [0.21193528])
+            >>> print(paddle.distribution.kl_divergence(p, q))
+            Tensor(shape=[], dtype=float32, place=Place(cpu), stop_gradient=True,
+                0.21193528)
 
     """
     return _dispatch(type(p), type(q))(p, q)
@@ -73,7 +73,7 @@ def register_kl(cls_p, cls_q):
     functions registered by ``register_kl``, according to multi-dispatch pattern.
     If an implemention function is found, it will return the result, otherwise,
     it will raise ``NotImplementError`` exception. Users can register
-    implemention funciton by the decorator.
+    implemention function by the decorator.
 
     Args:
         cls_p (Distribution): The Distribution type of Instance p. Subclass derived from ``Distribution``.
@@ -82,11 +82,11 @@ def register_kl(cls_p, cls_q):
     Examples:
         .. code-block:: python
 
-            import paddle
+            >>> import paddle
 
-            @paddle.distribution.register_kl(paddle.distribution.Beta, paddle.distribution.Beta)
-            def kl_beta_beta():
-                pass # insert implementation here
+            >>> @paddle.distribution.register_kl(paddle.distribution.Beta, paddle.distribution.Beta)
+            >>> def kl_beta_beta():
+            ...     pass # insert implementation here
     """
     if not issubclass(cls_p, Distribution) or not issubclass(
         cls_q, Distribution
@@ -229,7 +229,7 @@ def _kl_expfamily_expfamily(p, q):
     p_log_norm = p._log_normalizer(*p_natural_params)
 
     try:
-        if _non_static_mode():
+        if in_dynamic_mode():
             p_grads = paddle.grad(
                 p_log_norm, p_natural_params, create_graph=True
             )

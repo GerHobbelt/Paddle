@@ -134,7 +134,7 @@ void RnnKernel(const Context &dev_ctx,
                const paddle::optional<DenseTensor> &sequence_length,
                float dropout_prob,
                bool is_bidirec,
-               int input_size,
+               int input_size UNUSED,
                int hidden_size,
                int num_layers,
                const std::string &mode,
@@ -250,10 +250,10 @@ void RnnKernel(const Context &dev_ctx,
     // MIOPEN need to permute weight, do not share with weight_grad
     if (is_test) {  // maybe also reset small weights' ptr for training
       int offset = 0;
-      for (size_t i = 0; i < weight_list.size(); ++i) {
-        size_t len = weight_list[i]->numel();
-        auto dim = weight_list[i]->dims();
-        const_cast<DenseTensor *>(weight_list[i])
+      for (auto weight_item : weight_list) {
+        size_t len = weight_item->numel();
+        auto dim = weight_item->dims();
+        const_cast<DenseTensor *>(weight_item)
             ->ShareDataWith(
                 weight_whole.Slice(static_cast<int64_t>(offset),
                                    static_cast<int64_t>(offset + len)))

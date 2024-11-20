@@ -98,6 +98,8 @@ class LRScheduler:
                     type(learning_rate)
                 )
             )
+        if learning_rate < 0:
+            raise ValueError(f"Invalid learning rate: {learning_rate}")
         self.base_lr = float(learning_rate)
         self.last_lr = float(learning_rate)
         self.last_epoch = last_epoch
@@ -123,7 +125,32 @@ class LRScheduler:
 
         Returns:
             None
+        Examples:
+            .. code-block:: python
 
+                import paddle
+                value = paddle.arange(26, dtype='float32')
+                a = paddle.reshape(value, [2, 13])
+                linear = paddle.nn.Linear(13, 5)
+                adadelta = paddle.optimizer.Adadelta(learning_rate=0.0003, epsilon=1e-06, rho=0.95,
+                                            parameters = linear.parameters())
+                out = linear(a)
+                out.backward()
+                adadelta.step()
+                adadelta.clear_grad()
+
+        Examples:
+            .. code-block:: python
+                import paddle
+                value = paddle.arange(26, dtype='float32')
+                a = paddle.reshape(value, [2, 13])
+                linear = paddle.nn.Linear(13, 5)
+                adadelta = paddle.optimizer.Adadelta(learning_rate=0.0003, epsilon=1e-06, rho=0.95,
+                                            parameters = linear.parameters())
+                out = linear(a)
+                out.backward()
+                adadelta.step()
+                adadelta.clear_grad()
         """
         if epoch is None:
             self.last_epoch += 1
@@ -238,7 +265,9 @@ class NoamDecay(LRScheduler):
 
     Examples:
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -257,7 +286,12 @@ class NoamDecay(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -341,7 +375,9 @@ class PiecewiseDecay(LRScheduler):
     Examples:
 
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -360,7 +396,12 @@ class PiecewiseDecay(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -431,11 +472,11 @@ class NaturalExpDecay(LRScheduler):
     Examples:
 
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
-
-            # train on default dynamic graph mode
             linear = paddle.nn.Linear(10, 10)
             scheduler = paddle.optimizer.lr.NaturalExpDecay(learning_rate=0.5, gamma=0.1, verbose=True)
             sgd = paddle.optimizer.SGD(learning_rate=scheduler, parameters=linear.parameters())
@@ -450,7 +491,12 @@ class NaturalExpDecay(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -513,7 +559,9 @@ class InverseTimeDecay(LRScheduler):
     Examples:
 
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -532,7 +580,12 @@ class InverseTimeDecay(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -609,7 +662,9 @@ class PolynomialDecay(LRScheduler):
     Examples:
 
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -628,7 +683,12 @@ class PolynomialDecay(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -733,7 +793,9 @@ class LinearWarmup(LRScheduler):
     Examples:
 
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -753,7 +815,12 @@ class LinearWarmup(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -866,7 +933,9 @@ class ExponentialDecay(LRScheduler):
     Examples:
 
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -885,7 +954,12 @@ class ExponentialDecay(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -957,7 +1031,9 @@ class MultiStepDecay(LRScheduler):
     Examples:
 
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -976,7 +1052,12 @@ class MultiStepDecay(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -1014,10 +1095,8 @@ class MultiStepDecay(LRScheduler):
             )
 
         if not all(
-            [
-                milestones[i] < milestones[i + 1]
-                for i in range(len(milestones) - 1)
-            ]
+            milestones[i] < milestones[i + 1]
+            for i in range(len(milestones) - 1)
         ):
             raise ValueError('The elements of milestones must be incremented')
         if gamma >= 1.0:
@@ -1066,7 +1145,9 @@ class StepDecay(LRScheduler):
     Examples:
 
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -1085,7 +1166,12 @@ class StepDecay(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -1138,7 +1224,7 @@ class StepDecay(LRScheduler):
 
 class LambdaDecay(LRScheduler):
     """
-    Sets the learning rate of ``optimizer`` by function ``lr_lambda`` . ``lr_lambda`` is funciton which receives ``epoch`` .
+    Sets the learning rate of ``optimizer`` by function ``lr_lambda`` . ``lr_lambda`` is function which receives ``epoch`` .
 
     The algorithm can be described as the code below.
 
@@ -1163,7 +1249,9 @@ class LambdaDecay(LRScheduler):
     Examples:
 
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -1182,7 +1270,12 @@ class LambdaDecay(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -1264,7 +1357,9 @@ class ReduceOnPlateau(LRScheduler):
 
     Examples:
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -1283,7 +1378,12 @@ class ReduceOnPlateau(LRScheduler):
                     scheduler.step(loss)    # If you update learning rate each step
               # scheduler.step(loss)        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -1488,7 +1588,9 @@ class CosineAnnealingDecay(LRScheduler):
     Examples:
 
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -1507,7 +1609,12 @@ class CosineAnnealingDecay(LRScheduler):
                     scheduler.step()    # If you update learning rate each step
               # scheduler.step()        # If you update learning rate each epoch
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -1686,7 +1793,9 @@ class OneCycleLR(LRScheduler):
 
     Examples:
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -1704,7 +1813,12 @@ class OneCycleLR(LRScheduler):
                     sgd.clear_gradients()
                     scheduler.step()        # You should update learning rate each step
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
@@ -1872,7 +1986,7 @@ class OneCycleLR(LRScheduler):
                 )
             )
 
-        for (i, (end_step, step_size)) in enumerate(
+        for i, (end_step, step_size) in enumerate(
             zip(self._step_config[1:], self._steps_size)
         ):
             # i == len(self._lr_config) - 2 catch the last step, otherwise it will return None.
@@ -1929,7 +2043,9 @@ class CyclicLR(LRScheduler):
 
     Examples:
         .. code-block:: python
+            :name: code-example1
 
+            # Example1: train on default dynamic graph mode
             import paddle
             import numpy as np
 
@@ -1947,7 +2063,12 @@ class CyclicLR(LRScheduler):
                     sgd.clear_gradients()
                     scheduler.step()        # You should update learning rate each step
 
-            # train on static graph mode
+        .. code-block:: python
+            :name: code-example2
+
+            # Example2: train on static graph mode
+            import paddle
+            import numpy as np
             paddle.enable_static()
             main_prog = paddle.static.Program()
             start_prog = paddle.static.Program()
