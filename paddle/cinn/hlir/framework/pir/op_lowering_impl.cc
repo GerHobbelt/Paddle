@@ -49,7 +49,6 @@
 
 PD_DECLARE_bool(cinn_use_cuda_vectorize);
 PD_DECLARE_bool(cinn_bucket_compile);
-PD_DECLARE_bool(cinn_new_group_scheduler);
 PD_DECLARE_bool(cinn_check_tensor_buffer_map);
 const int default_priority = 100;
 
@@ -798,7 +797,7 @@ ir::Expr OpLowererImpl::LowerX86(const OpLoweringGroupPtr& group,
 
   std::vector<ir::Expr> func_bodies =
       LowerOps(group, ops, &group_func_arg_tensors, &tensor_map);
-  this->target_ = common::DefaultNVGPUTarget();
+  this->target_ = common::DefaultDeviceTarget();
   cinn::runtime::CurrentTarget::SetCurrentTarget(this->target_);
   ir::ModuleExpr mod_expr(func_bodies);
   ir::IRSchedule ir_sch(

@@ -229,14 +229,14 @@ void IrPrinter::PrintBlock(const Block& block) {
   os << indentation() << "{\n";
   AddIndentation();
   if (!block.kwargs_empty()) {
-    os << indentation() << "^kw:";
-    auto cur = block.kwargs_begin(), end = block.kwargs_end();
-    PrintValue(cur->second);
-    while (++cur != end) {
-      os << ", ";
-      PrintValue(cur->second);
+    os << indentation() << "^kw:\n";
+    AddIndentation();
+    for (auto iter = block.kwargs_begin(); iter != block.kwargs_end(); ++iter) {
+      os << indentation();
+      PrintValue(iter->second);
+      os << "\n";
     }
-    os << "\n";
+    DecreaseIndentation();
   }
   for (auto& item : block) {
     PrintOperation(item);
@@ -268,6 +268,19 @@ void IrPrinter::PrintValue(Value v) {
                arg.is_kwarg()
                    ? "%kwarg_" + arg.keyword()
                    : "%arg_" + std::to_string(cur_block_argument_number_++));
+    auto& arg_attributes = arg.attributes();
+    os << " {";
+    pir::detail::PrintInterleave(
+        arg_attributes.begin(),
+        arg_attributes.end(),
+        [this](std::pair<std::string, Attribute> it) {
+          this->os << it.first;
+          this->os << ":";
+          this->PrintAttribute(it.second);
+        },
+        [this]() { this->os << ","; });
+
+    os << "}";
   }
 }
 

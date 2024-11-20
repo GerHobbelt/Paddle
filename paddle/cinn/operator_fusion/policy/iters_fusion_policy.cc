@@ -21,6 +21,30 @@ COMMON_DECLARE_bool(enable_transpose_iters_in_fusion);
 
 namespace cinn::fusion {
 
+bool ItersFusionPolicy::CheckItersRelation(const PatternNodePtr& source,
+                                           const PatternNodePtr& target) {
+  const auto source_iters = source->fusion_iters().loop_iters;
+  const auto target_iters = target->fusion_iters().loop_iters;
+  auto related_iters = MapKeyToVector(iters_manager_->related_iters_map());
+  const auto [source_related_iters, _UNUESD] =
+      SplitFirstWhetherInSecond(source_iters, related_iters);
+  const auto target_unique_iters =
+      GatherFirstNotInSecond(target_iters, source_iters);
+  if (source_related_iters.empty() || target_unique_iters.empty()) {
+    return true;
+  } else {
+    for (const auto& related_iter : source_related_iters) {
+      if (iters_manager_->CanFindRelatedIters(related_iter,
+                                              target_unique_iters)) {
+        VLOG(4) << "Can not fuse from " << source->fusion_iters().DebugStr()
+                << " to " << target->fusion_iters().DebugStr();
+        return false;
+      }
+    }
+    return true;
+  }
+}
+
 bool ItersFusionPolicy::CanFuseSource2Target(const PatternNodePtr& source,
                                              const PatternNodePtr& target) {
   VLOG(4) << "Search iters transform route from "

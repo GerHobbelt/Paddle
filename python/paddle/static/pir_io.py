@@ -284,6 +284,11 @@ def normalize_pir_program(program, feed_vars, fetch_vars, **kwargs):
     if not all(isinstance(v, pir.Value) for v in fetch_vars):
         raise TypeError("fetch_vars type must be a Value or a list of Value.")
 
+    if len(program.global_block().ops) == 0:
+        raise ValueError(
+            "program must not be empty. at least one operator is required!"
+        )
+
     # remind users to set auc_states to 0 if auc op were found.
     for op in program.global_block().ops:
         if op.name() == 'pd_op.auc':
@@ -291,20 +296,6 @@ def normalize_pir_program(program, feed_vars, fetch_vars, **kwargs):
                 "Be sure that you have set auc states to 0 before saving inference model."
             )
             break
-
-    # fix the bug that the activation op's output as target will be pruned.
-    # will affect the inference performance.
-    # TODO(Superjomn) add an IR pass to remove 1-scale op.
-
-    with paddle.static.program_guard(program):
-        uniq_fetch_vars = []
-        for var in fetch_vars:
-            if var.dtype != paddle.bool:
-                var_ = paddle.scale(var, 1.0)
-                uniq_fetch_vars.append(var_)
-            else:
-                uniq_fetch_vars.append(var)
-            fetch_vars = uniq_fetch_vars
 
     # serialize program
     value_map = paddle.pir.IrMapping()

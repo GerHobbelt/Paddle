@@ -610,7 +610,6 @@ class TestTensorAxis(unittest.TestCase):
                 exe = paddle.static.Executor(self.place)
                 exe.run(startup_prog)
                 static_out = exe.run(feed={'x': np_x}, fetch_list=[out])
-
                 # run infer
                 paddle.static.save_inference_model(
                     self.save_path, [x], [out], exe, program=main_prog
@@ -623,7 +622,7 @@ class TestTensorAxis(unittest.TestCase):
 
                 self.assertEqual(
                     len(load_program.global_block().ops),
-                    11,
+                    9,
                 )
                 print(load_program)
                 self.assertEqual(

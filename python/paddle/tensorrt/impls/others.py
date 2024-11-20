@@ -136,3 +136,12 @@ def multiclass_nms3_converter(network, paddle_op, inputs):
         constant_layer.get_output(0),
         batch_nms_layer.get_output(0),
     )
+
+
+@converter_registry.register("pd_op.share_data", trt_version="8.x")
+def share_data_converter(network, paddle_op, inputs):
+    x = inputs[0]
+
+    identity_layer = network.add_identity(x)
+
+    return identity_layer.get_output(0)

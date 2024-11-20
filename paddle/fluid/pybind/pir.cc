@@ -102,6 +102,7 @@ using pir::TuplePopOp;
 
 using paddle::dialect::IntArrayAttribute;
 using paddle::dialect::OperationDistAttribute;
+using paddle::dialect::PlaceAttribute;
 using paddle::dialect::TensorDistAttribute;
 using pir::ArrayAttribute;
 using pir::Attribute;
@@ -110,6 +111,7 @@ using pir::BlockArgument;
 using pir::BoolAttribute;
 using pir::CloneOptions;
 using pir::Int32Attribute;
+using pir::Int64Attribute;
 using pir::IrContext;
 using pir::IrMapping;
 using pir::IrParser;
@@ -267,7 +269,7 @@ pir::Value AppendDataOp(pir::Block *block,
            ctx, phi::IntArray(phi::vectorize(GetValueDims(value))))},
       {"dtype",
        paddle::dialect::DataTypeAttribute::get(ctx, GetValueDtype(value))},
-      {"place", paddle::dialect::PlaceAttribute::get(ctx, phi::Place())}};
+      {"place", PlaceAttribute::get(ctx, phi::Place())}};
   std::vector<pir::Type> output_types{value.type()};
   pir::Operation *operation =
       pir::Operation::Create({}, attribute_map, output_types, op_info);
@@ -681,6 +683,7 @@ void BindBlock(py::module *m) {
       .def("__len__", [](Block &self) { return self.size(); })
       .def("args", &Block::args, return_value_policy::reference)
       .def("kwargs", &Block::kwargs, return_value_policy::reference)
+      .def("add_arg", &Block::AddArg)
       .def("add_kwarg", &Block::AddKwarg)
       .def("erase_kwarg", &Block::EraseKwarg)
       .def("remove_op",
@@ -853,10 +856,10 @@ void BindOperation(py::module *m) {
                  attr_name, StrAttribute::get(pir::IrContext::Instance(), val));
            })
       .def("set_int_attr",
-           [](Operation &self, std::string &attr_name, const int64_t &val) {
+           [](Operation &self, std::string &attr_name, const int &val) {
              self.set_attribute(
                  attr_name,
-                 pir::Int64Attribute::get(pir::IrContext::Instance(), val));
+                 pir::Int32Attribute::get(pir::IrContext::Instance(), val));
            })
       .def("attrs",
            [](Operation &self) -> py::dict {
@@ -1244,6 +1247,7 @@ void BindValue(py::module *m) {
   )DOC");
   g_ir_value_pytype = reinterpret_cast<PyTypeObject *>(value.ptr());
   value.def(py::init<>())
+      .def(py::init([](Value value) { return value; }))
       .def_property_readonly(
           "block",
           [](Value self) {
@@ -1316,6 +1320,18 @@ void BindValue(py::module *m) {
             PADDLE_THROW(common::errors::InvalidArgument(
                 "can't set dtype when building static graph"));
           })
+      .def_property(
+          "place_attr",
+          [](Value self) -> phi::Place {
+            auto palce_attr = self.attribute<PlaceAttribute>("place");
+            return palce_attr ? palce_attr.data() : phi::Place();
+          },
+          [](Value self, const phi::Place &place) {
+            // auto place = CastPyArg2Place(place_obj.release().ptr(), 1);
+            auto place_attr =
+                dialect::PlaceAttribute::get(pir::IrContext::Instance(), place);
+            self.set_attribute("palce", place_attr);
+          })
       .def("initialized",
            [](Value self) {
              if (self.impl() == nullptr || self.type().storage() == nullptr) {
@@ -1350,9 +1366,14 @@ void BindValue(py::module *m) {
            [](Value self) -> uint32_t {
              if (auto op_result = self.dyn_cast<OpResult>()) {
                return op_result.index();
+             } else if (auto arg = self.dyn_cast<BlockArgument>()) {
+               if (!arg.is_kwarg()) {
+                 return arg.index();
+               }
              }
              PADDLE_THROW(common::errors::InvalidArgument(
-                 "only support accesss index from op_result."));
+                 "only support accesss index from op_result or positional "
+                 "block arg."));
            })
       .def("is_dense_tensor_type",
            [](Value self) { return self.type().isa<DenseTensorType>(); })
@@ -1428,14 +1449,21 @@ void BindValue(py::module *m) {
                    "Method is_coalesced only support sparse coo tensor."));
              }
            })
-      .def_property_readonly("process_mesh", [](Value &self) -> py::object {
-        auto type = self.type();
-        if (auto dist_type = type.dyn_cast<DistTypeInterface>()) {
-          return py::cast(
-              dist_type.tensor_dist_attr().process_mesh_attr().process_mesh());
-        } else {
-          return py::cast<py::none>(Py_None);
-        }
+      .def_property_readonly(
+          "process_mesh",
+          [](Value &self) -> py::object {
+            auto type = self.type();
+            if (auto dist_type = type.dyn_cast<DistTypeInterface>()) {
+              return py::cast(dist_type.tensor_dist_attr()
+                                  .process_mesh_attr()
+                                  .process_mesh());
+            } else {
+              return py::cast<py::none>(Py_None);
+            }
+          })
+      .def("_clone", [](Value self) {
+        // Return a new value owned by python side
+        return self;
       });
 }
 

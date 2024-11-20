@@ -43,10 +43,16 @@ struct ShardableAxesInfoManager {
   static std::string GetUniqueName();
   std::string NameUnionDebugStr() const;
 
+  std::string GetNormalizedAxisName(const std::string& axis_name) {
+    return normalized_root_name_map_[FindAxisRoot(axis_name)];
+  }
+  auto& related_axes_map() { return related_axes_; }
+
  private:
   ShardableAxesSignature CreateShardableSignature(pir::Operation* op);
   ShardableAxes ReplaceShardableAxesWithRootName(const ShardableAxes& axes,
-                                                 bool normalize_name = false);
+                                                 bool normalize = false);
+  std::string FindAxisRoot(const std::string& name);
 
   const std::vector<pir::Operation*>& ops_;
   pir::ShapeConstraintIRAnalysis* shape_analysis_;
@@ -57,6 +63,8 @@ struct ShardableAxesInfoManager {
 
   std::unordered_map<std::string, std::vector<std::string>> root_to_sons_;
   std::unordered_map<std::string, std::string> normalized_root_name_map_;
+  std::unordered_map<std::string, std::unordered_set<std::string>>
+      related_axes_;
 };
 
 }  // namespace cinn::fusion

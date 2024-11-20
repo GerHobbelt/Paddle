@@ -20,7 +20,8 @@ if(WITH_XPU)
          data_transform
          phi
          common
-         var_helper)
+         var_helper
+         process_group_bkcl)
 elseif(WITH_NCCL OR WITH_RCCL)
   cc_library(
     prepared_operator

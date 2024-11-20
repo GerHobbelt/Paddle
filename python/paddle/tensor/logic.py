@@ -1415,6 +1415,54 @@ def bitwise_not_(x: Tensor, name: str | None = None) -> Tensor:
         return _C_ops.bitwise_not_(x)
 
 
+def bitwise_invert(
+    x: Tensor, out: Tensor | None = None, name: str | None = None
+) -> Tensor:
+    r"""
+    Apply ``bitwise_not`` (bitwise inversion) on Tensor ``x``.
+
+    This is an alias to the ``paddle.bitwise_not`` function.
+
+    .. math::
+        Out = \sim X
+
+    Note:
+        ``paddle.bitwise_invert`` is functionally equivalent to ``paddle.bitwise_not``.
+
+    Args:
+        x (Tensor): Input Tensor of ``bitwise_invert``. It is a N-D Tensor of bool, uint8, int8, int16, int32, int64.
+        out (Tensor|None, optional): Result of ``bitwise_invert``. It is a N-D Tensor with the same data type as the input Tensor. Default: None.
+        name (str|None, optional): The default value is None. This property is typically not set by the user.
+            For more information, please refer to :ref:`api_guide_Name`.
+
+    Returns:
+        Tensor: Result of ``bitwise_invert``. It is a N-D Tensor with the same data type as the input Tensor.
+
+    Examples:
+        .. code-block:: python
+
+            >>> import paddle
+            >>> x = paddle.to_tensor([-5, -1, 1])
+            >>> res = x.bitwise_invert()
+            >>> print(res)
+            Tensor(shape=[3], dtype=int64, place=Place(cpu), stop_gradient=True,
+            [ 4,  0, -2])
+
+    """
+    # Directly call bitwise_not for the implementation
+    return bitwise_not(x, out=out, name=name)
+
+
+@inplace_apis_in_dygraph_only
+def bitwise_invert_(x: Tensor, name: str | None = None) -> Tensor:
+    r"""
+    Inplace version of ``bitwise_invert`` API, the output Tensor will be inplaced with input ``x``.
+    Please refer to :ref:`api_paddle_bitwise_invert_`.
+    """
+    # Directly call bitwise_not_ for the implementation
+    return bitwise_not_(x, name=name)
+
+
 def isclose(
     x: Tensor,
     y: Tensor,

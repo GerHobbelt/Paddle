@@ -22,7 +22,7 @@ from test_case_base import (
 )
 
 import paddle
-from paddle.jit.sot.utils.envs import with_allow_dynamic_shape_guard
+from paddle.jit.sot.utils.envs import allow_dynamic_shape_guard
 
 
 def foo(x: list[paddle.Tensor], y: list[paddle.Tensor]):
@@ -47,7 +47,7 @@ class TestTraceListArg(TestCaseBase):
             self.assert_results(foo, [a], [c])  # Cache miss
             self.assertEqual(cache.translate_count, 2)
 
-    @with_allow_dynamic_shape_guard(False)
+    @allow_dynamic_shape_guard(False)
     def test_bar_static_shape(self):
         a = [paddle.to_tensor(1), paddle.to_tensor(2), paddle.to_tensor(3)]
         b = [paddle.to_tensor([2, 3]), paddle.to_tensor(4), paddle.to_tensor(5)]
@@ -60,7 +60,7 @@ class TestTraceListArg(TestCaseBase):
             self.assert_results(bar, b, 1, 1)  # Cache hit
             self.assertEqual(cache.translate_count, 2)
 
-    @with_allow_dynamic_shape_guard(True)
+    @allow_dynamic_shape_guard(True)
     def test_bar_dynamic_shape(self):
         # TODO(zrr1999): mv to dynamic shape test
         a = [paddle.to_tensor(1), paddle.to_tensor(2), paddle.to_tensor(3)]

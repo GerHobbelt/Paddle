@@ -14,6 +14,7 @@
 
 #include "paddle/fluid/pir/transforms/gpu/fused_gemm_epilogue_pass.h"
 
+#include "paddle/fluid/pir/dialect/operator/interface/infer_symbolic_shape/infer_sym_utils.h"
 #include "paddle/fluid/pir/dialect/operator/ir/pd_op.h"
 #include "paddle/fluid/pir/drr/include/drr_pattern_base.h"
 #include "paddle/fluid/pir/utils/general_functions.h"
@@ -135,7 +136,7 @@ class FusedLinearGradSinglePattern
       dout = assign_op->operand_source(0);
     }
 
-    bool have_sum_op = false;
+    bool can_fuse_sum = false;
     pir::Value sum_output;
     pir::Value sum_input;
     for (auto user_it = dout.use_begin(); user_it != dout.use_end();
@@ -144,15 +145,49 @@ class FusedLinearGradSinglePattern
         continue;
       }
       if (auto sum_op = user_it->owner()->dyn_cast<paddle::dialect::SumOp>()) {
-        have_sum_op = true;
-        sum_output = sum_op->result(0);
         sum_input = sum_op->operand_source(0);
+        int64_t input_rank = -1;
+        if (sum_input.type() &&
+            sum_input.type().isa<paddle::dialect::DenseTensorType>()) {
+          input_rank = sum_input.type()
+                           .dyn_cast<paddle::dialect::DenseTensorType>()
+                           .dims()
+                           .size();
+        }
+        if (input_rank == -1) {
+          break;
+        }
+
+        if (sum_op->operand_source(1)
+                .defining_op()
+                ->isa<paddle::dialect::FullIntArrayOp>()) {
+          auto axis_full_op = sum_op->operand_source(1)
+                                  .defining_op()
+                                  ->dyn_cast<paddle::dialect::FullIntArrayOp>();
+          const std::vector<int64_t> axis =
+              paddle::dialect::details::GetVectorAttr<int64_t>(axis_full_op,
+                                                               "value");
+
+          std::set<int64_t> reduce_set;
+          for (auto d : axis) {
+            if (d < 0) {
+              d += input_rank;
+            }
+            reduce_set.insert(d);
+          }
+          if ((reduce_set.size() == static_cast<size_t>(input_rank - 1)) &&
+              (!reduce_set.count(input_rank - 1))) {
+            can_fuse_sum = true;
+          }
+        }
+
+        sum_output = sum_op->result(0);
         rewriter.SetInsertionPointAfter(sum_op);
         break;
       }
     }
 
-    if (!have_sum_op) {
+    if (!can_fuse_sum) {
       return false;
     }
 

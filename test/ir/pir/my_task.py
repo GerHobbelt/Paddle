@@ -18,7 +18,6 @@ import sys
 import unittest
 
 os.environ['FLAGS_enable_pir_api'] = "1"
-os.environ['FLAGS_cinn_new_group_scheduler'] = "1"
 import numpy as np
 
 import paddle

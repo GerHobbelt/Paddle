@@ -1,4 +1,4 @@
-// Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+// Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -11,10 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
-#pragma once
-
-#include "paddle/phi/core/dense_tensor.h"
+#include "paddle/phi/kernels/view_kernel.h"
+#include "paddle/phi/core/kernel_registry.h"
+#include "paddle/phi/infermeta/unary.h"
 
 namespace phi {
 
@@ -22,17 +21,17 @@ template <typename Context>
 void ViewShapeKernel(const Context& dev_ctx,
                      const DenseTensor& input,
                      const std::vector<int64_t>& dims,
-                     DenseTensor* out);
+                     DenseTensor* out) {
+  MetaTensor meta_out(out);
+  InferMetaFromVecValue(input, dims, &meta_out);
+  auto meta = input.meta();
+  meta.offset = input.offset();
+  out->set_meta(meta);
+  out->ResetHolder(input.Holder());
+}
 
-template <typename Context>
-void ViewShapeStridedKernel(const Context& dev_ctx,
-                            const DenseTensor& input,
-                            const std::vector<int64_t>& dims,
-                            DenseTensor* out);
-
-template <typename Context>
-void ViewDtypeKernel(const Context& dev_ctx,
-                     const DenseTensor& input,
-                     DataType dtype,
-                     DenseTensor* out);
 }  // namespace phi
+
+PD_REGISTER_KERNEL_FOR_ALL_BACKEND_DTYPE(view_shape,
+                                         ALL_LAYOUT,
+                                         phi::ViewShapeKernel) {}

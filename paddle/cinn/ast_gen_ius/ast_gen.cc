@@ -21,7 +21,6 @@
 #include "paddle/cinn/lang/compute.h"
 #include "paddle/cinn/optim/replace_var_with_expr.h"
 
-PD_DECLARE_bool(cinn_new_group_scheduler);
 PD_DECLARE_bool(group_schedule_tiling_first);
 PD_DECLARE_bool(cinn_bucket_compile);
 
@@ -115,8 +114,7 @@ ir::Expr AstGen::Build(const ir::Tensor& tensor, TensorGroup* tensor_group) {
     const std::vector<ir::Var>& reduce_axis = tensor->reduce_axis;
     VLOG(4) << "ast gen: tensor init_body is " << init_body;
     for (int i = 0; i < shape.size(); ++i) {
-      if (!FLAGS_group_schedule_tiling_first &&
-          FLAGS_cinn_new_group_scheduler && shape[i] == Expr(1)) {
+      if (!FLAGS_group_schedule_tiling_first && shape[i] == Expr(1)) {
         optim::ReplaceVarWithExpr(&init_body, axis[i], Expr(0));
         continue;
       }
@@ -153,8 +151,7 @@ ir::Expr AstGen::Build(const ir::Tensor& tensor, TensorGroup* tensor_group) {
     // for same axis so we re-create objects
     std::vector<Var> reduce_axis_vars = cinn::common::GenDefaultAxis(axis_len);
     for (int i = 0; i < shape.size(); ++i) {
-      if (!FLAGS_group_schedule_tiling_first &&
-          FLAGS_cinn_new_group_scheduler && shape[i] == Expr(1)) {
+      if (!FLAGS_group_schedule_tiling_first && shape[i] == Expr(1)) {
         optim::ReplaceVarWithExpr(&reduce_body, axis[i], Expr(0));
         continue;
       }
@@ -199,8 +196,7 @@ ir::Expr AstGen::Build(const ir::Tensor& tensor, TensorGroup* tensor_group) {
       }
     } else {
       for (int i = 0; i < axis.size(); ++i) {
-        if (!FLAGS_group_schedule_tiling_first &&
-            FLAGS_cinn_new_group_scheduler && shape[i] == Expr(1)) {
+        if (!FLAGS_group_schedule_tiling_first && shape[i] == Expr(1)) {
           continue;
         }
         optim::ReplaceVarWithExpr(

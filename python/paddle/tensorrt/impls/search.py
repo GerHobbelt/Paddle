@@ -66,6 +66,17 @@ def argmax_converter(network, paddle_op, inputs):
         return squeeze_layer.get_output(0)
 
 
+@converter_registry.register("pd_op.where", trt_version="8.x")
+def where_converter(network, paddle_op, inputs):
+    condition = inputs[0]
+    x = inputs[1]
+    y = inputs[2]
+
+    select_layer = network.add_select(condition, x, y)
+
+    return select_layer.get_output(0)
+
+
 @converter_registry.register("pd_op.topk", trt_version="8.x")
 def topk_converter(network, paddle_op, inputs):
     input_tensor = inputs[0]

@@ -96,6 +96,18 @@ struct CanFuseTrivialAndReduce {
   }
 };
 
+struct DownstreamHasItersRelationMatcher {
+  bool operator()(PatternGraph graph, const PatternNodePtr& node) {  // NOLINT
+    return std::any_of(
+        node->downstream().begin(),
+        node->downstream().end(),
+        [&graph, &node](const PatternNodePtr& downstream) {
+          return !graph.iters_fusion_policy()->CheckItersRelation(node,
+                                                                  downstream);
+        });
+  }
+};
+
 struct CanFuseItersPermutationMatcher {
   bool operator()(PatternGraph graph,  // NOLINT
                   const PatternNodePtr& upstream,
@@ -107,6 +119,8 @@ struct CanFuseItersPermutationMatcher {
            graph.policy_manager()
                .template GetPolicy<GeneralTopoPolicy>()
                ->CanFuse(upstream, downstream) &&
+           graph.iters_fusion_policy()->CheckItersRelation(upstream,
+                                                           downstream) &&
            (graph.iters_fusion_policy()->CanFuseSource2Target(downstream,
                                                               upstream) ||
             graph.iters_fusion_policy()->CanFuseSource2Target(upstream,

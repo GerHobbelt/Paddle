@@ -4192,7 +4192,7 @@
   optional : sequence_length
   intermediate : reserve
   view : (dropout_state_in -> dropout_state_out)
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : roi_align
   args : (Tensor x, Tensor boxes, Tensor boxes_num, int pooled_height=1, int pooled_width=1, float spatial_scale=1.0, int sampling_ratio=-1, bool aligned=false)
@@ -5281,13 +5281,21 @@
   args : (Tensor input, int64_t[] dims = {})
   output : Tensor(out)
   infer_meta :
-    func : StridedUnChangedInferMeta
-    param : [input]
+    func : ViewShapeInferMeta
   kernel :
     func : view_shape
   backward : view_shape_grad
-  no_need_buffer : input
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+
+- op : view_slice
+  args : (Tensor input, int64_t begin_idx, int64_t end_idx)
+  output : Tensor
+  infer_meta :
+    func : ViewSliceInferMeta
+    spmd_rule : ViewSliceInferSpmd
+  kernel :
+    func : view_slice
+  interfaces : paddle::dialect::InplaceTrait
 
 - op : viterbi_decode
   args : (Tensor potentials, Tensor transition_params, Tensor lengths, bool include_bos_eos_tag = true)

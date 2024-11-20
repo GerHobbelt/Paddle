@@ -34,6 +34,8 @@ struct ItersFusionPolicy final : public PolicyBase {
 
   bool CanFuseSource2Target(const PatternNodePtr& source,
                             const PatternNodePtr& target);
+  bool CheckItersRelation(const PatternNodePtr& source,
+                          const PatternNodePtr& target);
   std::optional<ItersTransformRoute> GetItersTransformRoute(
       const PatternNodePtr& source, const PatternNodePtr& target);
   FusionItersSignature SingleDownstreamItersFusion(

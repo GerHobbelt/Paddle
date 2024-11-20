@@ -151,7 +151,7 @@ void ProcessDistBlock(pir::Block* block) {
                      .chunk_id();
       op_item->erase_attribute(kAttrOpDistAttr);
     }
-    op_item->set_attribute("chunk_id", pir::Int64Attribute::get(ctx, chunk_id));
+    op_item->set_attribute("chunk_id", pir::Int32Attribute::get(ctx, chunk_id));
 
     // TODO(2024-Q2) Handle other special dist op in future.
   }

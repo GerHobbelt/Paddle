@@ -129,14 +129,15 @@ class RunnableProgram:
     @staticmethod
     def _get_program_all_values(program):
         all_values = []
-        all_values.extend(
-            arg for arg in program.global_block().kwargs().values()
-        )
-        all_values.extend(
-            result
-            for op in program.global_block().ops
-            for result in op.results()
-        )
+
+        def extend_values(block):
+            all_values.extend(block.kwargs().values())
+            for op in block.ops:
+                all_values.extend(op.results())
+                for block in op.blocks():
+                    extend_values(block)
+
+        extend_values(program.global_block())
         return all_values
 
     @staticmethod

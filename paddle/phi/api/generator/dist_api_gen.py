@@ -545,6 +545,7 @@ ops_infer_shape_in_runtime = [
     "nearest_interp",
     "trilinear_interp",
     "nonzero",
+    "masked_select",
 ]
 
 

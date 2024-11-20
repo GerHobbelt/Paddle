@@ -170,6 +170,7 @@
   output : Tensor[](output){input.size()}, Tensor(fused_output)
   infer_meta :
     func : CoalesceTensorInferMeta
+    spmd_rule : CoalesceTensorInferSpmd
   kernel :
     func : coalesce_tensor
     data_type : dtype
@@ -314,6 +315,7 @@
     support_trans_dtype : x, y
   inplace: (x -> out)
   traits : paddle::dialect::ForwardOnlyTrait
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : fused_adam_
   args : (Tensor[] params, Tensor[] grads, Tensor learning_rate, Tensor[] moments1, Tensor[] moments2, Tensor[] beta1_pows, Tensor[] beta2_pows, Tensor[] master_params, Tensor skip_update, Scalar beta1, Scalar beta2, Scalar epsilon, int chunk_size, float weight_decay, bool use_adamw, bool multi_precision, bool use_global_beta_pow)

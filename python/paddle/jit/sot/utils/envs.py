@@ -38,6 +38,10 @@ ENV_SOT_ALLOW_DYNAMIC_SHAPE = BooleanEnvironmentVariable(
     # Enable SOT dynamic shape as default in PIR mode only
     paddle.framework.use_pir_api(),
 )
+ENV_SOT_ENABLE_FASTER_GUARD = BooleanEnvironmentVariable(
+    "SOT_ENABLE_FASTER_GUARD",
+    False,
+)
 ENV_SOT_EVENT_LEVEL = IntegerEnvironmentVariable("SOT_EVENT_LEVEL", 0)
 ENV_ENABLE_SOT_STEP_PROFILER = BooleanEnvironmentVariable(
     "ENABLE_SOT_STEP_PROFILER", False
@@ -69,14 +73,20 @@ def with_control_flow_guard(value: bool):
 
 
 @contextmanager
-def with_export_guard(value: str):
+def export_guard(value: str):
     with EnvironmentVariableGuard(ENV_SOT_EXPORT, value):
         yield
 
 
 @contextmanager
-def with_allow_dynamic_shape_guard(value: bool):
+def allow_dynamic_shape_guard(value: bool):
     with EnvironmentVariableGuard(ENV_SOT_ALLOW_DYNAMIC_SHAPE, value):
+        yield
+
+
+@contextmanager
+def faster_guard_guard(value: bool):
+    with EnvironmentVariableGuard(ENV_SOT_ENABLE_FASTER_GUARD, value):
         yield
 
 

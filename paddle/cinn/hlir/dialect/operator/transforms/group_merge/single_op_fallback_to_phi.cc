@@ -67,9 +67,14 @@ class FusionOpPattern : public pir::OpRewritePattern<cinn::dialect::FusionOp> {
       return false;
     }
 
-    for (size_t i = 0; i < fusion_op.num_results(); ++i) {
-      rewriter.ReplaceAllUsesWith(fusion_op.result(i),
-                                  paddle_op.value()->result(i));
+    // Results num of FusionOp may be more than the signal op when the signal
+    // has multiple downstream ops including yieldstore op.
+    auto num_results = paddle_op.value()->num_results();
+    for (size_t i = 0; i * num_results < fusion_op.num_results(); i++) {
+      for (size_t j = 0; j < num_results; ++j) {
+        rewriter.ReplaceAllUsesWith(fusion_op.result(i * num_results + j),
+                                    paddle_op.value()->result(j));
+      }
     }
 
     rewriter.EraseOp(fusion_op);

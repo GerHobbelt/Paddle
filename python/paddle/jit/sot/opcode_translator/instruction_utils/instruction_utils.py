@@ -84,7 +84,7 @@ def convert_instruction(instr: dis.Instruction) -> Instruction:
         instr.arg,
         instr.argval,
         instr.offset,
-        instr.starts_line,
+        instr.line_number if sys.version_info >= (3, 13) else instr.starts_line,
         instr.is_jump_target,
         jump_to=None,
         is_generated=False,

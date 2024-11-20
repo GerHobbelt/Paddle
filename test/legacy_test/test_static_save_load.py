@@ -1189,8 +1189,6 @@ class TestSaveLoadInferenceModel(unittest.TestCase):
                     [
                         'pd_op.data',
                         'pd_op.add',
-                        'pd_op.full',
-                        'pd_op.scale',
                         'pd_op.fetch',
                     ],
                 )

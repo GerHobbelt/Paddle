@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import warnings
 from functools import cached_property, partial, reduce
+from typing import Any
 
 import paddle
 from paddle import _C_ops
@@ -679,6 +680,77 @@ def assign_skip_lod_tensor_array(input, output):
             paddle.assign(input, output)
 
 
+def create_fake_value_for_undefined_var(while_op, value):
+    # Create a fake value for create WhileOp, and set its type and stop_gradient as next_var
+    stop_gradient = value.stop_gradient
+    fake_value = paddle.full(shape=[], dtype=value.dtype, fill_value=0)
+    fake_value_op = fake_value.get_defining_op()
+    fake_value_op.move_before(while_op.as_operation())
+
+    fake_value.set_type(value.type())
+    fake_value.stop_gradient = stop_gradient
+    while_op.add_extra_input(fake_value)
+
+    block_arg = while_op.body().add_arg(value.type())
+    block_arg.stop_gradient = stop_gradient
+    return fake_value, block_arg
+
+
+class LoopVar:
+    def __init__(self, curr_var, next_var=None, block_arg=None):
+        self.curr_var = curr_var
+        self.next_var = next_var
+        self.block_arg = block_arg
+        self._is_fake = False
+
+    @property
+    def is_variable_curr_var(self):
+        return isinstance(self.curr_var, paddle.pir.Value)
+
+    @property
+    def is_undefined_curr_var(self):
+        return isinstance(
+            self.curr_var, paddle.jit.dy2static.utils.UndefinedVar
+        )
+
+    @property
+    def is_variable_next_var(self):
+        return isinstance(self.next_var, paddle.pir.Value)
+
+    @property
+    def is_fake(self):
+        return self._is_fake
+
+    def bind_block_arg(self, block_arg):
+        self.block_arg = block_arg
+
+    def bind_next_var(self, next_var):
+        self.next_var = next_var
+
+    def infer_type_with_next_var(self, next_var, while_op):
+        assert self.is_undefined_curr_var
+
+        def create_loop_var_like(while_op, next_var):
+            fake_value, block_arg = create_fake_value_for_undefined_var(
+                while_op, next_var
+            )
+            loop_var = LoopVar(fake_value, next_var, block_arg)
+            loop_var._is_fake = True
+            return loop_var
+
+        if isinstance(next_var, paddle.pir.Value):
+            return create_loop_var_like(while_op, next_var)
+        if is_sequence(next_var):
+            return map_structure(
+                lambda var: create_loop_var_like(while_op, var),
+                next_var,
+            )
+        return LoopVar(self.curr_var, next_var, self.block_arg)
+
+    def __repr__(self):
+        return f"LoopVar(curr_var={self.curr_var}, next_var={self.next_var}, block_arg={self.block_arg})"
+
+
 def while_loop(cond, body, loop_vars, is_test=False, name=None):
     """
     :api_attr: Static Graph
@@ -747,13 +819,8 @@ def while_loop(cond, body, loop_vars, is_test=False, name=None):
         )
 
     if in_pir_mode():
-        from paddle.jit.dy2static.utils import UndefinedVar
 
-        def create_fake_value_for_undefined_var():
-            # Create a fake value for create WhileOp, it's type will be reset after body is executed.
-            return paddle.full(shape=[], fill_value=0)
-
-        def cast_value_in_amp(in_vars, out_vars, idx):
+        def cast_value_in_amp(loop_var):
             amp_attrs = core._get_amp_attrs()
             amp_level = amp_attrs._amp_level
             apply_amp_level_list = [
@@ -761,111 +828,127 @@ def while_loop(cond, body, loop_vars, is_test=False, name=None):
                 core.AmpLevel.O2,
             ]
             if amp_level not in apply_amp_level_list:
-                return out_vars
-            assert len(in_vars) == len(out_vars)
-            ret = []
-            for i, (in_var, out_var) in enumerate(zip(in_vars, out_vars)):
-                if i not in idx and in_var.dtype != out_var.dtype:
-                    cast_out_var = paddle.cast(out_var, in_var.dtype)
-                    ret.append(cast_out_var)
-                else:
-                    ret.append(out_var)
-            return ret
+                return
+            if not loop_var.is_variable_curr_var:
+                return
+            if loop_var.curr_var.dtype != loop_var.next_var.dtype:
+                cast_out_var = paddle.cast(
+                    loop_var.next_var, loop_var.curr_var.dtype
+                )
+                loop_var.next_var = cast_out_var
 
-        flattened_loop_vars = flatten(loop_vars)
-
-        undefined_var_mapping = {
-            idx: create_fake_value_for_undefined_var()
-            for idx, var in enumerate(flattened_loop_vars)
-            if isinstance(var, UndefinedVar)
-        }
-        unified_loop_vars = [
-            undefined_var_mapping[idx] if isinstance(var, UndefinedVar) else var
-            for idx, var in enumerate(flattened_loop_vars)
+        loop_vars: Any = map_structure(LoopVar, loop_vars)
+        variable_loop_vars = [
+            loop_var
+            for loop_var in flatten(loop_vars)
+            if loop_var.is_variable_curr_var
         ]
-        while_op = build_while_op(pre_cond, unified_loop_vars)
+        while_op = build_while_op(
+            pre_cond, [var.curr_var for var in variable_loop_vars]
+        )
         with while_op.body() as cur_block:
-            args = pack_sequence_as(loop_vars, cur_block.args())
+            assert len(cur_block.args()) == len(variable_loop_vars)
+            for loop_var, arg in zip(variable_loop_vars, cur_block.args()):
+                loop_var.bind_block_arg(arg._clone())
+
+            # For non-variable inputs, we use the original value directly.
+            args = map_structure(
+                lambda var: (
+                    var.block_arg if var.is_variable_curr_var else var.curr_var
+                ),
+                loop_vars,
+            )
             next_vars = body(*args)
+
+            if not isinstance(next_vars, (list, tuple)):
+                next_vars = [next_vars]
+
+            def infer_loop_vars_type_with_next_vars(loop_vars, next_vars):
+                def infer_loop_var_type_with_next_var(loop_var, next_var):
+                    if is_sequence(loop_var):
+                        return map_structure(
+                            infer_loop_var_type_with_next_var,
+                            loop_var,
+                            next_var,
+                        )
+                    if loop_var.is_undefined_curr_var:
+                        new_loop_var = loop_var.infer_type_with_next_var(
+                            next_var, while_op
+                        )
+                    else:
+                        loop_var.bind_next_var(next_var)
+                        new_loop_var = loop_var
+                    return new_loop_var
+
+                new_loop_vars = []
+                for next_var, loop_var in zip(next_vars, loop_vars):
+                    new_loop_vars.append(
+                        infer_loop_var_type_with_next_var(loop_var, next_var)
+                    )
+                return new_loop_vars
 
             try:
                 assert_same_structure(
-                    flatten(next_vars), unified_loop_vars, check_types=False
+                    loop_vars,
+                    next_vars,
+                    check_types=False,
+                    skip_if=lambda x: (
+                        isinstance(x, LoopVar)
+                        and isinstance(
+                            x.curr_var, paddle.jit.dy2static.utils.UndefinedVar
+                        )
+                    )
+                    or (isinstance(x, paddle.jit.dy2static.utils.UndefinedVar)),
                 )
             except ValueError as e:
                 raise ValueError(
                     "body in while_loop should return the same arity "
                     f"(length and structure) as loop_vars: {e}"
                 )
-            if not isinstance(next_vars, (list, tuple)):
-                next_vars = [next_vars]
-            next_cond = cond(*next_vars)
+
+            loop_vars = infer_loop_vars_type_with_next_vars(
+                loop_vars, next_vars
+            )
+
+            next_cond = cond(
+                *map_structure(lambda var: var.next_var, loop_vars)
+            )
             next_cond.stop_gradient = True
 
             # Filter out the constants from next_vars, we only pass the variables (Value) into cf_yield.
             # And pass the original fake value directly to constants position.
-            flattened_next_vars = flatten(next_vars)
-            (
-                variable_next_var_indices,
-                constant_next_var_indices,
-            ) = get_indices_by_discriminator(
-                flattened_next_vars,
-                lambda x: isinstance(x, paddle.pir.Value),
+            map_structure(cast_value_in_amp, loop_vars)
+            # Move all Fake Value to the end of next_vars
+            variable_loop_vars = list(
+                filter(
+                    lambda var: var.is_variable_curr_var and not var.is_fake,
+                    flatten(loop_vars),
+                ),
+            ) + list(
+                filter(
+                    lambda var: var.is_variable_curr_var and var.is_fake,
+                    flatten(loop_vars),
+                ),
             )
-            variable_next_vars, constant_next_vars = select_by_indices(
-                flattened_next_vars,
-                variable_next_var_indices,
-                constant_next_var_indices,
-            )
-            (fake_constant_next_vars,) = select_by_indices(
-                cur_block.args(), constant_next_var_indices
-            )
-            unified_next_vars = create_container_by_items_and_indices(
-                (variable_next_vars, variable_next_var_indices),
-                (fake_constant_next_vars, constant_next_var_indices),
-            )
-            unified_next_vars = cast_value_in_amp(
-                unified_loop_vars,
-                unified_next_vars,
-                undefined_var_mapping.keys(),
-            )
-            cf_yield([next_cond, *unified_next_vars])
-
-            # Reset type and stop_gradient of UndefinedVar from next_vars
-            for idx, value in undefined_var_mapping.items():
-                if idx in constant_next_var_indices:
-                    continue
-                value_new_type = flatten(next_vars)[idx].type()
-                value.set_type(value_new_type)
-                cur_block.args()[idx].set_type(value_new_type)
-                while_op.as_operation().results()[idx].set_type(value_new_type)
-
-                value_new_stop_gradient = flatten(next_vars)[idx].stop_gradient
-                value.stop_gradient = value_new_stop_gradient
-                cur_block.args()[idx].stop_gradient = value_new_stop_gradient
-                while_op.as_operation().results()[
-                    idx
-                ].stop_gradient = value_new_stop_gradient
+            cf_yield([next_cond, *(var.next_var for var in variable_loop_vars)])
 
         # Restore the outputs by variable and constants
         optimized_results = while_op.optimize_update()
-        (optimized_variable_results,) = select_by_indices(
-            optimized_results, variable_next_var_indices
-        )
+        assert len(optimized_results) == len(variable_loop_vars)
+        for loop_var, result in zip(variable_loop_vars, optimized_results):
+            loop_var.next_var = result
+
         # Prune unused fake values
-        for fake_value in undefined_var_mapping.values():
-            if fake_value.use_empty():
-                fake_value_def_op = fake_value.get_defining_op()
+        for loop_var in flatten(loop_vars):
+            if loop_var.is_fake and loop_var.curr_var.use_empty():
+                fake_value_def_op = loop_var.curr_var.get_defining_op()
                 fake_value_def_op.get_parent_block().remove_op(
                     fake_value_def_op
                 )
 
-        return pack_sequence_as(
+        return map_structure(
+            lambda var: var.next_var,
             loop_vars,
-            create_container_by_items_and_indices(
-                (optimized_variable_results, variable_next_var_indices),
-                (constant_next_vars, constant_next_var_indices),
-            ),
         )
 
     if in_dygraph_mode():

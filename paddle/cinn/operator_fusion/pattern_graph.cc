@@ -146,6 +146,13 @@ void PatternGraph::SinkTrivialPattern() {
       NodePattern,
       And<StmtPatternGraphMatcher<TrivialPattern>, TransposeOpMatcher>,
       MergeTrivialPatternOperation>(this);
+
+  // Sink Trivial pattern whose downstream containing related iters.
+  // TODO(huangjiyi): Only sink to the related iters pattern.
+  GraphTransformer<NodePattern,
+                   And<StmtPatternGraphMatcher<TrivialPattern>,
+                       DownstreamHasItersRelationMatcher>,
+                   MergeTrivialPatternOperation>(this);
 }
 
 void PatternGraph::ReduceLiftReduceTree() {

@@ -35,6 +35,38 @@ class TestArgmaxTRTPattern(TensorRTBaseTest):
         self.check_trt_result()
 
 
+class TestWhereTRTPatternCase1(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.where
+        self.api_args = {
+            "condition": np.random.choice([True, False], size=(2, 3)),
+            "x": np.random.randn(2, 3).astype("float32"),
+            "y": np.random.randn(2, 3).astype("float32"),
+        }
+        self.program_config = {"feed_list": ["condition", "x", "y"]}
+        self.min_shape = {"condition": [1, 3], "x": [1, 3], "y": [1, 3]}
+        self.max_shape = {"condition": [5, 3], "x": [5, 3], "y": [5, 3]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
+class TestWhereTRTPatternCase2(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.where
+        self.api_args = {
+            "condition": np.random.choice([True, False], size=(2, 3)),
+            "x": np.random.randn(2, 3).astype("int64"),
+            "y": np.random.randn(2, 3).astype("int64"),
+        }
+        self.program_config = {"feed_list": ["condition", "x", "y"]}
+        self.min_shape = {"condition": [1, 3], "x": [1, 3], "y": [1, 3]}
+        self.max_shape = {"condition": [5, 3], "x": [5, 3], "y": [5, 3]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
 class TestTopkCase1TRTPattern(TensorRTBaseTest):
     def setUp(self):
         self.python_api = paddle.topk

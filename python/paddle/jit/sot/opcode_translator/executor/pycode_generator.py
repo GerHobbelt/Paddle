@@ -23,6 +23,7 @@ import opcode
 import random
 import sys
 import types
+from enum import Enum
 from functools import cached_property
 from typing import TYPE_CHECKING
 
@@ -435,45 +436,6 @@ class PyCodeGen:
         self.hooks = []
         if self.disable_eval_frame:
             self.gen_disable_eval_frame()
-        self.fn_name = ResumeFnNameFactory().next()
-
-    def set_function_inputs(self, inputs: list[str], stack_size: int):
-        stack_arg_str = self.fn_name + '_stack_{}'
-
-        self._code_options['co_argcount'] = len(inputs) + stack_size
-        self._code_options['co_varnames'] = list(
-            [stack_arg_str.format(i) for i in range(stack_size)]
-            + inputs
-            + [
-                var_name
-                for var_name in self._origin_code.co_varnames
-                if var_name not in inputs
-            ]
-        )
-
-        self._instructions.extend(
-            [
-                gen_instr('LOAD_FAST', argval=stack_arg_str.format(i))
-                for i in range(stack_size)
-            ]
-        )
-
-    def set_function_outputs(self, outputs: list[str]):
-        for name in outputs:
-            self.gen_load(name)
-        self.gen_build_tuple(len(outputs))
-        self.gen_return()
-
-    def create_function(self) -> types.FunctionType:
-        self.update_code_name(self.fn_name, is_resumed_fn=True)
-        self._code_options['co_flags'] &= ~(
-            inspect.CO_VARARGS | inspect.CO_VARKEYWORDS
-        )
-        new_code = self.gen_pycode()
-        if len(new_code.co_freevars) + len(new_code.co_cellvars) > 0:
-            raise FallbackError("Break graph in closure is not support.")
-        fn = types.FunctionType(new_code, self._f_globals, new_code.co_name)
-        return fn
 
     def insert_prefix_instructions(self):
         """
@@ -1019,3 +981,81 @@ class PyCodeGen:
 
     def pop_instr(self):
         self._instructions.pop()
+
+
+class ResumeFunctionType(Enum):
+    # If breakgraph
+    IF_RESUME = 0
+    # Call breakgraph
+    CALL_RESUME = 1
+    # Loop breakgraph
+    LOOP_BODY_RESUME = 2
+    AFTER_LOOP_RESUME = 3
+    # Loop inline call
+    LOOP_BODY_INLINE_CALL = 4
+
+
+class ResumeFunctionCreator:
+    CODE_CACHE = {}
+
+    def __init__(
+        self, frame: types.FrameType, disable_eval_frame: bool = False
+    ):
+        self.codegen = PyCodeGen(frame, disable_eval_frame)
+        self.name = ResumeFnNameFactory().next()
+
+    def set_inputs(self, inputs: list[str], stack_size: int):
+        stack_arg_str = self.name + '_stack_{}'
+
+        self.codegen._code_options['co_argcount'] = len(inputs) + stack_size
+        self.codegen._code_options['co_varnames'] = list(
+            [stack_arg_str.format(i) for i in range(stack_size)]
+            + inputs
+            + [
+                var_name
+                for var_name in self.codegen._origin_code.co_varnames
+                if var_name not in inputs
+            ]
+        )
+
+        self.codegen._instructions.extend(
+            [
+                gen_instr('LOAD_FAST', argval=stack_arg_str.format(i))
+                for i in range(stack_size)
+            ]
+        )
+
+    def set_outputs(self, outputs: list[str]):
+        for name in outputs:
+            self.codegen.gen_load(name)
+        self.codegen.gen_build_tuple(len(outputs))
+        self.codegen.gen_return()
+
+    @staticmethod
+    def validate_code(code):
+        if len(code.co_freevars) + len(code.co_cellvars) > 0:
+            raise FallbackError("Break graph in closure is not support.")
+
+    def lookup(self, cache_key):
+        if cache_key in self.CODE_CACHE:
+            cached_code = self.CODE_CACHE[cache_key]
+            ResumeFunctionCreator.validate_code(cached_code)
+            return types.FunctionType(
+                cached_code, self.codegen._f_globals, cached_code.co_name
+            )
+        return None
+
+    def generate(self, cache_key=None) -> types.FunctionType:
+        self.codegen.update_code_name(self.name, is_resumed_fn=True)
+        self.codegen._code_options['co_flags'] &= ~(
+            inspect.CO_VARARGS | inspect.CO_VARKEYWORDS
+        )
+        new_code = self.codegen.gen_pycode()
+        # TODO(SigureMo): cache_key should not be None
+        if cache_key is not None:
+            self.CODE_CACHE[cache_key] = new_code
+        ResumeFunctionCreator.validate_code(new_code)
+        fn = types.FunctionType(
+            new_code, self.codegen._f_globals, new_code.co_name
+        )
+        return fn

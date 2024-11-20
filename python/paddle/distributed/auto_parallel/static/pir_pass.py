@@ -435,11 +435,16 @@ class RemovePasses:
                 lr = op.result(0)
                 lr.replace_all_uses_with(lr_value)
                 op.erase()
+        for keyword, argument in dist_program.global_block().kwargs().items():
+            if argument.use_empty():
+                dist_program.global_block().erase_kwarg(keyword)
 
     @staticmethod
     def remove_no_need_in_startup(startup_program, main_program):
         # 1. vars used in main_program
         main_program_var_names = []
+        for key in main_program.global_block().kwargs():
+            main_program_var_names.append(key)
         for op in main_program.global_block().ops:
             for var in op.operands_source():
                 if var.has_name:
@@ -452,9 +457,15 @@ class RemovePasses:
             for var in op.operands_source():
                 if var.has_name and var.name not in main_program_var_names:
                     op.erase()
+
         # 3. dead code elimination
         pm = pir.PassManager()
         pm.add_pass('dead_code_elimination_pass', {})
+        pm.run(startup_program)
+        for op in startup_program.global_block().ops:
+            if op.name() == "pd_op.coalesce_tensor_":
+                if op.result(0).use_empty() and op.result(1).use_empty():
+                    op.erase()
         pm.run(startup_program)
 
     @staticmethod
@@ -1040,6 +1051,8 @@ def complete_chunk_id(dist_program, startup_program, pipeline_strategy):
             param = dist_program.get_parameter_value_by_name(param_name)
             if param.dist_attr():
                 startup_param.update_dist_attr(param.dist_attr())
+
+    ReshardPasses.fold_reshard_pass(dist_program)
 
 
 def check_chunk_id(dist_program):

@@ -1149,6 +1149,37 @@ void ConstructAttrMapForRunProgram(
                         attr_start,
                         attr_end));
 
+  using CastFuncType = void (*)(PyObject*,
+                                paddle::framework::AttributeMap&,
+                                const std::string&,
+                                const std::string&,
+                                ssize_t);
+  // Static map from keys to casting function pointers
+  static const std::unordered_map<std::string, CastFuncType> kAttrFuncMap = {
+      {"cuda_graph_capture_mode", CastPyArg2AttrString},
+      {"global_block", CastPyArg2AttrIRBlock},
+      {"forward_program", CastPyArg2AttrIRProgram},
+      {"backward_program", CastPyArg2AttrIRProgram},
+      {"is_test", CastPyArg2AttrBoolean},
+      {"use_interpretorcore", CastPyArg2AttrBoolean},
+      {"in_sot_mode", CastPyArg2AttrBoolean},
+      {"start_op_index", CastPyArg2AttrLong},
+      {"end_op_index", CastPyArg2AttrLong},
+      {"program_id", CastPyArg2AttrLong},
+      {"cuda_graph_pool_id", CastPyArg2AttrLong},
+      {"fx", CastPyArg2AttrValues},
+      {"fp", CastPyArg2AttrValues},
+      {"fm", CastPyArg2AttrValues},
+      {"fo", CastPyArg2AttrValues},
+      {"bx", CastPyArg2AttrValues},
+      {"no_need_buffers", CastPyArg2AttrValues},
+      {"bp", CastPyArg2AttrValues},
+      {"bm", CastPyArg2AttrValues},
+      {"bo_g", CastPyArg2AttrValues},
+      {"bx_g", CastPyArg2AttrValues},
+      {"bp_g", CastPyArg2AttrValues},
+      {"bo", CastPyArg2AttrValues}};
+
   PyObject* obj = nullptr;
   for (ssize_t arg_pos = attr_start; arg_pos < attr_end; arg_pos += 2) {
     VLOG(1) << "Start Process " << arg_pos;
@@ -1159,51 +1190,23 @@ void ConstructAttrMapForRunProgram(
       key_ptr = PyUnicode_AsUTF8AndSize(obj, &key_len);
     } else {
       PADDLE_THROW(common::errors::InvalidArgument(
-          "%s(): argument (position %d) must be str, but got "
-          "%s",
+          "%s(): argument (position %d) must be str, but got %s",
           op_type,
           arg_pos,
           ((PyTypeObject*)obj->ob_type)->tp_name));  // NOLINT
     }
-
-    std::string key(key_ptr, (size_t)key_len);  // NOLINT
-    VLOG(1) << "Start Process " << key;
+    std::string_view key_view(key_ptr, static_cast<size_t>(key_len));
+    VLOG(1) << "Start Process " << key_view;
     obj = PyTuple_GET_ITEM(args, arg_pos + 1);
-
-    if (std::set<std::string>({"cuda_graph_capture_mode"}).count(key)) {
-      CastPyArg2AttrString(obj, attrs, key, op_type, arg_pos);
-    } else if (std::set<std::string>({"global_block"}).count(key)) {
-      CastPyArg2AttrIRBlock(obj, attrs, key, op_type, arg_pos);
-    } else if (std::set<std::string>({"forward_program", "backward_program"})
-                   .count(key)) {
-      CastPyArg2AttrIRProgram(obj, attrs, key, op_type, arg_pos);
-    } else if (std::set<std::string>(
-                   {"is_test", "use_interpretorcore", "in_sot_mode"})
-                   .count(key)) {
-      CastPyArg2AttrBoolean(obj, attrs, key, op_type, arg_pos);
-    } else if (std::set<std::string>({"start_op_index",
-                                      "end_op_index",
-                                      "program_id",
-                                      "cuda_graph_pool_id"})
-                   .count(key)) {
-      CastPyArg2AttrLong(obj, attrs, key, op_type, arg_pos);
-    } else if (std::set<std::string>({"fx",
-                                      "fp",
-                                      "fm",
-                                      "fo",
-                                      "bx",
-                                      "no_need_buffers",
-                                      "bp",
-                                      "bm",
-                                      "bo_g",
-                                      "bx_g",
-                                      "bp_g",
-                                      "bo"})
-                   .count(key)) {
-      CastPyArg2AttrValues(obj, attrs, key, op_type, arg_pos);
+    auto it = kAttrFuncMap.find(std::string(key_view));
+    if (it != kAttrFuncMap.end()) {
+      // Call Cast function
+      it->second(obj, attrs, std::string(key_view), op_type, arg_pos);
     } else {
       PADDLE_THROW(common::errors::InvalidArgument(
-          "%s is not defined in this function.", key));  // NOLINT
+          "%.*s is not defined in this function.",
+          static_cast<int>(key_view.size()),
+          key_view.data()));  // NOLINT
     }
   }
 }

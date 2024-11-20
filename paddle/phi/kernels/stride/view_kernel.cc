@@ -22,10 +22,10 @@ COMMON_DECLARE_bool(use_stride_kernel);
 namespace phi {
 
 template <typename Context>
-void ViewShapeKernel(const Context& dev_ctx,
-                     const DenseTensor& input,
-                     const std::vector<int64_t>& dims,
-                     DenseTensor* out) {
+void ViewShapeStridedKernel(const Context& dev_ctx,
+                            const DenseTensor& input,
+                            const std::vector<int64_t>& dims,
+                            DenseTensor* out) {
   if (!FLAGS_use_stride_kernel) {
     PADDLE_THROW(common::errors::Fatal(
         "FLAGS_use_stride_kernel is closed. Strided kernel "
@@ -190,7 +190,7 @@ void ViewDtypeKernel(const Context& dev_ctx,
 
 PD_REGISTER_KERNEL_FOR_ALL_BACKEND_DTYPE(view_shape,
                                          STRIDED,
-                                         phi::ViewShapeKernel) {}
+                                         phi::ViewShapeStridedKernel) {}
 
 PD_REGISTER_KERNEL_FOR_ALL_BACKEND_DTYPE(view_dtype,
                                          STRIDED,

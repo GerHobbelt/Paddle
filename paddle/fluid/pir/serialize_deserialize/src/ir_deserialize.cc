@@ -215,8 +215,8 @@ pir::Operation* ProgramReader::ReadParameterOp(Json* op_json) {
   // prepare opinfo
   pir::OpInfo op_info = ctx_->GetRegisteredOpInfo(pir::ParameterOp::name());
   // deserialize op
-  pir::Operation* op =
-      Operation::Create(inputs, attributes, output_types, op_info);
+  pir::Operation* op = Operation::Create(
+      inputs, attributes, output_types, op_info, 0, {}, false);
 
   id_value_map[value_id_] = op->result(0);
   VLOG(4) << "Finish Read Operation " << op->name() << ".";
@@ -295,8 +295,8 @@ pir::Operation* ProgramReader::ReadOp(Json* op_json) {
     num_regions = op_json->at(REGIONS).size();
   }
   // deserialize op
-  pir::Operation* op =
-      Operation::Create(inputs, attributes, output_types, op_info, num_regions);
+  pir::Operation* op = Operation::Create(
+      inputs, attributes, output_types, op_info, num_regions, {}, false);
 
   // deserialize op's regions
   if (op_json->contains(REGIONS)) {

@@ -33,15 +33,7 @@ struct FusionItersSignature {
 struct FusionItersManager {
   enum FusionDirection { upstream2downstream = 0, downstream2upstream = 1 };
   FusionItersManager(pir::ShapeConstraintIRAnalysis* shape_analysis,
-                     ShardableAxesInfoManager* axes_info)
-      : shape_analysis_(shape_analysis), axes_info_(axes_info) {
-    PADDLE_ENFORCE_NOT_NULL(shape_analysis,
-                            ::common::errors::InvalidArgument(
-                                "shape_analysis should not be nullptr."));
-    PADDLE_ENFORCE_NOT_NULL(
-        axes_info,
-        ::common::errors::InvalidArgument("axes_info should not be nullptr."));
-  }
+                     ShardableAxesInfoManager* axes_info);
   FusionItersSignature GetItersSignature(pir::Operation* op);
 
   std::string PrintItersSignature(const FusionItersSignature& sig);
@@ -57,27 +49,22 @@ struct FusionItersManager {
   bool IterSymbolEqual(const std::string& lhs, const std::string& rhs);
   bool IterSymbolEqualOne(const std::string& sym);
 
-  symbol::DimExpr GetIterSymbol(const std::string& iter) {
-    PADDLE_ENFORCE(iter2dimexpr_.count(iter),
-                   ::common::errors::InvalidArgument(
-                       "Can not find iter %s in iter2dimexpr_.", iter));
-    return iter2dimexpr_[iter];
-  }
-  symbol::DimExpr GetReduceDimsProduct(const FusionItersSignature& sig) {
-    symbol::DimExpr result = 1;
-    for (size_t i = 0; i < sig.reduce_iter_nums; i++) {
-      result =
-          result * GetIterSymbol(sig.loop_iters[sig.loop_iters.size() - i - 1]);
-    }
-    return result;
-  }
+  symbol::DimExpr GetIterSymbol(const std::string& iter);
+  symbol::DimExpr GetReduceDimsProduct(const FusionItersSignature& sig);
+
+  auto related_iters_map() const { return related_iters_; }
+  bool CanFindRelatedIters(const std::string& source,
+                           const std::vector<std::string>& targets);
 
  private:
   void StoreIter2DimExprForValue(const pir::Value& value);
+  void GenerateRelatedIters();
 
   std::unordered_map<pir::Value, FusionIters> value2iters_;
   std::unordered_map<pir::Value, size_t> value_remain_usage_;
   std::unordered_map<std::string, symbol::DimExpr> iter2dimexpr_;
+  std::unordered_map<std::string, std::unordered_set<std::string>>
+      related_iters_;
 
   pir::ShapeConstraintIRAnalysis* shape_analysis_;
   ShardableAxesInfoManager* axes_info_;

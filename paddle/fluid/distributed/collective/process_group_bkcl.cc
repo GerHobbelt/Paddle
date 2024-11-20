@@ -622,6 +622,15 @@ std::shared_ptr<ProcessGroupBKCL> ProcessGroupBKCL::CreateProcessGroupBKCL(
   return process_group;
 }
 
+phi::distributed::BKCLCommContext* ProcessGroupBKCL::GetOrCreateCommContext(
+    const Place& place, CommType comm_type) {
+  const auto& key = GetKeyFromPlace(place);
+  if (place_to_comm_ctx_.find(key) == place_to_comm_ctx_.end()) {
+    CreateBKCLEnvCache(place, key);
+  }
+  return GetCommContext();
+}
+
 phi::distributed::BKCLCommContext* ProcessGroupBKCL::GetCommContext() {
   const auto& comm_context_manager =
       phi::distributed::CommContextManager::GetInstance();

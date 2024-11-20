@@ -48,7 +48,7 @@ class TestElementwiseModOp(OpTest):
         self.outputs = {'Out': self.out}
 
     def test_check_output(self):
-        self.check_output(check_pir=True, check_symbol_infer=False)
+        self.check_output(check_pir=True)
 
     def init_input_output(self):
         self.x = np.random.uniform(0, 10000, [10, 10]).astype(self.dtype)
@@ -96,6 +96,13 @@ class TestElementwiseModOpInverse(TestElementwiseModOp):
     def init_input_output(self):
         self.x = np.random.uniform(0, 10000, [10]).astype(self.dtype)
         self.y = np.random.uniform(0, 1000, [10, 10]).astype(self.dtype)
+        self.out = np.floor_divide(self.x, self.y)
+
+
+class TestElementwiseFloorDivOp_OneDim(TestElementwiseModOp):
+    def init_input_output(self):
+        self.x = np.random.uniform(0, 10000, [10]).astype(self.dtype)
+        self.y = np.random.uniform(0, 1000, [10]).astype(self.dtype)
         self.out = np.floor_divide(self.x, self.y)
 
 

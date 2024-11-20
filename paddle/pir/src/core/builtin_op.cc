@@ -24,6 +24,27 @@ namespace pir {
 
 const char *ModuleOp::attributes_name[attributes_num] = {"program"};  // NOLINT
 
+bool IsDynamicShapeTypeEqual(Type type1, Type type2) {
+  // Only support DenseTensorType now
+  bool are_equal = false;
+  if (type1.isa<DenseTensorType>() && type2.isa<DenseTensorType>()) {
+    auto type_l = type1.dyn_cast<DenseTensorType>();
+    auto type_r = type2.dyn_cast<DenseTensorType>();
+    auto vec1 = type_l.dims();
+    auto vec2 = type_r.dims();
+    if (vec1.size() != vec2.size()) return false;
+    for (auto i = 0; i < vec1.size(); ++i) {
+      are_equal = ((vec1[i] == -1 || vec2[i] == -1) || (vec1[i] == vec2[i])) |
+                  are_equal;
+    }
+    return static_cast<bool>(type_l.dtype() == type_r.dtype() &&
+                             type_l.data_layout() == type_r.data_layout() &&
+                             type_l.lod() == type_r.lod() &&
+                             type_l.offset() == type_r.offset() && are_equal);
+  }
+  return are_equal;
+}
+
 void PassStopGradientsDefaultly(OperationArgument &argument) {  // NOLINT
   VLOG(10) << "Builder construction stop gradient for OpResults.";
   bool stop_gradient = true;
@@ -340,11 +361,12 @@ void CombineOp::VerifySig() const {
           input_num));
 
   // forall i in inputs.size(): inputs[i].type == outputs[0][i].type
-  for (size_t i = 0; i < input_num; ++i) {
+  for (uint64_t i = 0; i < input_num; ++i) {
     auto type = (*this)->operand(i).type();
     PADDLE_ENFORCE_EQ(
-        output_type[i],
-        type,
+        (output_type[i] == type ||
+         IsDynamicShapeTypeEqual(output_type[i], type)),
+        true,
         common::errors::InvalidArgument("The type %s of outputs[0][%d] must be "
                                         "equal to type %s of inputs[%d].",
                                         output_type[i],

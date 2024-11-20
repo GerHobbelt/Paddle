@@ -624,6 +624,9 @@ void ReshapeInferMeta(const MetaTensor& x,
                       const IntArray& shape,
                       MetaTensor* out,
                       MetaConfig config = MetaConfig());
+void ViewShapeInferMeta(const MetaTensor& input,
+                        const std::vector<int64_t>& shape,
+                        MetaTensor* out);
 
 void ReshapeWithXShapeInferMeta(const MetaTensor& x,
                                 const IntArray& shape,
@@ -707,6 +710,11 @@ void SliceRawInferMeta(const MetaTensor& input,
                        const std::vector<int64_t>& decrease_axis,
                        MetaTensor* out,
                        MetaConfig config = MetaConfig());
+
+void ViewSliceInferMeta(const MetaTensor& input,
+                        int64_t begin_idx,
+                        int64_t end_idx,
+                        MetaTensor* out);
 
 void SoftmaxInferMeta(const MetaTensor& x, int axis, MetaTensor* out);
 

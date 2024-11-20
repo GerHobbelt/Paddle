@@ -17,7 +17,12 @@ import unittest
 import numpy as np
 from tensorrt_test_base import TensorRTBaseTest
 
+import paddle
 from paddle import _C_ops
+
+
+def api_wrapper(x):
+    return paddle._C_ops.share_data(x)
 
 
 def multiclass_nms3(
@@ -79,6 +84,20 @@ class TestMulticlassNMS3Marker(TensorRTBaseTest):
 
     def test_trt_result(self):
         self.check_marker(expected_result=False)
+
+
+class TestShareDataTRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = api_wrapper
+        self.api_args = {
+            "x": np.random.rand(4, 3, 5).astype("float32"),
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [4, 3, 5]}
+        self.max_shape = {"x": [6, 3, 5]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
 
 
 if __name__ == '__main__':

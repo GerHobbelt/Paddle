@@ -144,7 +144,8 @@ void BindWhileOp(py::module* m) {
       .def("block_arguments",
            &WhileOp::block_args,
            return_value_policy::reference)
-      .def("optimize_update", &PyWhileOp::OptimizeUpdate);
+      .def("optimize_update", &PyWhileOp::OptimizeUpdate)
+      .def("add_extra_input", &PyWhileOp::AddExtraInput);
 }
 
 void BindAssertOp(py::module* m) {
@@ -304,6 +305,10 @@ PyWhileOp::PyWhileOp(WhileOp while_op) : WhileOp(while_op) {
           "The while_op used to construct PyWhileOp can't be nullptr"));
 }
 
+void PyWhileOp::AddExtraInput(const pir::Value& value) {
+  extra_inputs_.push_back(value);
+}
+
 std::vector<Value> PyWhileOp::OptimizeUpdate() {
   PADDLE_ENFORCE_NOT_NULL(operation_,
                           common::errors::InvalidArgument(
@@ -316,11 +321,21 @@ std::vector<Value> PyWhileOp::OptimizeUpdate() {
           "The parent block of while_op which used to remove "
           "unused loop vars can't be nullptr"));
 
-  operation_->Verify();
+  // Skip verify if operation has extra inputs
+  if (extra_inputs_.empty()) {
+    operation_->Verify();
+  }
   auto& body_block = body();
   auto yield_op = body_block.back().dyn_cast<YieldOp>();
   auto operand_num = operation_->num_operands();
-  bool no_change = true;
+
+  PADDLE_ENFORCE_EQ(
+      operand_num - 1 + extra_inputs_.size(),
+      body_block.args().size(),
+      common::errors::InvalidArgument("The number of operands in while_op and "
+                                      "the number of args in body block "
+                                      "should be equal."));
+  bool no_change = extra_inputs_.empty();
   std::vector<size_t> index_vec;
   std::vector<Value> res, new_input, new_yield_val{yield_op.operand_source(0)};
   for (uint32_t i = 0; i < num_results(); ++i) {
@@ -372,6 +387,12 @@ std::vector<Value> PyWhileOp::OptimizeUpdate() {
       ++arg_index;
     }
   }
+  for (size_t extra_input_idx = 0u; extra_input_idx < extra_inputs_.size();
+       ++extra_input_idx) {
+    new_input.push_back(extra_inputs_[extra_input_idx]);
+    new_yield_val.push_back(
+        yield_op.operand_source(operand_num + extra_input_idx));
+  }
   if (no_change) return res;
   Block::Iterator iter = **this;
   Builder builder(ir_context(), false);
@@ -383,8 +404,13 @@ std::vector<Value> PyWhileOp::OptimizeUpdate() {
   builder.SetInsertionPointToBlockEnd(&body_block);
   builder.Build<YieldOp>(new_yield_val);
   operation_->Verify();
-  for (size_t result_index = 0; result_index < num_results(); ++result_index) {
+  for (size_t result_index = 0;
+       result_index < num_results() - extra_inputs_.size();
+       ++result_index) {
     res[index_vec[result_index]] = result(result_index);
+  }
+  for (size_t i = 0; i < extra_inputs_.size(); ++i) {
+    res.push_back(result(num_results() - extra_inputs_.size() + i));
   }
   return res;
 }

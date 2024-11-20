@@ -39,6 +39,8 @@ from paddle.tensorrt.converter_utils import (
 )
 from paddle.tensorrt.register import converter_registry
 
+from ..util import get_trt_version_list
+
 
 @converter_registry.register("pd_op.reshape", trt_version="8.x")
 def reshape_converter(network, paddle_op, inputs):
@@ -702,6 +704,61 @@ def stack_converter(network, paddle_op, inputs):
     output_tensor = concat_layer.get_output(0)
 
     return output_tensor
+
+
+@converter_registry.register("pd_op.tile", trt_version="8.x")
+def tile_converter(network, paddle_op, inputs):
+    input = inputs[0]
+    input_shape = paddle_op.operands()[0].source().shape
+    input_shape_tensor = network.add_shape(input).get_output(0)
+    rank = len(input_shape)
+
+    repeat_times_op = paddle_op.operands()[1].source().get_defining_op()
+    if repeat_times_op.name() == "pd_op.full_int_array":
+        repeat_times = repeat_times_op.attrs()["value"]
+        repeat_tensor = add_1D_constant_layer(network, repeat_times)
+        repeat_rank = len(repeat_times)
+    else:
+        repeat_tensor = inputs[1]
+        repeat_shape = paddle_op.operands()[1].source().shape
+        repeat_rank = repeat_shape[0]
+
+    if rank > repeat_rank:
+        one_rank_tensor = add_1D_constant_layer(
+            network, [1] * (rank - repeat_rank)
+        )
+        repeat_expand_tensor = trt_concat(
+            network, [one_rank_tensor, repeat_tensor]
+        )
+    elif rank < repeat_rank:
+        one_rank_tensor = add_1D_constant_layer(
+            network, [1] * (repeat_rank - rank)
+        )
+        input_shape_tensor = trt_concat(
+            network, [one_rank_tensor, input_shape_tensor]
+        )
+        input = trt_reshape(network, input, input_shape_tensor, "", True)
+        repeat_expand_tensor = repeat_tensor
+    else:
+        repeat_expand_tensor = repeat_tensor
+
+    start = [0] * max(rank, repeat_rank)
+    stride = [1] * max(rank, repeat_rank)
+    output_shape = [0] * max(rank, repeat_rank)
+    output_shape_tensor = trt_mul(
+        network, input_shape_tensor, repeat_expand_tensor
+    )
+
+    slice_layer = network.add_slice(input, start, output_shape, stride)
+    slice_layer.set_input(2, output_shape_tensor)
+
+    version_list = get_trt_version_list()
+    if version_list >= [8, 6, 0]:
+        slice_layer.mode = trt.SampleMode.WRAP
+    else:
+        slice_layer.mode = trt.SliceMode.WRAP
+
+    return slice_layer.get_output(0)
 
 
 @converter_registry.register("pd_op.strided_slice", trt_version="8.x")

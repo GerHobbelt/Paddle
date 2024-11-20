@@ -463,5 +463,26 @@ class TestForLoopMeetDict(Dy2StTestBase):
         temp_dir.cleanup()
 
 
+def loop_with_inner_mutate_list(x):
+    out = 100
+    # a is an UndefinedVar
+    for i in range(x):
+        a = []
+        a.append(x)
+        a.append(x + 1)
+        out += a[0]
+        # After the loop, a is [x, x], which will be flattened to 2 elements
+    return out
+
+
+class TestLoopWithInnerMutateList(Dy2StTestBase):
+    def test_loop_with_inner_mutate_list(self):
+        static_fn = paddle.jit.to_static(loop_with_inner_mutate_list)
+        x = paddle.to_tensor(5)
+        static_res = static_fn(x)
+        dygraph_res = loop_with_inner_mutate_list(x)
+        np.testing.assert_allclose(dygraph_res.numpy(), static_res.numpy())
+
+
 if __name__ == '__main__':
     unittest.main()

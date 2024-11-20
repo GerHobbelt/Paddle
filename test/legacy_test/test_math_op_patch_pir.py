@@ -168,6 +168,7 @@ class TestMathOpPatchesPir(unittest.TestCase):
         res_np_b = ~x_np
         res_np_c = paddle.bitwise_not(paddle.to_tensor(x_np))
         res_np_d = x_np.__invert__()
+        res_np_e = res_np_d
         paddle.enable_static()
         with paddle.pir_utils.IrGuard():
             main_program, exe, program_guard = new_program()
@@ -176,14 +177,16 @@ class TestMathOpPatchesPir(unittest.TestCase):
                 b = ~x
                 c = x.bitwise_not()
                 d = x.__invert__()
-                (b_np, c_np, d_np) = exe.run(
+                e = x.bitwise_invert()
+                (b_np, c_np, d_np, e_np) = exe.run(
                     main_program,
                     feed={"x": x_np},
-                    fetch_list=[b, c, d],
+                    fetch_list=[b, c, d, e],
                 )
                 np.testing.assert_array_equal(res_np_b, b_np)
                 np.testing.assert_array_equal(res_np_c, c_np)
                 np.testing.assert_array_equal(res_np_d, d_np)
+                np.testing.assert_array_equal(res_np_e, e_np)
 
     def test_bitwise_xor(self):
         paddle.disable_static()

@@ -154,6 +154,9 @@ class ProcessGroupBKCL : public ProcessGroupWithStream {
 
   BKCLContext_t BKCLComm(const Place& place) const;
 
+  phi::distributed::BKCLCommContext* GetOrCreateCommContext(
+      const Place& place, CommType comm_type = CommType::UNKNOWN);
+
  private:
   std::shared_ptr<ProcessGroupBKCL::BKCLTask> CreateTask(const Place& place,
                                                          int rank,
