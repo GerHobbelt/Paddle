@@ -25,6 +25,7 @@ enum InstructionType {
   T_Return,
   T_InitPattern,
   T_TrivialInline,
+  T_ReshapeAlign,
   T_TmpTransform,
   T_TrivialLoopAlign,
   T_ItersTransform,
@@ -140,6 +141,32 @@ struct TrivialInlineInstr : public FusionInstruction {
   virtual std::string DebugStr() const {
     return "TrivialInlineInstr || " + upstream_ + ", " + downstream_ + " => " +
            result_;
+  }
+};
+
+struct ReshapeAlignInstr : public FusionInstruction {
+  ReshapeAlignInstr(const std::string& input,
+                    const std::vector<symbol::DimExpr>& in_shape,
+                    const std::vector<symbol::DimExpr>& out_shape,
+                    const std::string& result)
+      : input_(input),
+        in_shape_(in_shape),
+        out_shape_(out_shape),
+        result_(result) {}
+  virtual InstructionType type() const { return T_ReshapeAlign; }
+  virtual FusionInstrPtr Clone() {
+    return std::make_shared<ReshapeAlignInstr>(*this);
+  }
+
+  std::string input_;
+  std::vector<symbol::DimExpr> in_shape_;
+  std::vector<symbol::DimExpr> out_shape_;
+  std::string result_;
+
+  virtual std::string DebugStr() const {
+    return "ReshapeAlignInstr || " + input_ + "(" +
+           cinn::utils::Join(in_shape_, ",") + ") => " + result_ + "(" +
+           cinn::utils::Join(out_shape_, ",") + ")";
   }
 };
 

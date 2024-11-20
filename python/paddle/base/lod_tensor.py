@@ -22,7 +22,7 @@ __all__ = []
 
 def create_lod_tensor(data, recursive_seq_lens, place):
     """
-    Create a DenseTensor from a numpy array, list or existing LoDTensor.
+    Create a DenseTensor from a numpy array, list or existing DenseTensor.
 
     The implementation is as follows:
 
@@ -34,7 +34,7 @@ def create_lod_tensor(data, recursive_seq_lens, place):
     3. Based on :code:`place` , copy the :code:`data` from a numpy array, list
        or existing DenseTensor to CPU or GPU device.
 
-    4. Set offset-based LoD to the output LoDTensor.
+    4. Set offset-based LoD to the output DenseTensor.
 
     Suppose we want to create a DenseTensor to hold data for word sequences,
     where each word is represented by an integer. If we want to create
@@ -48,7 +48,7 @@ def create_lod_tensor(data, recursive_seq_lens, place):
 
 
     Args:
-        data (numpy.ndarray|list|LoDTensor): a numpy array, a list or ad LoDTensor
+        data (numpy.ndarray|list|DenseTensor): a numpy array, a list or ad DenseTensor
                 holding the data to be copied.
         recursive_seq_lens (list[list[int]]): a list of lists indicating the
                 length-based LoD info.
@@ -126,7 +126,7 @@ def create_random_int_lodtensor(
 
     2. Create a numpy array of random integers, and parse the created numpy
        array as parameter :code:`data` of :ref:`api_paddle_base_create_lod_tensor` to
-       create the output LoDTensor.
+       create the output DenseTensor.
 
     Suppose we want to create a DenseTensor to hold data for 2 sequences, where
     the dimension of the sequences are [2, 30] and [3, 30] respectively.

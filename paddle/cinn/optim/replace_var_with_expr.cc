@@ -155,13 +155,7 @@ struct CollectTensorIndexMutator : public ir::IRMutator<> {
 std::vector<std::vector<Expr>> CollectTensorIndex(
     Expr* source, const std::string& tensor_name) {
   CollectTensorIndexMutator mutator(tensor_name);
-  std::vector<std::vector<Expr>> result = mutator(source);
-  for (auto& i : result) {
-    for (auto& j : i) {
-      j = cinn::common::AutoSimplify(j);
-    }
-  }
-  return result;
+  return mutator(source);
 }
 
 }  // namespace optim

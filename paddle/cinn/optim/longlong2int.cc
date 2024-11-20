@@ -69,7 +69,7 @@ class CastLonglong2Int : public ir::IRMutator<> {
     std::for_each(node->shape.begin(),
                   node->shape.end(),
                   [&](cinn::ir::Expr& e) { e->convert_int64_to_int32(); });
-    CastBuffer(node->buffer);
+    CastBufferMeta(node->buffer);
   }
   void Visit(const ir::Load* op, Expr* expr) override {
     auto node = expr->As<ir::Load>();
@@ -107,7 +107,7 @@ class CastLonglong2Int : public ir::IRMutator<> {
                       range->ranges.end(),
                       [&](cinn::ir::Var& v) { CastVarWithBound(v); });
         auto bf = range->buffer.as_buffer_ref();
-        CastBuffer(bf);
+        CastBufferMeta(bf);
       }
     }
 
@@ -117,7 +117,7 @@ class CastLonglong2Int : public ir::IRMutator<> {
                       range->ranges.end(),
                       [&](cinn::ir::Var& v) { CastVarWithBound(v); });
         auto bf = range->buffer.as_buffer_ref();
-        CastBuffer(bf);
+        CastBufferMeta(bf);
       }
     }
     ir::IRMutator<>::Visit(&(node->body), &(node->body));
@@ -140,7 +140,7 @@ class CastLonglong2Int : public ir::IRMutator<> {
     if (lb.defined()) lb->convert_int64_to_int32();
     if (ub.defined()) ub->convert_int64_to_int32();
   }
-  void CastBuffer(cinn::ir::Buffer& bf) {  // NOLINT
+  void CastBufferMeta(cinn::ir::Buffer& bf) {  // NOLINT
     if (!bf.defined()) return;
     std::for_each(bf->shape.begin(), bf->shape.end(), [&](cinn::ir::Expr& e) {
       e->convert_int64_to_int32();

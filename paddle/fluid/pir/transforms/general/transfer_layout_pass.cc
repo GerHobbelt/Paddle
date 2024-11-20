@@ -492,7 +492,7 @@ struct FlowGraph {
     return (heights[dst_node()] > 0);
   }
 
-  // cf is the admissable flow in current path
+  // cf is the admissible flow in current path
   float FindBlockingFlow(Node src, float cf) {
     if (src == dst_node() || abs(cf) < 1e-9) {
       return cf;

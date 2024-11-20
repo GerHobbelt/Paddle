@@ -40,7 +40,7 @@
 #include "paddle/cinn/utils/string.h"
 #include "paddle/common/enforce.h"
 
-PD_DECLARE_bool(cinn_longlong2int_for_integer);
+PD_DECLARE_bool(cinn_longlong2int);
 namespace cinn {
 namespace optim {
 
@@ -487,7 +487,7 @@ void OptimizeExprGPU(Expr *expr) {
   ReplaceVarToZero replace_var_to_zero;
   replace_var_to_zero(expr);
 
-  if (FLAGS_cinn_longlong2int_for_integer) {
+  if (FLAGS_cinn_longlong2int) {
     TryCastLonglong2Int(expr);
   }
 

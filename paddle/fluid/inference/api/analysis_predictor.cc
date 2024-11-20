@@ -807,6 +807,30 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
                      pass->name()) != this->config_.ir_debug_passes_.end();
   };
 
+  auto AddAutoMixedPrecisionPass = [&](pir::PassManager &pass_manager) {
+    auto auto_mixed_precision_pass = ::pir::CreateAutoMixedPrecisionPass();
+    if (std::find(config_.deleted_passes_.begin(),
+                  config_.deleted_passes_.end(),
+                  auto_mixed_precision_pass->name()) ==
+        config_.deleted_passes_.end()) {
+      auto_mixed_precision_pass->SetNotOwned(pir::Pass::kPlaceAttr, &place_);
+      auto_mixed_precision_pass->Set("mixed_precision_mode",
+                                     new phi::DataType(paddle::ConvertPrecision(
+                                         config_.mixed_precision_mode_)));
+      auto_mixed_precision_pass->Set(
+          "enable_low_precision_io",
+          new bool(config_.enable_low_precision_io_));
+      auto_mixed_precision_pass->Set(
+          "mixed_black_list",
+          new std::unordered_set<std::string>(config_.mixed_black_list_));
+      auto_mixed_precision_pass->Set(
+          "mixed_white_list",
+          new std::unordered_set<std::string>(config_.mixed_white_list_));
+
+      pass_manager.AddPass(std::move(auto_mixed_precision_pass));
+    }
+  };
+
   if (!config_.use_optimized_model_) {
 #ifdef PADDLE_WITH_CINN
     auto CreatePassMgr = [&] {
@@ -833,11 +857,14 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
         const std::vector<std::string> FusedOpPasses{// Operator fusion pass
                                                      "conv2d_bn_fuse_pass",
                                                      "conv2d_add_act_fuse_pass",
-                                                     "conv2d_add_fuse_pass",
-                                                     "transfer_layout_pass"};
+                                                     "conv2d_add_fuse_pass"};
 
         for (const auto &fused_op : FusedOpPasses) {
           fused_op_pm.AddPass(pir::PassRegistry::Instance().Get(fused_op));
+        }
+
+        if (config_.enable_gpu_mixed_) {
+          AddAutoMixedPrecisionPass(fused_op_pm);
         }
 
         fused_op_pm.Run(pir_program_.get());
@@ -965,26 +992,10 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
   ::pir::PassManager basic_pass_pm(::pir::IrContext::Instance(),
                                    config_.pm_opt_level_);
   if (config_.enable_gpu_mixed_) {
-    auto auto_mixed_precision_pass = ::pir::CreateAutoMixedPrecisionPass();
-    if (std::find(config_.deleted_passes_.begin(),
-                  config_.deleted_passes_.end(),
-                  auto_mixed_precision_pass->name()) ==
-        config_.deleted_passes_.end()) {
-      auto_mixed_precision_pass->SetNotOwned(pir::Pass::kPlaceAttr, &place_);
-      auto_mixed_precision_pass->Set("mixed_precision_mode",
-                                     new phi::DataType(paddle::ConvertPrecision(
-                                         config_.mixed_precision_mode_)));
-      auto_mixed_precision_pass->Set(
-          "enable_low_precision_io",
-          new bool(config_.enable_low_precision_io_));
-      auto_mixed_precision_pass->Set(
-          "mixed_black_list",
-          new std::unordered_set<std::string>(config_.mixed_black_list_));
-      auto_mixed_precision_pass->Set(
-          "mixed_white_list",
-          new std::unordered_set<std::string>(config_.mixed_white_list_));
-      basic_pass_pm.AddPass(std::move(auto_mixed_precision_pass));
+    if (!config_.cinn_enabled()) {
+      AddAutoMixedPrecisionPass(basic_pass_pm);
     }
+
     auto transfer_layout_pass = ::pir::CreateTransferLayoutPass();
     if (std::find(config_.deleted_passes_.begin(),
                   config_.deleted_passes_.end(),

@@ -659,8 +659,10 @@ void multiply_double_grad(const Tensor& x,
         if (!axes.size()) {
           set_output<T>(dx, x_grad);
         } else {
-          auto dx_reduce = dx.sum(common::vectorize(axes), dx.dtype(), false);
-          if (dx_reduce.dims().size() != x.dims().size()) {
+          auto dx_reduce = dx.sum(common::vectorize(axes),
+                                  dx.dtype(),
+                                  dx.dims().size() == x.dims().size());
+          if (dx_reduce.dims() != x.dims()) {
             dx_reduce = reshape<T>(dx_reduce, x.shape());
           }
           set_output<T>(dx_reduce, x_grad);
@@ -682,8 +684,10 @@ void multiply_double_grad(const Tensor& x,
         if (!axes.size()) {
           set_output<T>(dy, y_grad);
         } else {
-          auto dy_reduce = dy.sum(common::vectorize(axes), dy.dtype(), false);
-          if (dy_reduce.dims().size() != y.dims().size()) {
+          auto dy_reduce = dy.sum(common::vectorize(axes),
+                                  dy.dtype(),
+                                  dy.dims().size() == y.dims().size());
+          if (dy_reduce.dims() != y.dims()) {
             dy_reduce = reshape<T>(dy_reduce, y.shape());
           }
           set_output<T>(dy_reduce, y_grad);
@@ -754,11 +758,16 @@ void add_triple_grad(const paddle::optional<Tensor>& grad_grad_x,
         if (!reduce_dim.size()) {
           by_pass<T>(grad_grad_out_grad, grad_grad_y_grad);
         } else {
-          auto dddy_reduce_res = grad_grad_out_grad.sum(
-              common::vectorize(reduce_dim), grad_grad_y.get().dtype(), false);
-          auto dddy_tmp = reshape<T>(
-              dddy_reduce_res, common::vectorize(grad_grad_y.get().dims()));
-          set_output<T>(dddy_tmp, grad_grad_y_grad);
+          auto dddy_reduce_res =
+              grad_grad_out_grad.sum(common::vectorize(reduce_dim),
+                                     grad_grad_y.get().dtype(),
+                                     grad_grad_out_grad.dims().size() ==
+                                         grad_grad_y.get().dims().size());
+          if (dddy_reduce_res.dims() != grad_grad_y.get().dims()) {
+            dddy_reduce_res = reshape<T>(
+                dddy_reduce_res, common::vectorize(grad_grad_y.get().dims()));
+          }
+          set_output<T>(dddy_reduce_res, grad_grad_y_grad);
         }
       } else {
         by_pass<T>(grad_grad_out_grad, grad_grad_y_grad);
@@ -774,11 +783,16 @@ void add_triple_grad(const paddle::optional<Tensor>& grad_grad_x,
         if (!reduce_dim.size()) {
           by_pass<T>(grad_grad_out_grad, grad_grad_x_grad);
         } else {
-          auto dddx_reduce_res = grad_grad_out_grad.sum(
-              common::vectorize(reduce_dim), grad_grad_x.get().dtype(), false);
-          auto dddx_tmp = reshape<T>(
-              dddx_reduce_res, common::vectorize(grad_grad_x.get().dims()));
-          set_output<T>(dddx_tmp, grad_grad_x_grad);
+          auto dddx_reduce_res =
+              grad_grad_out_grad.sum(common::vectorize(reduce_dim),
+                                     grad_grad_x.get().dtype(),
+                                     grad_grad_out_grad.dims().size() ==
+                                         grad_grad_x.get().dims().size());
+          if (dddx_reduce_res.dims() != grad_grad_x.get().dims()) {
+            dddx_reduce_res = reshape<T>(
+                dddx_reduce_res, common::vectorize(grad_grad_x.get().dims()));
+          }
+          set_output<T>(dddx_reduce_res, grad_grad_x_grad);
         }
       } else {
         by_pass<T>(grad_grad_out_grad, grad_grad_x_grad);

@@ -642,4 +642,15 @@ std::vector<Int> ArangeVector(Int start, Int end, Int step = 1) {
   return res;
 }
 
+bool ShapeProductEqual(const std::vector<symbol::DimExpr>& in_shape,
+                       const std::vector<symbol::DimExpr>& out_shape,
+                       int in_start,
+                       int in_end,
+                       int out_start,
+                       int out_end);
+
+std::vector<std::pair<int, int>> PartionReshapeAxes(
+    const std::vector<symbol::DimExpr>& in_shape,
+    const std::vector<symbol::DimExpr>& out_shape);
+
 }  // namespace cinn::fusion

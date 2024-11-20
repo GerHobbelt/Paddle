@@ -785,5 +785,40 @@ class TestPyLayerJitSaveLoad(unittest.TestCase):
         np.testing.assert_array_equal(train_layer_result, infer_layer_result)
 
 
+class PyLayerWrongUsage(PyLayer):
+    @staticmethod
+    def forward(ctx, x):
+        ctx.x = x
+        x1 = paddle.tanh(x)
+        return x1
+
+    @staticmethod
+    def backward(ctx, grad):
+        x = ctx.x
+        x_grad = grad * (1 - paddle.square(x))
+        return x_grad
+
+
+class PyLayerWrongUsageWrapper(paddle.nn.Layer):
+    def __init__(self):
+        super().__init__()
+        self.layer = PyLayerWrongUsage()
+
+    def forward(self, x):
+        return PyLayerWrongUsage.apply(x)
+
+
+class TestPyLayerWrongUsage(unittest.TestCase):
+    def test_wrong_usage(self):
+        layer = PyLayerWrongUsageWrapper()
+        static_layer = paddle.jit.to_static(layer, full_graph=True)
+        x = paddle.to_tensor(np.random.random((1, 784)).astype('float32'))
+        with self.assertRaisesRegex(
+            AttributeError,
+            r"`ctx.x = tensor` is not allowed in static mode, please use `ctx.save_for_backward\(tensor\)` instead.",
+        ):
+            static_layer(x)
+
+
 if __name__ == "__main__":
     unittest.main()

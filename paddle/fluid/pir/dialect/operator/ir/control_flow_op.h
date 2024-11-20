@@ -120,7 +120,8 @@ struct TuplePushOpVjpInterfaceModel : public VjpInterface::Concept {
 ///   ...
 /// }
 ///
-class HasElementsOp : public pir::Op<HasElementsOp> {
+class HasElementsOp
+    : public pir::Op<HasElementsOp, InferSymbolicShapeInterface> {
  public:
   using Op::Op;
   static const char *name() { return "cf.has_elements"; }
@@ -133,6 +134,7 @@ class HasElementsOp : public pir::Op<HasElementsOp> {
   void VerifySig();
   pir::Value input() { return operand_source(0); }
   pir::Value out() { return result(0); }
+  bool InferSymbolicShape(pir::InferSymbolicShapeContext *infer_context);
 };
 
 ///

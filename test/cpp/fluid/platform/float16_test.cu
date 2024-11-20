@@ -341,7 +341,7 @@ TEST(float16, lod_tensor_on_gpu) {
   // GPU DenseTensor to CPU DenseTensor
   framework::TensorCopy(gpu_tensor, CPUPlace(), gpu_ctx, &dst_tensor);
 
-  // Sync before comparing LoDTensors
+  // Sync before comparing DenseTensors
   gpu_ctx.Wait();
   const float16 *dst_ptr = dst_tensor.data<float16>();
   ASSERT_NE(src_ptr, dst_ptr);

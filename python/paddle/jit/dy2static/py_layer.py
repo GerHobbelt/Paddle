@@ -14,6 +14,7 @@
 
 import functools
 import inspect
+import textwrap
 
 from paddle import pir
 from paddle.base.framework import Variable, in_pir_mode
@@ -31,6 +32,39 @@ class StaticPyLayerContext:
         if in_pir_mode():
             self.tuple_push_op_name = "cf.tuple_push"
             self.tuple_pop_op_name = "cf.tuple_pop"
+
+    def __setattr__(self, attr: str, value: object):
+        attr_allow_list = ["saved_vars"]
+        if (
+            in_pir_mode()
+            and attr not in attr_allow_list
+            and isinstance(value, pir.Value)
+        ):
+            raise AttributeError(
+                textwrap.dedent(
+                    f"""\
+                `ctx.{attr} = tensor` is not allowed in static mode, please use `ctx.save_for_backward(tensor)` instead.
+
+                For example:
+
+                    >>> class ExamplePyLayer(PyLayer):
+                    ...     @staticmethod
+                    ...     def forward(ctx, x):
+                    ...         # ctx.x = x  # This is not allowed in static mode, Replace it with `ctx.save_for_backward(x)`
+                    ...         ctx.save_for_backward(x)
+                    ...         x1 = paddle.tanh(x)
+                    ...         return x1
+
+                    ...     @staticmethod
+                    ...     def backward(ctx, grad):
+                    ...         # x = ctx.x  # Same as above, replace it with `x, = ctx.saved_tensor()`
+                    ...         x, = ctx.saved_tensor()
+                    ...         x_grad = grad * (1 - paddle.square(x))
+                    ...         return x_grad
+                """
+                )
+            )
+        super().__setattr__(attr, value)
 
     def save_for_backward(self, *tensors):
         if in_pir_mode():

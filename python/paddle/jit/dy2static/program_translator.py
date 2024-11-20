@@ -101,10 +101,22 @@ def synchronized(func):
 
 def show_op_callstack(op):
     op_callstack = op.callstack
-    index = op_callstack.index("    outputs = static_func(*inputs)")
-    op_callstack_result = '\n'.join(op_callstack[index + 1 :])
+    target_lines = {
+        "outputs = static_func(*inputs)",
+        "outputs = static_func(*inputs, **_kwargs)",
+    }
+    op_callstack_message = ""
+    for index, line in enumerate(op_callstack):
+        if line.strip() in target_lines:
+            op_callstack_result = '\n'.join(op_callstack[index + 1 :])
+            op_callstack_message = (
+                f"In transformed code:\n\n{op_callstack_result}\n\n"
+            )
     raise ValueError(
-        f'In transformed code:\n\n{op_callstack_result}\n\nSorry about what\'s happened. In to_static mode, {op.name()}\'s output variable is a viewed Tensor in dygraph. This will result in inconsistent calculation behavior between dynamic and static graphs. You must find the location of the strided ops be called, and call paddle.assign() before inplace input.If you certainly make sure it\'s safe, you can set env stride_in_no_check_dy2st_diff to 1.'
+        f"{op_callstack_message}Sorry about what's happened. In to_static mode, {op.name()}'s output variable is a viewed Tensor in dygraph. "
+        f"This will result in inconsistent calculation behavior between dynamic and static graphs. "
+        f"You must find the location of the strided ops be called, and call paddle.assign() before inplace input. "
+        f"If you certainly make sure it's safe, you can set env stride_in_no_check_dy2st_diff to 1."
     )
 
 
@@ -122,8 +134,6 @@ def check_view_api_used_by_inplace(program: paddle.pir.Program) -> None:
     """
     all_vars_list = program.list_vars()
     for value in all_vars_list:
-        if len(value.all_used_ops()) == 0:
-            return
         uesd_by_stride_ops = []
         for op in value.all_used_ops()[::-1]:
             inplace_info = paddle.core.pir.get_op_inplace_info(op)
@@ -1625,15 +1635,16 @@ class ProgramCache:
             )
 
         backend = cache_key.kwargs['backend']
-        if (
-            prim_or_cinn_is_enabled(cache_key.kwargs['build_strategy'], backend)
-            and not use_pir_api()
-        ):
-            for var in concrete_program.main_program.list_vars():
-                if var.type not in NO_SHAPE_VAR_TYPE and -1 in var.shape:
-                    warnings.warn(
-                        f"Now prim and cinn do not support -1 shape, but the shape of var {var.name} is {var.shape}"
-                    )
+        if not use_pir_api():
+            # decrease prim_is_enable() call to decrease print log
+            if prim_or_cinn_is_enabled(
+                cache_key.kwargs['build_strategy'], backend
+            ):
+                for var in concrete_program.main_program.list_vars():
+                    if var.type not in NO_SHAPE_VAR_TYPE and -1 in var.shape:
+                        warnings.warn(
+                            f"Now prim and cinn do not support -1 shape, but the shape of var {var.name} is {var.shape}"
+                        )
 
         if use_pir_api():
             from .pir_partial_program import partial_program_from

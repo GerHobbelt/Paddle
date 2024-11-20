@@ -2385,8 +2385,9 @@ bool WeightDequantizeOpInferSymbolicShape(
                     common::errors::InvalidArgument(
                         "The x tensor of dequantize op must be 2D, but got[%d]",
                         x_shape.size()));
-  int group_size = op->attribute<pir::Int32Attribute>("group_size").data();
-  std::string algo = op->attribute<pir::StrAttribute>("algo").AsString();
+  const int group_size =
+      op->attribute<pir::Int32Attribute>("group_size").data();
+  const std::string algo = op->attribute<pir::StrAttribute>("algo").AsString();
   PADDLE_ENFORCE_EQ(
       (group_size == -1 || group_size == 64 || group_size == 128),
       true,

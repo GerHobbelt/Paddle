@@ -539,7 +539,7 @@ void CollectSymbolNames(const std::vector<symbol::DimExpr>& dim_exprs,
 
 template <typename SymbolBindingsT>
 void AppendSymbolBindings(const std::vector<symbol::DimExpr>& dim_exprs,
-                          const std::set<std::string>& symbol_names,
+                          std::set<std::string>* remain_symbol_names_to_bind,
                           int in_tensor_idx,
                           SymbolBindings* symbol_bindings) {
   for (int in_tensor_dim_idx = 0; in_tensor_dim_idx < dim_exprs.size();
@@ -550,7 +550,10 @@ void AppendSymbolBindings(const std::vector<symbol::DimExpr>& dim_exprs,
                        "The type of dim_expr is not atomic"));
     if (!dim_expr.isa<std::string>()) continue;
     const auto& sym_name = dim_expr.dyn_cast<std::string>();
-    if (symbol_names.find(sym_name) == symbol_names.end()) continue;
+    if (remain_symbol_names_to_bind->find(sym_name) ==
+        remain_symbol_names_to_bind->end())
+      continue;
+    remain_symbol_names_to_bind->erase(sym_name);
     symbol_bindings->emplace_back(SymbolBindingsT{
         /*.symbol_name=*/sym_name,
         /*.input_tensor_idx=*/in_tensor_idx,
@@ -564,14 +567,17 @@ void GenerateSymbolBindings(
     const std::vector<pir::Value>& input_tensors,
     const std::set<std::string>& symbol_names,
     SymbolBindings* symbol_bindings) {
+  std::set<std::string> remain_symbol_names_to_bind = symbol_names;
   for (int i = 0; i < input_tensors.size(); ++i) {
     const auto& input_tensor = input_tensors.at(i);
     const auto& dim_exprs = ShapeOrDataDimExprs4Value(input_tensor);
     AppendSymbolBindings<ShapeSymbolBinding>(
-        dim_exprs.shape(), symbol_names, i, symbol_bindings);
+        dim_exprs.shape(), &remain_symbol_names_to_bind, i, symbol_bindings);
     if (dim_exprs.data().has_value()) {
-      AppendSymbolBindings<DataSymbolBinding>(
-          dim_exprs.data().value(), symbol_names, i, symbol_bindings);
+      AppendSymbolBindings<DataSymbolBinding>(dim_exprs.data().value(),
+                                              &remain_symbol_names_to_bind,
+                                              i,
+                                              symbol_bindings);
     }
   }
 }

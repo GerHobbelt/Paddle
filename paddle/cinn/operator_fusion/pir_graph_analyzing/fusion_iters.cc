@@ -274,11 +274,25 @@ bool FusionItersManager::IterSymbolEqualOne(const std::string& sym) {
   return shape_analysis_->IsEqual(iter2dimexpr_[sym], 1);
 }
 
+std::vector<std::string> FusionItersManager::GetValueIters(
+    const pir::Value& value) {
+  return value2iters_[value];
+}
+
 symbol::DimExpr FusionItersManager::GetIterSymbol(const std::string& iter) {
   PADDLE_ENFORCE(iter2dimexpr_.count(iter),
                  ::common::errors::InvalidArgument(
                      "Can not find iter %s in iter2dimexpr_.", iter));
   return iter2dimexpr_[iter];
+}
+
+std::vector<symbol::DimExpr> FusionItersManager::GetIterSymbols(
+    const FusionIters& iters) {
+  std::vector<symbol::DimExpr> result;
+  for (const auto& iter : iters) {
+    result.push_back(GetIterSymbol(iter));
+  }
+  return result;
 }
 
 symbol::DimExpr FusionItersManager::GetReduceDimsProduct(

@@ -42,7 +42,7 @@ struct SearchAlgorithm<NodePattern, GraphMatcher, GraphOperation> {
       if (GraphMatcher()(*graph_, iter_node) &&
           !visited_nodes.count(iter_node)) {
         visited_nodes.insert(iter_node);
-        VLOG(4) << "Find Matched Node: " << iter_node;
+        VLOG(4) << "Find Matched Node: " << iter_node->id();
         return iter_node;
       }
     }

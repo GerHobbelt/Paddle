@@ -61,7 +61,7 @@ def multiclass_nms(
                            N is the batch size. Each bounding box has four
                            coordinate values and the layout is
                            [xmin, ymin, xmax, ymax], when box size equals to 4.
-                           2. (LoDTensor) A 3-D Tensor with shape [M, C, 4]
+                           2. (DenseTensor) A 3-D Tensor with shape [M, C, 4]
                            M is the number of bounding boxes, C is the
                            class number
         scores (Tensor): Two types of scores are supported:
@@ -72,7 +72,7 @@ def multiclass_nms(
                            are total M scores which corresponding M bounding
                            boxes. Please note, M is equal to the 2nd dimension
                            of BBoxes.
-                           2. (LoDTensor) A 2-D DenseTensor with shape [M, C].
+                           2. (DenseTensor) A 2-D DenseTensor with shape [M, C].
                            M is the number of bbox, C is the class number.
                            In this case, input BBoxes should be the second
                            case with shape [M, C, 4].

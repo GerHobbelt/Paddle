@@ -29,7 +29,9 @@ class TestTakeAlongAxisOp(OpTest):
     def setUp(self):
         self.init_data()
         self.op_type = "take_along_axis"
+        self.prim_op_type = "prim"
         self.python_api = paddle.tensor.take_along_axis
+        self.public_python_api = paddle.tensor.take_along_axis
         self.check_cinn = True
         self.xnp = np.random.random(self.x_shape).astype(self.x_type)
         self.target = np.take_along_axis(self.xnp, self.index, self.axis)
@@ -49,7 +51,11 @@ class TestTakeAlongAxisOp(OpTest):
 
     def test_check_grad(self):
         self.check_grad(
-            ['Input'], 'Result', check_cinn=self.check_cinn, check_pir=True
+            ['Input'],
+            'Result',
+            check_cinn=self.check_cinn,
+            check_pir=True,
+            check_prim_pir=True,
         )
 
     def init_data(self):
@@ -78,7 +84,7 @@ class TestTakeAlongAxisFP16Op(TestTakeAlongAxisOp):
         self.axis_type = "int64"
 
 
-class TestTakeAlongAxisOp(OpTest):
+class TestTakeAlongAxisOp2(OpTest):
     def setUp(self):
         self.init_data()
         self.op_type = "take_along_axis"
@@ -118,7 +124,9 @@ class TestTakeAlongAxisBF16Op(OpTest):
     def setUp(self):
         self.init_data()
         self.op_type = "take_along_axis"
+        self.prim_op_type = "prim"
         self.python_api = paddle.tensor.take_along_axis
+        self.public_python_api = paddle.tensor.take_along_axis
         self.check_cinn = True
         self.xnp = np.random.random(self.x_shape).astype(self.x_type)
         self.target = np.take_along_axis(self.xnp, self.index, self.axis)
@@ -149,6 +157,7 @@ class TestTakeAlongAxisBF16Op(OpTest):
             'Result',
             check_cinn=self.check_cinn,
             check_pir=True,
+            check_prim_pir=True,
         )
 
     def init_data(self):

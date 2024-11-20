@@ -2397,7 +2397,7 @@ struct SimpleOpTypeSetTeller : public Teller {
         std::string padding_algorithm =
             PADDLE_GET_CONST(std::string, desc.GetAttr("padding_algorithm"));
 
-        // trt error is arised if conv3d_transpose and SAME
+        // trt error is raised if conv3d_transpose and SAME
         if (op_type == "conv3d_transpose" && padding_algorithm == "SAME" &&
             !with_dynamic_shape) {
           return false;

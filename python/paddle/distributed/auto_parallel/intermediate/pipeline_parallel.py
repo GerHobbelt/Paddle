@@ -141,8 +141,8 @@ def pipeline_parallel(model, optimizer, split_spec, mesh=None, dimension=None):
     Args:
         model (paddle.nn.Layer): A single card model to be distributed
         optimizer (paddle.optimizer.Optimizer): An optimizer to be distributed
-        split_spec (OrderedDict|dict|str): The pipeline parallel split point.
-            if split_spec is a string, such as "llama.layer", Then the layer with same prefix a will be divided equally according to the size of pipeline degree.
+        split_spec (OrderedDict|dict|str|list(str)): The pipeline parallel split point.
+            if split_spec is a string or list, such as "llama.layer" or ["llama.layerA", "llama.layerB"], Then the layer with same prefix a will be divided equally according to the size of pipeline degree.
             if split_spec is a OrderedDict|dict, key is the layer name, and the value is the split position that can be SplitPoint.BEGINNING or SplitPoint.END, the order of the keys is the order of the pipeline stage.
             NOTE: dict is also ordered after python3.7, so use dict at this time.
         the order of the keys is the order of the pipeline stage
@@ -167,13 +167,21 @@ def pipeline_parallel(model, optimizer, split_spec, mesh=None, dimension=None):
         )
 
     if isinstance(split_spec, str):
+        split_spec = [split_spec]
+
+    if isinstance(split_spec, (list, tuple)):
         # match layer_name with split_spec following by a dot and numbers and no other characters
-        # such as split_spec = "llama.layer", then llama.layer.0 is matched, llama.layer.0.mlp is not matched
-        pattern = rf"{split_spec}\.\d+$"
+        # such as split_spec = ["llama.layer"], then llama.layer.0 is matched, llama.layer.0.mlp is not matched
+        patterns = [rf"{prefix}\.\d+$" for prefix in split_spec]
+
+        def is_match(layer_name):
+            for pattern in patterns:
+                if re.match(pattern, layer_name):
+                    return True
+            return False
+
         matched_layer_name = [
-            name
-            for name, _ in model.named_sublayers()
-            if re.match(pattern, name)
+            name for name, _ in model.named_sublayers() if is_match(name)
         ]
 
         pp_size = mesh.get_dim_size("pp")
@@ -188,7 +196,7 @@ def pipeline_parallel(model, optimizer, split_spec, mesh=None, dimension=None):
         split_spec_dict = OrderedDict(
             [
                 (
-                    f"{split_spec}.{i * layers_per_rank - 1}",
+                    matched_layer_name[i * layers_per_rank - 1],
                     SplitPoint.END,
                 )
                 for i in range(1, pp_size)

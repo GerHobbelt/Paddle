@@ -97,7 +97,7 @@ struct SearchAlgorithmBase {};
 // cuDNN convolution forward algorithm searcher, consisted of three searching
 // modes, namely: deterministic, heuristic and exhaustive_search mode.
 // As well as one workspace size acquirsition function with respect to
-// the chosen alogrithm.
+// the chosen algorithm.
 template <>
 struct SearchAlgorithmBase<ConvKind::kForward> {
   using PerfT = cudnnConvolutionFwdAlgoPerf_t;
@@ -271,7 +271,7 @@ struct SearchAlgorithmBase<ConvKind::kForward> {
 // mode. Specially, there are 2 pattens of exhaustive search mode, one for
 // HALF precision only, one for the rest.
 // As well as one workspace size acquirsition function with
-// respect to the chosen alogrithm.
+// respect to the chosen algorithm.
 template <>
 struct SearchAlgorithmBase<ConvKind::kBackwardData> {
   using PerfT = cudnnConvolutionBwdDataAlgoPerf_t;
@@ -454,7 +454,7 @@ struct SearchAlgorithmBase<ConvKind::kBackwardData> {
 // cuDNN convution backward filter-algorithm searcher, consisted of three
 // algorithm searching modes, namely: deterministic, heuristic, and
 // exhaustive_search mode. As well as one workspace size acquirsition function
-// with respect to the chosen alogrithm.
+// with respect to the chosen algorithm.
 template <>
 struct SearchAlgorithmBase<ConvKind::kBackwardFilter> {
   using PerfT = cudnnConvolutionBwdFilterAlgoPerf_t;

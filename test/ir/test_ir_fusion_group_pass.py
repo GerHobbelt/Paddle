@@ -62,7 +62,9 @@ class FusionGroupPassTest(PassTest):
         feeds = {}
         for var in feed_vars:
             if var.type != base.core.VarDesc.VarType.DENSE_TENSOR:
-                raise TypeError("Feed data of non LoDTensor is not supported.")
+                raise TypeError(
+                    "Feed data of non DenseTensor is not supported."
+                )
 
             shape = var.shape
             if var.dtype == paddle.float32:

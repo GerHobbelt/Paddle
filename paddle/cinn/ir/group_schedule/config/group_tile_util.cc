@@ -63,8 +63,8 @@ bool GetCanApplyGridReduce(const std::vector<ir::Expr>& op_compute_bodies,
     auto* block = expr_block.As<ir::ScheduleBlockRealize>();
     auto& iter_vars = block->schedule_block.As<ir::ScheduleBlock>()->iter_vars;
     for (int i = 0; i < iter_vars.size(); i++) {
-      ir::Var loop_var = block->iter_values[i].as_var_ref();
-      if (reduce_loop_vars.count(loop_var->name) > 0) {
+      if (block->iter_values[i].is_var() &&
+          reduce_loop_vars.count(block->iter_values[i].as_var()->name) > 0) {
         reduce_iter_vars.insert(iter_vars[i]->name);
       }
     }

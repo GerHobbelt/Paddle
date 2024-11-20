@@ -547,7 +547,7 @@ def _is_state_dict(obj):
 
 def _transformed_from_varbase(obj):
     # In paddle2.1 version, Tensor is saved as tuple(tensor.name, tensor.numpy()).
-    # When executing paddle.load, use this function to determine whether to restore to Tensor/LoDTensor.
+    # When executing paddle.load, use this function to determine whether to restore to Tensor.
     if isinstance(obj, tuple) and len(obj) == 2:
         name_types = str
         if isinstance(obj[0], name_types) and isinstance(obj[1], np.ndarray):
@@ -557,7 +557,7 @@ def _transformed_from_varbase(obj):
 
 def _transformed_from_lodtensor(obj):
     # In paddle2.1 version, DenseTensor is saved as np.array(tensor).
-    # When executing paddle.load, use this function to determine whether to restore to Tensor/LoDTensor.
+    # When executing paddle.load, use this function to determine whether to restore to Tensor.
     if isinstance(obj, np.ndarray):
         return True
     return False
@@ -665,7 +665,7 @@ def _parse_load_result(obj, return_numpy):
             obj, _transformed_from_varbase, tuple_to_tensor
         )
     # If there is no tuple(name, ndarray), it is considered to be saved by paddle2.0
-    # or converted from LoDTensor, and all ndarrays are converted to tensor.
+    # or converted from DenseTensor, and all ndarrays are converted to tensor.
     else:
         return _parse_every_object(
             obj, _transformed_from_lodtensor, ndarray_to_tensor
@@ -764,7 +764,7 @@ def _save_binary_var(obj, path):
     elif isinstance(obj, core.eager.Tensor):
         _save_lod_tensor(obj.value().get_tensor(), path)
     else:
-        # Since the concept of 'Tensor' is only exposed to users, the error message can only contain tensor instead of 'LoDTensor' or 'SelectedRows'
+        # Since the concept of 'Tensor' is only exposed to users, the error message can only contain tensor instead of 'DenseTensor' or 'SelectedRows'
         raise NotImplementedError(
             f"When use_binary_format = True, `paddle.save`  expected Tensor, but received {type(obj)}."
         )

@@ -297,6 +297,10 @@ std::vector<ir::Var> GetAllLoopVars(const ir::Expr& root);
 
 ir::Expr GetBodyBlock(const ir::Expr& root);
 
+ir::Expr ReshapeLoop(const ir::Expr& root,
+                     const std::vector<symbol::DimExpr>& in_shape,
+                     const std::vector<symbol::DimExpr>& out_shape);
+
 }  // namespace trivial_fusion_detail
 }  // namespace pir
 }  // namespace framework

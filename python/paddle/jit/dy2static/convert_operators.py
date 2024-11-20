@@ -193,7 +193,7 @@ def convert_while_loop(
         _run_py_while(cond, body, getter, setter)
 
 
-def _convert_tensor_arrray_if_necessary(setterhelper, push_pop_names):
+def _convert_tensor_array_if_necessary(setterhelper, push_pop_names):
     push_pop_vars = setterhelper.get(push_pop_names)
     if push_pop_vars is None:
         return
@@ -219,7 +219,7 @@ def _run_paddle_while(
 ):
     # NOTE: loop_vars of Paddle op `control_flow.while_loop` must be Paddle Tensors.
     helper = GetterSetterHelper(getter, setter, return_name_ids, push_pop_names)
-    _convert_tensor_arrray_if_necessary(helper, push_pop_names)
+    _convert_tensor_array_if_necessary(helper, push_pop_names)
 
     union_name = (
         OrderedSet(return_name_ids) if return_name_ids else OrderedSet()
@@ -447,7 +447,7 @@ def _run_paddle_cond(
     helper = GetterSetterHelper(
         get_args, set_args, return_name_ids, push_pop_names
     )
-    _convert_tensor_arrray_if_necessary(helper, push_pop_names)
+    _convert_tensor_array_if_necessary(helper, push_pop_names)
     pred = cast_bool_if_necessary(pred)
     init_args = helper.get(return_name_ids)
     from paddle.jit.dy2static.program_translator import ProgramTranslator

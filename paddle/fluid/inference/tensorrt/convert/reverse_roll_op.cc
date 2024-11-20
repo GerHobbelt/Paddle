@@ -65,7 +65,7 @@ class ReverseRollOpConverter : public OpConverter {
       reverse_roll_layer = engine_->AddDynamicPlugin(&X, 1, plugin);
     } else {
       PADDLE_THROW(common::errors::InvalidArgument(
-          "ReverseROll TRT Plugin should run in dynamic shape."));
+          "ReverseRoll TRT Plugin should run in dynamic shape."));
     }
     auto output_name = op_desc.Output("Out").front();
     ReplenishLayerAndOutput(

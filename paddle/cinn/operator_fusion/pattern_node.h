@@ -93,6 +93,7 @@ struct PatternNode {
   void set_fusion_iters(const FusionItersSignature& fusion_iters) {
     fusion_iters_ = fusion_iters;
   }
+  FusionTrackerPtr fusion_tracker() { return GetFusionTracker(stmt_pattern_); }
 
  private:
   StmtPattern stmt_pattern_;

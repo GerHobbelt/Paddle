@@ -24,6 +24,39 @@ struct AlwaysTrue {
   }
 };
 
+struct NonSinkNodeMatcher {
+  bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
+    return !node->downstream().empty();
+  }
+};
+
+struct IsOutputNodeMatcher {
+  bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
+    bool res = IsAnyFirstInSecond(node->sink_op()->results(), graph.outputs());
+    return res;
+  }
+};
+
+template <int N>
+struct DownstreamSmallerThan {
+  bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
+    return node->downstream().size() < N;
+  }
+};
+
+template <int N>
+struct DownstreamGreaterThan {
+  bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
+    return node->downstream().size() > N;
+  }
+};
+
+struct OnlyOneDownstreamMatcher {
+  bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
+    return node->downstream().size() == 1;
+  }
+};
+
 template <typename StmtPattern>
 struct StmtPatternGraphMatcher {
   bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
@@ -139,7 +172,15 @@ struct RecomputeNodeMatcher {
       if (node->fusion_iters().output_values.size() > 1) {
         return false;
       }
-
+      bool has_combine_fusion =
+          std::any_of(node->fusion_tracker()->instructions_.begin(),
+                      node->fusion_tracker()->instructions_.end(),
+                      [](const FusionInstrPtr& instr) {
+                        return instr->type() == T_Combine;
+                      });
+      if (has_combine_fusion) {
+        return false;
+      }
       for (const auto& op : GetOpsInPattern(node->stmt_pattern())) {
         const auto& op_kind = GetOpPatternKind(op);
         if (op_kind >= hlir::framework::kReduction) {
@@ -183,9 +224,50 @@ struct TransposeOpMatcher {
   }
 };
 
-struct NonSinkNodeMatcher {
+struct ReshapeOpMatcher {
   bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
-    return !node->downstream().empty();
+    return (node->sink_op()->name() == "cinn_op.reshape");
+  }
+};
+
+struct ReshapeConnectionMatcher {
+  bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
+    bool upstream_match =
+        node->downstream().size() == 1 &&
+        node->downstream()[0]->sink_op()->name() == "cinn_op.reshape" &&
+        node->downstream()[0]->downstream().size() == 1;
+    bool downstream_match = node->sink_op()->name() == "cinn_op.reshape" &&
+                            node->downstream().size() == 1;
+    return upstream_match || downstream_match;
+  }
+};
+
+struct LeafReshapeConnectionMatcher {
+  bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
+    const auto match_upstream = [&graph](const PatternNodePtr& upstream) {
+      return StmtPatternGraphMatcher<TrivialPattern>()(graph, upstream) &&
+             upstream->downstream().size() == 1 &&
+             !upstream->upstream().empty() &&
+             std::any_of(upstream->upstream().begin(),
+                         upstream->upstream().end(),
+                         [&graph](const PatternNodePtr& node) {
+                           return DownstreamGreaterThan<1>()(graph, node);
+                         });
+    };
+    const auto match_downstream = [&graph](const PatternNodePtr& downstream) {
+      return downstream->sink_op()->name() == "cinn_op.reshape" &&
+             downstream->downstream().size() == 1 &&
+             downstream->downstream()[0]->downstream().empty() &&
+             downstream->fusion_iters().loop_iters ==
+                 downstream->downstream()[0]->fusion_iters().loop_iters;
+    };
+    bool upstream_match = match_upstream(node) &&
+                          node->downstream().size() == 1 &&
+                          match_downstream(node->downstream()[0]);
+    bool downstream_match = match_downstream(node) &&
+                            node->upstream().size() == 1 &&
+                            match_upstream(node->upstream()[0]);
+    return upstream_match || downstream_match;
   }
 };
 
@@ -206,26 +288,6 @@ struct NotAllElementWiseDownstreamMatcher {
   }
 };
 
-struct IsOutputNodeMatcher {
-  bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
-    bool res = IsAnyFirstInSecond(node->sink_op()->results(), graph.outputs());
-    return res;
-  }
-};
-
-template <int N>
-struct DownstreamSmallerThan {
-  bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
-    return node->downstream().size() < N;
-  }
-};
-
-template <int N>
-struct DownstreamGreaterThan {
-  bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
-    return node->downstream().size() > N;
-  }
-};
 template <typename... Args>
 struct And {};
 

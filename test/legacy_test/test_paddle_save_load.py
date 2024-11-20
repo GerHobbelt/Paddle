@@ -430,7 +430,7 @@ class TestSaveLoadAny(unittest.TestCase):
         # set_tensor(np.ndarray)
         set_value(var, np_static, scope)
         np.testing.assert_array_equal(origin_tensor, np.array(tensor))
-        # set_tensor(LoDTensor)
+        # set_tensor(DenseTensor)
         self.set_zero(prog, place, scope)
         set_value(var, lod_static, scope)
         np.testing.assert_array_equal(origin_tensor, np.array(tensor))

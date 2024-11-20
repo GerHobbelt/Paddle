@@ -392,7 +392,7 @@ class OpDequantBf16SquashPattern
 class CPUBf16QuantizeSquashPass : public pir::PatternRewritePass {
  public:
   CPUBf16QuantizeSquashPass()
-      : pir::PatternRewritePass("cpu_bf16_quantize_squash_pass", 3) {}
+      : pir::PatternRewritePass("cpu_bf16_quantize_squash_pass", 2) {}
 
   pir::RewritePatternSet InitializePatterns(pir::IrContext *context) override {
     pir::RewritePatternSet ps(context);

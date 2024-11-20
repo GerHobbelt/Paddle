@@ -533,6 +533,28 @@ class TestSetitemInDygraph(unittest.TestCase):
         else:
             np.testing.assert_equal(v.grad.numpy(), expected_v_grad)
 
+    def test_boolean_mask_scalar(self):
+        tensor_np = np.arange(2 * 3).reshape(2, 3)
+        tensor = paddle.to_tensor(tensor_np)
+        mask_np = np.array([[True, True, False], [False, True, False]])
+        mask = paddle.to_tensor(mask_np)
+        tensor[mask] = 100
+        tensor_np[mask_np] = 100
+        np.testing.assert_equal(tensor.numpy(), tensor_np)
+
+    def test_boolean_mask_tensor(self):
+        tensor_np = np.arange(2 * 3).reshape(2, 3)
+        tensor = paddle.to_tensor(tensor_np)
+        mask_np = np.array([[True, True, False], [False, True, False]]).astype(
+            'bool'
+        )
+        mask = paddle.to_tensor(mask_np)
+        value_np = np.array([100] * mask_np.sum())
+        value = paddle.to_tensor(value_np)
+        tensor[mask] = value
+        tensor_np[mask_np] = value_np
+        np.testing.assert_equal(tensor.numpy(), tensor_np)
+
 
 @unittest.skipIf(
     not core.is_compiled_with_cuda()
@@ -940,6 +962,38 @@ class TestSetitemInStatic(unittest.TestCase):
             res = self.exe.run(fetch_list=[y])
 
         np.testing.assert_allclose(res[0], np_data)
+
+    def test_boolean_mask_scalar(self):
+        tensor_np = np.arange(2 * 3).reshape(2, 3).astype('int32')
+        mask_np = np.array([[True, True, False], [False, True, False]]).astype(
+            'bool'
+        )
+        with paddle.static.program_guard(
+            paddle.static.Program(), paddle.static.Program()
+        ):
+            tensor = paddle.to_tensor(tensor_np)
+            mask = paddle.to_tensor(mask_np)
+            tensor[mask] = 100
+            res = self.exe.run(fetch_list=[tensor])
+        tensor_np[mask_np] = 100
+        np.testing.assert_equal(res[0], tensor_np)
+
+    def test_boolean_mask_tensor(self):
+        tensor_np = np.arange(2 * 3).reshape(2, 3).astype('int32')
+        mask_np = np.array([[True, True, False], [False, True, False]]).astype(
+            'bool'
+        )
+        value_np = np.array([100] * mask_np.sum()).astype('int32')
+        with paddle.static.program_guard(
+            paddle.static.Program(), paddle.static.Program()
+        ):
+            tensor = paddle.to_tensor(tensor_np)
+            mask = paddle.to_tensor(mask_np)
+            value = paddle.to_tensor(value_np)
+            tensor[mask] = value
+            res = self.exe.run(fetch_list=[tensor])
+        tensor_np[mask_np] = value_np
+        np.testing.assert_equal(res[0], tensor_np)
 
 
 if __name__ == '__main__':

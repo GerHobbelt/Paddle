@@ -557,7 +557,7 @@ void ReplaceAllReduceOp(const Node &node,
   // ### v0 = op0(grad0)
   // ### v1 = op1(grad1)
   // We should add the following dependency to ensure that op0 and op1 both run
-  // afer c_sum_allreduce:
+  // after c_sum_allreduce:
   // ### grad0 =  depend(grad0, fused_grad)
   // ### grad1 = depend(grad1, fused_grad)
   if (is_fused) {

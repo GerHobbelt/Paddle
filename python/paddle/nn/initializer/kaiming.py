@@ -321,7 +321,7 @@ class KaimingUniform(MSRAInitializer):
         x = gain \times \sqrt{\frac{3}{fan\_in}}
 
     Args:
-        fan_in (float32|None, optional): fan_in (in_features) of trainable Tensor, If None, it will be infered automaticly. If you don't want to use in_features of the Tensor, you can set the value of 'fan_in' smartly by yourself. Default is None.
+        fan_in (float32|None, optional): fan_in (in_features) of trainable Tensor, If None, it will be infered automatically. If you don't want to use in_features of the Tensor, you can set the value of 'fan_in' smartly by yourself. Default is None.
         negative_slope (float, optional): negative_slope (only used with leaky_relu). Default is 0.0.
         nonlinearity(str, optional): the non-linear function. Default is relu.
 

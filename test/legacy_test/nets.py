@@ -284,14 +284,14 @@ def sequence_conv_pool(
     """
         :api_attr: Static Graph
 
-    **This api takes input as an LoDTensor. If input is a Tensor, please use**
+    **This api takes input as an DenseTensor. If input is a Tensor, please use**
     :ref:`api_base_nets_simple_img_conv_pool` **instead**
 
     The sequence_conv_pool is composed of :ref:`api_base_layers_sequence_conv`
     and :ref:`api_base_layers_sequence_pool` .
 
     Args:
-        input (Tensor): 2-D LoDTensor, the input of sequence_conv,
+        input (Tensor): 2-D DenseTensor, the input of sequence_conv,
             which supports variable-time length input sequence.
             The underlying of input is a matrix with shape
             (T, N), where T is the total time steps in this mini-batch and N is
@@ -370,7 +370,7 @@ def glu(input, dim=-1):
     <https://arxiv.org/pdf/1612.08083.pdf>`_.
 
     Args:
-        input (Variable): The input variable which is a Tensor or LoDTensor.
+        input (Variable): The input variable which is a Tensor.
                           The supported data types include float32, float64
                           and float16 (only for GPU).
         dim (int, optional): The dimension along which to split. If :math:`dim < 0`, the

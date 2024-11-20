@@ -345,15 +345,18 @@ void IrNode::replace(Expr old_op, Expr new_op) {
 }
 
 void IrNode::convert_int32_to_int64() {
-  if (type_ != Int(64))
-    if (type_ != Int(32))
+  if (type_ != Int(64) && type_ != UInt(64))
+    if (type_ != Int(32) && type_ != UInt(32))
       PADDLE_ENFORCE_EQ(type_.is_unk(),
                         true,
                         ::common::errors::InvalidArgument(
                             "Current only support convert int32_t "
                             "to int64_t, but get type is: %s",
                             type_));
-  type_ = Int(64);
+
+  if (type_ == Int(32)) type_ = Int(64);
+  if (type_ == UInt(32)) type_ = UInt(64);
+
   for (Expr &operand : operands) {
     operand->convert_int32_to_int64();
   }

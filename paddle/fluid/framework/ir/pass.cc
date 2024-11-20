@@ -107,13 +107,13 @@ Graph *Pass::Apply(Graph *graph) const {
         attrs_.find(attr),
         attrs_.end(),
         common::errors::InvalidArgument(
-            "Required atrribute %s for pass < %s > is not set.", attr, Type()));
+            "Required attribute %s for pass < %s > is not set.", attr, Type()));
   }
   for (const std::string &attr : required_graph_attrs_) {
     PADDLE_ENFORCE_EQ(graph->Has(attr),
                       true,
                       common::errors::InvalidArgument(
-                          "Required atrribute %s for graph is not set.", attr));
+                          "Required attribute %s for graph is not set.", attr));
   }
   ApplyImpl(graph);
   // TODO(panyx0718): Add more verifications.

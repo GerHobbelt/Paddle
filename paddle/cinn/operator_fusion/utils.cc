@@ -177,4 +177,57 @@ std::vector<std::pair<size_t, size_t>> GetNonBroadCastDims(pir::Operation* op) {
   return res;
 }
 
+bool ShapeProductEqual(const std::vector<symbol::DimExpr>& in_shape,
+                       const std::vector<symbol::DimExpr>& out_shape,
+                       int in_start,
+                       int in_end,
+                       int out_start,
+                       int out_end) {
+  symbol::DimExpr in_product(1);
+  symbol::DimExpr out_product(1);
+  for (int i = in_start; i < in_end; ++i) {
+    in_product = in_product * in_shape[i];
+  }
+  for (int i = out_start; i < out_end; ++i) {
+    out_product = out_product * out_shape[i];
+  }
+  return symbol::SimplifyDimExpr(in_product) ==
+         symbol::SimplifyDimExpr(out_product);
+}
+
+std::vector<std::pair<int, int>> PartionReshapeAxes(
+    const std::vector<symbol::DimExpr>& in_shape,
+    const std::vector<symbol::DimExpr>& out_shape) {
+  PADDLE_ENFORCE(
+      ShapeProductEqual(
+          in_shape, out_shape, 0, in_shape.size(), 0, out_shape.size()),
+      ::common::errors::InvalidArgument(
+          "Shape product should be equal for reshape operation."));
+
+  int input_rank = in_shape.size();
+  int output_rank = out_shape.size();
+  std::vector<std::pair<int, int>> partion = {{0, 0}};
+  for (int i = 1, j = 1; i <= in_shape.size() && j <= out_shape.size();) {
+    bool shape_product_equal = ShapeProductEqual(
+        in_shape, out_shape, partion.back().first, i, partion.back().second, j);
+    if (shape_product_equal) {
+      partion.emplace_back(i++, j++);
+      if (i > input_rank || j > output_rank) {
+        // In case of the last few dims are 1
+        partion.back().first = input_rank;
+        partion.back().second = output_rank;
+      }
+    } else if (j < output_rank) {
+      j++;
+    } else if (i < input_rank) {
+      i++;
+      j = partion.back().second + 1;
+    } else {
+      PADDLE_THROW(::common::errors::InvalidArgument(
+          "Shape product should be equal for reshape operation."));
+    }
+  }
+  return partion;
+}
+
 }  // namespace cinn::fusion

@@ -214,7 +214,7 @@ def array_write(
 
     Args:
         x (Tensor): The input data to be written into array. It's multi-dimensional
-            Tensor or LoDTensor. Data type: float32, float64, int32, int64 and bool.
+            Tensor. Data type: float32, float64, int32, int64 and bool.
         i (Tensor): 0-D Tensor with shape [], which represents the position into which
             ``x`` is written.
         array (list|Tensor, optional): The array into which ``x`` is written. The default value is None,

@@ -221,7 +221,7 @@ class ShuffleChannelDetectPattern : public paddle::drr::DrrPatternBase {
 class ShuffleChannelDetectPass : public pir::PatternRewritePass {
  public:
   ShuffleChannelDetectPass()
-      : pir::PatternRewritePass("shuffle_channel_detect_pass", 3) {}
+      : pir::PatternRewritePass("shuffle_channel_detect_pass", 2) {}
 
   pir::RewritePatternSet InitializePatterns(pir::IrContext *context) override {
     pir::RewritePatternSet ps(context);

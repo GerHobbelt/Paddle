@@ -987,7 +987,7 @@ int GpuPsGraphTable::init_cpu_table(
  gpu i triggers a neighbor_sample task,
  when this task is done,
  this function is called to move the sample result on other gpu back
- to gup i and aggragate the result.
+ to gup i and aggregate the result.
  the sample_result is saved on src_sample_res and the actual sample size for
  each node is saved on actual_sample_size.
  the number of actual sample_result for

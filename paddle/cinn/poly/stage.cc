@@ -956,7 +956,7 @@ Iterator Stage::Fuse(const std::vector<Iterator> &levels) {
           offsets.back() + 1,
           offset,
           ::common::errors::InvalidArgument(
-              "level offsets.back and level offset should be adjancent"));
+              "level offsets.back and level offset should be adjacent"));
     AssertAxisIsNotLocked(offset);
     offsets.push_back(offset);
     new_iter_name += utils::StringFormat("%s_", level.id.c_str());

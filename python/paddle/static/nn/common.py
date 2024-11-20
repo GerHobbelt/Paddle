@@ -426,7 +426,7 @@ def continuous_value_model(input, cvm, use_cvm=True):
         use_cvm  (bool):  Use show_click or not. if use, the output dim is the same as input.
                           if not use, the output dim is `input dim - 2` (remove show and click)
     Returns:
-        Variable: A 2-D LodTensor with shape :math:`[N, M]` . if :attr:`use_cvm` = True, M is equal to input dim D. if False, M is equal to `D - 2`. \
+        Variable: A 2-D DenseTensor with shape :math:`[N, M]` . if :attr:`use_cvm` = True, M is equal to input dim D. if False, M is equal to `D - 2`. \
         A Tensor with same type as input.
     Examples:
         .. code-block:: python
@@ -3384,7 +3384,8 @@ def row_conv(input, future_context_size, param_attr=None, act=None):
 
         .. code-block:: python
 
-            >>> # for LodTensor inputs
+            >>> # doctest: +SKIP("This has diff in xdoctest env")
+            >>> # for DenseTensor inputs
             >>> import paddle
             >>> paddle.enable_static()
             >>> x = paddle.static.data(name='x', shape=[9, 16],
@@ -3735,7 +3736,7 @@ def embedding(
             input.data = [[1], [3], [2], [4], [0]]
             input.shape = [5, 1]
         Given size = [128, 16]
-        output is a LoDTensor:
+        output is a DenseTensor:
             out.lod = [[2, 3]]
             out.shape = [5, 1, 16]
             out.data = [[[0.129435295, 0.244512452, ..., 0.436322452]],
@@ -3891,7 +3892,7 @@ def sparse_embedding(
             input.data = [[1], [3], [2], [4], [0]]
             input.shape = [5, 1]
         Given size = [128, 16]
-        output is a LoDTensor:
+        output is a DenseTensor:
             out.lod = [[2, 3]]
             out.shape = [5, 1, 16]
             out.data = [[[0.129435295, 0.244512452, ..., 0.436322452]],

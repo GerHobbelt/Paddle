@@ -550,7 +550,7 @@ def create_mask(
     t = tensor.astype(float)
 
     assert isinstance(func_name, MaskAlgo), (
-        "func_name argumet of create_mask is only accepted as type MaskAlgo. "
+        "func_name argument of create_mask is only accepted as type MaskAlgo. "
         f"But got {type(func_name)}"
     )
     func = getattr(sys.modules[__name__], func_name.value, None)

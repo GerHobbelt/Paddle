@@ -102,7 +102,7 @@ class PatternCreator {
 
 class OneDNNPlacementPass : public pir::PatternRewritePass {
  public:
-  OneDNNPlacementPass() : pir::PatternRewritePass("onednn_placement_pass", 3) {}
+  OneDNNPlacementPass() : pir::PatternRewritePass("onednn_placement_pass", 2) {}
 
   pir::RewritePatternSet InitializePatterns(pir::IrContext *context) override {
     pir::RewritePatternSet ps(context);

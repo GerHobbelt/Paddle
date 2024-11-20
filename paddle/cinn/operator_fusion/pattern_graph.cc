@@ -136,8 +136,8 @@ std::vector<PatternNodePtr> PatternGraph::SortByReverseTopoOrder() const {
 void PatternGraph::SinkTrivialPattern() {
   GraphTransformer<NodePattern,
                    And<StmtPatternGraphMatcher<TrivialPattern>,
-                       DownstreamSmallerThan<2>,
-                       NonSinkNodeMatcher>,
+                       OnlyOneDownstreamMatcher,
+                       Not<ReshapeConnectionMatcher>>,
                    MergeTrivialPatternOperation>(this);
 
   // TODO(huangjiyi): remove sink multi downstream transpose after
@@ -151,8 +151,24 @@ void PatternGraph::SinkTrivialPattern() {
   // TODO(huangjiyi): Only sink to the related iters pattern.
   GraphTransformer<NodePattern,
                    And<StmtPatternGraphMatcher<TrivialPattern>,
-                       DownstreamHasItersRelationMatcher>,
+                       DownstreamHasItersRelationMatcher,
+                       Not<ReshapeConnectionMatcher>>,
                    MergeTrivialPatternOperation>(this);
+
+  // Sink non-leaf reshape pattern.
+  GraphTransformer<
+      NodePattern,
+      And<StmtPatternGraphMatcher<TrivialPattern>,
+          Or<OnlyOneDownstreamMatcher, DownstreamHasItersRelationMatcher>,
+          Not<LeafReshapeConnectionMatcher>>,
+      MergeTrivialPatternOperation>(this);
+
+  // Align leaf reshape pattern to the input shape
+  GraphTransformer<NodePattern,
+                   And<StmtPatternGraphMatcher<TrivialPattern>,
+                       ReshapeOpMatcher,
+                       LeafReshapeConnectionMatcher>,
+                   ReshapeAlignInputOperation>(this);
 }
 
 void PatternGraph::ReduceLiftReduceTree() {

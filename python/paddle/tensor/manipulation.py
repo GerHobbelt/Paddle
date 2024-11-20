@@ -1660,7 +1660,7 @@ def flip(
         :align: center
 
     Args:
-        x (Tensor): A Tensor(or LoDTensor) with shape :math:`[N_1, N_2,..., N_k]` . The data type of the input Tensor x
+        x (Tensor): A Tensor with shape :math:`[N_1, N_2,..., N_k]` . The data type of the input Tensor x
             should be float32, float64, int32, int64, bool.
         axis (list|tuple|int): The axis(axes) to flip on. Negative indices for indexing from the end are accepted.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
@@ -1671,6 +1671,7 @@ def flip(
     Examples:
         .. code-block:: python
 
+            >>> # doctest: +SKIP("This has diff in xdoctest env")
             >>> import paddle
 
             >>> image_shape=(3, 2, 2)
@@ -1734,7 +1735,7 @@ def rot90(
     Rotate a n-D tensor by 90 degrees. The rotation direction and times are specified by axes and the absolute value of k. Rotation direction is from axes[0] towards axes[1] if k > 0, and from axes[1] towards axes[0] for k < 0.
 
     Args:
-        x (Tensor): The input Tensor(or LoDTensor). The data type of the input Tensor x
+        x (Tensor): The input Tensor. The data type of the input Tensor x
             should be float16, float32, float64, int32, int64, bool. float16 is only supported on gpu.
         k (int, optional): Direction and number of times to rotate, default value: 1.
         axes (list|tuple, optional): Axes to rotate, dimension must be 2. default value: [0, 1].

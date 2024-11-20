@@ -49,7 +49,9 @@ struct FusionItersManager {
   bool IterSymbolEqual(const std::string& lhs, const std::string& rhs);
   bool IterSymbolEqualOne(const std::string& sym);
 
+  std::vector<std::string> GetValueIters(const pir::Value& value);
   symbol::DimExpr GetIterSymbol(const std::string& iter);
+  std::vector<symbol::DimExpr> GetIterSymbols(const FusionIters& iters);
   symbol::DimExpr GetReduceDimsProduct(const FusionItersSignature& sig);
 
   auto related_iters_map() const { return related_iters_; }

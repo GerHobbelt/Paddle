@@ -79,7 +79,7 @@ void CheckValues(T* expect,
   }
 }
 
-// Here, we create 4 LoDTensors and use save_combine_op to first save these
+// Here, we create 4 DenseTensors and use save_combine_op to first save these
 // in a single file. Then, we use load_combine_op to load these sequentially
 template <typename T, typename U>
 void SaveLoadCombineOp() {

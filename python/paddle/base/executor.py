@@ -257,7 +257,7 @@ def check_feed_shape_type(var, feed, num_places=1):
 
     Args:
         var (Variable): the Variable object
-        feed (LoDTensor): the fed value, which must be a LoDTensor
+        feed (DenseTensor): the fed value, which must be a DenseTensor
         num_places: an integer value indicating the number of places.
             ParallelExecutor will divide data into devices (CPU/GPU) evenly.
     Returns:
@@ -303,7 +303,7 @@ def pir_check_feed_shape_type(feed, name, target_shape, dtype, num_places=1):
        is compatible with any number.
 
     Args:
-        feed (LoDTensor): the fed value, which must be a LoDTensor
+        feed (DenseTensor): the fed value, which must be a DenseTensor
         name (str): name of the variable
         target_shape (list): the shape that will be compared with feed
         dtype (core.VarDesc.VarType): the dtype that will be compared with feed
@@ -395,7 +395,7 @@ def has_fetch_operators(
         fetch_targets: a dictionary of {fetch_target_name: fetch_target_data}
         fetch_holder_name: the name of the variable that holds the data of
             all fetch targets. The type of this fetch_holder variable is
-            FETCH_LIST, which is essentially vector<LoDTensor>.
+            FETCH_LIST, which is essentially vector<DenseTensor>.
         fetch_op: the operator name of fetch
 
     Return:
@@ -601,7 +601,7 @@ def _fetch_var(name, scope=None, return_numpy=True):
             Default True.
 
     Returns:
-       LodTensor|numpy.ndarray
+       DenseTensor|numpy.ndarray
     """
     assert isinstance(name, str)
     if scope is None:
@@ -737,7 +737,7 @@ def _as_lodtensor(data, place, dtype=None):
         dtype(core.VarDesc.VarType|str): the expected data type of created tensor
 
     Returns:
-        LoDTensor
+        DenseTensor
     """
     # NOTE(zhiqiu): convert python builtin, like float, int, and list, to numpy ndarray
     if not isinstance(data, np.ndarray):
@@ -840,7 +840,7 @@ class _StandaloneExecutor:
                 after the model runs. The default is None.
             return_numpy(bool): This parameter indicates whether convert the fetched Tensors
                 (the Tensor specified in the fetch list) to numpy.ndarray. if it is False,
-                the type of the return value is a list of :code:`LoDTensor`. The default is True.
+                the type of the return value is a list of :code:`DenseTensor`. The default is True.
         """
         tensors = self._new_exe.run(
             feed_names, enable_job_schedule_profiler
@@ -1777,7 +1777,7 @@ class Executor:
                 it to different scope. default is :code:`paddle.static.global_scope()`
             return_numpy(bool): This parameter indicates whether convert the fetched Tensors
                 (the Tensor specified in the fetch list) to numpy.ndarray. if it is False,
-                the type of the return value is a list of :code:`LoDTensor`. The default is True.
+                the type of the return value is a list of :code:`DenseTensor`. The default is True.
             use_program_cache(bool): This parameter indicates whether the input :code:`Program` is cached.
                 If the parameter is True, the model may run faster in the following cases:
                 the input program is :code:`paddle.static.Program`, and the parameters(program, feed Tensor name
@@ -1800,6 +1800,7 @@ class Executor:
             .. code-block:: python
                 :name: code-example-1
 
+                >>> # doctest: +SKIP("This has diff in xdoctest env")
                 >>> import paddle
                 >>> import numpy
 
@@ -1832,6 +1833,7 @@ class Executor:
             .. code-block:: python
                 :name: code-example-2
 
+                >>> # doctest: +SKIP("This has diff in xdoctest env")
                 >>> # doctest: +REQUIRES(env:GPU)
                 >>> import paddle
                 >>> import numpy as np

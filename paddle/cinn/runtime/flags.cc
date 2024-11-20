@@ -296,8 +296,8 @@ PD_DEFINE_bool(cinn_check_tensor_buffer_map,
                BoolFromEnv("FLAGS_cinn_check_tensor_buffer_map", false),
                "Whether to check tensor buffer mapping in cinn ir.");
 
-PD_DEFINE_bool(cinn_longlong2int_for_integer,
-               BoolFromEnv("FLAGS_cinn_longlong2int_for_integer", true),
+PD_DEFINE_bool(cinn_longlong2int,
+               BoolFromEnv("FLAGS_cinn_longlong2int", true),
                "Whether to cast long long to int for integer.");
 
 namespace cinn {

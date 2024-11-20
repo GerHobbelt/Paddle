@@ -2493,7 +2493,7 @@ def histogram(
     If min and max are both zero, the minimum and maximum values of the data are used.
 
     Args:
-        input (Tensor): A Tensor(or LoDTensor) with shape :math:`[N_1, N_2,..., N_k]` . The data type of the input Tensor
+        input (Tensor): A Tensor with shape :math:`[N_1, N_2,..., N_k]` . The data type of the input Tensor
             should be float32, float64, int32, int64.
         bins (int, optional): number of histogram bins. Default: 100.
         min (int, optional): lower end of the range (inclusive). Default: 0.

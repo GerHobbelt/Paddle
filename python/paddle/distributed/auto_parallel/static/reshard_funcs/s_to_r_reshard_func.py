@@ -266,7 +266,7 @@ class SToRReshardFunction(ReshardFunction):
                 pd_splite_op.dist_attr, new_chunk_id=chunk_id
             )
 
-            # fix the split_with_num dist attribtue.
+            # fix the split_with_num dist attribute.
             new_inner_types = []
             for sub_value in split_values:
                 new_inner_type = paddle.base.libpaddle.pir.cvt_to_dist_type(

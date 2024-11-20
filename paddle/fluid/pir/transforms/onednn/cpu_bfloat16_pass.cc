@@ -2072,7 +2072,7 @@ class CastBf16Pattern : public pir::OpRewritePattern<OpType> {
 
 class CpuBfloat16Pass : public pir::PatternRewritePass {
  public:
-  CpuBfloat16Pass() : pir::PatternRewritePass("cpu_bfloat16_pass", 3) {}
+  CpuBfloat16Pass() : pir::PatternRewritePass("cpu_bfloat16_pass", 2) {}
 
   pir::RewritePatternSet InitializePatterns(pir::IrContext *context) override {
     pir::RewritePatternSet ps(context);

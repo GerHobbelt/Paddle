@@ -448,7 +448,7 @@ class RemoveUnsupportedOpPattern : public pir::RewritePattern {
 class OneDNNPlacementBf16Pass : public pir::PatternRewritePass {
  public:
   OneDNNPlacementBf16Pass()
-      : pir::PatternRewritePass("cpu_bfloat16_placement_pass", 3) {}
+      : pir::PatternRewritePass("cpu_bfloat16_placement_pass", 2) {}
 
   pir::RewritePatternSet InitializePatterns(pir::IrContext* context) override {
     pir::RewritePatternSet ps(context);
