@@ -1553,6 +1553,18 @@
     data_type : out_grad
   inplace : (out_grad -> x_grad)
 
+- backward_op : index_put_double_grad
+  forward : index_put_grad (Tensor x, Tensor[] indices, Tensor value, Tensor out_grad, bool accumulate=false) -> Tensor(grad_x), Tensor(grad_value)
+  args : (Tensor x, Tensor[] indices, Tensor value, Tensor grad_x_grad, Tensor grad_value_grad, bool accumulate=false)
+  output : Tensor(out_grad_grad)
+  infer_meta :
+    func : UnchangedInferMeta
+    param: [x]
+  data_transform :
+    skip_transform : indices
+  composite : index_put_double_grad(x, indices, value, grad_x_grad, grad_value_grad, accumulate, out_grad_grad)
+  optional: grad_x_grad, grad_value_grad
+
 - backward_op : index_put_grad
   forward : index_put (Tensor x, Tensor[] indices, Tensor value, bool accumulate=false) -> Tensor(out)
   args : (Tensor x, Tensor[] indices, Tensor value, Tensor out_grad, bool accumulate=false)
@@ -1564,6 +1576,7 @@
     data_type : out_grad
   data_transform :
     skip_transform : indices
+  backward : index_put_double_grad
 
 - backward_op : index_sample_grad
   forward : index_sample (Tensor x, Tensor index) -> Tensor(out)

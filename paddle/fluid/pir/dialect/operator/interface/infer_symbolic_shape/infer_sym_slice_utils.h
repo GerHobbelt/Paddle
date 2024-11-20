@@ -249,8 +249,9 @@ inline ShapeOrData SliceRawInferSymbolicShape(
                               ? GetDataDimExprs()
                               : GetShapeDimExprs();
   if (out_shape.data().has_value() && out_shape.shape().empty()) {  // 0D tensor
-    const auto &out_ddim =
-        out.type().dyn_cast<paddle::dialect::DenseTensorType>().dims();
+    const paddle::dialect::DenseTensorType &tensor_type =
+        out.type().dyn_cast<paddle::dialect::DenseTensorType>();
+    const auto &out_ddim = tensor_type.dims();
     if (out_ddim.size() == 1 && out_ddim[0] == 1) {  // value is 1D
       return symbol::ShapeOrDataDimExprs{symbol::TensorShapeOrDataDimExprs(
           std::vector<symbol::DimExpr>{1}, out_shape.data().value())};

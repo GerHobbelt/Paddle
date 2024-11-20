@@ -102,6 +102,8 @@ class CodeGenC : public ir::IrPrinter {
 #define __DEFINE_VISIT(op__) void Visit(const ir::op__* op) override;
   NODETY_FORALL(__DEFINE_VISIT)
 #undef __DEFINE_VISIT
+  void Visit(const ir::_Module_* op) override;
+  void Visit(const ir::_LoweredFunc_* op) override;
 
 #define __DEFINE_VISIT(op__) \
   void Visit(const ir::intrinsics::op__* op) override;

@@ -53,7 +53,6 @@ class TensorRTBaseTest(unittest.TestCase):
                     for sub_arg_name, sub_arg_value in self.api_args[
                         feed_name
                     ].items():
-
                         if (
                             feed_name in self.min_shape.keys()
                             and feed_name in self.max_shape.keys()

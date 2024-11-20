@@ -256,7 +256,7 @@ TEST(EagerUtils, PassStopGradient) {
       auto_grad0->StopGradient(),
       false,
       ::common::errors::InvalidArgument(
-          "Expected auto_grad0->StopGradient() to be false, but recieved %d.",
+          "Expected auto_grad0->StopGradient() to be false, but received %d.",
           auto_grad0->StopGradient()));
   egr::EagerUtils::PassStopGradient(true,
                                     auto_grad0.get(),
@@ -267,25 +267,25 @@ TEST(EagerUtils, PassStopGradient) {
       auto_grad0->StopGradient(),
       true,
       ::common::errors::InvalidArgument(
-          "Expected auto_grad0->StopGradient() to be true, but recieved %d.",
+          "Expected auto_grad0->StopGradient() to be true, but received %d.",
           auto_grad0->StopGradient()));
   PADDLE_ENFORCE_EQ(
       auto_grad1->StopGradient(),
       true,
       ::common::errors::InvalidArgument(
-          "Expected auto_grad1->StopGradient() to be true, but recieved %d.",
+          "Expected auto_grad1->StopGradient() to be true, but received %d.",
           auto_grad1->StopGradient()));
   PADDLE_ENFORCE_EQ(
       auto_grad2->StopGradient(),
       true,
       ::common::errors::InvalidArgument(
-          "Expected auto_grad2->StopGradient() to be true, but recieved %d.",
+          "Expected auto_grad2->StopGradient() to be true, but received %d.",
           auto_grad2->StopGradient()));
   PADDLE_ENFORCE_EQ(
       auto_grad3->StopGradient(),
       true,
       ::common::errors::InvalidArgument(
-          "Expected auto_grad3->StopGradient() to be true, but recieved %d.",
+          "Expected auto_grad3->StopGradient() to be true, but received %d.",
           auto_grad3->StopGradient()));
 }
 

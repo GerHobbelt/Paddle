@@ -374,7 +374,7 @@ def fp8_fp8_half_gemm_fused(
                     dtype='bfloat16'
                 )
             else:
-                raise ValueError("The output_dtype must be float16 or bfloa16")
+                raise ValueError("The output_dtype must be float16 or bfloat16")
 
             helper.append_op(
                 type='fp8_fp8_half_gemm_fused',
@@ -408,7 +408,7 @@ def fp8_fp8_half_gemm_fused(
                     bias, 'bias', ['bfloat16'], 'fp8_fp8_half_gemm_fused'
                 )
             else:
-                raise ValueError("The output_dtype must be float16 or bfloa16")
+                raise ValueError("The output_dtype must be float16 or bfloat16")
 
             helper = LayerHelper('fp8_fp8_half_gemm_fused', **locals())
 
@@ -419,7 +419,7 @@ def fp8_fp8_half_gemm_fused(
                     dtype='bfloat16'
                 )
             else:
-                raise ValueError("The output_dtype must be float16 or bfloa16")
+                raise ValueError("The output_dtype must be float16 or bfloat16")
 
             helper.append_op(
                 type='fp8_fp8_half_gemm_fused',

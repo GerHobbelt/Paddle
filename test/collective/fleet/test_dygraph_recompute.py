@@ -149,7 +149,7 @@ def run_model(
     )
 
     if enable_autocast:
-        scaler = paddle.amp.GradScaler()
+        scaler = paddle.amp.GradScaler(init_loss_scaling=4096)
 
     loss_ = []
     param_ = []
@@ -268,7 +268,9 @@ class TestPyLayer(unittest.TestCase):
         self.test_base_case(enable_autocast=True, pure_fp16=True)
 
     def test_recompute_kwargs(self):
-        paddle.set_device("gpu")
+        paddle.set_device(
+            "xpu" if paddle.base.core.is_compiled_with_xpu() else "gpu"
+        )
         kwargs = {"is_test": False}
         with self.assertRaises(TypeError):
             loss_ref, param_ref, grad_ref = run_model(

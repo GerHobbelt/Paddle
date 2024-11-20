@@ -194,10 +194,6 @@ void VerifyDenseBlock(pir::Block* block) {
 }
 
 void DistToDensePass(pir::Program* prog) {
-  if (FLAGS_print_ir) {
-    VLOG(0) << "IR before DistToDense Pass = " << *prog;
-  }
-
   pir::IrContext* ctx = pir::IrContext::Instance();
   ctx->GetOrRegisterDialect<OperatorDialect>();
   ctx->GetOrRegisterDialect<DistDialect>();

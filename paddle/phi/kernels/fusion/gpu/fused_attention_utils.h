@@ -15,7 +15,9 @@
 #pragma once
 
 #if defined(PADDLE_WITH_NCCL) || defined(PADDLE_WITH_RCCL)
+#include "paddle/phi/core/distributed/collective/process_group.h"
 #include "paddle/phi/core/distributed/nccl_comm_context.h"
+#include "paddle/phi/kernels/funcs/reduce_function.h"
 #endif
 #include "paddle/common/errors.h"
 #include "paddle/phi/core/platform/collective_helper.h"
@@ -30,25 +32,23 @@ static void AllReduce(phi::DenseTensor &tensor,  // NOLINT
                       const phi::GPUContext &dev_ctx) {
   if (ring_id == -1) return;
 #if defined(PADDLE_WITH_NCCL) || defined(PADDLE_WITH_RCCL)
-  auto dtype = phi::ToNCCLDataType(tensor.dtype());
-  int64_t numel = tensor.numel();
-  const void *sendbuff = tensor.data<T>();
-  auto place = dev_ctx.GetPlace();
-  void *recvbuff =
-      dev_ctx.template Alloc<T>(&tensor, tensor.numel() * sizeof(T));
-
-  gpuStream_t stream = dev_ctx.stream();
-  paddle::platform::NCCLComm *comm = nullptr;
-  phi::distributed::NCCLCommContext *comm_ctx = nullptr;
-  comm_ctx = static_cast<phi::distributed::NCCLCommContext *>(
-      dev_ctx.GetCommContext());
-  if (comm_ctx) {
-    comm_ctx->AllReduce(&tensor, tensor, ncclSum, stream);
+  distributed::ProcessGroup *pg = nullptr;
+  auto map = distributed::ProcessGroupMapFromGid::getInstance();
+  if (map->has(ring_id)) {
+    // Use ProcessGroup
+    pg = map->get(ring_id);
   } else {
-    comm = paddle::platform::NCCLCommContext::Instance().Get(ring_id, place);
-    PADDLE_ENFORCE_GPU_SUCCESS(phi::dynload::ncclAllReduce(
-        sendbuff, recvbuff, numel, dtype, ncclSum, comm->comm(), stream));
+    PADDLE_THROW(common::errors::Unimplemented(
+        "ring_id %d is not in ProcessGroupMap, please check releated"
+        "configurations and retry.",
+        ring_id));
   }
+
+  distributed::AllreduceOptions opts;
+  opts.reduce_op = distributed::ReduceOp::SUM;
+  auto task = pg->AllReduce(&tensor, tensor, opts, false, false);
+  task->Wait();
+
 #else
   PADDLE_THROW(common::errors::Unimplemented(
       "PaddlePaddle should compile with NCCL or RCCL when used tensor model "

@@ -1180,26 +1180,6 @@ struct ScheduleBlockRealize : public ExprNode<ScheduleBlockRealize> {
 };
 
 /**
- * Content of a module.
- */
-struct _Module_ : public ExprNode<_Module_> {
-  std::string name;
-  Target target;
-  std::vector<Expr> buffers;
-  std::vector<Expr> functions;
-  std::vector<Expr> submodules;
-  std::vector<Expr> predicates;
-  std::vector<int> priorities;
-  Expr infer_shape_func;
-
-  static ir::Module Make(const std::string& name, Target target);
-
-  void Verify() const override {}
-
-  static const IrNodeTy _node_type_ = IrNodeTy::_Module_;
-};
-
-/**
  * \brief PrimitiveNode holds the concept of Primitive in CINN.
  * A Primitive is a basic Call to some Expr function, it is introduced to create
  * several level of coarsed-grained IR nodes for better IR optimization and

@@ -20,6 +20,7 @@
 #include "paddle/cinn/ir/intrinsic_ops.h"
 #include "paddle/cinn/ir/ir.h"
 #include "paddle/cinn/ir/ir_visitor.h"
+#include "paddle/cinn/ir/module.h"
 
 namespace cinn {
 namespace ir {
@@ -29,6 +30,9 @@ template <typename T = Expr *>
 class IRMutator : public IRVisitorRequireReImpl<void, T> {
  public:
   void Visit(const Expr *expr, T op) override;
+
+  virtual void Visit(_Module_ *op);
+  virtual void Visit(_LoweredFunc_ *op);
 
 #define __(op__) void Visit(const op__ *op, T expr) override;
   NODETY_FORALL(__)
@@ -126,18 +130,23 @@ void IRMutator<T>::Visit(const Call *expr, T op) {
   }
 }
 template <typename T>
-void IRMutator<T>::Visit(const _Module_ *expr, T op) {
-  auto *node = op->template As<_Module_>();
-  for (auto &func : node->functions) {
+void IRMutator<T>::Visit(_Module_ *module) {
+  for (auto &func : module->functions) {
+    this->Visit(func.As<_LoweredFunc_>());
+  }
+  for (auto &func : module->buffers) {
     IRVisitorRequireReImpl<void, T>::Visit(&func, &func);
   }
-  for (auto &func : node->buffers) {
-    IRVisitorRequireReImpl<void, T>::Visit(&func, &func);
-  }
-  for (auto &expr : node->submodules) {
-    IRVisitorRequireReImpl<void, T>::Visit(&expr, &expr);
+  for (auto &submodule : module->submodules) {
+    this->Visit(submodule.As<_Module_>());
   }
 }
+
+template <typename T>
+void IRMutator<T>::Visit(_LoweredFunc_ *lower_func) {
+  IRVisitorRequireReImpl<void, T>::Visit(&lower_func->body, &lower_func->body);
+}
+
 template <typename T>
 void IRMutator<T>::Visit(const _Var_ *expr, T op) {
   auto *node = op->template As<ir::_Var_>();
@@ -205,11 +214,6 @@ void IRMutator<T>::Visit(const _Tensor_ *expr, T op) {
   for (auto &e : node->shape) {
     IRVisitorRequireReImpl<void, T>::Visit(&e, &e);
   }
-}
-template <typename T>
-void IRMutator<T>::Visit(const _LoweredFunc_ *expr, T op) {
-  auto *node = op->template As<_LoweredFunc_>();
-  IRVisitorRequireReImpl<void, T>::Visit(&node->body, &node->body);
 }
 template <typename T>
 void IRMutator<T>::Visit(const Let *expr, T op) {

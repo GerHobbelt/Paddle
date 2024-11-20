@@ -264,11 +264,13 @@ void DependencyBuilder::AddDependencyForCommunicationOp() {
   // c_allreduce_sum(b)
   // c_allreduce_sum(c)
   // c_sync_comm_stream(a)
-  const std::string kSyncComm = "c_sync_comm_stream";
+  const std::string kCSyncComm = "c_sync_comm_stream";
+  const std::string kSyncComm = "sync_comm_stream";
   dependence_op_idx = ULLONG_MAX;
   for (size_t op_idx = 0; op_idx < op_num_; ++op_idx) {
     if (instructions_->at(op_idx).OpBaseValid() &&
-        instructions_->at(op_idx).OpBase()->Type() == kSyncComm) {
+        (instructions_->at(op_idx).OpBase()->Type() == kCSyncComm ||
+         instructions_->at(op_idx).OpBase()->Type() == kSyncComm)) {
       dependence_op_idx = op_idx;
     } else {
       if (dependence_op_idx != ULLONG_MAX) {
@@ -1135,7 +1137,8 @@ void DependencyBuilderSimplify::AddDependencyForCommunicationOp() {
    }
   }
  */
-  const std::string kSyncComm = "c_sync_comm_stream";
+  const std::string kCSyncComm = "c_sync_comm_stream";
+  const std::string kSyncComm = "sync_comm_stream";
   std::vector<size_t> com_op_vector;
   std::vector<size_t> sync_com_op_vector;
   for (auto op_idx : ops_list) {
@@ -1146,7 +1149,8 @@ void DependencyBuilderSimplify::AddDependencyForCommunicationOp() {
       }
     }
 
-    if (_ops_ptr->at(op_idx)->Type() == kSyncComm) {
+    if (_ops_ptr->at(op_idx)->Type() == kCSyncComm ||
+        _ops_ptr->at(op_idx)->Type() == kSyncComm) {
       for (auto com_op_id : com_op_vector) {
         if (com_op_id < op_idx) {
           AddDownstreamOp(com_op_id, op_idx);
@@ -1223,7 +1227,8 @@ void DependencyBuilderSimplify::AddDependencyForReadOp() {
 // for speed up com and calc parallel
 void DependencyBuilderSimplify::AddDependencyForBroadcastOp() {
   const std::string broadcast = "c_broadcast";
-  const std::string kSyncComm = "c_sync_comm_stream";
+  const std::string kCSyncComm = "c_sync_comm_stream";
+  const std::string kSyncComm = "sync_comm_stream";
   std::vector<size_t> op_between_broadcast_and_sync;
   std::vector<size_t> op_broadcast;
   size_t index = 0;
@@ -1231,7 +1236,8 @@ void DependencyBuilderSimplify::AddDependencyForBroadcastOp() {
     if (_ops_ptr->at(op_idx)->Type() == broadcast) {
       op_broadcast.push_back(op_idx);
       op_between_broadcast_and_sync.clear();
-    } else if (_ops_ptr->at(op_idx)->Type() == kSyncComm) {
+    } else if (_ops_ptr->at(op_idx)->Type() == kCSyncComm ||
+               _ops_ptr->at(op_idx)->Type() == kSyncComm) {
       op_broadcast.clear();
       for (auto op : op_between_broadcast_and_sync) {
         AddDownstreamOp(op, op_idx);
@@ -1276,7 +1282,7 @@ void DependencyBuilderSimplify::SetSameStream() {
   if (last_pos > 0) {
     for (size_t i = last_pos + 1; i < op_num_; i++) {
       std::string op_name = _ops_ptr->at(i)->Type();
-      if (op_name == "c_sync_comm_stream") {
+      if (op_name == "c_sync_comm_stream" || op_name == "sync_comm_stream") {
         for (auto it : _ops_ptr->at(i)->Inputs()) {
           for (auto var : it.second) {
             if (inputs.count(var) == 0) {

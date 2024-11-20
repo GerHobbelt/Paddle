@@ -80,6 +80,7 @@ DEFINE_GENERAL_PATTERN(Hardswish, paddle::dialect::HardswishOp)
 DEFINE_GENERAL_PATTERN(Assign, paddle::dialect::AssignOp)
 DEFINE_GENERAL_PATTERN(AssignValue_, paddle::dialect::AssignValue_Op)
 DEFINE_GENERAL_PATTERN(AssignOut, paddle::dialect::AssignOut_Op)
+DEFINE_GENERAL_PATTERN(Roll, paddle::dialect::RollOp)
 
 #undef DEFINE_GENERAL_PATTERN
 
@@ -610,11 +611,12 @@ class ScaleOpPattern : public pir::OpRewritePattern<paddle::dialect::ScaleOp> {
     }
     pir::Value x = op.operand_source(0);
     auto x_dtype = pir::GetDataTypeFromValue(x);
+    // TODO(YuanRisheng): The trt(<=8.5) can't support cast layer, we need
+    // support int32 and int64 after we upgrade our trt version
     if (!(x_dtype.isa<pir::Float32Type>() || x_dtype.isa<pir::Float64Type>() ||
-          x_dtype.isa<pir::Float16Type>() || x_dtype.isa<pir::Int32Type>() ||
-          x_dtype.isa<pir::Int64Type>())) {
+          x_dtype.isa<pir::Float16Type>())) {
       VLOG(3) << "At present, ScaleOp only support float32 or float16 or "
-                 "float64 or int32 or int64 into trt.";
+                 "float64 into trt.";
       return false;
     }
     op->set_attribute(kCanRunTrtAttr, rewriter.bool_attr(true));
@@ -1434,7 +1436,7 @@ class StackOpPattern : public pir::OpRewritePattern<paddle::dialect::StackOp> {
     }
 
     pir::Value x = op.operand_source(0);
-    int rank;
+    int rank = 1;
     auto x_type = x.type();
     if (x_type.isa<pir::VectorType>()) {
       rank = x_type.dyn_cast<pir::VectorType>().size();
@@ -1443,7 +1445,7 @@ class StackOpPattern : public pir::OpRewritePattern<paddle::dialect::StackOp> {
       rank = x_shape.size();
     }
 
-    int axis;
+    int axis = 1;
     if (op->HasAttribute("axis")) {
       axis = op->attribute<pir::Int32Attribute>("axis").data();
     } else {
@@ -1561,6 +1563,32 @@ class StridedSliceOpPattern
   }
 };
 
+class TopkOpPattern : public pir::OpRewritePattern<paddle::dialect::TopkOp> {
+ public:
+  using pir::OpRewritePattern<paddle::dialect::TopkOp>::OpRewritePattern;
+  bool MatchAndRewrite(paddle::dialect::TopkOp op,
+                       pir::PatternRewriter &rewriter) const override {
+    if (op->HasAttribute(kCanRunTrtAttr) &&
+        op.attribute<pir::BoolAttribute>(kCanRunTrtAttr).data()) {
+      return false;
+    }
+    if (!op->HasAttribute("axis")) {
+      VLOG(3) << "pd_op.topk must has axis attribute";
+      return false;
+    }
+    if (op->HasAttribute("sorted")) {
+      bool sorted = op->attribute<pir::BoolAttribute>("sorted").data();
+      if (!sorted) {
+        VLOG(3)
+            << "pd_op.topk does not support results not sorted in tensorrt.";
+        return false;
+      }
+    }
+    op->set_attribute(kCanRunTrtAttr, rewriter.bool_attr(true));
+    return true;
+  }
+};
+
 class TrtOpMarkerPass : public pir::PatternRewritePass {
  public:
   TrtOpMarkerPass() : pir::PatternRewritePass("trt_op_marker_pass", 2) {}
@@ -1599,6 +1627,7 @@ class TrtOpMarkerPass : public pir::PatternRewritePass {
     ADD_PATTERN(AssignOut)
     ADD_PATTERN(Assign)
     ADD_PATTERN(AssignValue_)
+    ADD_PATTERN(Roll)
 #if IS_TRT_VERSION_GE(8600)
     ADD_PATTERN(Layer_norm)
 #endif
@@ -1648,6 +1677,8 @@ class TrtOpMarkerPass : public pir::PatternRewritePass {
     ps.Add(std::make_unique<StackOpPattern>(context));
     ps.Add(std::make_unique<TanhOpPattern>(context));
     ps.Add(std::make_unique<FullWithTensorPattern>(context));
+    ps.Add(std::make_unique<StridedSliceOpPattern>(context));
+    ps.Add(std::make_unique<TopkOpPattern>(context));
     return ps;
   }
 };

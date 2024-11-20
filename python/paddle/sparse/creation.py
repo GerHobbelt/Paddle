@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from paddle import CPUPlace, CUDAPinnedPlace, CUDAPlace, Tensor
-    from paddle._typing import DTypeLike, NumbericSequence, ShapeLike
+    from paddle._typing import DTypeLike, NumericSequence, ShapeLike
 
 __all__ = [
     'sparse_coo_tensor',
@@ -87,7 +87,7 @@ def sparse_coo_tensor(
         | npt.NDArray[np.int_]
         | Tensor
     ),
-    values: NumbericSequence | npt.NDArray[Any] | Tensor,
+    values: NumericSequence | npt.NDArray[Any] | Tensor,
     shape: ShapeLike | None = None,
     dtype: DTypeLike | None = None,
     place: CPUPlace | CUDAPinnedPlace | CUDAPlace | str | None = None,
@@ -220,7 +220,7 @@ def _infer_dense_csr_shape(crows, cols):
 def sparse_csr_tensor(
     crows: list[int] | tuple[int, ...] | npt.NDArray[np.int_] | Tensor,
     cols: list[int] | tuple[int, ...] | npt.NDArray[np.int_] | Tensor,
-    values: NumbericSequence | npt.NDArray[Any] | Tensor,
+    values: NumericSequence | npt.NDArray[Any] | Tensor,
     shape: ShapeLike | None = None,
     dtype: DTypeLike | None = None,
     place: CPUPlace | CUDAPinnedPlace | CUDAPlace | str | None = None,

@@ -558,7 +558,7 @@ TEST(Predictor, Streams) {
         0,
         common::errors::InvalidArgument(
             "paddle::ResourceManager::Instance().RefCount(stream) should be 0 "
-            "but recieved %d.",
+            "but received %d.",
             paddle::ResourceManager::Instance().RefCount(stream)));
   }
 
@@ -575,7 +575,7 @@ TEST(Predictor, Streams) {
         0,
         common::errors::InvalidArgument(
             "paddle::ResourceManager::Instance().RefCount(stream1) should be 0 "
-            "but recieved %d.",
+            "but received %d.",
             paddle::ResourceManager::Instance().RefCount(stream1)));
 
     Config config2;
@@ -589,7 +589,7 @@ TEST(Predictor, Streams) {
         0,
         common::errors::InvalidArgument(
             "paddle::ResourceManager::Instance().RefCount(stream2) should be 0 "
-            "but recieved %d.",
+            "but received %d.",
             paddle::ResourceManager::Instance().RefCount(stream2)));
     PADDLE_ENFORCE_EQ(
         stream1,
@@ -597,7 +597,7 @@ TEST(Predictor, Streams) {
         common::errors::InvalidArgument(
             "paddle::ResourceManager::Instance().RefCount(stream1) should be "
             "equal to paddle::ResourceManager::Instance().RefCount(stream2) "
-            "but recieved %d and %d.",
+            "but received %d and %d.",
             paddle::ResourceManager::Instance().RefCount(stream1),
             paddle::ResourceManager::Instance().RefCount(stream2)));
   }
@@ -615,7 +615,7 @@ TEST(Predictor, Streams) {
         0,
         common::errors::InvalidArgument(
             "paddle::ResourceManager::Instance().RefCount(stream) should be 0 "
-            "but recieved %d.",
+            "but received %d.",
             paddle::ResourceManager::Instance().RefCount(stream)));
 
     auto predictor2 = predictor->Clone();
@@ -626,7 +626,7 @@ TEST(Predictor, Streams) {
         0,
         common::errors::InvalidArgument(
             "paddle::ResourceManager::Instance().RefCount(stream) should be 0 "
-            "but recieved %d.",
+            "but received %d.",
             paddle::ResourceManager::Instance().RefCount(stream2)));
     PADDLE_ENFORCE_EQ(
         stream,
@@ -634,7 +634,7 @@ TEST(Predictor, Streams) {
         common::errors::InvalidArgument(
             "paddle::ResourceManager::Instance().RefCount(stream) should be "
             "equal to paddle::ResourceManager::Instance().RefCount(stream2) "
-            "but recieved %d and %d.",
+            "but received %d and %d.",
             paddle::ResourceManager::Instance().RefCount(stream),
             paddle::ResourceManager::Instance().RefCount(stream2)));
   }
@@ -661,7 +661,7 @@ TEST(Predictor, Streams) {
         stream,
         common::errors::InvalidArgument("external_stream should be "
                                         "equal to stream "
-                                        "but recieved %d and %d.",
+                                        "but received %d and %d.",
                                         external_stream,
                                         stream));
     PADDLE_ENFORCE_NOT_NULL(

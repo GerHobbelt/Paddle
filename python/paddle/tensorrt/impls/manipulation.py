@@ -734,59 +734,166 @@ def strided_slice_converter(network, paddle_op, inputs):
 
     trt_start_dims = [0] * nchw_input_dims
     trt_size_dims = [input_shape[i] for i in range(nchw_input_dims)]
-    trt_end_dims = [0] * nchw_input_dims
     trt_step_dims = [1] * nchw_input_dims
 
     has_neg_indices = False
+    trt_start_tensors = []
+    trt_end_tensors = []
+    trt_stride_tensors = []
+
     for i, axis in enumerate(axes):
-        trt_start_dims[axis] = starts[i]
-        trt_end_dims[axis] = ends[i]
-        trt_step_dims[axis] = strides[i]
-        trt_size_dims[axis] = max(
-            0, (ends[i] - starts[i] + strides[i] - 1) // strides[i]
-        )
-        if starts[i] < 0 or ends[i] < 0:
-            has_neg_indices = True
+        if isinstance(starts, trt.ITensor):
+            start_tensor = get_shape_tensor_element(network, starts, i)
+        else:
+            start_tensor = add_1D_constant_layer(network, [starts[i]])
+
+        if isinstance(ends, trt.ITensor):
+            end_tensor = get_shape_tensor_element(network, ends, i)
+        else:
+            end_tensor = add_1D_constant_layer(network, [ends[i]])
+
+        if isinstance(strides, trt.ITensor):
+            stride_tensor = get_shape_tensor_element(network, strides, i)
+        else:
+            stride_tensor = add_1D_constant_layer(network, [strides[i]])
+
+        zero_tensor = add_1D_constant_layer(network, [0])
+
+        if isinstance(starts, trt.ITensor) or isinstance(ends, trt.ITensor):
+            is_start_neg = trt_less(network, start_tensor, zero_tensor)
+            is_end_neg = trt_less(network, end_tensor, zero_tensor)
+            temp_has_neg = network.add_elementwise(
+                is_start_neg, is_end_neg, trt.ElementWiseOperation.OR
+            ).get_output(0)
+            if not has_neg_indices:
+                has_neg_indices = temp_has_neg
+            else:
+                has_neg_indices = network.add_elementwise(
+                    has_neg_indices, temp_has_neg, trt.ElementWiseOperation.OR
+                ).get_output(0)
+        else:
+            if starts[i] < 0 or ends[i] < 0:
+                has_neg_indices = True
+
+        trt_start_tensors.append(start_tensor)
+        trt_end_tensors.append(end_tensor)
+        trt_stride_tensors.append(stride_tensor)
+
+    # Concatenate the tensors for start, end, and strides
+    start_tensor = network.add_concatenation(trt_start_tensors).get_output(0)
+    end_tensor = network.add_concatenation(trt_end_tensors).get_output(0)
+    step_tensor = network.add_concatenation(trt_stride_tensors).get_output(0)
 
     shape_tensor = network.add_shape(input_tensor).get_output(0)
-    start_tensor = add_1D_constant_layer(network, trt_start_dims)
 
-    if has_neg_indices:
+    if has_neg_indices is True:
         start_tensor = fix_negative_indices(network, shape_tensor, start_tensor)
-
-    end_vec_tensor = []
-    for i in range(len(trt_end_dims)):
-        end_vec_tensor.append(
-            get_shape_tensor_element(network, shape_tensor, i)
+    elif isinstance(has_neg_indices, trt.ITensor):
+        fixed_start_tensor = fix_negative_indices(
+            network, shape_tensor, start_tensor
         )
+        start_tensor = network.add_select(
+            condition=has_neg_indices,
+            then_input=fixed_start_tensor,
+            else_input=start_tensor,
+        ).get_output(0)
 
-    for i, axis in enumerate(axes):
-        if ends[i] >= 0:
-            end_vec_tensor[axis] = network.add_constant(
-                (1,), np.array([ends[i]], dtype=np.int32)
-            ).get_output(0)
-        else:
-            adjusted_end = network.add_constant(
-                (1,), np.array([ends[i]], dtype=np.int32)
-            ).get_output(0)
-            end_vec_tensor[axis] = trt_sum(
-                network, end_vec_tensor[axis], adjusted_end
-            )
+    # Process end_tensor similarly to handle negative indices
+    if has_neg_indices is True:
+        end_tensor = fix_negative_indices(network, shape_tensor, end_tensor)
+    elif isinstance(has_neg_indices, trt.ITensor):
+        fixed_end_tensor = fix_negative_indices(
+            network, shape_tensor, end_tensor
+        )
+        end_tensor = network.add_select(
+            condition=has_neg_indices,
+            then_input=fixed_end_tensor,
+            else_input=end_tensor,
+        ).get_output(0)
 
-    concat_end_tensor = network.add_concatenation(end_vec_tensor).get_output(0)
-    min_tensor = trt_min(network, concat_end_tensor, shape_tensor)
+    # Compute min_tensor
+    min_tensor = trt_min(network, end_tensor, shape_tensor)
+    # Correct size_tensor calculation
     size_tensor = trt_sub(network, start_tensor, min_tensor)
 
-    zero_t = add_1D_constant_layer(network, [0] * nchw_input_dims)
-    step_tensor = add_1D_constant_layer(network, trt_step_dims)
+    # floor_div_tensor computation
     floor_div_tensor = trt_floor_div(network, size_tensor, step_tensor)
-    size_tensor = trt_sub(network, zero_t, floor_div_tensor)
+    size_tensor = trt_sub(network, zero_tensor, floor_div_tensor)
 
+    # Create the slice layer
     layer = network.add_slice(
         input_tensor, trt_start_dims, trt_size_dims, trt_step_dims
     )
     layer.set_input(1, start_tensor)
     layer.set_input(2, size_tensor)
     layer.set_input(3, step_tensor)
+
+    return layer.get_output(0)
+
+
+@converter_registry.register("pd_op.roll", trt_version="8.x")
+def roll_converter(network, paddle_op, inputs):
+    input_tensor = inputs[0]
+    axis = paddle_op.attrs()["axis"]
+
+    shifts_op = paddle_op.operands()[1].source().get_defining_op()
+    if shifts_op.name() == "pd_op.full_int_array":
+        shifts = shifts_op.attrs()["value"]
+    else:
+        shifts = inputs[1]
+
+    axis_size = len(axis)
+    input_shape_tensor = trt_shape(network, input_tensor)
+
+    for i in range(axis_size):
+        axi = axis[i]
+        if isinstance(shifts, trt.ITensor):
+            shift = get_shape_tensor_element(network, shifts, i)
+            input_shift = shift
+        else:
+            shift = shifts[i]
+            input_shift = add_1D_constant_layer(network, shift)
+        input_axis = get_shape_tensor_element(network, input_shape_tensor, axi)
+
+        # 1.sub_value mod input_axis
+        input1 = trt_sub(network, input_axis, input_shift)
+        tmp_div_res = trt_floor_div(network, input1, input_axis)
+        tmp_prod_res = trt_mul(network, tmp_div_res, input_axis)
+        start = trt_sub(network, input1, tmp_prod_res)
+        # 2.avoid start less than 0,start mod input_axis
+        start = trt_sum(network, start, input_axis)
+        tmp_div_res1 = trt_floor_div(network, start, input_axis)
+        tmp_prod_res1 = trt_mul(network, tmp_div_res1, input_axis)
+        start = trt_sub(network, start, tmp_prod_res1)
+        zero_tensor = add_1D_constant_layer(network, 0)
+        step = add_1D_constant_layer(network, 1)
+        # 3.make index_tensor0
+        sub_qutient = trt_sub(network, input_axis, start)
+        quotient_tensor = trt_floor_div(network, sub_qutient, step)
+        start1 = get_shape_tensor_element(network, start, 0, is_scalar=True)
+        fill_layer0 = network.add_fill(shape=(), op=trt.FillOperation.LINSPACE)
+        fill_layer0.set_input(0, quotient_tensor)
+        fill_layer0.set_input(1, start1)
+        fill_layer0.set_input(2, step)
+        index_tensor0 = fill_layer0.get_output(0)
+        # 4.make index_tensor1
+        sub_qutient_tensor = trt_sub(network, start, zero_tensor)
+        quotient_tensor = trt_floor_div(network, sub_qutient_tensor, step)
+        start2 = add_1D_constant_layer(network, 0, is_scalar=True)
+        fill_layer1 = network.add_fill(shape=(), op=trt.FillOperation.LINSPACE)
+        fill_layer1.set_input(0, quotient_tensor)
+        fill_layer1.set_input(1, start2)
+        fill_layer1.set_input(2, step)
+        index_tensor1 = fill_layer1.get_output(0)
+        itensors = [index_tensor0, index_tensor1]
+        concat_input_tensor = trt_concat(network, itensors)
+        if i == 0:
+            layer = network.add_gather(
+                input=input_tensor, indices=concat_input_tensor, axis=axi
+            )
+        else:
+            layer = network.add_gather(
+                input=layer.get_output(0), indices=concat_input_tensor, axis=axi
+            )
 
     return layer.get_output(0)

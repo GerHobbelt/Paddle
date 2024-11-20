@@ -18,6 +18,7 @@
 
 #include "paddle/cinn/ir/ir_base.h"
 #include "paddle/cinn/ir/ir_printer.h"
+#include "paddle/cinn/ir/module.h"
 
 namespace cinn {
 namespace ir {
@@ -47,6 +48,14 @@ bool IrEqualVisitor::Compare(const Expr& lhs, const Expr& rhs) {
             << rhs;
   }
   return equal;
+}
+
+bool IrEqualVisitor::Compare(const Module& lhs, const Module& rhs) {
+  return Visit(lhs.As<_Module_>(), rhs.As<_Module_>());
+}
+
+bool IrEqualVisitor::Compare(const LoweredFunc& lhs, const LoweredFunc& rhs) {
+  return Visit(lhs.As<_LoweredFunc_>(), rhs.As<_LoweredFunc_>());
 }
 
 bool IrEqualVisitor::Compare(const std::string& lhs, const std::string& rhs) {
@@ -253,8 +262,7 @@ bool IrEqualVisitor::Visit(const _Tensor_* lhs, const Expr* other) {
   return flag && Compare(lhs->name, rhs->name);
 }
 
-bool IrEqualVisitor::Visit(const _LoweredFunc_* lhs, const Expr* other) {
-  auto* rhs = other->As<_LoweredFunc_>();
+bool IrEqualVisitor::Visit(const _LoweredFunc_* lhs, const _LoweredFunc_* rhs) {
   if (lhs->name != rhs->name) {
     VLOG(6) << "Not equal, lhs name=" << lhs->name
             << ", rhs name=" << rhs->name;
@@ -297,8 +305,7 @@ bool IrEqualVisitor::Visit(const _LoweredFunc_* lhs, const Expr* other) {
          Compare(lhs->argument_prepare_exprs, rhs->argument_prepare_exprs);
 }
 
-bool IrEqualVisitor::Visit(const _Module_* lhs, const Expr* other) {
-  auto* rhs = other->As<_Module_>();
+bool IrEqualVisitor::Visit(const _Module_* lhs, const _Module_* rhs) {
   bool flag = Compare(lhs->buffers, rhs->buffers) &&
               Compare(lhs->functions, rhs->functions) &&
               Compare(lhs->submodules, rhs->submodules);

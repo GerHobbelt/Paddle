@@ -32,6 +32,7 @@ class Variable:
     Args:
         is_discrete (bool): Is the variable discrete or continuous.
         event_rank (int): The rank of event dimensions.
+        constraint (Constraint|None, optional): The constraint of the variable.
     """
 
     def __init__(
@@ -56,7 +57,7 @@ class Variable:
         """Check whether the 'value' meet the constraint conditions of this
         random variable."""
         assert self._constraint is not None
-        return self._constraint(value)
+        return self._constraint.check(value)
 
 
 class Real(Variable):

@@ -21,24 +21,35 @@ import paddle
 from paddle.jit.sot.utils import strict_mode_guard
 
 
-def foo(x, y):
+def numpy_add(x, y):
+    out = paddle.to_tensor(x.numpy() + y.numpy())
+    return out
+
+
+def tensor_add_numpy(x, y):
     ret = x + y
     return ret
 
 
 class TestNumpy(TestCaseBase):
+    @strict_mode_guard(False)
+    def test_numpy_add(self):
+        x = paddle.to_tensor([2])
+        y = paddle.to_tensor([3])
+        self.assert_results(numpy_add, x, y)
+
     def test_tensor_add_numpy_number(self):
         x = paddle.to_tensor([1.0])
         y = np.int64(2)
-        self.assert_results(foo, x, y)
-        self.assert_results(foo, y, x)
+        self.assert_results(tensor_add_numpy, x, y)
+        self.assert_results(tensor_add_numpy, y, x)
 
     @strict_mode_guard(False)
     def test_tensor_add_numpy_array(self):
         x = paddle.to_tensor([1.0])
         y = np.array(2.0)
-        self.assert_results(foo, x, y)
-        self.assert_results(foo, y, x)
+        self.assert_results(tensor_add_numpy, x, y)
+        self.assert_results(tensor_add_numpy, y, x)
 
 
 if __name__ == "__main__":

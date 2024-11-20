@@ -749,17 +749,12 @@ llvm::Value *CodeGenLLVM::Visit(const ir::Call *op) {
 }
 
 llvm::Value *CodeGenLLVM::Visit(const ir::_Module_ *op) {
-  {
-    Expr body_to_verify(&Reference(op));
-    ir::ir_utils::IrVerify(body_to_verify);
-  }
+  { ir::ir_utils::IrVerify(op); }
 
   for (auto &fn : op->functions) {
     VLOG(1) << "JIT Linking function [" << fn.As<ir::_LoweredFunc_>()->name
             << "]";
-    ir::Expr fn_expr(fn);
-
-    auto fnll = Visit(&fn_expr);
+    auto fnll = Visit(fn.As<ir::_LoweredFunc_>());
 
     VLOG(5) << "fn llvm:\n" << DumpToString(*fnll);
   }

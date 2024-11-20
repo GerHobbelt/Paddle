@@ -40,7 +40,7 @@ if TYPE_CHECKING:
     import numpy.typing as npt
 
     from paddle import Tensor
-    from paddle._typing import NestedNumbericSequence
+    from paddle._typing import NestedNumericSequence
     from paddle.base.framework import Block
     from paddle.distributed.fleet.base.distributed_strategy import (
         DistributedStrategy,
@@ -80,7 +80,7 @@ class UtilBase:
 
     def all_reduce(
         self,
-        input: NestedNumbericSequence | npt.NDArray[Any],
+        input: NestedNumericSequence | npt.NDArray[Any],
         mode: Literal["sum", "min", "max"] = "sum",
         comm_world: Literal["worker", "server", "all"] = "worker",
     ) -> npt.NDArray[Any] | None:

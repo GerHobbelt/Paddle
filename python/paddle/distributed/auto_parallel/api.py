@@ -84,7 +84,7 @@ if TYPE_CHECKING:
     from paddle import Tensor
     from paddle._typing import (
         DTypeLike,
-        NestedNumbericSequence,
+        NestedNumericSequence,
         PlaceLike,
         TensorLike,
     )
@@ -210,7 +210,7 @@ class DistAttr(core.TensorDistAttr):
 
 
 def shard_tensor(
-    data: Tensor | TensorLike | NestedNumbericSequence,
+    data: Tensor | TensorLike | NestedNumericSequence,
     mesh: ProcessMesh,
     placements: list[Placement],
     dtype: DTypeLike | None = None,

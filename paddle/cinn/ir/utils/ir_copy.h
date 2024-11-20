@@ -35,6 +35,8 @@ std::vector<Expr> IRCopy(const std::vector<Expr>& x,
 
 ir::ModuleExpr IRCopy(const ir::ModuleExpr& x, bool copy_buffer_node = true);
 
+ir::Module IRCopy(const Module& m, bool copy_buffer_node = true);
+
 ir::LoweredFunc IRCopy(const ir::LoweredFunc& x, bool copy_buffer_node = true);
 
 std::vector<ir::LoweredFunc> IRCopy(const std::vector<ir::LoweredFunc>& x,

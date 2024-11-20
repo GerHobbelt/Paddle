@@ -19,8 +19,6 @@ import sys
 import numpy as np
 import tensorrt as trt
 
-from .util import get_trt_version_list
-
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.abspath(os.path.join(current_dir, os.pardir))
 if parent_dir not in sys.path:
@@ -33,7 +31,8 @@ _logger = get_logger(
     __name__, logging.INFO, fmt='%(asctime)s-%(levelname)s: %(message)s'
 )
 
-version_list = get_trt_version_list()
+version = trt.__version__
+version_list = list(map(int, version.split('.')))
 
 
 def has_dynamic_shape(shape):
@@ -162,11 +161,12 @@ def add_elementwise_layer(network, paddle_op, inputs, op_type):
 
 
 # Create and add 1D constant layer
-def add_1D_constant_layer(network, data, dtype=np.int32):
+def add_1D_constant_layer(network, data, dtype=np.int32, is_scalar=False):
     if not isinstance(data, list):
         data = [data]
     constant_data = np.array(data, dtype=dtype)
-    constant_layer = network.add_constant(constant_data.shape, constant_data)
+    shape = () if is_scalar else (len(data),)
+    constant_layer = network.add_constant(shape, constant_data)
     return constant_layer.get_output(0)
 
 
@@ -204,13 +204,12 @@ def trt_reshape(network, input, new_shape, name="", is_shape_tensor=False):
 
 
 # Get element tensor of 1D shape tensor
-def get_shape_tensor_element(network, x, index):
+def get_shape_tensor_element(network, x, index, is_scalar=False):
     assert index >= 0, (
         "The index should be greater or equal than 0, but got %d" % index
     )
-    gather_layer = network.add_gather(
-        input=x, indices=add_1D_constant_layer(network, index), axis=0
-    )
+    index_tensor = add_1D_constant_layer(network, index, is_scalar=is_scalar)
+    gather_layer = network.add_gather(input=x, indices=index_tensor, axis=0)
     return gather_layer.get_output(0)
 
 
@@ -514,3 +513,55 @@ def fix_negative_indices(network, input_shape, indices):
     sub = trt_mul(network, sign, input_shape)
     fixed_indices = trt_sub(network, indices, sub)
     return fixed_indices
+
+
+def unsqueeze_trt(network, input_tensor, axes):
+    input_shape = network.add_shape(input_tensor).get_output(0)
+
+    axis_set = set(axes)
+
+    subscripts = list(range(len(input_tensor.shape)))
+
+    for axis in sorted(axis_set):
+        subscripts.insert(axis, len(input_tensor.shape))
+
+    one_tensor = network.add_constant(
+        (1,), np.array([1], dtype=np.int32)
+    ).get_output(0)
+    extended_shape = network.add_concatenation(
+        [input_shape, one_tensor]
+    ).get_output(0)
+
+    gather_layer = network.add_gather(
+        extended_shape,
+        network.add_constant(
+            (len(subscripts),), np.array(subscripts, dtype=np.int32)
+        ).get_output(0),
+        axis=0,
+    )
+    new_shape_tensor = gather_layer.get_output(0)
+
+    reshaped_tensor = network.add_shuffle(input_tensor)
+    reshaped_tensor.set_input(1, new_shape_tensor)
+
+    return reshaped_tensor.get_output(0)
+
+
+def squeeze_trt(network, input_tensor, axes):
+    input_shape = network.add_shape(input_tensor).get_output(0)
+    input_shape = input_tensor.shape
+    all_dims = list(range(len(input_shape)))
+    remaining_dims = [dim for dim in all_dims if dim not in axes]
+
+    input_shape_tensor = network.add_shape(input_tensor).get_output(0)
+
+    remaining_dims_tensor = network.add_constant(
+        (len(remaining_dims),), np.array(remaining_dims, dtype=np.int32)
+    ).get_output(0)
+
+    new_shape_tensor = network.add_gather(
+        input_shape_tensor, remaining_dims_tensor, axis=0
+    ).get_output(0)
+    reshape_layer = network.add_shuffle(input_tensor)
+    reshape_layer.set_input(1, new_shape_tensor)
+    return reshape_layer.get_output(0)

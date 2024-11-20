@@ -16,17 +16,16 @@
 
 #include "paddle/cinn/ir/ir_mutator.h"
 #include "paddle/cinn/ir/ir_printer.h"
+#include "paddle/cinn/ir/module.h"
 #include "paddle/cinn/optim/replace_var_with_expr.h"
 
 namespace cinn {
 namespace optim {
 
 struct ScheduleBlockRemover : public ir::IRMutator<Expr*> {
-  void operator()(ir::Expr* expr) { Visit(expr); }
+  void operator()(ir::Module m) { IRMutator::Visit(m.As<ir::_Module_>()); }
 
  private:
-  void Visit(ir::Expr* expr) { ir::IRMutator<>::Visit(expr, expr); }
-
   void Visit(const ir::ScheduleBlockRealize* op, Expr* expr) override {
     auto* node = expr->As<ir::ScheduleBlockRealize>();
     PADDLE_ENFORCE_NOT_NULL(
@@ -58,7 +57,7 @@ struct ScheduleBlockRemover : public ir::IRMutator<Expr*> {
   }
 };
 
-void RemoveScheduleBlock(Expr* e) { ScheduleBlockRemover()(e); }
+void RemoveScheduleBlock(ir::Module m) { ScheduleBlockRemover()(m); }
 
 }  // namespace optim
 }  // namespace cinn

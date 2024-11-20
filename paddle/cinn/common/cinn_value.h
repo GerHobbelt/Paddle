@@ -32,6 +32,7 @@ namespace ir {
 
 class Expr;
 class Var;
+class LoweredFunc;
 
 }  // namespace ir
 
@@ -152,6 +153,7 @@ class CINNValue : public cinn_pod_value_t {
   explicit CINNValue(const std::string&);
   explicit CINNValue(const ir::Var& value);
   explicit CINNValue(const ir::Expr& value);
+  explicit CINNValue(const ir::LoweredFunc& value);
   explicit CINNValue(const CINNValuePack& value);
 
   bool defined() const { return type_code_ != kNull; }

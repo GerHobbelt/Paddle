@@ -16,6 +16,7 @@
 
 #include "paddle/cinn/ir/ir.h"
 #include "paddle/cinn/ir/ir_base.h"
+#include "paddle/cinn/ir/lowered_func.h"
 #include "paddle/cinn/poly/stage.h"
 #include "paddle/cinn/runtime/cinn_runtime.h"
 #include "paddle/common/enforce.h"
@@ -43,7 +44,8 @@ __m(char *, 20);  // start from a larger number to avoid duplicate id with
 __m(char const *, 21);
 __m(ir::Expr, 22);
 __m(ir::Var, 23);
-__m(CINNValuePack, 24);
+__m(ir::LoweredFunc, 24);
+__m(CINNValuePack, 25);
 __m(std::string, 26);
 #undef __m
 //@}
@@ -174,6 +176,16 @@ CINNValue::CINNValue(const Expr &value)
       ::common::errors::InvalidArgument("The input of Expr is not defined."));
   shared_ = value;
 }
+
+CINNValue::CINNValue(const ir::LoweredFunc &value)
+    : cinn_pod_value_t(cinn_value_t(), TypeCode<ir::LoweredFunc>()) {
+  PADDLE_ENFORCE_EQ(value.defined(),
+                    true,
+                    ::common::errors::InvalidArgument(
+                        "The input of LoweredFunc is not defined."));
+  shared_ = value;
+}
+
 CINNValue::CINNValue(const CINNValuePack &value)
     : cinn_pod_value_t(cinn_value_t(), TypeCode<CINNValuePack>()) {
   PADDLE_ENFORCE_EQ(value.defined(),

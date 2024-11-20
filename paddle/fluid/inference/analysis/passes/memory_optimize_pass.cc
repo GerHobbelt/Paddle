@@ -66,9 +66,8 @@ void MemoryOptimizePass::CollectLifeCycle(
     auto reads = op_node->inputs;
     auto writes = op_node->outputs;
 
-    std::vector<Node*>
-    requires(reads.begin(), reads.end());
-    requires.insert(requires.end(), writes.begin(), writes.end());
+    std::vector<Node*> req(reads.begin(), reads.end());
+    req.insert(req.end(), writes.begin(), writes.end());
 
     // Disable reuse of feed variables.
     if (op_node->Name() == "feed") {
@@ -79,7 +78,7 @@ void MemoryOptimizePass::CollectLifeCycle(
       }
     } else {
       // Normal operators.
-      for (const Node* node : requires) {
+      for (const Node* node : req) {
         if (!node->Var()) continue;
         if (node->Var()->Persistable()) {
           // "Getting 'tensor_desc' is not supported by the fetch type

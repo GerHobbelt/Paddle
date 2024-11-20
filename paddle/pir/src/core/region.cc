@@ -57,7 +57,8 @@ void Region::CloneInto(Region &other, IrMapping &ir_mapping) const {
     for (const auto &arg : block.args()) {
       auto new_arg = new_block->AddArg(arg.type());
       ir_mapping.Add(arg, new_arg);
-      for (auto &attr : arg.dyn_cast<BlockArgument>().attributes()) {
+      const BlockArgument &block_arg = arg.dyn_cast<BlockArgument>();
+      for (auto &attr : block_arg.attributes()) {
         new_arg.set_attribute(attr.first, attr.second);
       }
     }

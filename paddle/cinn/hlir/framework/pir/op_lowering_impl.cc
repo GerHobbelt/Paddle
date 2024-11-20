@@ -198,7 +198,7 @@ BucketLoweredFuncsWrapper OpLowererImpl::BucketLower(
                                                    &infer_shape_tensor_args);
   if (FLAGS_cinn_check_tensor_buffer_map) {
     for (ir::LoweredFunc& func : funcs) {
-      optim::CheckTensorBufferMap(Expr(func), "BucketLower PostProcess");
+      optim::CheckTensorBufferMap(func->body, "BucketLower PostProcess");
     }
     VLOG(3) << "PostProcess tensor-buffer map check succeed";
   }
@@ -386,11 +386,10 @@ std::vector<ir::LoweredFunc> OpLowererImpl::PostProcess(
 
     // 4.Apply low level pass
     if (i != func_bodies.size() - 1) {
-      func = optim::Optimize(Expr(func), target_, false).as_lowered_func_ref();
+      func = optim::Optimize(func, target_, false);
       optim::RearrangeLoadInstruction(&(func->body));
     } else {
-      func = optim::Optimize(Expr(func), common::DefaultHostTarget(), false)
-                 .as_lowered_func_ref();
+      func = optim::Optimize(func, common::DefaultHostTarget(), false);
     }
     func->num_output_tensors = infer_shape_arg_tensor->size();
     lowered_funcs.push_back(std::move(func));

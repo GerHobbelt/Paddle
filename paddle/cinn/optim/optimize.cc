@@ -42,24 +42,24 @@
 namespace cinn {
 namespace optim {
 
-Expr Optimize(Expr e,
-              Target target,
-              bool runtime_debug_info,
-              bool remove_gpu_for_loops) {
+ir::LoweredFunc Optimize(ir::LoweredFunc fn,
+                         Target target,
+                         bool runtime_debug_info,
+                         bool remove_gpu_for_loops) {
   PADDLE_ENFORCE_EQ(
-      e.defined(),
+      fn.defined(),
       true,
       ::common::errors::InvalidArgument(
-          "Expected expression 'e' to be defined, but it is undefined."));
+          "Expected expression 'fn' to be defined, but it is undefined."));
 
-  auto copied = ir::ir_utils::IRCopy(e);
+  auto copied = ir::ir_utils::IRCopy(fn);
 
-  ReplaceConstParamToInteger(&copied);
+  ReplaceConstParamToInteger(&copied->body);
   // Simplify already contains CastSimplify
-  Simplify(&copied);
-  ReplaceCrossThreadReduction(&copied);
+  Simplify(&copied->body);
+  ReplaceCrossThreadReduction(copied);
   VLOG(4) << "After Optimize ReplaceCrossThreadReduction:" << copied;
-  ReplaceCrossBlockReduction(&copied);
+  ReplaceCrossBlockReduction(copied);
   VLOG(4) << "After Optimize ReplaceCrossBlockReduction:" << copied;
 
   cinn::common::DefaultDeviceTarget().arch.Match(
@@ -67,63 +67,56 @@ Expr Optimize(Expr e,
       },
       [&](common::NVGPUArch) {
 #ifdef CINN_WITH_CUDA
-        if (copied.as_lowered_func()) {
-          ir::SetCudaAxisInfo(&copied);
-        }
+        ir::SetCudaAxisInfo(copied);
         if (remove_gpu_for_loops) {
-          RemoveGpuForloopsAxis(&copied);
+          RemoveGpuForloopsAxis(copied);
         }
-        CudaSyncThreadsDropIfThenElse(&copied);
+        CudaSyncThreadsDropIfThenElse(copied);
     // CudaTransBufferWithDynamicShape(&copied);
 #endif
       },
       [&](common::HygonDCUArchHIP) {
 #ifdef CINN_WITH_HIP
-        if (copied.as_lowered_func()) {
-          ir::SetCudaAxisInfo(&copied);
-        }
+        ir::SetCudaAxisInfo(copied);
         if (remove_gpu_for_loops) {
-          RemoveGpuForloopsAxis(&copied);
+          RemoveGpuForloopsAxis(copied);
         }
-        CudaSyncThreadsDropIfThenElse(&copied);
+        CudaSyncThreadsDropIfThenElse(copied);
     // CudaTransBufferWithDynamicShape(&copied);
 #endif
       });
 
-  SimplifyBlocks(&copied);
+  SimplifyBlocks(&copied->body);
   VLOG(4) << "After SimplifyBlocks:" << copied;
 
-  MapExternCall(&copied, target);
+  MapExternCall(&copied->body, target);
   VLOG(10) << "After Optimize MapExternCall:" << copied;
 
-  ExternCallMultiOutputShallowStore(&copied);
+  ExternCallMultiOutputShallowStore(&copied->body);
   VLOG(10) << "After Optimize ExternCallMultiOutputShallowStore:" << copied;
   // Simplify already contains CastSimplify
-  Simplify(&copied);
+  Simplify(&copied->body);
   VLOG(10) << "After Optimize Simplify:" << copied;
 
-  IfFusion(&copied);
+  IfFusion(&copied->body);
   VLOG(10) << "After Optimize IfFusion" << copied;
 
-  if (runtime_debug_info) {
-    LOG(WARNING) << "Turn on runtime debug information output";
-    InsertDebugLogCallee(&copied);
-  }
   return copied;
 }
 
 ir::Module Optimize(const ir::Module& module, const Target& target) {
-  auto copied = ir::ir_utils::IRCopy(Expr(module));
-  RemoveScheduleBlock(&copied);
-  VLOG(10) << "After RemoveScheduleBlock:" << copied.as_module_ref();
-  LowerFunctionCallBindVars(&copied);
-  VLOG(10) << "After LowerFunctionCallBindVars:" << copied.as_module_ref();
-  CallArgListToPodValue(&copied);
-  VLOG(10) << "After CallArgListToPodValue:" << copied.as_module_ref();
-  LowerIntrin(&copied, target);
-  VLOG(10) << "After LowerIntrin:" << copied.as_module_ref();
+  auto copied = ir::ir_utils::IRCopy(module);
 
-  return copied.as_module_ref();
+  RemoveScheduleBlock(copied);
+  VLOG(10) << "After RemoveScheduleBlock:" << copied;
+  LowerFunctionCallBindVars(copied);
+  VLOG(10) << "After LowerFunctionCallBindVars:" << copied;
+  CallArgListToPodValue(copied);
+  VLOG(10) << "After CallArgListToPodValue:" << copied;
+  LowerIntrin(copied, target);
+  VLOG(10) << "After LowerIntrin:" << copied;
+
+  return copied;
 }
 
 }  // namespace optim

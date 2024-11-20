@@ -81,7 +81,7 @@ void Module::Builder::AddPriority(int priority) {
   module_->priorities.push_back(priority);
 }
 
-void Module::Builder::SetInferShapeFunc(ir::Expr infer_shape_func) {
+void Module::Builder::SetInferShapeFunc(ir::LoweredFunc infer_shape_func) {
   module_->infer_shape_func = infer_shape_func;
 }
 
@@ -120,25 +120,15 @@ std::vector<ir::Buffer> Module::buffers() const {
   return buffers;
 }
 
-std::vector<ir::LoweredFunc> Module::functions() const {
-  std::vector<ir::LoweredFunc> functions;
-  for (auto &x : self()->functions) {
-    functions.emplace_back(x.as_lowered_func_ref());
-  }
-  return functions;
+const std::vector<ir::LoweredFunc> &Module::functions() const {
+  return self()->functions;
 }
 
-std::vector<Module> Module::submodules() const {
-  std::vector<ir::Module> modules;
-  for (auto &x : self()->submodules) {
-    modules.push_back(x.as_module_ref());
-  }
-  return modules;
+const std::vector<Module> &Module::submodules() const {
+  return self()->submodules;
 }
 
 void Module::Compile(const backends::Outputs &outputs) const {}
-
-Module::operator Expr() const { return Expr(ptr()); }
 
 }  // namespace ir
 }  // namespace cinn

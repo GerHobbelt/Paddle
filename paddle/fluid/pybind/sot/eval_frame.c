@@ -67,7 +67,16 @@ DECLARE_PROXY_PROPERTY(f_executable)
 #else
 DECLARE_PROXY_PROPERTY(f_code)
 #endif
+#if PY_3_13_PLUS
+static PyObject *PyInterpreterFrameProxy_property_f_locals(
+    PyInterpreterFrameProxy *self, void *closure) {
+  PyObject *f_locals = Internal_PyFrame_GetLocals(self->frame);
+  Py_XINCREF(f_locals);
+  return f_locals;
+}
+#else
 DECLARE_PROXY_PROPERTY(f_locals)
+#endif
 DECLARE_PROXY_PROPERTY(f_globals)
 DECLARE_PROXY_PROPERTY(f_builtins)
 
@@ -339,7 +348,9 @@ static PyObject *_custom_eval_frame(PyThreadState *tstate,
   // original frame. So we pass a PyInterpreterFrame to
   // _PyFrame_FastToLocalsWithError directly. But this is an internal API, so we
   // copy many code from CPython project into our project.
-#if !PY_3_13_PLUS
+#if PY_3_13_PLUS
+  Internal_PyFrame_GetLocals(frame);
+#else
   if (Internal_PyFrame_FastToLocalsWithError(frame) < 0) {
     return NULL;
   }

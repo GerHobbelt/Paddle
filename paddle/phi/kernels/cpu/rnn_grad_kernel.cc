@@ -691,6 +691,7 @@ struct SingleGradLayer : GradLayer<T, GradCellType> {
   explicit SingleGradLayer(const GradCellType& cell)
       : GradLayer<T, GradCellType>(cell) {}
   ~SingleGradLayer() override = default;
+  using GradLayer<T, GradCellType>::operator();
   void operator()(const CPUContext& dev_ctx,
                   const DenseTensor* input,
                   const DenseTensor* output,
@@ -803,6 +804,7 @@ struct BidirGradLayer : GradLayer<T, GradCellType> {
   explicit BidirGradLayer(const GradCellType& cell)
       : GradLayer<T, GradCellType>(cell) {}
   ~BidirGradLayer() override = default;
+  using GradLayer<T, GradCellType>::operator();
   void operator()(const CPUContext& dev_ctx,
                   const DenseTensor* input,
                   const DenseTensor* output,

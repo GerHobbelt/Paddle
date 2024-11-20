@@ -171,15 +171,137 @@ void Internal_PyEvalFrameClearAndPop(PyThreadState *tstate,
   }
 }
 
+#if PY_3_13_PLUS
+// Returns borrowed reference or NULL
+static PyObject *framelocalsproxy_getval(_PyInterpreterFrame *frame,
+                                         PyCodeObject *co,
+                                         int i) {
+  PyObject **fast = _PyFrame_GetLocalsArray(frame);
+  _PyLocals_Kind kind = _PyLocals_GetKind(co->co_localspluskinds, i);
+
+  PyObject *value = fast[i];
+  PyObject *cell = NULL;
+
+  if (value == NULL) {
+    return NULL;
+  }
+
+  if (kind == CO_FAST_FREE || kind & CO_FAST_CELL) {
+    // The cell was set when the frame was created from
+    // the function's closure.
+    assert(PyCell_Check(value));
+    cell = value;
+  }
+
+  if (cell != NULL) {
+    value = PyCell_GET(cell);
+  }
+
+  if (value == NULL) {
+    return NULL;
+  }
+
+  return value;
+}
+
+bool Internal_PyFrame_HasHiddenLocals(_PyInterpreterFrame *frame) {
+  /*
+   * This function returns if there are hidden locals introduced by PEP 709,
+   * which are the isolated fast locals for inline comprehensions
+   */
+  PyCodeObject *co = _PyFrame_GetCode(frame);
+
+  for (int i = 0; i < co->co_nlocalsplus; i++) {
+    _PyLocals_Kind kind = _PyLocals_GetKind(co->co_localspluskinds, i);
+
+    if (kind & CO_FAST_HIDDEN) {
+      PyObject *value = framelocalsproxy_getval(frame, co, i);
+
+      if (value != NULL) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+static PyObject *framelocalsproxy_new(PyTypeObject *type,
+                                      PyObject *args,
+                                      PyObject *kwds) {
+  if (PyTuple_GET_SIZE(args) != 1) {
+    PyErr_Format(PyExc_TypeError,
+                 "FrameLocalsProxy expected 1 argument, got %zd",
+                 PyTuple_GET_SIZE(args));
+    return NULL;
+  }
+  PyObject *item = PyTuple_GET_ITEM(args, 0);
+
+  if (!PyFrame_Check(item)) {
+    PyErr_Format(PyExc_TypeError, "expect frame, not %T", item);
+    return NULL;
+  }
+  PyFrameObject *frame = (PyFrameObject *)item;
+
+  if (kwds != NULL && PyDict_Size(kwds) != 0) {
+    PyErr_SetString(PyExc_TypeError,
+                    "FrameLocalsProxy takes no keyword arguments");
+    return 0;
+  }
+
+  PyFrameLocalsProxyObject *self =
+      (PyFrameLocalsProxyObject *)type->tp_alloc(type, 0);
+  if (self == NULL) {
+    return NULL;
+  }
+
+  ((PyFrameLocalsProxyObject *)self)->frame = (PyFrameObject *)Py_NewRef(frame);
+
+  return (PyObject *)self;
+}
+
+PyObject *Internal_PyFrameLocalsProxy_New(PyFrameObject *frame) {
+  PyObject *args = PyTuple_Pack(1, frame);
+  if (args == NULL) {
+    return NULL;
+  }
+
+  PyObject *proxy =
+      (PyObject *)framelocalsproxy_new(&PyFrameLocalsProxy_Type, args, NULL);
+  Py_DECREF(args);
+  return proxy;
+}
+
+PyObject *Internal_PyFrame_GetLocals(_PyInterpreterFrame *frame) {
+  // We should try to avoid creating the FrameObject if possible.
+  // So we check if the frame is a module or class level scope
+  PyCodeObject *co = _PyFrame_GetCode(frame);
+
+  if (!(co->co_flags & CO_OPTIMIZED) &&
+      !Internal_PyFrame_HasHiddenLocals(frame)) {
+    if (frame->f_locals == NULL) {
+      // We found cases when f_locals is NULL for non-optimized code.
+      // We fill the f_locals with an empty dict to avoid crash until
+      // we find the root cause.
+      frame->f_locals = PyDict_New();
+      if (frame->f_locals == NULL) {
+        return NULL;
+      }
+    }
+    return Py_NewRef(frame->f_locals);
+  }
+
+  PyFrameObject *f = Internal_PyFrame_GetFrameObject(frame);
+
+  return Internal_PyFrameLocalsProxy_New(f);
+}
+
+#else
+
 // Initialize frame free variables if needed
 static void Internal_frame_init_get_vars(_PyInterpreterFrame *frame) {
-// COPY_FREE_VARS has no quickened forms, so no need to use _PyOpcode_Deopt
-// here:
-#if PY_3_13_PLUS
-  PyCodeObject *co = _PyFrame_GetCode(frame);
-#else
+  // COPY_FREE_VARS has no quickened forms, so no need to use _PyOpcode_Deopt
+  // here:
   PyCodeObject *co = frame->f_code;
-#endif
   int lasti = _PyInterpreterFrame_LASTI(frame);
   if (!(lasti < 0 && _PyCode_CODE(co)->op.code == COPY_FREE_VARS &&
         PyFunction_Check(frame->f_funcobj))) {
@@ -189,21 +311,13 @@ static void Internal_frame_init_get_vars(_PyInterpreterFrame *frame) {
 
   /* Free vars have not been initialized -- Do that */
   PyObject *closure = ((PyFunctionObject *)frame->f_funcobj)->func_closure;
-#if PY_3_13_PLUS
-  int offset = PyUnstable_Code_GetFirstFree(co);
-#else
   int offset = PyCode_GetFirstFree(co);
-#endif
   for (int i = 0; i < co->co_nfreevars; ++i) {
     PyObject *o = PyTuple_GET_ITEM(closure, i);
     frame->localsplus[offset + i] = Py_NewRef(o);
   }
-// COPY_FREE_VARS doesn't have inline CACHEs, either:
-#if PY_3_13_PLUS
-  frame->instr_ptr = _PyCode_CODE(_PyFrame_GetCode(frame));
-#else
+  // COPY_FREE_VARS doesn't have inline CACHEs, either:
   frame->prev_instr = _PyCode_CODE(frame->f_code);
-#endif
 }
 
 static int Internal_frame_get_var(_PyInterpreterFrame *frame,
@@ -254,7 +368,6 @@ static int Internal_frame_get_var(_PyInterpreterFrame *frame,
   return 1;
 }
 
-#if !PY_3_13_PLUS
 PyObject *Internal_PyFrame_GetLocals(_PyInterpreterFrame *frame,
                                      int include_hidden) {
   /* Merge fast locals into f->f_locals */
@@ -337,9 +450,7 @@ error:
   Py_XDECREF(hidden);
   return NULL;
 }
-#endif  // !PY_3_13_PLUS
 
-#if !PY_3_13_PLUS
 int Internal_PyFrame_FastToLocalsWithError(_PyInterpreterFrame *frame) {
   PyObject *locals = Internal_PyFrame_GetLocals(frame, 0);
   if (locals == NULL) {

@@ -93,7 +93,7 @@ class TestDataUnshard(unittest.TestCase):
         input_data = np.array(range(2 * 8)).reshape([2, 8]).astype("float32")
         label_data = np.random.randint(0, 10, [2, 8]).astype("float32")
 
-        fetchs = (
+        fetches = (
             [loss.name, 'split@RESHARD.tmp_0']
             if worker_index == 0
             else [loss.name, 'split@RESHARD.tmp_1']
@@ -101,7 +101,7 @@ class TestDataUnshard(unittest.TestCase):
         loss_np, shard_data_np = exe.run(
             distributed_main_program,
             feed={"input": input_data, "label": label_data},
-            fetch_list=fetchs,
+            fetch_list=fetches,
         )
         desired = input_data[worker_index].reshape(shard_data_np.shape)
         np.testing.assert_allclose(shard_data_np, desired)
@@ -172,11 +172,11 @@ class TestDataUnshard(unittest.TestCase):
 
         input_data = np.array(range(8 * 8)).reshape([8, 8]).astype("float32")
         label_data = np.random.randint(0, 10, [8, 8]).astype("float32")
-        fetchs = [loss.name, 'input']
+        fetches = [loss.name, 'input']
         loss_np, shard_data_np = exe.run(
             distributed_main_program,
             feed={"input": input_data, "label": label_data},
-            fetch_list=fetchs,
+            fetch_list=fetches,
         )
 
         desired = input_data.reshape(shard_data_np.shape)

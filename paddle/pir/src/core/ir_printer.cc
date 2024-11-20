@@ -29,8 +29,6 @@
 #include "paddle/pir/include/core/utils.h"
 #include "paddle/pir/include/core/value.h"
 
-COMMON_DECLARE_bool(pir_debug);
-
 namespace pir {
 
 namespace {
@@ -192,7 +190,7 @@ void IrPrinter::PrintOperationWithNoRegion(const Operation& op) {
 
   os << " \"" << op.name() << "\"";
 
-  if (VLOG_IS_ON(1) || FLAGS_pir_debug) {
+  if (VLOG_IS_ON(1)) {
     os << " [id:" << op.id() << "]";
   }
 

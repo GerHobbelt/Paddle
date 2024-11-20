@@ -203,9 +203,9 @@ class ElseContextNode : public IRContextNode {
 class IRBuilderNode : public cinn::common::Object {
  public:
   std::vector<IRContext> contexts;
-  Expr result;
+  ir::LoweredFunc result;
   const char* type_info() const override { return __type_info__; }
-  Expr GetResult() const;
+  ir::LoweredFunc GetResult() const;
   void Reset();
 
   template <typename TIRContextNode>

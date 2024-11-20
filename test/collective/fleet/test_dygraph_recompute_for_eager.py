@@ -188,7 +188,7 @@ def run_model(
     )
 
     if enable_autocast:
-        scaler = paddle.amp.GradScaler()
+        scaler = paddle.amp.GradScaler(init_loss_scaling=4096)
 
     loss_ = []
     param_ = []
@@ -340,7 +340,9 @@ class TestRecompute(unittest.TestCase):
         )
 
     def test_recompute_kwargs(self):
-        paddle.set_device("gpu")
+        paddle.set_device(
+            "xpu" if paddle.base.core.is_compiled_with_xpu() else "gpu"
+        )
         pos = paddle.randn(shape=[10, 10], dtype="float32")
         pos.stop_gradient = False
 

@@ -65,6 +65,12 @@ if(NOT WIN32)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wno-error=uninitialized")
   endif()
 endif()
+if(NOT WIN32
+   AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU"
+   AND ${CMAKE_CXX_COMPILER_VERSION} VERSION_GREATER_EQUAL 13.0)
+  message(STATUS "GCC version is >= 13.0, adding -Wno-error=stringop-overflow.")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error=stringop-overflow ")
+endif()
 ExternalProject_Add(
   extern_eigen3
   ${EXTERNAL_PROJECT_LOG_ARGS}

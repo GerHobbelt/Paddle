@@ -172,6 +172,12 @@ std::set<Expr> CollectIRNodes(Expr expr,
   return exprs;
 }
 
+std::set<Expr> CollectIRNodes(ir::LoweredFunc f,
+                              std::function<bool(const Expr*)>&& teller,
+                              bool uniq_target) {
+  return CollectIRNodes(f->body, std::move(teller), uniq_target);
+}
+
 std::vector<Expr> CollectIRNodesInOrder(
     Expr expr, std::function<bool(const Expr*)>&& teller) {
   std::vector<Expr> exprs;

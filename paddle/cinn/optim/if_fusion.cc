@@ -123,7 +123,6 @@ struct IfFusionMutator : public ir::IRMutator<Expr *> {
   VisitImpl(PolyFor);
   VisitImpl(Select);
   VisitImpl(Call);
-  VisitImpl(_Module_);
   VisitImpl(_Var_);
   VisitImpl(Load);
   VisitImpl(Store);
@@ -131,7 +130,6 @@ struct IfFusionMutator : public ir::IRMutator<Expr *> {
   VisitImpl(Free);
   VisitImpl(_Buffer_);
   VisitImpl(_Tensor_);
-  VisitImpl(_LoweredFunc_);
   VisitImpl(Let);
   VisitImpl(Reduce);
   VisitImpl(Ramp);

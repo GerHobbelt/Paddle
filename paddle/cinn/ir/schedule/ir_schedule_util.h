@@ -78,7 +78,7 @@ bool ContainVar(const std::vector<Expr>& exprs, const std::string& var_name);
  * \brief Given a _LoweredFunc_, set its cuda_axis_info based on its func_body.
  * @param lowered_func A pointer to the given _LoweredFunc_
  */
-void SetCudaAxisInfo(Expr* lowered_func);
+void SetCudaAxisInfo(ir::LoweredFunc lowered_func);
 
 /*!
  * \brief Check if a Expr node contains a ScheduleBlockRealize node.

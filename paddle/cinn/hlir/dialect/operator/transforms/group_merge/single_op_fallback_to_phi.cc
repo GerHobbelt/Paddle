@@ -35,22 +35,28 @@ class FusionOpPattern : public pir::OpRewritePattern<cinn::dialect::FusionOp> {
 
   bool MatchAndRewrite(cinn::dialect::FusionOp fusion_op,
                        pir::PatternRewriter& rewriter) const override {
-    // Fallback only when FusionOp has two operators inside: AnySingleOp +
-    // cf.yield
-    if (fusion_op.GetOperators().size() > 2) {
+    // Fallback only when FusionOp has two operators inside: AnySingleOp + yiled
+    // store cf.yield
+
+    if (fusion_op.GetOperators().size() != 3) {
       return false;
     }
+
+    if (!fusion_op.GetOperators()[1]->isa<cinn::dialect::YieldStoreOp>()) {
+      return false;
+    }
+
     PADDLE_ENFORCE_EQ(
         fusion_op.GetOperators().size(),
-        2,
+        3,
         ::common::errors::InvalidArgument(
             "fusion_op should have two operators inside, but got %d",
             fusion_op.GetOperators().size()));
     PADDLE_ENFORCE(
-        fusion_op.GetOperators()[1]->isa<::pir::YieldOp>(),
+        fusion_op.GetOperators()[2]->isa<::pir::YieldOp>(),
         ::common::errors::InvalidArgument(
             "The last operator of fusion_op must be YieldOp, but got %s",
-            fusion_op.GetOperators()[1]->name()));
+            fusion_op.GetOperators()[2]->name()));
 
     auto* program = fusion_op->GetParentProgram();
     auto& shape_analysis = pir::ShapeAnalysisManager::Instance().Get(
@@ -118,6 +124,7 @@ class FusionOpPattern : public pir::OpRewritePattern<cinn::dialect::FusionOp> {
   std::optional<pir::Operation*> FallBackOp(
       pir::Operation* op,
       pir::PatternRewriter& rewriter) const {  // NOLINT
+    std::cerr << "fall back op   " << op->name() << std::endl;
     auto it = op_handler_map().find(op->name());
     if (it == op_handler_map().end()) {
       VLOG(4) << "No fallback handler for op: " << op->name();

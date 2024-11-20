@@ -55,12 +55,12 @@ void OptimizeExprGPU(Expr* expr);
  * constant, so this only takes For nodes, not \note PolyFor nodes is allowed to
  * be GPU related.
  */
-void RemoveGpuForloopsAxis(Expr* expr);
+void RemoveGpuForloopsAxis(ir::LoweredFunc fn);
 
 /**
  * Add __syncthreads() to shared memory producer.
  */
-void CudaSyncThreadsDropIfThenElse(Expr* expr);
+void CudaSyncThreadsDropIfThenElse(ir::LoweredFunc fn);
 
 }  // namespace optim
 }  // namespace cinn

@@ -826,17 +826,6 @@
     func : c_scatter
   traits : paddle::dialect::ForwardOnlyTrait
 
-- op : c_sync_comm_stream
-  args : (Tensor x, int ring_id)
-  output : Tensor(out)
-  infer_meta :
-    func : UnchangedInferMeta
-    param : [x]
-  kernel :
-    func : c_sync_comm_stream
-  inplace : (x -> out)
-  traits : paddle::dialect::ForwardOnlyTrait
-
 - op : calc_reduced_attn_scores
   args : (Tensor q, Tensor k, Tensor softmax_lse)
   output : Tensor(reduced_scores)
@@ -1351,7 +1340,7 @@
     func : depthwise_conv2d_transpose
     data_type : x
   backward : depthwise_conv2d_transpose_grad
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : dequantize_abs_max
   args : (Tensor x, Tensor scale, float max_range)
@@ -1958,7 +1947,7 @@
     func : flash_attn_qkvpacked
     data_type : qkv
   backward : flash_attn_qkvpacked_grad
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : flash_attn_unpadded
   args : (Tensor q, Tensor k, Tensor v, Tensor cu_seqlens_q,  Tensor cu_seqlens_k, Tensor fixed_seed_offset, Tensor attn_mask, int64_t max_seqlen_q, int64_t max_seqlen_k, float scale, float dropout = 0.0, bool causal = false, bool return_softmax = false, bool is_test = false, str rng_name = "")
@@ -2711,6 +2700,7 @@
   optional : scale, bias
   intermediate : saved_mean, saved_variance
   backward : instance_norm_grad
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : inverse
   args : (Tensor x)
@@ -2942,6 +2932,7 @@
     data_type : x
   optional: bias
   traits : paddle::dialect::ForwardOnlyTrait
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : log
   args : (Tensor x)
@@ -3006,6 +2997,7 @@
     func : log_softmax
     data_type : x
   backward : log_softmax_grad
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : logcumsumexp
   args : (Tensor x, int axis=-1, bool flatten=false, bool exclusive=false, bool reverse=false)
@@ -3155,6 +3147,7 @@
   optional: h0, c0
   intermediate: batch_gate, batch_cell_pre_act
   backward: lstm_grad
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : lstsq
   args : (Tensor x, Tensor y, Scalar rcond=0.0f, str driver="gels")
@@ -3166,6 +3159,7 @@
     data_type : x
   optional : residuals
   traits : paddle::dialect::ForwardOnlyTrait
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : lu
   args : (Tensor x, bool pivot = true)
@@ -3977,7 +3971,7 @@
     data_type : x
   backward : rank_attention_grad
   optional : ins_rank, input_help
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : read_file
   args : (str filename = "", DataType dtype=DataType::UINT8, Place place=CPUPlace())

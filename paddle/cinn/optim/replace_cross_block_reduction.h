@@ -54,7 +54,7 @@ namespace optim {
  *         var_1[i] = grid_reduce_sum(var_1_rf)
  * }
  */
-void ReplaceCrossBlockReduction(Expr* e);
+void ReplaceCrossBlockReduction(ir::LoweredFunc fn);
 
 }  // namespace optim
 }  // namespace cinn

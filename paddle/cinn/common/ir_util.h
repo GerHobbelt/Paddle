@@ -81,11 +81,6 @@ inline Expr make_bool(bool x, int lanes) {
  */
 void CheckTensorUniqueInExpr(Expr expr);
 
-/**
- * \brief Check all the buffers are unique in an expression.
- */
-void CheckBufferUniqueInExpr(Expr expr);
-
 std::vector<std::string> GatherItersToTensorProducer(
     const std::string &target_tensor_name, Expr *expr);
 

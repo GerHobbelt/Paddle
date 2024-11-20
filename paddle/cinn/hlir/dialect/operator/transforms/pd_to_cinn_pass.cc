@@ -533,6 +533,7 @@ class SplitOpPattern : public pir::OpRewritePattern<paddle::dialect::SplitOp> {
 
   bool Match(paddle::dialect::SplitOp op) const override {
     const bool is_denied = CompatibleInfo::IsDeniedForCinn(*op.operation());
+
     return !is_denied && PatternConstraint(op);
   }
 
@@ -569,9 +570,28 @@ class SplitOpPattern : public pir::OpRewritePattern<paddle::dialect::SplitOp> {
       }
       return true;
     };
+
+    const auto &CanInferNegative = [&]() -> bool {
+      const auto &section = GetSections(op);
+      bool have_negative =
+          std::find(section.begin(), section.end(), -1) != section.end();
+      if (have_negative && GetSplitDim(op) < 0) {
+        return false;
+      }
+      return true;
+    };
+
     return IsDefinedBy<FullIntArrayOp>(op, 1) && IsDefinedBy<FullOp>(op, 2) &&
-           OnlyUsedBySplitOrSlice();
+           OnlyUsedBySplitOrSlice() && CanInferNegative();
   }
+
+  int64_t GetSplitDim(paddle::dialect::SplitOp op) const {
+    return op.x()
+        .type()
+        .dyn_cast<paddle::dialect::DenseTensorType>()
+        .dims()[GetAxis(op)];
+  }
+
   int GetAxis(paddle::dialect::SplitOp op) const {
     auto axis_gen_op = op->operand_source(2).defining_op();
     auto full_op = axis_gen_op->dyn_cast<paddle::dialect::FullOp>();
@@ -590,6 +610,36 @@ class SplitOpPattern : public pir::OpRewritePattern<paddle::dialect::SplitOp> {
     return axis;
   }
 
+  std::vector<int64_t> UpdateSectionBySplitDim(
+      const std::vector<int64_t> &section,
+      paddle::dialect::SplitOp op,
+      int axis) const {
+    // process negative
+    int negative_index = -1;
+    std::vector<int64_t> result(section);
+    int64_t numel = 0;
+    for (int i = 0; i < result.size(); ++i) {
+      if (result[i] < 0) {
+        negative_index = i;
+      } else {
+        numel += result[i];
+      }
+    }
+
+    if (negative_index != -1) {
+      auto split_dim = op.x()
+                           .type()
+                           .dyn_cast<paddle::dialect::DenseTensorType>()
+                           .dims()[axis];
+
+      if (split_dim > 0) {
+        result[negative_index] = split_dim - numel;
+      }
+    }
+
+    return result;
+  }
+
   std::vector<int64_t> GetSections(paddle::dialect::SplitOp op) const {
     std::vector<int64_t> result;
     auto sections_gen_op = op->operand_source(1)
@@ -603,6 +653,7 @@ class SplitOpPattern : public pir::OpRewritePattern<paddle::dialect::SplitOp> {
             section_attr[i].dyn_cast<::pir::Int64Attribute>().data());
       }
     }
+
     return result;
   }
 
@@ -611,7 +662,8 @@ class SplitOpPattern : public pir::OpRewritePattern<paddle::dialect::SplitOp> {
       ::pir::SliceOp slice,
       pir::PatternRewriter &rewriter) const {  // NOLINT
     const int axis = GetAxis(split);
-    const std::vector<int64_t> &sections = GetSections(split);
+    const std::vector<int64_t> &sections =
+        UpdateSectionBySplitDim(GetSections(split), split, axis);
     const int index = slice->attribute<::pir::Int32Attribute>("index").data();
     int64_t start =
         std::accumulate(sections.begin(), sections.begin() + index, 0);
@@ -636,7 +688,9 @@ class SplitOpPattern : public pir::OpRewritePattern<paddle::dialect::SplitOp> {
       ::pir::SplitOp pir_split,
       pir::PatternRewriter &rewriter) const {  // NOLINT
     const int axis = GetAxis(split);
-    const std::vector<int64_t> &sections = GetSections(split);
+    const std::vector<int64_t> &sections =
+        UpdateSectionBySplitDim(GetSections(split), split, axis);
+
     int64_t start = 0, end = 0;
     for (size_t i = 0; i < pir_split->num_results(); ++i) {
       start = end;

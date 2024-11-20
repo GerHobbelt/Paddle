@@ -15,10 +15,10 @@
 
 from paddle.distributed import fleet
 
-from .parallel_base import ParallelBase
+from .parallel_base import ParallelModel, ParallelOptimizer
 
 
-class ShardedDataParallel(ParallelBase):
+class ShardedDataParallel(ParallelModel):
     """
     ShardedDataParallel converts a single card model to a distrubuted data parallel model
 
@@ -37,17 +37,13 @@ class ShardedDataParallel(ParallelBase):
     def __init__(
         self,
         model,
-        optimizer=None,
-        level=None,
         offload=False,
         exclude_layer=None,
     ):
-        super().__init__(model, optimizer)
-        assert level in ("os", "os_g", "p_g_os", None)
+        super().__init__(model)
         assert offload is False
         assert exclude_layer is None
 
-        self.level = level
         self.sharding_parallelizer = self.sharding_parallelizer_func
 
     def sharding_parallelizer_func(self, model):
@@ -55,7 +51,7 @@ class ShardedDataParallel(ParallelBase):
 
 
 def sharded_data_parallel(
-    model, optimizer, level=None, offload=False, exclude_layer=None
+    model, optimizer=None, level=None, offload=False, exclude_layer=None
 ):
     """
     sharded_data_parallel converts model and optimizer to distributed and supports set zero stage1/2/3
@@ -75,9 +71,9 @@ def sharded_data_parallel(
         ShardedDataParallel: a distributed model
         ParallelOptimizer: a distributed optimizer
     """
-    sdp_model = ShardedDataParallel(
-        model, optimizer, level, offload, exclude_layer
-    )
+    sdp_model = ShardedDataParallel(model, offload, exclude_layer)
+    if optimizer is not None:
+        optimizer = ParallelOptimizer(optimizer, level)
 
     # check global_mesh
     mesh = fleet.auto.get_mesh()
@@ -87,4 +83,4 @@ def sharded_data_parallel(
     assert (
         "dp" in mesh.dim_names
     ), "dp must in the mesh dim_names when use sharded_data_parallel"
-    return sdp_model, sdp_model.optimizer
+    return sdp_model, optimizer

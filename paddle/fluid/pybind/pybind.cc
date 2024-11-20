@@ -936,7 +936,7 @@ void BindVjp(pybind11::module *m) {
             PADDLE_ENFORCE_EQ(inputs[idx].size(),
                               vjp_res[grad_index].size(),
                               common::errors::InvalidArgument(
-                                  "The size of inouts[%d] should be the "
+                                  "The size of inputs[%d] should be the "
                                   "same as vjp_res[%d] size.",
                                   idx,
                                   grad_index));
@@ -1385,7 +1385,7 @@ PYBIND11_MODULE(libpaddle, m) {
            Return the registered kernels in paddle.
 
            Args:
-               lib[string]: the libarary, could be 'phi', 'fluid' and 'all'.
+               lib[string]: the library, could be 'phi', 'fluid' and 'all'.
            )DOC");
 
   m.def(
@@ -1437,7 +1437,7 @@ PYBIND11_MODULE(libpaddle, m) {
            Return the registered kernels in phi.
 
            Args:
-               kernel_registered_type[string]: the libarary, could be 'function', 'structure', and 'all'.
+               kernel_registered_type[string]: the library, could be 'function', 'structure', and 'all'.
            )DOC");
 
   // NOTE(Aganlengzi): KernelFactory static instance is initialized BEFORE
@@ -1825,7 +1825,7 @@ All parameter, weight, gradient are variables in Paddle.
           VLOG(3) << "need skip: " << need_skip << std::endl;
           if (paddle::prim::PrimCommonUtils::IsBwdPrimEnabled()) {
             if ((grad_comp_op_maker != nullptr) && (!need_skip)) {
-              VLOG(3) << "Prim Flag Open: Runing composite grad fun for "
+              VLOG(3) << "Prim Flag Open: Running composite grad fun for "
                       << op_desc.Type();
               grad_op_descs = grad_comp_op_maker(op_desc,
                                                  no_grad_set,
@@ -1838,12 +1838,12 @@ All parameter, weight, gradient are variables in Paddle.
             }
           } else {
             if (grad_op_maker != nullptr) {
-              VLOG(6) << "Prim Flag Close: Runing origin grad fun for "
+              VLOG(6) << "Prim Flag Close: Running origin grad fun for "
                       << op_desc.Type();
               grad_op_descs = grad_op_maker(
                   op_desc, no_grad_set, &grad_to_var, grad_sub_block);
             } else {
-              VLOG(6) << "Prim Flag Close: Runing composite grad fun for "
+              VLOG(6) << "Prim Flag Close: Running composite grad fun for "
                       << op_desc.Type();
               grad_op_descs = grad_comp_op_maker(op_desc,
                                                  no_grad_set,
@@ -3279,6 +3279,7 @@ All parameter, weight, gradient are variables in Paddle.
            bool is_shape_tensor,
            paddle::framework::ShapeMode shape_mode) -> py::list {
           py::list res;
+
           paddle::framework::CollectShapeManager::Instance()
               .StatisticShapeRangeInfo();
           auto shape_result =
@@ -3289,6 +3290,9 @@ All parameter, weight, gradient are variables in Paddle.
           }
           return res;
         });
+  m.def("clear_shape_info", []() {
+    paddle::framework::CollectShapeManager::Instance().ClearShapeInfo();
+  });
 
 #if defined(PADDLE_WITH_PSLIB) && !defined(PADDLE_WITH_HETERPS)
   BindHeterWrapper(&m);

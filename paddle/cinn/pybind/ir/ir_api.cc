@@ -99,7 +99,7 @@ void BindLoweredFunc(py::module *m) {
           [](const ir::LoweredFunc &self) -> std::string { return self->name; })
       .def("__str__",
            [](const ir::LoweredFunc &self) -> std::string {
-             return utils::GetStreamCnt(Expr(self));
+             return utils::GetStreamCnt(self);
            })
       .def("__repr__",
            [](const ir::LoweredFunc &self) -> std::string {
@@ -551,8 +551,7 @@ void BindIrIr(py::module *m) {
       .def("expr_fields_const",
            py::overload_cast<>(&ir::Block::expr_fields, py::const_));
 
-  DefineExprNode<ir::_Module_>(m, "_Module_");
-  py::class_<ir::_Module_, ir::ExprNode<ir::_Module_>> _module_(*m, "_Module_");
+  py::class_<ir::_Module_, ir::IrNode> _module_(*m, "_Module_");
   _module_.def_readwrite("name", &ir::_Module_::name)
       .def_readwrite("target", &ir::_Module_::target)
       .def_readwrite("buffers", &ir::_Module_::buffers)
@@ -863,9 +862,8 @@ void BindIrContext(py::module *m) {
   ir_builder.def(py::init<>())
       .def("EnterWithContext", &IRBuilder::EnterWithContext)
       .def("ExitWithContext", &IRBuilder::ExitWithContext)
-      .def("get_result", [](IRBuilder &self) {
-        return self.data_->GetResult().as_lowered_func_ref();
-      });
+      .def("get_result",
+           [](IRBuilder &self) { return self.data_->GetResult(); });
 
   m->def("AxisMap", &AxisMap);
   m->def("TensorStore", &TensorStore);

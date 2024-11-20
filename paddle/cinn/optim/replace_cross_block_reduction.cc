@@ -89,7 +89,8 @@ void RemoveGridReduceAxisFromIfCondition(ir::Expr* expr) {
 }
 
 struct BaseMutator : public ir::IRMutator<> {
-  void operator()(ir::Expr* expr) { Visit(expr); }
+  using ir::IRMutator<>::Visit;
+  void operator()(ir::LoweredFunc fn) { Visit(fn.As<ir::_LoweredFunc_>()); }
 
  protected:
   bool IsGridReduce(const ir::ScheduleBlockRealize* block_realize) {
@@ -378,24 +379,23 @@ struct CrossBlockReductionReplacer : public BaseMutator {
         lang::CallExtern(func_name, {rf_tensor, spatial_size, spatial_index});
   }
 
-  void Visit(const ir::_LoweredFunc_* expr, ir::Expr* op) override {
+  void Visit(ir::_LoweredFunc_* fn) override {
     is_after_grid_reduce_ = false;
     func_arg_buffer_names_.clear();
-    for (auto& arg : expr->args) {
+    for (auto& arg : fn->args) {
       if (arg.is_buffer()) {
         func_arg_buffer_names_.insert(arg.buffer_arg()->name);
       }
     }
 
-    IRMutator::Visit(expr, op);
+    IRMutator::Visit(fn);
     if (!is_after_grid_reduce_) {
       return;
     }
 
-    ir::_LoweredFunc_* func_node = op->As<ir::_LoweredFunc_>();
-    ConvertHeapBuffersToFuncArgs(func_node);
-    InsertTempSpaceToFuncArgs(func_node, semaphore_buffer_, true);
-    func_node->temp_bufs.push_back(is_done_tensor_->buffer);
+    ConvertHeapBuffersToFuncArgs(fn);
+    InsertTempSpaceToFuncArgs(fn, semaphore_buffer_, true);
+    fn->temp_bufs.push_back(is_done_tensor_->buffer);
   }
 
   void Visit(const ir::ScheduleBlockRealize* expr, ir::Expr* op) override {
@@ -458,9 +458,9 @@ struct CrossBlockReductionReplacer : public BaseMutator {
 
 }  // namespace
 
-void ReplaceCrossBlockReduction(Expr* e) {
-  CrossBlockReductionReorderer()(e);
-  CrossBlockReductionReplacer()(e);
+void ReplaceCrossBlockReduction(ir::LoweredFunc fn) {
+  CrossBlockReductionReorderer()(fn);
+  CrossBlockReductionReplacer()(fn);
 }
 
 }  // namespace optim

@@ -770,7 +770,7 @@ void BindCompiledProgram(pybind11::module &m) {  // NOLINT
                   "or True"));
             }
           },
-          R"DOC((bool, optional): memory opitimize aims to save total memory
+          R"DOC((bool, optional): memory optimize aims to save total memory
                 consumption, set to True to enable it.
 
                 Default None. None means framework would choose to use or not use

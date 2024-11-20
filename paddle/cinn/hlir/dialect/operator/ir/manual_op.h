@@ -31,7 +31,9 @@ namespace cinn {
 namespace dialect {
 
 class IR_API GroupOp
-    : public pir::Op<GroupOp, paddle::dialect::InferSymbolicShapeInterface> {
+    : public pir::Op<GroupOp,
+                     paddle::dialect::InferSymbolicShapeInterface,
+                     pir::SideEffectTrait> {
  public:
   using Op::Op;
   static const char *name() { return "cinn_op.group"; }

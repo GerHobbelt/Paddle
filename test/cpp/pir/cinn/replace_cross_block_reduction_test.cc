@@ -54,8 +54,7 @@ TEST(CrossBlockReductionReplacer, SRLayout) {
   func->temp_bufs = {A->buffer, B->buffer};
 
   VLOG(6) << "Before ReplaceCrossBlockReduction: " << func;
-  auto expr_func = Expr(func);
-  ReplaceCrossBlockReduction(&expr_func);
+  ReplaceCrossBlockReduction(func);
   VLOG(6) << "After ReplaceCrossBlockReduction: " << func;
 
   EXPECT_EQ(utils::GetStreamCnt(func),
@@ -140,8 +139,7 @@ TEST(CrossBlockReductionReplacer, RSLayout) {
   func->temp_bufs = {A->buffer, B->buffer};
 
   VLOG(6) << "Before ReplaceCrossBlockReduction: " << func;
-  auto expr_func = Expr(func);
-  ReplaceCrossBlockReduction(&expr_func);
+  ReplaceCrossBlockReduction(func);
   VLOG(6) << "After ReplaceCrossBlockReduction: " << func;
 
   EXPECT_EQ(utils::GetStreamCnt(func),

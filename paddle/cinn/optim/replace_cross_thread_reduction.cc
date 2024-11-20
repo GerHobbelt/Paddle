@@ -41,7 +41,7 @@ struct BufferCmp {
 
 thread_local std::set<ir::Buffer, BufferCmp> shm_buffer_;
 struct CrossThreadReductionReplacer : public ir::IRMutator<> {
-  void operator()(ir::Expr* expr) { Visit(expr); }
+  void operator()(ir::LoweredFunc fn) { Visit(fn.As<ir::_LoweredFunc_>()); }
 
  private:
   bool CanReplace(const ir::ScheduleBlockRealize* block_realize) {
@@ -183,20 +183,18 @@ struct CrossThreadReductionReplacer : public ir::IRMutator<> {
 
   void Visit(ir::Expr* expr) { ir::IRMutator<>::Visit(expr, expr); }
 
-  void Visit(const ir::_LoweredFunc_* expr, ir::Expr* op) override {
-    ir::IRMutator<>::Visit(expr, op);
-    if (std::find_if(op->as_lowered_func()->temp_bufs.begin(),
-                     op->as_lowered_func()->temp_bufs.end(),
+  void Visit(ir::_LoweredFunc_* fn) override {
+    ir::IRMutator<>::Visit(fn);
+    if (std::find_if(fn->temp_bufs.begin(),
+                     fn->temp_bufs.end(),
                      [&](const ir::Buffer& buf) -> bool {
                        for (auto& tmp_buf : shm_buffer_) {
                          if (buf->name == tmp_buf->name) return true;
                        }
                        return false;
-                     }) == op->as_lowered_func()->temp_bufs.end())
-      op->as_lowered_func()->temp_bufs.insert(
-          op->as_lowered_func()->temp_bufs.end(),
-          shm_buffer_.begin(),
-          shm_buffer_.end());
+                     }) == fn->temp_bufs.end())
+      fn->temp_bufs.insert(
+          fn->temp_bufs.end(), shm_buffer_.begin(), shm_buffer_.end());
     shm_buffer_.clear();
   }
 
@@ -266,7 +264,9 @@ struct CrossThreadReductionReplacer : public ir::IRMutator<> {
 
 }  // namespace
 
-void ReplaceCrossThreadReduction(Expr* e) { CrossThreadReductionReplacer()(e); }
+void ReplaceCrossThreadReduction(ir::LoweredFunc fn) {
+  CrossThreadReductionReplacer()(fn);
+}
 
 }  // namespace optim
 }  // namespace cinn

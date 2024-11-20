@@ -41,7 +41,7 @@ std::string CodeGenGpuDev::Compile(const ir::Module &module, bool use_rtc) {
 }
 
 void CodeGenGpuDev::Compile(const ir::Module &module, const Outputs &outputs) {
-  ir::ir_utils::IrVerify(Expr(module));
+  ir::ir_utils::IrVerify(module.As<ir::_Module_>());
 
   CodeGenC::inline_builtin_codes_ = false;
   if (!outputs.c_header_name.empty()) {
@@ -73,7 +73,7 @@ void CodeGenGpuDev::Compile(const ir::Module &module, const Outputs &outputs) {
 
 void CodeGenGpuDev::Compile(const ir::LoweredFunc &func) {
   dyn_shared_mem_offset_ = Expr(-1);
-  IrPrinter::Visit(Expr(func));
+  Visit(func.As<ir::_LoweredFunc_>());
 }
 
 std::vector<Expr> CodeGenGpuDev::GenerateBufferAliasExprs(
@@ -522,10 +522,7 @@ ir::Expr CalculateSharedMemory(const ir::Buffer &buffer) {
   return buffer_size * Expr(type_bytes);
 }
 
-ir::Expr CalculateSharedMemory(const ir::Expr &func_expr) {
-  auto func = func_expr.as_lowered_func();
-  PADDLE_ENFORCE_NOT_NULL(
-      func, ::common::errors::InvalidType("expr is not a lowered_func"));
+ir::Expr CalculateSharedMemory(const ir::LoweredFunc &func) {
   auto alloc_temp_buffers = func->PrepareAllocTempBufferExprs();
   ir::Expr shm_size{0};
   for (const auto &alloc : alloc_temp_buffers) {

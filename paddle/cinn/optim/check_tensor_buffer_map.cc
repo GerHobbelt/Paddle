@@ -68,14 +68,12 @@ struct TensorBufferMapChecker : public ir::IRVisitorRequireReImpl<void> {
   VisitImpl(PolyFor);
   VisitImpl(Select);
   VisitImpl(Call);
-  VisitImpl(_Module_);
   VisitImpl(_Var_);
   VisitImpl(Load);
   VisitImpl(Store);
   VisitImpl(Alloc);
   VisitImpl(Free);
   VisitImpl(_Buffer_);
-  VisitImpl(_LoweredFunc_);
   VisitImpl(Let);
   VisitImpl(Reduce);
   VisitImpl(Ramp);
@@ -229,17 +227,7 @@ void TensorBufferMapChecker::Visit(const ir::Call *x) {
     Visit(x->write_args.back());
   }
 }
-void TensorBufferMapChecker::Visit(const ir::_Module_ *x) {
-  for (auto &e : x->functions) {
-    TensorBufferMapChecker::Visit(&e);
-  }
-  for (auto &e : x->buffers) {
-    TensorBufferMapChecker::Visit(&e);
-  }
-  for (auto &e : x->submodules) {
-    TensorBufferMapChecker::Visit(&e);
-  }
-}
+
 void TensorBufferMapChecker::Visit(const ir::_Var_ *x) {
   if (x->lower_bound.defined()) {
     TensorBufferMapChecker::Visit(x->lower_bound);
@@ -277,10 +265,6 @@ void TensorBufferMapChecker::Visit(const ir::_Buffer_ *x) {
     TensorBufferMapChecker::Visit(&e);
   }
   TensorBufferMapChecker::Visit(x->elem_offset);
-}
-
-void TensorBufferMapChecker::Visit(const ir::_LoweredFunc_ *x) {
-  TensorBufferMapChecker::Visit(x->body);
 }
 void TensorBufferMapChecker::Visit(const ir::Let *x) {
   TensorBufferMapChecker::Visit(x->symbol);

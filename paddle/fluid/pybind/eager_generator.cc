@@ -671,7 +671,7 @@ static void PurifyForwardOpProto(const proto::OpProto& op_proto,
     }
   }
 
-  /* ------ Maping forward slot name to fwd position ------ */
+  /* ------ Mapping forward slot name to fwd position ------ */
   size_t in_pos = 0;
   for (const auto& var : *in_vars) {
     VLOG(6) << "Mapping input tensor: " << var.name()
@@ -1877,7 +1877,7 @@ static std::pair<std::string, std::string> GenerateForwardFunctionContents(
   trace_op_body_str += trace_op_str;
   trace_op_body_str += "\n";
 
-  // [Generation] Log memory infomation
+  // [Generation] Log memory information
   const char* LOG_MEMORY_INFO_TEMPLATE =
       " // Log memory information\n"
       "  "

@@ -52,8 +52,8 @@ if TYPE_CHECKING:
 
     from paddle._typing import (
         DTypeLike,
-        NestedNumbericSequence,
-        Numberic,
+        NestedNumericSequence,
+        Numeric,
         ParamAttrLike,
         PlaceLike,
         ShapeLike,
@@ -854,7 +854,7 @@ def _to_tensor_static(
 
 
 def to_tensor(
-    data: TensorLike | NestedNumbericSequence,
+    data: TensorLike | NestedNumericSequence,
     dtype: DTypeLike | None = None,
     place: PlaceLike | None = None,
     stop_gradient: bool = True,
@@ -1363,7 +1363,7 @@ def eye(
             assert len(attr.shape) == 0 or (
                 len(attr.shape) == 1 and attr.shape[0] in [1, -1]
             )
-        elif not isinstance(attr, int) or attr < 0:
+        elif not isinstance(attr, (int, np.integer)) or attr < 0:
             raise TypeError(f"{message} should be a non-negative int.")
 
     _check_attr(num_rows, "num_rows")
@@ -3185,8 +3185,8 @@ def polar(
 @dygraph_only
 def cauchy_(
     x: paddle.Tensor,
-    loc: Numberic = 0,
-    scale: Numberic = 1,
+    loc: Numeric = 0,
+    scale: Numeric = 1,
     name: str | None = None,
 ) -> paddle.Tensor:
     """Fills the tensor with numbers drawn from the Cauchy distribution.

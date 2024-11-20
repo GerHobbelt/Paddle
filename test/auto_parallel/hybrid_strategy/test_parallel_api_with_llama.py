@@ -36,15 +36,9 @@ class TestTensorParallelAPI(test_base.CommunicationTestDistBase):
             "backend": ["gpu"],
             "amp": ["true"],
             "amp_level": ["O2"],
-            "amp_dtype": [
-                "float16",
-            ],
-            "amp_master_grad": [
-                "False",
-            ],
-            "only_build": [
-                "1",
-            ],
+            "amp_dtype": ["bfloat16"],
+            "amp_master_grad": ["true"],
+            "layz_init": ["true", "false"],
         }
 
     def test_simple_net_mp2(self):

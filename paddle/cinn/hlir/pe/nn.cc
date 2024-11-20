@@ -1774,15 +1774,6 @@ ir::Tensor Select(const ir::Tensor &condition,
                     true,
                     ::common::errors::InvalidArgument(
                         "The condition tensor type should be bool!"));
-  PADDLE_ENFORCE_EQ(
-      (condition->shape == true_value->shape &&
-       true_value->shape == false_value->shape),
-      true,
-      ::common::errors::InvalidArgument(
-          "The input tensor shape is not equal, recieved %d, %d and %d!",
-          condition->shape,
-          true_value->shape,
-          false_value->shape));
   return lang::Compute(
       condition->shape,
       [=](const std::vector<Expr> &indice) {

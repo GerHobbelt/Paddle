@@ -217,7 +217,6 @@ NO_NEED_GEN_STATIC_ONLY_APIS = [
     'push_gpups_sparse',
     'push_gpups_sparse_',
     'random_routing',
-    'rank_attention',
     'rnn_',
     'row_conv',
     'seed',

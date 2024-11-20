@@ -15,6 +15,7 @@
 #include "paddle/phi/kernels/index_put_kernel.h"
 #include "paddle/phi/backends/gpu/gpu_context.h"
 #include "paddle/phi/backends/gpu/gpu_launch_config.h"
+#include "paddle/phi/backends/gpu/gpu_primitives.h"
 #include "paddle/phi/core/kernel_registry.h"
 #include "paddle/phi/kernels/cast_kernel.h"
 #include "paddle/phi/kernels/funcs/index_put_utils.h"
@@ -54,7 +55,7 @@ __global__ void IndexPutCudaKernel(const T* x,
   }
 
   if (accumulate) {
-    *(out + offset) += *(vals + (idx & is_single_val_tensor));
+    phi::CudaAtomicAdd(out + offset, *(vals + (idx & is_single_val_tensor)));
   } else {
     *(out + offset) = *(vals + (idx & is_single_val_tensor));
   }

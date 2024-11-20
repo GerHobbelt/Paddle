@@ -35,7 +35,7 @@ class CodeGenGpuHost : public CodeGenHost {
       : CodeGenHost(m, b, vars) {}
 
   // TODO(Hongqing-work): remove this after we clear some old codes.
-  llvm::Value *Visit(const ir::_LoweredFunc_ *func) override {
+  llvm::Value *Visit(const ir::_LoweredFunc_ *func) {
     if (FLAGS_cinn_bucket_compile) {
       return CodeGenHost::Visit(func);
     }

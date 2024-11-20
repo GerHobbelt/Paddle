@@ -133,8 +133,7 @@ void BindModule(py::module *m) {
                  },
                  [&](common::NVGPUArch) {
 #ifdef CINN_WITH_CUDA
-                   auto func_expr = Expr(func);
-                   ir::SetCudaAxisInfo(&func_expr);
+                   ir::SetCudaAxisInfo(func);
                    optim::OptimizeExprGPU(&(func->body));
 #endif
                  },

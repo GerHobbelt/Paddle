@@ -25,12 +25,10 @@ namespace backends {
 std::tuple<ir::Module, ir::Module> SplitDeviceAndHostModule(ir::Module module) {
   if (FLAGS_cinn_bucket_compile) {
     detail::CollectBucketStrategyHostFunctionVisitor visitor(module->name);
-    Expr expr(module);
-    return visitor(&expr);
+    return visitor(module);
   }
   detail::CollectHostFunctionVisitor visitor(module->name);
-  Expr expr(module);
-  return visitor(&expr);
+  return visitor(module);
 }
 
 ir::Module CreateSwitchWithBroadcastConditionModule(
@@ -73,7 +71,7 @@ ir::Module CreateSwitchWithBroadcastConditionModule(
   const auto &CreateSwitchFunction =
       [&](std::vector<ir::Argument> func_arguments,
           const std::vector<ir::Expr> &read_args,
-          std::string name_extend) -> ir::Expr {
+          std::string name_extend) -> ir::LoweredFunc {
     std::vector<ir::Expr> body_stmts(symbolic_arg_define);
     for (int i = 0; i < broadcast_conditions.size(); ++i) {
       ir::Expr callee = ir::Call::Make(Void(),
@@ -93,33 +91,31 @@ ir::Module CreateSwitchWithBroadcastConditionModule(
             ir::IfThenElse::Make(broadcast_conditions[i], callee, false_expr));
       }
     }
-    ir::Expr caller = ir::_LoweredFunc_::Make(wrapper_func_name + name_extend,
-                                              func_arguments,
-                                              ir::Block::Make(body_stmts),
-                                              {});
+    ir::LoweredFunc caller =
+        ir::_LoweredFunc_::Make(wrapper_func_name + name_extend,
+                                func_arguments,
+                                ir::Block::Make(body_stmts),
+                                {});
     return caller;
   };
 
   ir::Module::Builder module_builder(wrapper_func_name + "_switch",
                                      cinn::common::DefaultHostTarget());
-  ir::Expr host_func_caller = CreateSwitchFunction(
+  ir::LoweredFunc host_func_caller = CreateSwitchFunction(
       host_func_arguments, {kernel_args, kernel_args_num, kernel_stream}, "");
-  ir::Expr infer_shape_func_caller =
+  ir::LoweredFunc infer_shape_func_caller =
       CreateSwitchFunction(infer_shape_func_arguments,
                            {kernel_args, kernel_args_num, tensor_shape_args},
                            "_infer_shape");
-  module_builder.AddFunctionWithoutOptim(
-      host_func_caller.as_lowered_func_ref());
-  module_builder.AddFunctionWithoutOptim(
-      infer_shape_func_caller.as_lowered_func_ref());
+  module_builder.AddFunctionWithoutOptim(host_func_caller);
+  module_builder.AddFunctionWithoutOptim(infer_shape_func_caller);
   // no need cx86 func
-  ir::Expr cx86_func_caller =
+  ir::LoweredFunc cx86_func_caller =
       ir::_LoweredFunc_::Make(wrapper_func_name + "_CX86",
                               host_func_arguments,
                               ir::Block::Make({}),
                               {});
-  module_builder.AddFunctionWithoutOptim(
-      cx86_func_caller.as_lowered_func_ref());
+  module_builder.AddFunctionWithoutOptim(cx86_func_caller);
   return module_builder.Build();
 }
 
@@ -191,9 +187,9 @@ detail::CollectBucketStrategyHostFunctionVisitor::GenDeviceKernelName(
 }
 
 void detail::CollectBucketStrategyHostFunctionVisitor::ProcessLoweredFunc(
-    ir::Expr func, ir::Expr predicate) {
+    ir::LoweredFunc func, ir::Expr predicate) {
   VLOG(4) << "Process Lowered Func" << func;
-  ir::_LoweredFunc_ *func_node = func.as_lowered_func();
+  ir::_LoweredFunc_ *func_node = func.As<ir::_LoweredFunc_>();
   PADDLE_ENFORCE_NOT_NULL(
       func_node,
       ::common::errors::InvalidArgument(
@@ -204,7 +200,7 @@ void detail::CollectBucketStrategyHostFunctionVisitor::ProcessLoweredFunc(
   }
   // process device func
   device_module_builder.AddFunctionWithoutOptim(
-      CreateDeviceFunction(func, predicate).as_lowered_func_ref());
+      CreateDeviceFunction(func, predicate));
   // process host func
   ir::Var kernel_ptr(GenDeviceKernelName(func_node->name, predicate),
                      type_of<std::string>());
@@ -311,8 +307,8 @@ void detail::CollectBucketStrategyHostFunctionVisitor::ProcessLoweredFunc(
 }
 
 void detail::CollectBucketStrategyHostFunctionVisitor::ProcessArgs(
-    ir::Expr func) {
-  std::vector<ir::Argument> args = func.as_lowered_func_ref()->args;
+    ir::LoweredFunc func) {
+  const std::vector<ir::Argument> &args = func->args;
   for (int i = 0; i < args.size(); ++i) {
     if (args[i].is_var()) {
       ir::Expr call_get_value_in_kernel_args =
@@ -331,11 +327,11 @@ void detail::CollectBucketStrategyHostFunctionVisitor::ProcessArgs(
   }
 }
 
-Expr detail::CollectBucketStrategyHostFunctionVisitor::CreateDeviceFunction(
-    ir::Expr expr, ir::Expr predicate) {
+ir::LoweredFunc
+detail::CollectBucketStrategyHostFunctionVisitor::CreateDeviceFunction(
+    ir::LoweredFunc expr, ir::Expr predicate) {
   auto copied = ir::ir_utils::IRCopy(expr);
-  auto *lowered_func = copied.as_lowered_func();
-  lowered_func->name = GenDeviceKernelName(lowered_func->name, predicate);
+  copied->name = GenDeviceKernelName(copied->name, predicate);
   return copied;
 }
 

@@ -16,11 +16,11 @@ import unittest
 
 import paddle
 from paddle.distributed.auto_parallel.intermediate.parallel_base import (
-    ParallelBase,
+    ParallelModel,
 )
 
 
-class PP(ParallelBase):
+class PP(ParallelModel):
     def __init__(self, model):
         super().__init__(model)
         self.pp_parallelizer = self.pp_init
@@ -29,7 +29,7 @@ class PP(ParallelBase):
         return paddle.nn.Linear(2, 2)
 
 
-class TP(ParallelBase):
+class TP(ParallelModel):
     def __init__(self, model):
         super().__init__(model)
         self.tp_parallelizer = self.tp_init
@@ -38,7 +38,7 @@ class TP(ParallelBase):
         return paddle.nn.Linear(3, 3)
 
 
-class SD(ParallelBase):
+class SD(ParallelModel):
     def __init__(self, model):
         super().__init__(model)
         self.sharding_parallelizer = self.sd_init

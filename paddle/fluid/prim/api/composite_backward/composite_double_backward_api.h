@@ -984,5 +984,70 @@ void bmm_double_grad(const Tensor& x,
   }
 }
 
+template <typename T>
+void index_put_double_grad(const Tensor& x,
+                           const std::vector<Tensor>& indices,
+                           const Tensor& value,
+                           const paddle::optional<Tensor>& grad_x_grad,
+                           const paddle::optional<Tensor>& grad_value_grad,
+                           const bool& accumulate,
+                           Tensor* grad_out_grad) {
+  if (grad_out_grad) {
+    if (grad_x_grad && grad_value_grad) {
+      /*
+        ddout_{i,j} = {
+          ddx_{i, j},           (i, j) \notin indices,
+          ddv_{k},              (i, j) \in indices and accumulate is false.
+          ddx_{i, j} + ddv_{k}, (i, j) \in indices and accumulate is true.
+        }
+      */
+      Tensor grad_out_grad_tmp = grad_x_grad.get();
+      grad_out_grad_tmp = index_put<T>(
+          grad_out_grad_tmp, indices, grad_value_grad.get(), accumulate);
+      set_output<T>(grad_out_grad_tmp, grad_out_grad);
+
+    } else if (grad_x_grad) {
+      /*
+        ddout_{i,j} = {
+          ddx_{i, j},           (i, j) \notin indices,
+          0,                    (i, j) \in indices and accumulate is false.
+          ddx_{i, j},           (i, j) \in indices and accumulate is true.
+        }
+      */
+      Tensor grad_out_grad_tmp = grad_x_grad.get();
+      if (!accumulate) {
+        auto zero_to_fill =
+            full<T>(common::vectorize(value.dims()), 0, value.dtype());
+        grad_out_grad_tmp =
+            index_put<T>(grad_out_grad_tmp, indices, zero_to_fill, accumulate);
+      }
+      set_output<T>(grad_out_grad_tmp, grad_out_grad);
+
+    } else if (grad_value_grad) {
+      /*
+        ddout_{i,j} = {
+          0,                    (i, j) \notin indices,
+          ddv_{k},              (i, j) \in indices.
+        }
+      */
+      Tensor grad_out_grad_tmp =
+          full<T>(common::vectorize(x.dims()), 0, x.dtype());
+      grad_out_grad_tmp = index_put<T>(grad_out_grad_tmp,
+                                       indices,
+                                       grad_value_grad.get(),
+                                       /*accumulate*/ false);
+      set_output<T>(grad_out_grad_tmp, grad_out_grad);
+
+    } else {
+      /*
+        ddout_{i,j} = 0
+      */
+      Tensor grad_out_grad_tmp =
+          full<T>(common::vectorize(x.dims()), 0, x.dtype());
+      set_output<T>(grad_out_grad_tmp, grad_out_grad);
+    }
+  }
+}
+
 }  // namespace prim
 }  // namespace paddle

@@ -40,7 +40,6 @@
 
 COMMON_DECLARE_bool(enable_pir_with_pt_in_dy2st);
 COMMON_DECLARE_bool(enable_pir_in_executor);
-COMMON_DECLARE_bool(print_ir);
 COMMON_DECLARE_bool(use_mkldnn);
 
 namespace details {
@@ -424,19 +423,6 @@ inline void PirRunProgramAPI(
   std::shared_ptr<::pir::Program> backward_program = PADDLE_GET_CONST(
       std::shared_ptr<::pir::Program>, attrs.at("backward_program"));
 
-  if (FLAGS_print_ir) {
-    std::ostringstream print_stream;
-    print_stream << "ForwardProgram is :\n";
-    forward_program->Print(print_stream);
-    if (!is_test) {
-      print_stream << "BackwardProgram is:\n";
-      backward_program->Print(print_stream);
-    } else {
-      print_stream << "BackwardProgram is empty in test mode.\n";
-    }
-    std::cout << "Program (fwd | bwd): \n" << print_stream.str() << std::endl;
-  }
-
   VLOG(10) << is_test << program_id;
 
   auto &cache = paddle::framework::InterpreterCoreInfoCache::Instance();
@@ -459,12 +445,6 @@ inline void PirRunProgramAPI(
     // Step 2. create new interpretercore
     auto passed_kernel_program =
         paddle::framework::ApplyIrPass(forward_program.get(), place);
-    if (FLAGS_print_ir) {
-      std::ostringstream print_stream;
-      print_stream << "LoweredProgram( AfterPass ) is :\n";
-      passed_kernel_program->Print(print_stream);
-      std::cout << print_stream.str() << std::endl;
-    }
     interpreter_core = paddle::framework::CreatePirInterpreterCoreInfoToCache(
         std::move(passed_kernel_program),
         place,
@@ -1016,12 +996,6 @@ inline void PirRunProgramGradAPI(
     passed_kernel_program = paddle::framework::ApplyRemoveShadowFeedPass(
         std::move(passed_kernel_program), new_block, place, global_inner_scope);
 
-    if (FLAGS_print_ir) {
-      std::ostringstream print_stream;
-      print_stream << "LoweredProgram( AfterPass | Backward ) is :\n";
-      passed_kernel_program->Print(print_stream);
-      std::cout << print_stream.str() << std::endl;
-    }
     interpreter_core = paddle::framework::CreatePirInterpreterCoreInfoToCache(
         std::move(passed_kernel_program),
         place,

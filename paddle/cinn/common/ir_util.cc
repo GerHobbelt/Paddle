@@ -324,44 +324,6 @@ void CheckTensorUniqueInExpr(Expr expr) {
   }
 }
 
-void CheckBufferUniqueInExpr(Expr expr) {
-  // the buffers exists in tensor and lowered functions.
-  CheckTensorUniqueInExpr(expr);
-
-  auto tensors = ir::ir_utils::CollectIRNodes(
-      expr, [](const Expr *x) { return x->as_tensor(); });
-  auto funcs = ir::ir_utils::CollectIRNodes(
-      expr, [](const Expr *x) { return x->as_lowered_func(); });
-
-  absl::flat_hash_map<std::string, const ir::_Buffer_ *> buffer_name;
-  auto check_buffer_uniq = [&](const ir::_Buffer_ *b) {
-    if (buffer_name.count(b->name)) {
-      PADDLE_ENFORCE_EQ(
-          buffer_name[b->name],
-          b,
-          ::common::errors::InvalidArgument(
-              "Found buffer not unique, The original express is %d .", expr));
-    } else {
-      buffer_name[b->name] = b->const_self();
-    }
-  };
-  for (auto &e : tensors) {
-    auto *t = e.as_tensor();
-    if (t->buffer.defined()) {
-      check_buffer_uniq(t->buffer->const_self());
-    }
-  }
-
-  for (auto &e : funcs) {
-    auto *f = e.as_lowered_func();
-    for (auto &b : f->temp_bufs) {
-      if (b.defined()) {
-        check_buffer_uniq(b->const_self());
-      }
-    }
-  }
-}
-
 Expr cast(Expr e, Type type) {
   if (e.is_constant()) {
     if (type.is_bool()) {

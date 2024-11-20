@@ -903,6 +903,12 @@ class Engine:
         paddle.base.libpaddle.pir.apply_dist2dense_pass(dense_program)
         remove_unuseful_comm_op_pass(dense_program)
 
+        if core._enable_dist_prim_all():
+            from paddle.decomposition import decomp
+
+            with decomp.prim_guard():
+                decomp.decompose_dist_program(dense_program)
+
         if self._strategy.pipeline.enable:
             self._job_plan = pipeline_pass(
                 [dense_program], [dense_program], self._strategy.pipeline

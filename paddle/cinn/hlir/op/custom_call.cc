@@ -144,7 +144,7 @@ std::shared_ptr<OpStrategy> StrategyForCustomCall(
         ir::_LoweredFunc_::Make(func_name, arguments, call_extern_api, {});
 
     VLOG(3) << func;
-    *ret = CINNValuePack{{CINNValue(ir::Expr(func))}};
+    *ret = CINNValuePack{{CINNValue(func)}};
   });
 
   framework::CINNSchedule schedule(

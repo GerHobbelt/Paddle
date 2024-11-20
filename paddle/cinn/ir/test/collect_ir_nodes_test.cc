@@ -49,7 +49,7 @@ TEST(CollectIRNodes, basic) {
   LOG(INFO) << "fn:\n" << fn;
 
   auto tensors =
-      CollectIRNodes(fn, [](const Expr* x) { return x->as_tensor(); });
+      CollectIRNodes(fn->body, [](const Expr* x) { return x->as_tensor(); });
   ASSERT_EQ(tensors.size(), 3UL);
 
   auto fn_body = fn.As<ir::_LoweredFunc_>()->body;

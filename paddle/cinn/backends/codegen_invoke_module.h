@@ -39,7 +39,7 @@ class CodeGenInvokeModule : public CodeGenLLVM {
       : CodeGenLLVM(m, b, vars) {}
 
   using CodeGenLLVM::Visit;
-  llvm::Value *Visit(const ir::_LoweredFunc_ *func) override {
+  llvm::Value *Visit(const ir::_LoweredFunc_ *func) {
     return LowerInvokeFunc(func);
   }
 

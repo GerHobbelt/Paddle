@@ -640,7 +640,7 @@ def max_pool1d(
         padding, 1, ceil_mode=ceil_mode
     )
 
-    # use 2d to implenment 1d should expand padding in advance.
+    # use 2d to implement 1d should expand padding in advance.
     padding = _expand_low_nd_padding(padding)
 
     if in_dynamic_or_pir_mode():
@@ -831,7 +831,7 @@ def max_unpool1d(
     else:
         stride = [1, *convert_to_list(stride, 1, 'pool_stride')]
     padding, padding_algorithm = _update_padding_nd(padding, 1)
-    # use 2d to implenment 1d should expand padding in advance.
+    # use 2d to implement 1d should expand padding in advance.
     padding = _expand_low_nd_padding(padding)
 
     if output_size is not None:

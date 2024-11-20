@@ -33,6 +33,10 @@ class IrEqualVisitor : public IRVisitorRequireReImpl<bool, const Expr*> {
   // Return true if they are equal, otherwise false;
   bool Compare(const Expr& lhs, const Expr& rhs);
 
+  bool Compare(const Module& lhs, const Module& rhs);
+
+  bool Compare(const LoweredFunc& lhs, const LoweredFunc& rhs);
+
  private:
   bool Compare(const std::string& lhs, const std::string& rhs);
   bool Compare(const std::map<std::string, attr_t>& lhs,
@@ -49,6 +53,10 @@ class IrEqualVisitor : public IRVisitorRequireReImpl<bool, const Expr*> {
   bool Visit(const IterSplit* lhs, const Expr* other);
 
   bool Visit(const IterSum* lhs, const Expr* other);
+
+  bool Visit(const _Module_* lhs, const _Module_* rhs);
+
+  bool Visit(const _LoweredFunc_* lhs, const _LoweredFunc_* rhs);
 
   // whether allowing name suffix ends with "_[0-9]+" different
   bool allow_name_suffix_diff_ = false;

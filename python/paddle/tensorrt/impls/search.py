@@ -15,6 +15,11 @@
 
 import tensorrt as trt
 
+from paddle.tensorrt.converter_utils import (
+    squeeze_trt,
+    trt_cast,
+    unsqueeze_trt,
+)
 from paddle.tensorrt.register import converter_registry
 
 
@@ -59,3 +64,40 @@ def argmax_converter(network, paddle_op, inputs):
             output_dims.append(input_dims[i])
         squeeze_layer.reshape_dims = tuple(output_dims)
         return squeeze_layer.get_output(0)
+
+
+@converter_registry.register("pd_op.topk", trt_version="8.x")
+def topk_converter(network, paddle_op, inputs):
+    input_tensor = inputs[0]
+
+    input_shape = paddle_op.operands()[0].source().shape
+
+    k = paddle_op.attrs().get("k", 1)
+    axis = paddle_op.attrs().get("axis", -1)
+    largest = paddle_op.attrs().get("largest", True)
+    flag = trt.TopKOperation.MAX if largest else trt.TopKOperation.MIN
+
+    input_rank = len(input_shape)
+
+    expand_to_2d = input_rank == 1
+    if expand_to_2d:
+        input_tensor = unsqueeze_trt(network, input_tensor, [1])
+
+    input_type = input_tensor.dtype
+    if input_type == trt.DataType.INT32:
+        input_tensor = trt_cast(network, input_tensor, trt.DataType.FLOAT)
+
+    if axis < 0:
+        axis += input_rank
+    layer = network.add_topk(input_tensor, flag, k, 1 << axis)
+    values = layer.get_output(0)
+    indices = layer.get_output(1)
+
+    if expand_to_2d:
+        values = squeeze_trt(network, values, [1])
+        indices = squeeze_trt(network, indices, [1])
+
+    if input_type == trt.DataType.INT32:
+        values = trt_cast(network, values, trt.DataType.INT32)
+
+    return values, indices

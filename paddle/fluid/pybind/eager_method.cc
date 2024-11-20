@@ -719,7 +719,7 @@ PyDoc_STRVAR(tensor_method_clone__doc__,  // NOLINT
 
 Returns a new Tensor, which is clone of origin Tensor, and it remains in the current graph.
 It will always have a Tensor copy.
-Tn addition, the cloned Tensor provides gradient propagation.
+In addition, the cloned Tensor provides gradient propagation.
 
 Returns:
     Tensor, The cloned Tensor.
@@ -841,7 +841,7 @@ PyDoc_STRVAR(tensor_clear_gradient__doc__,  // NOLINT
 --
 
 Only for Tensor that has gradient, normally we use this for Parameters since
-other temporary Tensor doesen't has gradient.
+other temporary Tensor doesn't has gradient.
 
 The Gradient of current Tensor will be set to ``0`` elementwise or ``None``.
 

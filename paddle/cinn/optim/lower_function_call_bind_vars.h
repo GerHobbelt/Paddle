@@ -21,7 +21,7 @@
 namespace cinn {
 namespace optim {
 
-void LowerFunctionCallBindVars(Expr *m);
+void LowerFunctionCallBindVars(ir::Module m);
 
 }  // namespace optim
 }  // namespace cinn

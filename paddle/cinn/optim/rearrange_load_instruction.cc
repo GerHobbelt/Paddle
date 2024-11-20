@@ -152,13 +152,11 @@ struct RearrangeLoadInstructionMutator : public ir::IRMutator<Expr *> {
   VisitImpl(Cast);
   VisitImpl(PolyFor);
   VisitImpl(Call);
-  VisitImpl(_Module_);
   VisitImpl(_Var_);
   VisitImpl(Alloc);
   VisitImpl(Free);
   VisitImpl(_Buffer_);
   VisitImpl(_Tensor_);
-  VisitImpl(_LoweredFunc_);
   VisitImpl(Let);
   VisitImpl(Reduce);
   VisitImpl(Ramp);

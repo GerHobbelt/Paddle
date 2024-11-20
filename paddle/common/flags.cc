@@ -1668,9 +1668,6 @@ PHI_DEFINE_EXPORTED_int32(
 
 PHI_DEFINE_EXPORTED_bool(print_ir, false, "Whether print ir debug str.");
 
-PHI_DEFINE_EXPORTED_bool(pir_debug,
-                         false,
-                         "Whether print more pir debug info.");
 PHI_DEFINE_EXPORTED_bool(
     prim_skip_dynamic,
     true,

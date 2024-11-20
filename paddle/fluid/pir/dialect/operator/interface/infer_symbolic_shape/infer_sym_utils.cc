@@ -201,8 +201,9 @@ std::vector<symbol::DimExpr> GetSymShapeForInputValue(
     const std::string &input_name,
     const pir::Value &value,
     pir::InferSymbolicShapeContext *infer_context) {
-  const common::DDim &result_dims =
-      value.type().dyn_cast<pir::DenseTensorType>().dims();
+  const pir::DenseTensorType &value_type =
+      value.type().dyn_cast<pir::DenseTensorType>();
+  const common::DDim &result_dims = value_type.dims();
   const auto &predefined_dim_index_to_expr = [&]() {
     std::unordered_map<int, symbol::DimExpr> index_to_expr;
     if (infer_context->HasPredefinedDimExprForInputName(input_name)) {

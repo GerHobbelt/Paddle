@@ -44,7 +44,7 @@ class TestSigmoidCrossEntropyWithLogitsOpGradWithAutoGrad(unittest.TestCase):
             )
         )
 
-        self.lable = np.random.uniform(
+        self.label = np.random.uniform(
             0, 1, (self.batch_size, self.num_classes)
         ).astype("float32")
 
@@ -76,7 +76,7 @@ class TestSigmoidCrossEntropyWithLogitsOpGradWithAutoGrad(unittest.TestCase):
 
         def cal(fn, place):
             x1 = paddle.to_tensor(self.x, stop_gradient=False, place=place)
-            label1 = paddle.to_tensor(self.lable)
+            label1 = paddle.to_tensor(self.label)
             pos_weight1 = paddle.to_tensor(self.pos_weight, place=place)
             res = fn(x1, label1, pos_weight1)
             return res

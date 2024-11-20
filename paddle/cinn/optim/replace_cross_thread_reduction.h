@@ -27,7 +27,7 @@ namespace optim {
 /**
  * Replace cross thread reduction to external call.
  */
-void ReplaceCrossThreadReduction(Expr* e);
+void ReplaceCrossThreadReduction(ir::LoweredFunc fn);
 
 }  // namespace optim
 }  // namespace cinn

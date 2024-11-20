@@ -92,6 +92,11 @@ void Tensor::copy_(const Tensor &src,
     return;
   }
 
+  if (src.place().GetType() == AllocationType::UNDEFINED) {
+    VLOG(8) << "Src place is UNDEFINED, skip copy";
+    return;
+  }
+
   VLOG(3) << "Deep copy Tensor from " << src.name() << " to " << name();
   if (initialized()) {
     PADDLE_ENFORCE_EQ(dtype(),

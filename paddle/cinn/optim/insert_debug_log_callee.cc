@@ -101,8 +101,6 @@ struct StoreDebugInfoBuilder : public ir::IRVisitor {
   void Visit(const ir::Free *x) override {}
   void Visit(const ir::_Buffer_ *x) override {}
   void Visit(const ir::_Tensor_ *x) override {}
-  void Visit(const ir::_LoweredFunc_ *x) override {}
-  void Visit(const ir::_Module_ *x) override {}
   void Visit(const ir::Let *x) override {}
   void Visit(const ir::Reduce *x) override {}
   void Visit(const ir::Ramp *x) override {}
@@ -223,7 +221,7 @@ struct InsertDebugLogCalleeMutator : public ir::IRMutator<> {
            << " with condition: " << node->condition << ">";
         break;
       }
-      case ir::IrNodeTy::_LoweredFunc_: {
+      case ir::IrNodeTy::LoweredFunc: {
         auto *node = e.As<ir::_LoweredFunc_>();
         ss << "<LoweredFunc " << node->name << ">";
         break;

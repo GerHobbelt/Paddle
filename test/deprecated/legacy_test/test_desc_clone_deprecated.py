@@ -48,7 +48,7 @@ def cnn_model(data):
         act="relu",
     )
 
-    # TODO(dzhwinter) : refine the initializer and random seed settting
+    # TODO(dzhwinter) : refine the initializer and random seed setting
     SIZE = 10
     input_shape = conv_pool_2.shape
     param_shape = [

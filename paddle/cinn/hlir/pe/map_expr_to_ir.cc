@@ -89,7 +89,7 @@ class MapExprToIrTranslator {
         1,
         ::common::errors::InvalidArgument("Only support one LoweredFunc now!"));
     std::optional<ir::Expr> ret{std::nullopt};
-    VisitEachStoreExpr(lowered_funcs.at(0), [&](const ir::Expr& expr) {
+    VisitEachStoreExpr(lowered_funcs.at(0)->body, [&](const ir::Expr& expr) {
       PADDLE_ENFORCE_EQ(
           ret.has_value(),
           false,
@@ -121,7 +121,7 @@ class MapExprToIrTranslator {
         1,
         ::common::errors::InvalidArgument("Only support one LoweredFunc now!"));
     std::vector<ir::Expr> stores{};
-    VisitEachStoreExpr(lowered_funcs.at(0), [&](const ir::Expr& expr) {
+    VisitEachStoreExpr(lowered_funcs.at(0)->body, [&](const ir::Expr& expr) {
       stores.emplace_back(expr);
     });
     PADDLE_ENFORCE_EQ(stores.size(),
@@ -146,7 +146,7 @@ class MapExprToIrTranslator {
         1,
         ::common::errors::InvalidArgument("Only support one LoweredFunc now!"));
     std::vector<ir::Expr> stores{};
-    VisitEachStoreExpr(lowered_funcs.at(0), [&](const ir::Expr& expr) {
+    VisitEachStoreExpr(lowered_funcs.at(0)->body, [&](const ir::Expr& expr) {
       stores.emplace_back(expr);
     });
     PADDLE_ENFORCE_EQ(stores.size(),
@@ -176,9 +176,6 @@ class MapExprToIrTranslator {
   template <typename DoEachT>
   void VisitEachStoreExpr(const ir::Expr& expr, const DoEachT& DoEach) const {
     switch (expr.node_type()) {
-      case ir::IrNodeTy::_LoweredFunc_:
-        VisitEachStoreExpr(expr.as_lowered_func()->body, DoEach);
-        break;
       case ir::IrNodeTy::Block:
         for (const auto& stmt : expr.As<ir::Block>()->stmts) {
           VisitEachStoreExpr(stmt, DoEach);

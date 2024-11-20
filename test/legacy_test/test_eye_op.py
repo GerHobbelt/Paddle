@@ -91,6 +91,22 @@ class TestEyeOp2(OpTest):
         self.check_output(check_pir=True)
 
 
+class TestEyeOp3(OpTest):
+    def setUp(self):
+        '''
+        Test eye op with np.int32 scalar
+        '''
+        self.python_api = paddle.eye
+        self.op_type = "eye"
+
+        self.inputs = {}
+        self.attrs = {'num_rows': np.int32(99), 'num_columns': np.int32(1)}
+        self.outputs = {'Out': np.eye(99, 1, dtype=float)}
+
+    def test_check_output(self):
+        self.check_output(check_pir=True)
+
+
 class API_TestTensorEye(unittest.TestCase):
 
     def test_static_out(self):

@@ -46,6 +46,11 @@ inline bool IsCustomOp(pir::Operation* op) {
   return op_name.find("custom_op") != op_name.npos;
 }
 
+inline bool IsInplaceOp(pir::Operation* op) {
+  std::string op_name = op->name();
+  return op_name.back() == '_';
+}
+
 inline bool IsTensorRTOp(pir::Operation* op) {
   std::string op_name = op->name();
   return op_name == "pd_op.tensorrt_engine";

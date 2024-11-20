@@ -41,8 +41,6 @@ using pir::TuplePopOp;
 using pir::TuplePushOp;
 constexpr char kStopGradientAttrName[] = "stop_gradient";  // NOLINT
 
-COMMON_DECLARE_bool(pir_debug);
-
 namespace paddle::dialect {
 
 void IfOp::Build(pir::Builder &builder,             // NOLINT
@@ -171,7 +169,7 @@ void IfOp::Print(pir::IrPrinter &printer) {
   printer.PrintOpResult(*op);
   os << " = \"" << name() << "\"";
 
-  if (VLOG_IS_ON(1) || FLAGS_pir_debug) {
+  if (VLOG_IS_ON(1)) {
     os << " [id:" << op->id() << "]";
   }
 
@@ -428,7 +426,7 @@ void WhileOp::Print(pir::IrPrinter &printer) {
   auto op = operation();
   printer.PrintOpResult(*op);
   os << " = \"" << name() << "\"";
-  if (VLOG_IS_ON(1) || FLAGS_pir_debug) {
+  if (VLOG_IS_ON(1)) {
     os << " [id:" << op->id() << "]";
   }
   os << " (cond=";
