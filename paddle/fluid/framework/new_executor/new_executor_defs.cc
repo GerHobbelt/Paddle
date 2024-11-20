@@ -23,8 +23,7 @@
 #include "paddle/fluid/framework/new_executor/garbage_collector/garbage_collector.h"
 #include "paddle/fluid/platform/profiler/event_tracing.h"
 
-namespace paddle {
-namespace framework {
+namespace paddle::framework {
 
 VariableScope::VariableScope(Scope* scope)
     : var_list_(), name2id_(), vec_meta_info_(), data_transfer_added_vars_() {
@@ -178,7 +177,7 @@ Instruction::Instruction(size_t id,
 
 void Instruction::WaitEvent(const Place& place) const {
   // If InterpreterCore in on CPUPlace, do nothing.
-  if (platform::is_cpu_place(place)) {
+  if (phi::is_cpu_place(place)) {
     return;
   }
 
@@ -307,12 +306,12 @@ const platform::DeviceContext& Instruction::DeviceContext() const {
   return dev_ctx_;
 }
 
-const std::vector<std::pair<Variable*, Variable*>>& Instruction::InplaceInfo()
-    const {
+const std::vector<std::pair<const Variable*, Variable*>>&
+Instruction::InplaceInfo() const {
   return vec_inplace_in_to_out_;
 }
 
-void Instruction::AddInplace(Variable* in, Variable* out) {
+void Instruction::AddInplace(const Variable* in, Variable* out) {
   vec_inplace_in_to_out_.emplace_back(in, out);
 }
 
@@ -353,5 +352,4 @@ void Instruction::UpdateRecordStreamForGcInfo() {
 }
 #endif
 
-}  // namespace framework
-}  // namespace paddle
+}  // namespace paddle::framework

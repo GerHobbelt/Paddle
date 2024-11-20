@@ -19,8 +19,7 @@
 #include "paddle/fluid/framework/new_executor/feed_fetch_utils.h"
 #include "paddle/fluid/pir/dialect/operator/ir/pd_op.h"
 
-namespace paddle {
-namespace framework {
+namespace paddle::framework {
 
 void SetColAttrForFeedFetchOps(std::shared_ptr<ProgramDesc> program_desc,
                                const int64_t micro_batch_num,
@@ -110,15 +109,29 @@ void FetchTensors(const std::vector<std::string>& job_fetch_names,
     int col = find(fetch_var_names.begin(), fetch_var_names.end(), var_name) -
               fetch_var_names.begin();
     auto* var = scope->FindVar(var_name);
-    auto& src = var->Get<phi::DenseTensor>();
-    auto* dst =
-        &(PADDLE_GET(phi::DenseTensor, fetch_list->at(micro_batch_id)[col]));
-    if (src.IsInitialized()) {
-      TensorCopy(src, platform::CPUPlace(), dst);
-      dst->set_lod(src.lod());
-    } else {
-      VLOG(6) << "Found " << var_name
-              << " is not initialized and skip TensorCopy.";
+    if (var->IsType<phi::DenseTensor>()) {
+      auto& src = var->Get<phi::DenseTensor>();
+      auto* dst =
+          &(PADDLE_GET(phi::DenseTensor, fetch_list->at(micro_batch_id)[col]));
+      if (src.IsInitialized()) {
+        TensorCopy(src, platform::CPUPlace(), dst);
+        dst->set_lod(src.lod());
+      } else {
+        VLOG(6) << "Found " << var_name
+                << " is not initialized and skip TensorCopy.";
+      }
+    } else if (var->IsType<phi::TensorArray>()) {
+      auto& src = var->Get<phi::TensorArray>();
+      fetch_list->at(micro_batch_id)[col] =
+          phi::TensorArray();  // default DenseTensor, we replace it with
+                               // TensorArray.
+      auto* dst =
+          &(PADDLE_GET(phi::TensorArray, fetch_list->at(micro_batch_id)[col]));
+      dst->resize(src.size());
+      for (size_t i = 0; i < src.size(); ++i) {
+        TensorCopy(src[i], platform::CPUPlace(), &dst->at(i));
+        dst->at(i).set_lod(src[i].lod());
+      }
     }
   }
 }
@@ -150,13 +163,13 @@ void MergeFetchTensors(const FetchUnmergedList& fetch_list,
           &PADDLE_GET_CONST(phi::DenseTensor, fetch_list[micro_batch_id][i]));
     }
     phi::DenseTensor merged_tensor;
-    MergeTensors(tensors_ptr, platform::CPUPlace(), &merged_tensor);
+    MergeTensors(tensors_ptr, phi::CPUPlace(), &merged_tensor);
     out->at(i) = std::move(merged_tensor);
   }
 }
 
 void MergeTensors(const std::vector<const phi::DenseTensor*>& tensors,
-                  const platform::Place dst_place,
+                  const phi::Place dst_place,
                   phi::DenseTensor* target) {
   PADDLE_ENFORCE_EQ(
       tensors.empty(),
@@ -253,5 +266,4 @@ void MergeTensors(const std::vector<const phi::DenseTensor*>& tensors,
   }
 }
 
-}  // namespace framework
-}  // namespace paddle
+}  // namespace paddle::framework

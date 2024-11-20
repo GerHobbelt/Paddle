@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
+
 import os
 
 import numpy as np
@@ -473,7 +475,7 @@ class PirTranslatedLayer(layers.Layer):
             >>> CLASS_NUM = 10
 
             >>> # define a random dataset
-            >>> class RandomDataset(paddle.io.Dataset):
+            >>> class RandomDataset(paddle.io.Dataset): # type: ignore[type-arg]
             ...     def __init__(self, num_samples):
             ...         self.num_samples = num_samples
             ...
@@ -542,7 +544,11 @@ class PirTranslatedLayer(layers.Layer):
 
     """
 
-    def __init__(self, programs, persistable_vars):
+    def __init__(
+        self,
+        programs: dict[str, paddle.static.Program],
+        persistable_vars: dict[str, paddle.Tensor],
+    ):
         super().__init__()
 
         if not isinstance(programs, dict):

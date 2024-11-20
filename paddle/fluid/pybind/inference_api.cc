@@ -52,8 +52,7 @@
 
 namespace py = pybind11;  // NOLINT
 
-namespace pybind11 {
-namespace detail {
+namespace pybind11::detail {
 
 // Note: use same enum number of float16 in numpy.
 // import numpy as np
@@ -62,7 +61,7 @@ constexpr int NPY_FLOAT16_ = 23;
 constexpr int NPY_UINT16_ = 4;
 
 // Note: Since float16 is not a builtin type in C++, we register
-// paddle::platform::float16 as numpy.float16.
+// phi::dtype::float16 as numpy.float16.
 // Ref: https://github.com/pybind/pybind11/issues/1776
 template <>
 struct npy_format_descriptor<phi::dtype::float16> {
@@ -79,11 +78,9 @@ struct npy_format_descriptor<phi::dtype::float16> {
   static constexpr auto name = _("float16");
 };
 
-}  // namespace detail
-}  // namespace pybind11
+}  // namespace pybind11::detail
 
-namespace paddle {
-namespace pybind {
+namespace paddle::pybind {
 using paddle::AnalysisPredictor;
 using paddle::NativeConfig;
 using paddle::NativePaddlePredictor;
@@ -322,8 +319,8 @@ void PaddleTensorShareExternalData(paddle_infer::Tensor &tensor,     // NOLINT
         ToPaddleInferPlace(paddle_tensor.place().GetType()));
   } else if (paddle_tensor.dtype() == phi::DataType::FLOAT16) {
     tensor.ShareExternalData(
-        static_cast<paddle::platform::float16 *>(
-            paddle_tensor.data<paddle::platform::float16>()),
+        static_cast<phi::dtype::float16 *>(
+            paddle_tensor.data<phi::dtype::float16>()),
         shape,
         ToPaddleInferPlace(paddle_tensor.place().GetType()));
   } else if (paddle_tensor.dtype() == phi::DataType::BFLOAT16) {
@@ -971,18 +968,6 @@ void BindAnalysisConfig(py::module *m) {
            &AnalysisConfig::SetTensorRtOptimizationLevel)
       .def("tensorrt_optimization_level",
            &AnalysisConfig::tensorrt_optimization_level)
-      .def("enable_dlnne",
-           &AnalysisConfig::EnableDlnne,
-           py::arg("min_subgraph_size") = 3,
-           py::arg("max_batch_size") = 1,
-           py::arg("use_static_batch") = false,
-           py::arg("weight_share_mode") = "0",
-           py::arg("disable_nodes_by_outputs") =
-               std::unordered_set<std::string>(),
-           py::arg("input_shape_dict") =
-               std::map<std::string, std::vector<int64_t>>(),
-           py::arg("use_calib_mode") = false,
-           py::arg("precision_mode") = AnalysisConfig::Precision::kFloat32)
       .def("switch_ir_debug",
            &AnalysisConfig::SwitchIrDebug,
            py::arg("x") = true,
@@ -1035,6 +1020,7 @@ void BindAnalysisConfig(py::module *m) {
            [](AnalysisConfig &self, const std::string &pass) {
              self.pass_builder()->DeletePass(pass);
            })
+      .def("delete_pass", &AnalysisConfig::DeletePass)
       .def(
           "pass_builder",
           [](AnalysisConfig &self) {
@@ -1345,5 +1331,4 @@ void BindInternalUtils(py::module *m) {
                   });
 }
 }  // namespace
-}  // namespace pybind
-}  // namespace paddle
+}  // namespace paddle::pybind

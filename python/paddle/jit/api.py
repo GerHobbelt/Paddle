@@ -23,8 +23,26 @@ import threading
 import types
 import warnings
 from collections import OrderedDict
+from collections.abc import Sequence
 from contextlib import contextmanager
-from typing import Any
+from types import ModuleType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Callable,
+    Protocol,
+    TypedDict,
+    TypeVar,
+    overload,
+)
+
+from typing_extensions import (
+    Literal,
+    NotRequired,
+    ParamSpec,
+    TypeAlias,
+    Unpack,
+)
 
 import paddle
 from paddle.base import core, dygraph
@@ -69,7 +87,17 @@ from .translated_layer import (
     TranslatedLayer,
 )
 
+if TYPE_CHECKING:
+    from paddle._typing import NestedStructure
+    from paddle.static import InputSpec
+
 ENV_ENABLE_SOT = BooleanEnvironmentVariable("ENABLE_FALL_BACK", True)
+
+
+_LayerT = TypeVar("_LayerT", bound=Layer)
+_RetT = TypeVar("_RetT")
+_InputT = ParamSpec("_InputT")
+Backends: TypeAlias = Literal["CINN"]
 
 
 @contextmanager
@@ -98,13 +126,13 @@ def copy_decorator_attrs(original_func, decorated_obj):
     return decorated_obj
 
 
-def ignore_module(modules: list[Any]):
+def ignore_module(modules: list[ModuleType]) -> None:
     """
     Adds modules that ignore transcription.
     Builtin modules that have been ignored are collections, pdb, copy, inspect, re, numpy, logging, six
 
     Args:
-        modules (List[Any]): Ignored modules that you want to add
+        modules (list[ModuleType]): Ignored modules that you want to add
 
     Examples:
         .. code-block:: python
@@ -131,6 +159,56 @@ def _check_and_set_backend(backend, build_strategy):
         )
     if backend == 'CINN':
         build_strategy.build_cinn_pass = True
+
+
+class _ToStaticOptions(TypedDict):
+    property: NotRequired[bool]
+    full_graph: NotRequired[bool]
+
+
+class _ToStaticDecorator(Protocol):
+    @overload
+    def __call__(self, function: _LayerT) -> _LayerT:
+        ...
+
+    @overload
+    def __call__(
+        self, function: Callable[_InputT, _RetT]
+    ) -> StaticFunction[_InputT, _RetT]:
+        ...
+
+
+@overload
+def to_static(
+    function: _LayerT,
+    input_spec: NestedStructure[InputSpec] | None = ...,
+    build_strategy: BuildStrategy | None = ...,
+    backend: Backends | None = ...,
+    **kwargs: Unpack[_ToStaticOptions],
+) -> _LayerT:
+    ...
+
+
+@overload
+def to_static(
+    function: Callable[_InputT, _RetT],
+    input_spec: NestedStructure[InputSpec] | None = ...,
+    build_strategy: BuildStrategy | None = ...,
+    backend: Backends | None = ...,
+    **kwargs: Unpack[_ToStaticOptions],
+) -> StaticFunction[_InputT, _RetT]:
+    ...
+
+
+@overload
+def to_static(
+    function: None = ...,
+    input_spec: NestedStructure[InputSpec] | None = ...,
+    build_strategy: BuildStrategy | None = ...,
+    backend: Backends | None = ...,
+    **kwargs: Unpack[_ToStaticOptions],
+) -> _ToStaticDecorator:
+    ...
 
 
 def to_static(
@@ -252,6 +330,28 @@ def to_static(
 
     # for usage: `@to_static`
     return decorated
+
+
+class _NotToStaticDecorator(Protocol):
+    @overload
+    def __call__(
+        self, func: Callable[_InputT, _RetT]
+    ) -> Callable[_InputT, _RetT]:
+        ...
+
+    @overload
+    def __call__(self, func: None = ...) -> _NotToStaticDecorator:
+        ...
+
+
+@overload
+def not_to_static(func: Callable[_InputT, _RetT]) -> Callable[_InputT, _RetT]:
+    ...
+
+
+@overload
+def not_to_static(func: None = ...) -> _NotToStaticDecorator:
+    ...
 
 
 def not_to_static(func=None):
@@ -393,7 +493,17 @@ class _SaveLoadConfig:
         self._keep_name_table = value
 
 
-def _parse_save_configs(configs):
+class _SaveLoadOptions(TypedDict):
+    output_spec: NotRequired[Sequence[InputSpec]]
+    with_hook: NotRequired[bool]
+    combine_params: NotRequired[bool]
+    clip_extra: NotRequired[bool]
+    skip_forward: NotRequired[bool]
+    input_names_after_prune: NotRequired[list[str]]
+    skip_prune_program: NotRequired[bool]
+
+
+def _parse_save_configs(configs: _SaveLoadOptions):
     supported_configs = [
         "output_spec",
         "with_hook",
@@ -517,6 +627,14 @@ def _get_input_var_and_names(inputs, input_spec, input_names_after_prune):
     return result_var_list, result_name_list
 
 
+def _contains_dict(output):
+    if isinstance(output, dict):
+        return True
+    if isinstance(output, Sequence) and not isinstance(output, str):
+        return any(_contains_dict(i) for i in output)
+    return False
+
+
 def _get_output_vars(outputs, output_spec, with_hook=False):
     name_no_exists_error = (
         "The tensor `%s` does not exists. "
@@ -536,6 +654,10 @@ def _get_output_vars(outputs, output_spec, with_hook=False):
             "Currently not support specify output_spec while founding pre/post hooks in your outermost layer."
         )
     result_list = []
+    if _contains_dict(outputs):
+        warnings.warn(
+            "Found 'dict' in given outputs, the values will be returned in a sequence sorted in lexicographical order by their keys."
+        )
     if use_pir_api():
         from paddle.autograd.backward_utils import ValueSet
 
@@ -749,9 +871,25 @@ def _remove_save_pre_hook(hook):
     _save_pre_hooks_lock.release()
 
 
+class _SaveFunction(Protocol):
+    def __call__(
+        self,
+        layer: Layer | Callable[..., Any],
+        path: str,
+        input_spec: Sequence[InputSpec | paddle.Tensor | object] | None = ...,
+        **configs: Unpack[_SaveLoadOptions],
+    ) -> None:
+        ...
+
+
 @wrap_decorator
-def _run_save_pre_hooks(func):
-    def wrapper(layer, path, input_spec=None, **configs):
+def _run_save_pre_hooks(func: _SaveFunction) -> _SaveFunction:
+    def wrapper(
+        layer: Layer | Callable[..., Any],
+        path: str,
+        input_spec: Sequence[InputSpec | paddle.Tensor | object] | None = None,
+        **configs: Unpack[_SaveLoadOptions],
+    ) -> None:
         global _save_pre_hooks
         for hook in _save_pre_hooks:
             hook(layer, input_spec, configs)
@@ -793,9 +931,27 @@ def _save_property(filename: str, property_vals: list[tuple[Any, str]]):
         f.write(meta.serialize_to_string())
 
 
+def _get_function_names_from_layer(layer: Layer) -> list[str]:
+    cls = layer.__class__
+    return [
+        member_name
+        for member_name, member in inspect.getmembers(cls)
+        if (
+            inspect.isfunction(member)
+            or inspect.ismethod(member)
+            or inspect.ismethoddescriptor(member)
+        )
+    ]
+
+
 @_run_save_pre_hooks
 @switch_to_static_graph
-def save(layer, path, input_spec=None, **configs):
+def save(
+    layer: Layer | Callable[..., Any],
+    path: str,
+    input_spec: Sequence[InputSpec | paddle.Tensor | object] | None = None,
+    **configs: Unpack[_SaveLoadOptions],
+) -> None:
     """
     Saves input Layer or function as ``paddle.jit.TranslatedLayer``
     format model, which can be used for inference or fine-tuning after loading.
@@ -858,7 +1014,7 @@ def save(layer, path, input_spec=None, **configs):
             >>> CLASS_NUM = 10
 
             >>> # define a random dataset
-            >>> class RandomDataset(paddle.io.Dataset):
+            >>> class RandomDataset(paddle.io.Dataset): # type: ignore[type-arg]
             ...     def __init__(self, num_samples):
             ...         self.num_samples = num_samples
             ...
@@ -981,11 +1137,11 @@ def save(layer, path, input_spec=None, **configs):
     inner_input_spec = None
     if input_spec is not None:
         if isinstance(layer, Layer):
-            for attr_func in dir(inner_layer):
-                static_func = getattr(inner_layer, attr_func, None)
+            for member_name in _get_function_names_from_layer(inner_layer):
+                static_func = getattr(inner_layer, member_name, None)
                 if (
                     isinstance(static_func, StaticFunction)
-                    and 'forward' != attr_func
+                    and 'forward' != member_name
                 ):
                     raise ValueError(
                         f"If there are static functions other than 'forward' that need to be saved, the input 'input_spec' should be None, but received the type of 'input_spec' is {type(input_spec)}."
@@ -1021,15 +1177,13 @@ def save(layer, path, input_spec=None, **configs):
     scope = core.Scope()
     extra_var_info = {}
     if isinstance(layer, Layer):
-        functions = list(set(dir(inner_layer)))
+        functions = list(set(_get_function_names_from_layer(inner_layer)))
         functions = sorted(functions)
         if inner_layer._forward_pre_hooks or inner_layer._forward_post_hooks:
             with_hook = True
     else:
         # layer is function
-        functions = [
-            layer,
-        ]
+        functions = [layer]
 
     combine_vars = {}
     combine_program = []
@@ -1362,7 +1516,9 @@ def save(layer, path, input_spec=None, **configs):
 
 
 @dygraph_only
-def load(path, **configs):
+def load(
+    path: str, **configs: Unpack[_SaveLoadOptions]
+) -> TranslatedLayer | PirTranslatedLayer:
     """
     :api_attr: imperative
 
@@ -1414,7 +1570,7 @@ def load(path, **configs):
                 >>> CLASS_NUM = 10
 
                 >>> # define a random dataset
-                >>> class RandomDataset(paddle.io.Dataset):
+                >>> class RandomDataset(paddle.io.Dataset): # type: ignore[type-arg]
                 ...     def __init__(self, num_samples):
                 ...         self.num_samples = num_samples
                 ...
@@ -1507,7 +1663,7 @@ def load(path, **configs):
                 >>> CLASS_NUM = 10
 
                 >>> # define a random dataset
-                >>> class RandomDataset(paddle.io.Dataset):
+                >>> class RandomDataset(paddle.io.Dataset): # type: ignore[type-arg]
                 ...     def __init__(self, num_samples):
                 ...         self.num_samples = num_samples
                 ...

@@ -30,11 +30,10 @@ limitations under the License. */
 #include "paddle/common/flags.h"
 #include "paddle/fluid/framework/executor_gc_helper.h"
 
-PD_DECLARE_bool(benchmark);
+COMMON_DECLARE_bool(benchmark);
 COMMON_DECLARE_bool(use_mkldnn);
 
-namespace paddle {
-namespace framework {
+namespace paddle::framework {
 namespace {
 // block id starts from 0. This id is used to represent the codeblock
 // wrapping the first block 0.
@@ -67,7 +66,7 @@ ExecutorPrepareContext::~ExecutorPrepareContext() {
   VLOG(5) << "destroy ExecutorPrepareContext";
 }
 
-Executor::Executor(const platform::Place& place) : place_(place) {}
+Executor::Executor(const phi::Place& place) : place_(place) {}
 
 Executor::~Executor() {
 #ifdef PADDLE_WITH_DNNL
@@ -528,7 +527,7 @@ void Executor::RunPartialPreparedContext(ExecutorPrepareContext* ctx,
     gc->DirectClearCallback(callback);
   } else {
     VLOG(4) << "Sync deleting scope";
-    platform::DeviceContextPool::Instance().Get(place_)->Wait();
+    phi::DeviceContextPool::Instance().Get(place_)->Wait();
     callback();
   }
 }
@@ -609,5 +608,4 @@ void Executor::EnableMKLDNN(const ProgramDesc& program) {
       << "'MKLDNN' is not supported, Please re-compile with WITH_ONEDNN option";
 #endif
 }
-}  // namespace framework
-}  // namespace paddle
+}  // namespace paddle::framework

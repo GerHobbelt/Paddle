@@ -14,12 +14,16 @@
 
 import typing
 
+__is_metainfo_generated = False
 try:
     from paddle.cuda_env import *  # noqa: F403
     from paddle.version import (  # noqa: F401
         commit as __git_commit__,
         full_version as __version__,
     )
+
+    __is_metainfo_generated = True
+
 except ImportError:
     import sys
 
@@ -61,6 +65,8 @@ from .framework.dtype import (
     complex128,
     dtype,
     finfo,
+    float8_e4m3fn,
+    float8_e5m2,
     float16,
     float32,
     float64,
@@ -221,6 +227,7 @@ from .tensor.linalg import (  # noqa: F401
     dot,
     eigvalsh,
     histogram,
+    histogram_bin_edges,
     histogramdd,
     matmul,
     mv,
@@ -373,6 +380,7 @@ from .tensor.math import (  # noqa: F401
     bitwise_right_shift,
     bitwise_right_shift_,
     broadcast_shape,
+    cartesian_prod,
     ceil,
     clip,
     combinations,
@@ -527,6 +535,8 @@ from .tensor.random import (
     bernoulli_,
     binomial,
     check_shape,
+    log_normal,
+    log_normal_,
     multinomial,
     normal,
     normal_,
@@ -579,8 +589,7 @@ if is_compiled_with_cinn():
     if os.path.exists(cuh_file):
         os.environ.setdefault('runtime_include_dir', runtime_include_dir)
 
-
-if is_compiled_with_cuda():
+if __is_metainfo_generated and is_compiled_with_cuda():
     import os
     import platform
 
@@ -745,6 +754,8 @@ __all__ = [
     'int16',
     'int32',
     'int64',
+    'float8_e4m3fn',
+    'float8_e5m2',
     'float16',
     'float32',
     'float64',
@@ -793,6 +804,7 @@ __all__ = [
     'is_tensor',
     'is_complex',
     'is_integer',
+    'cartesian_prod',
     'cross',
     'where',
     'where_',
@@ -812,6 +824,8 @@ __all__ = [
     'slice_scatter',
     'normal',
     'normal_',
+    'log_normal',
+    'log_normal_',
     'logsumexp',
     'full',
     'unsqueeze',

@@ -33,20 +33,19 @@ limitations under the License. */
 #include "paddle/fluid/framework/dataset_factory.h"
 #include "paddle/fluid/framework/scope.h"
 #include "paddle/fluid/inference/io.h"
-#include "paddle/fluid/platform/place.h"
+#include "paddle/phi/common/place.h"
 
 #include "paddle/fluid/pybind/data_set_py.h"
 
 namespace py = pybind11;
 
-namespace paddle {
-namespace pybind {
+namespace paddle::pybind {
 
 class IterableDatasetWrapper {
  public:
   IterableDatasetWrapper(framework::Dataset *dataset,
                          const std::vector<std::string> &slots,
-                         const std::vector<platform::Place> &places,
+                         const std::vector<phi::Place> &places,
                          size_t batch_size,
                          bool drop_last)
       : dataset_(dataset),
@@ -103,7 +102,7 @@ class IterableDatasetWrapper {
                           "Device number does not match reader number"));
     for (size_t i = 0; i < places_.size(); ++i) {
       data_feeds_[i]->AssignFeedVar(*scopes_[i]);
-      data_feeds_[i]->SetPlace(platform::CPUPlace());
+      data_feeds_[i]->SetPlace(phi::CPUPlace());
       PADDLE_ENFORCE_EQ(data_feeds_[i]->Start(),
                         true,
                         platform::errors::Unavailable(
@@ -195,7 +194,7 @@ class IterableDatasetWrapper {
  private:
   framework::Dataset *dataset_;
   std::vector<std::string> slots_;
-  std::vector<platform::Place> places_;
+  std::vector<phi::Place> places_;
   size_t batch_size_;
   bool drop_last_;
 
@@ -393,12 +392,11 @@ void BindDataset(py::module *m) {
   py::class_<IterableDatasetWrapper>(*m, "IterableDatasetWrapper")
       .def(py::init<framework::Dataset *,
                     const std::vector<std::string> &,
-                    const std::vector<platform::Place> &,
+                    const std::vector<phi::Place> &,
                     size_t,
                     bool>())
       .def("_start", &IterableDatasetWrapper::Start)
       .def("_next", &IterableDatasetWrapper::Next);
 }
 
-}  // namespace pybind
-}  // namespace paddle
+}  // namespace paddle::pybind
