@@ -1,13 +1,16 @@
-/* Copyright (c) 2013 PaddlePaddle Authors. All Rights Reserved.
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-    http://www.apache.org/licenses/LICENSE-2.0
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License. */
+// Copyright (c) 2023 PaddlePaddle Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #pragma once
 
@@ -26,20 +29,32 @@ limitations under the License. */
 #include <windows.h>  // GetModuleFileName, Sleep
 #endif
 
+#include "paddle/common/errors.h"
 #include "paddle/common/macros.h"
+#include "paddle/utils/test_macros.h"
+
 #if !defined(_WIN32) && !defined(PADDLE_WITH_MUSL)
 #include <execinfo.h>
 #endif
 
-// #define GLOG_NO_ABBREVIATED_SEVERITIES  // msvc conflict logging with
-// windows.h
-#include "paddle/common/errors.h"
+// msvc conflict logging with windows.h
+#define GLOG_NO_ABBREVIATED_SEVERITIES
 #include "paddle/utils/string/printf.h"
 #include "paddle/utils/string/to_string.h"
-#include "paddle/utils/test_macros.h"
 #include "paddle/utils/variant.h"
 
 namespace common {
+#ifdef __GNUC__
+inline std::string demangle(std::string name) {
+  int status = -4;  // some arbitrary value to eliminate the compiler warning
+  std::unique_ptr<char, void (*)(void*)> res{
+      abi::__cxa_demangle(name.c_str(), NULL, NULL, &status), std::free};
+  return (status == 0) ? res.get() : name;
+}
+#else
+inline std::string demangle(std::string name) { return name; }
+#endif
+
 class CommonNotMetException : public std::exception {
  public:
   explicit CommonNotMetException(const std::string& str) : err_str_(str) {}
@@ -49,15 +64,12 @@ class CommonNotMetException : public std::exception {
  private:
   std::string err_str_;
 };
-}  // namespace common
-namespace common {
+
 namespace enforce {
 
-#if !defined(_WIN32)
-#define UNLIKELY(condition) __builtin_expect(static_cast<bool>(condition), 0)
-#else
-// there is no equivalent intrinsics in msvc.
-#define UNLIKELY(condition) (condition)
+/** HELPER MACROS AND FUNCTIONS **/
+#ifndef PADDLE_MAY_THROW
+#define PADDLE_MAY_THROW noexcept(false)
 #endif
 
 #if defined _WIN32 && defined PADDLE_ON_INFERENCE && defined PADDLE_NO_PYTHON
@@ -158,5 +170,71 @@ using CommonType2 = typename std::add_lvalue_reference<
 #define COMMON_ENFORCE_LE(__VAL0, __VAL1, ...) \
   __COMMON_BINARY_COMPARE(__VAL0, __VAL1, <=, >, __VA_ARGS__)
 
+TEST_API bool RegisterLogSimplyStr(const std::string& type,
+                                   const std::string& simply);
+TEST_API std::string GetCurrentTraceBackString(bool for_signal = false);
+template <typename T>
+class LogSimplyStrRegistrar {
+ public:
+  static bool success;
+};
+
+#define REGISTER_LOG_SIMPLY_STR(Type)                            \
+  template <>                                                    \
+  bool ::common::enforce::LogSimplyStrRegistrar<Type>::success = \
+      ::common::enforce::RegisterLogSimplyStr(                   \
+          ::common::demangle(typeid(Type).name()), #Type);
 }  // namespace enforce
 }  // namespace common
+
+// TODO(zhangbopd): This is a copy from pir, and shoud be removed after merge
+// this into common enfoce namespace above.
+template <typename T>
+inline bool is_error(const T& stat) {
+  return !stat;
+}
+
+namespace pir {
+class IrNotMetException : public std::exception {
+ public:
+  explicit IrNotMetException(const std::string& str)
+      : err_str_(str + ::common::enforce::GetCurrentTraceBackString()) {}
+
+  const char* what() const noexcept override { return err_str_.c_str(); }
+
+ private:
+  std::string err_str_;
+};
+
+#define IR_THROW(...)                                                     \
+  do {                                                                    \
+    try {                                                                 \
+      throw pir::IrNotMetException(                                       \
+          paddle::string::Sprintf("Error occured at: %s:%d :\n%s",        \
+                                  __FILE__,                               \
+                                  __LINE__,                               \
+                                  paddle::string::Sprintf(__VA_ARGS__))); \
+    } catch (const std::exception& e) {                                   \
+      std::cout << e.what() << std::endl;                                 \
+      throw;                                                              \
+    }                                                                     \
+  } while (0)
+
+#define IR_ENFORCE(COND, ...)                                               \
+  do {                                                                      \
+    bool __cond__(COND);                                                    \
+    if (UNLIKELY(is_error(__cond__))) {                                     \
+      try {                                                                 \
+        throw pir::IrNotMetException(                                       \
+            paddle::string::Sprintf("Error occured at: %s:%d :\n%s",        \
+                                    __FILE__,                               \
+                                    __LINE__,                               \
+                                    paddle::string::Sprintf(__VA_ARGS__))); \
+      } catch (const std::exception& e) {                                   \
+        std::cout << e.what() << std::endl;                                 \
+        throw;                                                              \
+      }                                                                     \
+    }                                                                       \
+  } while (0)
+
+}  // namespace pir

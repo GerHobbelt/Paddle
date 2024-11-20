@@ -178,6 +178,11 @@ inline bool NeedTransformPlace(const phi::Place& src_place,
              (target != Backend::ALL_BACKEND &&
               phi::TransToPhiBackend(src_place) !=
                   (target != Backend::GPUDNN ? target : Backend::GPU));
+#ifdef PADDLE_WITH_DNNL
+  if (target == Backend::ONEDNN) {
+    ret = src_place.GetType() != AllocationType::CPU;
+  }
+#endif
   return ret;
 }
 
@@ -235,6 +240,12 @@ void ReshardKernelOutputToApiOutput(
     phi::DeviceContext* dev_ctx,
     const std::shared_ptr<phi::distributed::DistTensor>& src_tensor,
     Tensor* dst_tensor);
+
+void ReshardKernelOutputToApiOutput(
+    phi::DeviceContext* dev_ctx,
+    const std::vector<std::shared_ptr<phi::distributed::DistTensor>>&
+        src_tensors,
+    const std::vector<Tensor*>& dst_tensors);
 
 std::shared_ptr<phi::distributed::DistTensor> PrepareDataForDistTensor(
     std::shared_ptr<phi::distributed::DistTensor> input,

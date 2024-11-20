@@ -41,7 +41,7 @@ from .proto import (
     data_feed_pb2,  # noqa: F401
     framework_pb2,
 )
-from .variable_index import _getitem_static, _setitem_impl_, _setitem_static
+from .variable_index import _getitem_static, _setitem_static
 from .wrapped_decorator import signature_safe_contextmanager, wrap_decorator
 
 if TYPE_CHECKING:
@@ -1133,6 +1133,66 @@ def name_scope(prefix=None):
             _name_scope = _name_scope.parent()
 
 
+class NameStruct:
+    def __init__(self, name="", parent=None):
+        self._children = {}
+        self._name = name
+        self._parent = parent
+
+    def child(self, prefix):
+        if prefix not in self._children:
+            new_child = NameStruct(prefix, self)
+            self._children[prefix] = [new_child]
+        else:
+            new_child = NameStruct(
+                prefix + "_%d" % len(self._children[prefix]), self
+            )
+            self._children[prefix].append(new_child)
+        return new_child
+
+    def parent(self):
+        return self._parent
+
+    def name(self):
+        return self._name
+
+
+_name_struct = NameStruct()
+
+
+@signature_safe_contextmanager
+def name_struct(prefix=None):
+    """
+    Note: This should only used in Paddle/python/paddle/nn/layer/layers.py
+    to record the call path for the operators in Static Graph of AutoParallel.
+
+    Args:
+        prefix(str, optional): prefix. Default is none.
+    """
+    # TODO(panyx0718): Only [0-9a-z].
+    # in dygraph we don't need namescope since it will cause mem leak
+    if in_dygraph_mode():
+        yield
+    else:
+        assert prefix, "namescope prefix can not be empty."
+        global _name_struct
+        _name_struct = _name_struct.child(prefix)
+        try:
+            yield
+        finally:
+            _name_struct = _name_struct.parent()
+
+
+def _full_name_struct():
+    global _name_struct
+    struct = _name_struct
+    name = ""
+    while struct:
+        name = struct.name() + "/" + name
+        struct = struct.parent()
+    return name
+
+
 def _full_name_scope():
     global _name_scope
     scope = _name_scope
@@ -1464,7 +1524,7 @@ class Variable(metaclass=VariableMetaClass):
     ):
         self.block = block
         if name is None:
-            name = unique_name.generate('_generated_var')
+            name = self.block.program._name_generator('_generated_var')
 
         if dtype is not None:
             if not isinstance(dtype, core.VarDesc.VarType):
@@ -1591,16 +1651,21 @@ class Variable(metaclass=VariableMetaClass):
             or self.type == core.VarDesc.VarType.LOD_TENSOR
         ), "only support a variable with SELECTED_ROWS or LOD_TENSOR to be detached"
 
-        output = self.block.create_var(
-            name=unique_name.generate_with_ignorable_key("detach_" + self.name),
-            dtype=self.dtype,
-            type=self.type,
-            persistable=self.persistable,
-            stop_gradient=True,
-        )
+        with unique_name.guard(self.block.program._name_generator):
+            output = self.block.create_var(
+                name=unique_name.generate_with_ignorable_key(
+                    "detach_" + self.name
+                ),
+                dtype=self.dtype,
+                type=self.type,
+                persistable=self.persistable,
+                stop_gradient=True,
+            )
 
         self.block.append_op(
-            type='share_data', inputs={'X': [self]}, outputs={'Out': [output]}
+            type='share_data',
+            inputs={'X': [self]},
+            outputs={'Out': [output]},
         )
         return output
 
@@ -1754,19 +1819,18 @@ class Variable(metaclass=VariableMetaClass):
                 >>> import numpy as np
 
                 >>> x = np.ones([2, 2], np.float32)
-                >>> with base.dygraph.guard():
-                ...     inputs2 = []
-                ...     for _ in range(10):
-                ...         tmp = base.dygraph.base.to_variable(x)
-                ...         tmp.stop_gradient=False
-                ...         inputs2.append(tmp)
-                ...     ret2 = paddle.add_n(inputs2)
-                ...     loss2 = paddle.sum(ret2)
-                ...     loss2.retain_grads()
-                ...     loss2.backward()
-                ...     print(loss2.gradient())
-                ...     loss2.clear_gradient()
-                ...     print("After clear {}".format(loss2.gradient()))
+                >>> inputs2 = []
+                >>> for _ in range(10):
+                >>>     tmp = base.dygraph.base.to_variable(x)
+                >>>     tmp.stop_gradient=False
+                >>>     inputs2.append(tmp)
+                >>> ret2 = paddle.add_n(inputs2)
+                >>> loss2 = paddle.sum(ret2)
+                >>> loss2.retain_grads()
+                >>> loss2.backward()
+                >>> print(loss2.gradient())
+                >>> loss2.clear_gradient()
+                >>> print("After clear {}".format(loss2.gradient()))
                 1.0
                 After clear 0.0
         """
@@ -1790,6 +1854,16 @@ class Variable(metaclass=VariableMetaClass):
             backward_func=backward_hook_wrapper,
             skip_vars_in_backward_input=[self],
         )
+
+    def apply(self, func):
+        if not self.stop_gradient:
+            raise RuntimeError(
+                "Cannot apply function on a tensor that required gradient."
+            )
+        try:
+            return func(self)
+        except:
+            raise ValueError(f"The PyFunc {func.__name__} could not be applied")
 
     def __str__(self):
         return self._to_readable_code()
@@ -2216,28 +2290,33 @@ class Variable(metaclass=VariableMetaClass):
         for i in range(len(self.shape)):
             perm.insert(0, i)
 
-        out = self.block.create_var(
-            name=unique_name.generate_with_ignorable_key(self.name + '.tmp'),
-            dtype=self.dtype,
-            type=self.type,
-            persistable=False,
-            stop_gradient=False,
-        )
-        input_shape = self.block.create_var(
-            name=unique_name.generate_with_ignorable_key(self.name + '.tmp'),
-            dtype=self.dtype,
-            type=core.VarDesc.VarType.LOD_TENSOR,
-            persistable=False,
-            stop_gradient=False,
-        )
+        with unique_name.guard(self.block.program._name_generator):
+            out = self.block.create_var(
+                name=unique_name.generate_with_ignorable_key(
+                    self.name + '.tmp'
+                ),
+                dtype=self.dtype,
+                type=self.type,
+                persistable=False,
+                stop_gradient=False,
+            )
+            input_shape = self.block.create_var(
+                name=unique_name.generate_with_ignorable_key(
+                    self.name + '.tmp'
+                ),
+                dtype=self.dtype,
+                type=core.VarDesc.VarType.LOD_TENSOR,
+                persistable=False,
+                stop_gradient=False,
+            )
 
-        self.block.append_op(
-            type='transpose2',
-            inputs={'X': [self]},
-            outputs={'Out': [out], 'XShape': [input_shape]},
-            attrs={'axis': perm},
-        )
-        return out
+            self.block.append_op(
+                type='transpose2',
+                inputs={'X': [self]},
+                outputs={'Out': [out], 'XShape': [input_shape]},
+                attrs={'axis': perm},
+            )
+            return out
 
     def clone(self):
         """
@@ -2262,18 +2341,23 @@ class Variable(metaclass=VariableMetaClass):
                 >>> y = x.clone()
 
         """
-        output = self.block.create_var(
-            name=unique_name.generate_with_ignorable_key(self.name + "_clone"),
-            dtype=self.dtype,
-            type=self.type,
-            persistable=self.persistable,
-            stop_gradient=self.stop_gradient,
-        )
+        with unique_name.guard(self.block.program._name_generator):
+            output = self.block.create_var(
+                name=unique_name.generate_with_ignorable_key(
+                    self.name + "_clone"
+                ),
+                dtype=self.dtype,
+                type=self.type,
+                persistable=self.persistable,
+                stop_gradient=self.stop_gradient,
+            )
 
-        self.block.append_op(
-            type='assign', inputs={'X': [self]}, outputs={'Out': [output]}
-        )
-        return output
+            self.block.append_op(
+                type='assign',
+                inputs={'X': [self]},
+                outputs={'Out': [output]},
+            )
+            return output
 
     def _set_error_clip(self, error_clip):
         """
@@ -2417,13 +2501,14 @@ class Variable(metaclass=VariableMetaClass):
         return True, [starts, ends]
 
     def _cloneVar(self, copy=False):
-        if not copy:
-            return self.block.create_var(
-                name=unique_name.generate_with_ignorable_key(self.name),
-                dtype=self.dtype,
-            )
-        else:
-            return self
+        with unique_name.guard(self.block.program._name_generator):
+            if not copy:
+                return self.block.create_var(
+                    name=unique_name.generate_with_ignorable_key(self.name),
+                    dtype=self.dtype,
+                )
+            else:
+                return self
 
     def _sliceVar(self, axes, starts, ends):
         new_var = self._cloneVar()
@@ -2488,9 +2573,6 @@ class Variable(metaclass=VariableMetaClass):
         from .dygraph.base import in_to_static_mode
 
         if in_to_static_mode():
-            if is_compiled_with_xpu():
-                # (NOTE): Currently, there is no index_put_xpu kernel.
-                return _setitem_impl_(self, item, value)
             return _setitem_static(self, item, value)
         else:
             raise RuntimeError(
@@ -2692,15 +2774,20 @@ class Variable(metaclass=VariableMetaClass):
 
         """
 
-        output = self.block.create_var(
-            name=unique_name.generate_with_ignorable_key(self.name + "_size"),
-            dtype=core.VarDesc.VarType.INT64,
-        )
+        with unique_name.guard(self.block.program._name_generator):
+            output = self.block.create_var(
+                name=unique_name.generate_with_ignorable_key(
+                    self.name + "_size"
+                ),
+                dtype=core.VarDesc.VarType.INT64,
+            )
 
-        self.block.append_op(
-            type='size', inputs={'Input': [self]}, outputs={'Out': [output]}
-        )
-        return output
+            self.block.append_op(
+                type='size',
+                inputs={'Input': [self]},
+                outputs={'Out': [output]},
+            )
+            return output
 
     def _set_attr(self, name, val):
         """
@@ -2964,6 +3051,9 @@ class Operator:
             from paddle.static.amp.fp16_utils import DEFAULT_AMP_OPTIONS
 
             self._amp_options: AmpOptions = DEFAULT_AMP_OPTIONS
+
+            # record the call path of op, only used in AutoParallel
+            self._struct_name = _full_name_struct()
 
             op_maker = core.op_proto_and_checker_maker
 
@@ -3741,6 +3831,14 @@ class Operator:
         """
         return self._amp_options
 
+    @property
+    def struct_name(self):
+        return self._struct_name
+
+    @struct_name.setter
+    def struct_name(self, struct_name):
+        self._struct_name = struct_name
+
 
 @signature_safe_contextmanager
 def _stride_in_no_check_dy2st_diff():
@@ -4044,8 +4142,7 @@ class Block:
         ), "skip_op_callstack parameter's type is error, expect bool, received {}".format(
             type(skip_op_callstack)
         )
-        block_str = "{ // block "
-        block_str += f"{self.idx}\n"
+        block_str = f"{{ // block_idx:{self.idx}  parent_idx:{self.parent_idx}  forward_idx:{self.forward_block_idx}  backward_idx:{self.backward_block_idx}\n"
         for var in list(self.vars.values()):
             block_str += f"    {var._to_readable_code()}\n"
         block_str += "\n"
@@ -5734,7 +5831,8 @@ class Program:
         self._appending_grad_times = 0
 
         # identifier for auto checkpoint
-        self._auto_checkpoint_name = unique_name.generate(
+        self._name_generator = unique_name.UniqueNameGenerator()
+        self._auto_checkpoint_name = self._name_generator(
             "__auto_checkpoint_program__"
         )
 
@@ -5742,6 +5840,13 @@ class Program:
         self._graph = None
         # to tag whether is startup_program
         self._is_start_up_program_ = False
+
+        # distributed training combined with prim mechanism (prim is behind of distributed)
+        # after distributed partition, for subprogram or subgraph on a single card, decompose PHI grad ops into primitive ops
+        # _need_decomp, to tag whether this program needs to be decomposed
+        self._need_decomp = False
+        # _grad_var_to_var, a dict which recording the mapping of backward grad variable to forward variable
+        self._grad_var_to_var = None
 
     def _find_var_class_kwargs(self, new_desc):
         # NOTE: not all variables support shape/dtype/lod_level methods.
@@ -6365,6 +6470,10 @@ class Program:
                 p._pipeline_opt = self._pipeline_opt
             if hasattr(self, '_pass_opt'):
                 p._pass_opt = self._pass_opt
+            if hasattr(self, '_need_decomp'):
+                p._need_decomp = self._need_decomp
+            if hasattr(self, '_grad_var_to_var'):
+                p._grad_var_to_var = self._grad_var_to_var
             # NOTE(zhiqiu): we sync the cloned program, to update its program by
             # its desc.
             p._sync_with_cpp()
@@ -6373,7 +6482,24 @@ class Program:
         p._copy_data_info_from(self, pruned_origin_block_id_map)
         p._copy_dist_param_info_from(self)
         p._copy_operator_info_from(self)
+        p._name_generator = self._name_generator.clone()
         return p
+
+    @signature_safe_contextmanager
+    def switch_name_generator_guard(self, new_generator):
+        if isinstance(new_generator, str):
+            new_generator = unique_name.UniqueNameGenerator(new_generator)
+        elif isinstance(new_generator, bytes):
+            new_generator = unique_name.UniqueNameGenerator(
+                new_generator.decode()
+            )
+
+        old_generator = self._name_generator
+        self._name_generator = new_generator
+        try:
+            yield
+        finally:
+            self._name_generator = old_generator
 
     def _prune(self, targets):
         """
@@ -6904,6 +7030,9 @@ class Program:
         self.blocks.append(Block(self, self.current_block_idx))
         return self.current_block()
 
+    def _roll_to_global_block(self):
+        self.current_block_idx = 0
+
     def _rollback(self):
         """
         Exit a code block, i.e., roll back to the parent block.
@@ -7029,6 +7158,7 @@ class Program:
         for dst_block, src_block in zip(self.blocks, other.blocks):
             for dst_op, src_op in zip(dst_block.ops, src_block.ops):
                 dst_op.set_amp_options(src_op.amp_options)
+                dst_op.struct_name = src_op.struct_name
 
     def list_vars(self):
         """
@@ -7468,10 +7598,12 @@ class EagerParamBase(core.eager.Tensor):
         mesh = kwargs.get("process_mesh", None)
         placements = kwargs.get("placements", None)
         src_tensor = tensor
+
         if mesh is not None and placements is not None:
             src_tensor = core.eager.Tensor(
                 tensor, process_mesh=mesh, placements=placements
             )
+            param.name = tensor.name + ".dist"
 
         # 3. set param data
         param._set_impl(src_tensor)

@@ -198,6 +198,11 @@ llvm::Value* CodeGenCUDA_Host::LowerHostFunc(const ir::_LoweredFunc_* func) {
                  [](auto& arg) { return std::addressof(arg); });
   // @}
 
+  // Set local scope table
+  CHECK_EQ(ll_function_args.size(), func->args.size());
+  for (int i = 0; i < ll_function_args.size(); ++i) {
+    SetVar(func->args[i].name(), ll_function_args[i]);
+  }
   llvm::BasicBlock* entry = llvm::BasicBlock::Create(
       /*Context=*/b_->getContext(),
       /*Name=*/"entry",
@@ -205,9 +210,34 @@ llvm::Value* CodeGenCUDA_Host::LowerHostFunc(const ir::_LoweredFunc_* func) {
       /*InsertBefore=*/nullptr);
   b_->SetInsertPoint(entry);
   CodeGenLLVM::Visit(&func->body);
+
+  // Reset local scope table
+  for (const ir::Argument& func_arg : func->args) {
+    symbol_table_->Erase(func_arg.name());
+  }
   RetVoid();
 
   return f_;
+}
+
+llvm::Value* CodeGenCUDA_Host::LowerParseArgsValueCall(
+    const ir::Call* call_ir) {
+  auto ret_type = CinnTypeToLLVMType(Int(32), m_);
+  std::vector<llvm::Type*> args_type;
+  CHECK_EQ(call_ir->read_args.size(), 2);
+  CHECK(call_ir->read_args[0].is_var() &&
+        call_ir->read_args[0].as_var()->type().is_cpp_handle());
+  CHECK(call_ir->read_args[1].type().is_int(32));
+  args_type.push_back(CinnTypeToLLVMType(type_of<void*>(), m_));
+  args_type.push_back(CinnTypeToLLVMType(type_of<int32_t>(), m_));
+
+  auto func_type = llvm::FunctionType::get(ret_type, args_type, false);
+  auto call_func = m_->getOrInsertFunction(call_ir->name, func_type);
+
+  std::vector<llvm::Value*> call_args;
+  call_args.push_back(std::addressof(*f_->arg_begin()));
+  call_args.push_back(b_->getInt32(call_ir->read_args[1].as_int32()));
+  return b_->CreateCall(call_func, call_args);
 }
 
 llvm::Value* CodeGenCUDA_Host::LowerCUDAKernelCall(const ir::Call* call_ir) {

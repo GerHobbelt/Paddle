@@ -20,6 +20,7 @@ import numpy as np
 
 import paddle
 from paddle import base
+from paddle.autograd.backward_utils import ValueDict
 from paddle.base import core
 from paddle.base.backward import _append_grad_suffix_, _as_list
 from paddle.base.framework import in_pir_mode
@@ -352,7 +353,7 @@ def _compute_analytical_jacobian_pir(
 def grad_check(
     x,
     y,
-    x_init=None,
+    fetch_list=None,
     feeds=None,
     place=None,
     program=None,
@@ -402,12 +403,12 @@ def grad_check(
         for i in range(len(y)):
             analytical.append(
                 _compute_analytical_jacobian_pir(
-                    program, x, i, y, x_init, feeds, place
+                    program, x, i, y, fetch_list, feeds, place
                 )
             )
         numerical = [
             _compute_numerical_jacobian_pir(
-                program, xi, y, x_init, feeds, place, eps
+                program, xi, y, fetch_list, feeds, place, eps
             )
             for xi in x
         ]
@@ -498,9 +499,12 @@ def double_grad_check(
     x_init = _as_list(x_init)
 
     if in_pir_mode():
-        program, op_map = paddle.base.libpaddle.pir.clone_program(
+        program, (keys, values) = paddle.base.libpaddle.pir.clone_program(
             paddle.static.default_main_program()
         )
+        op_map = ValueDict()
+        for key, value in zip(keys, values):
+            op_map[key] = value
         clone_x = []
         for xi in x:
             clone_x.append(op_map[xi])
@@ -589,9 +593,12 @@ def triple_grad_check(
 
     # x <=> [x, dout, ddx]
     if in_pir_mode():
-        program, op_map = paddle.base.libpaddle.pir.clone_program(
+        program, (keys, values) = paddle.base.libpaddle.pir.clone_program(
             paddle.static.default_main_program()
         )
+        op_map = ValueDict()
+        for key, value in zip(keys, values):
+            op_map[key] = value
         clone_x = []
         for xi in x:
             clone_x.append(op_map[xi])
@@ -763,6 +770,8 @@ def get_pir_static_double_grad(
     """
     if program is None:
         program = paddle.static.default_main_program()
+    exe = paddle.static.Executor(place)
+    exe.run(paddle.static.default_startup_program())
     if dy_init is None:
         y_grads = []
         y_grads_init = []
@@ -852,7 +861,7 @@ def get_pir_static_double_grad(
 
     # append second order backward
     ddx = base.gradients(y, x, dys)
-    exe = paddle.static.Executor()
+
     # filter None in dx for DX/DY may be None in kernel
     # only fetch not None dx in exe.run
     filted = [(i, dxi) for i, dxi in enumerate(ddx) if dxi is not None]

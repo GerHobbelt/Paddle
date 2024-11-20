@@ -29,12 +29,12 @@
 namespace cinn {
 
 namespace ir {
-using common::BFloat16;
-using common::Float;
-using common::Float16;
-using common::Int;
-using common::Type;
-using common::type_of;
+using cinn::common::BFloat16;
+using cinn::common::Float;
+using cinn::common::Float16;
+using cinn::common::Int;
+using cinn::common::Type;
+using cinn::common::type_of;
 
 class Module;
 class IRVisitor;
@@ -110,16 +110,23 @@ class Dim;
   macro__(Product)                          \
   macro__(Sum)                              \
   macro__(PrimitiveNode)                    \
-  macro__(IntrinsicOp)                      \
   macro__(_BufferRange_)                    \
   macro__(ScheduleBlock)                    \
   macro__(ScheduleBlockRealize)             \
   macro__(_Dim_)                            \
 
+#define NODETY_CONTROL_OP_FOR_INTRINSIC(macro__) \
+  macro__(IntrinsicOp)                      \
 
 #define NODETY_FORALL(__m)              \
   NODETY_PRIMITIVE_TYPE_FOR_EACH(__m)   \
   NODETY_OP_FOR_EACH(__m)               \
+  NODETY_CONTROL_OP_FOR_INTRINSIC(__m)  \
+  NODETY_CONTROL_OP_FOR_EACH(__m)
+
+#define NODETY_FORALL_EXCEPT_INTRINSIC(__m)              \
+  NODETY_PRIMITIVE_TYPE_FOR_EACH(__m)                    \
+  NODETY_OP_FOR_EACH(__m)                                \
   NODETY_CONTROL_OP_FOR_EACH(__m)
 // clang-format on
 
@@ -144,7 +151,7 @@ struct Expr;
 /**
  * The base of all the nodes in the IR.
  */
-class IrNode : public common::Object {
+class IrNode : public cinn::common::Object {
  public:
   //! The operands of this operator.
   std::vector<Expr> operands;
@@ -177,7 +184,7 @@ class IrNode : public common::Object {
 /**
  * A handle to store any IRNode.
  */
-class IrNodeRef : public common::Shared<IrNode> {
+class IrNodeRef : public cinn::common::Shared<IrNode> {
  public:
   IrNodeRef() = default;
   IrNodeRef(const IrNodeRef& other) : Shared(other.p_) {}

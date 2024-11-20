@@ -21,30 +21,46 @@
 decomp_interface_declare_gen_op_list = [
     "add_n",
     "batch_norm",
+    "dropout",
+    "full_like",
     "gelu",
+    "instance_norm",
     "layer_norm",
+    "leaky_relu",
     "mean",
     "pow",
     "relu",
+    "rsqrt",
+    "sigmoid",
     "silu",
     "softmax",
     "sqrt",
     "squeeze",
+    "stack",
+    "unsqueeze",
 ]
 
 # come into effect in generated file op_decomp.cc
 # manual decomp interface implementation are located in manual_op_decomp.cc
 decomp_interface_implementation_gen_op_list = [
     "add_n",
+    "dropout",
+    "full_like",
     "gelu",
+    "instance_norm",
     "layer_norm",
+    "leaky_relu",
     "mean",
     "pow",
     "relu",
+    "rsqrt",
+    "sigmoid",
     "silu",
     "softmax",
     "sqrt",
     "squeeze",
+    "stack",
+    "unsqueeze",
 ]
 
 

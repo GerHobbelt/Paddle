@@ -25,6 +25,7 @@
 #include "paddle/phi/common/data_type.h"
 #include "paddle/pir/core/builtin_op.h"
 #include "paddle/pir/core/builtin_type.h"
+#include "paddle/pir/dialect/shape/ir/shape_attribute.h"
 
 namespace cinn {
 namespace hlir {
@@ -38,10 +39,11 @@ const std::unordered_map<std::string, std::string> CompatibleInfo::OP_NAMES = {
     {"pd_op.full", "fill_constant"},
     {"pd_op.sum", "reduce_sum"},
     {"pd_op.max", "reduce_max"},
-    {"pd_op.mean", "reduce_mean"},
     {"pd_op.add", "elementwise_add"},
     {"pd_op.elementwise_pow", "pow"},
     {"pd_op.multiply", "elementwise_mul"},
+    {"pd_op.maximum", "max"},
+    {"pd_op.minimum", "min"},
     {"pd_op.split_with_num", "split"},
     {"cinn_op.reshape", "reshape"},
     {"cinn_op.scale", "scale"},
@@ -89,12 +91,6 @@ std::string CompatibleInfo::OpName(const ::pir::Operation& op) {
   return cinn_op_name;
 }
 
-std::string CompatibleInfo::ValueName(const ::pir::Value& value) {
-  size_t hash_key = std::hash<::pir::Value>()(value);
-  return cinn::common::Context::Global().PrettyUniqName(
-      hash_key, CompatibleInfo::kNamePrefix);
-}
-
 std::string CompatibleInfo::OpFuncName(const ::pir::Operation& op) {
   std::string op_name = OpName(op);
   std::string func_name =
@@ -112,30 +108,10 @@ std::string CompatibleInfo::GroupOpsName(
   return name;
 }
 
-std::vector<std::string> CompatibleInfo::InputNames(const ::pir::Operation& op,
-                                                    bool allow_duplicate) {
-  std::vector<std::string> names;
-  std::unordered_set<std::string> repeat;
-  for (int i = 0; i < op.num_operands(); ++i) {
-    auto value = op.operand_source(i);
-    std::string name = CompatibleInfo::ValueName(value);
-    if (!allow_duplicate && repeat.count(name)) {
-      continue;
-    }
-    repeat.insert(name);
-    names.push_back(name);
-  }
-  return names;
-}
-
-std::vector<std::string> CompatibleInfo::OutputNames(::pir::Operation& op) {
-  std::vector<std::string> names;
-  for (int i = 0; i < op.num_results(); ++i) {
-    auto value = op.result(i);
-    std::string name = CompatibleInfo::ValueName(value);
-    names.push_back(std::move(name));
-  }
-  return names;
+std::string CompatibleInfo::ValueName(const ::pir::Value& value) {
+  size_t hash_key = std::hash<::pir::Value>()(value);
+  return cinn::common::Context::Global().PrettyUniqName(
+      hash_key, CompatibleInfo::kNamePrefix);
 }
 
 std::vector<::pir::Value> CompatibleInfo::RealOperandSources(
@@ -171,6 +147,8 @@ utils::Attribute CompatibleInfo::ConvertAttribute(
   } else if (src_attr.isa<paddle::dialect::DataTypeAttribute>()) {
     auto dtype = src_attr.dyn_cast<paddle::dialect::DataTypeAttribute>().data();
     dst_attr = phi::DataTypeToString(dtype);
+  } else if (src_attr.isa<::pir::shape::SymbolAttribute>()) {
+    auto dst_attr = src_attr.dyn_cast<::pir::shape::SymbolAttribute>().data();
   } else if (src_attr.isa<::pir::ArrayAttribute>()) {
     auto attr_vec = src_attr.dyn_cast<::pir::ArrayAttribute>().AsVector();
     if (attr_vec.size() > 0) {
@@ -189,11 +167,18 @@ utils::Attribute CompatibleInfo::ConvertAttribute(
           vec_int64.push_back(
               vec_element.dyn_cast<::pir::Int64Attribute>().data());
         }
-
         dst_attr = vec_int64;
+      } else if (attr_vec[0].isa<::pir::BoolAttribute>()) {
+        std::vector<bool> vec_bool;
+        int index = 0;
+        for (auto vec_element : attr_vec) {
+          vec_bool.push_back(
+              vec_element.dyn_cast<::pir::BoolAttribute>().data());
+        }
+        dst_attr = vec_bool;
       } else {
         LOG(FATAL)
-            << "only suuport int32 and int64 attribute in ArrayAttribute";
+            << "only support bool/int32/int64 attribute in ArrayAttribute";
       }
     }
   } else {
@@ -229,10 +214,10 @@ utils::AttributeMap CompatibleInfo::ConvertAttributes(
 }
 
 #define CASE_TYPE(src, dst) \
-  else if (type.isa<::pir::src>()) return common::dst();
+  else if (type.isa<::pir::src>()) return cinn::common::dst();
 
-common::Type CompatibleInfo::ConvertIRType(::pir::Type type) {
-  if (type.isa<::pir::BFloat16Type>()) return common::BF16();
+cinn::common::Type CompatibleInfo::ConvertIRType(::pir::Type type) {
+  if (type.isa<::pir::BFloat16Type>()) return cinn::common::BF16();
   CASE_TYPE(Float16Type, F16)
   CASE_TYPE(Float32Type, F32)
   CASE_TYPE(Float64Type, F64)
@@ -270,7 +255,20 @@ OpPatternKind CompatibleInfo::OpKind(const ::pir::Operation& op) {
 
 std::vector<int> CompatibleInfo::ValueShape(const ::pir::Value& value) {
   auto& dim = value.type().dyn_cast<::pir::DenseTensorType>().dims();
-  return phi::vectorize<int>(dim);
+  return ::common::vectorize<int>(dim);
+}
+
+std::vector<int64_t> GetBroadcastAxis(const phi::DDim& in_shape,
+                                      const std::vector<int64_t>& out_shape) {
+  std::vector<int64_t> broadcast_axes(in_shape.size(), 0);
+  auto in_shape_size = in_shape.size();
+  if (in_shape_size >= 1) {
+    for (int i = 1; i <= in_shape_size; ++i) {
+      broadcast_axes[in_shape_size - i] = out_shape.size() - i;
+    }
+  }
+
+  return broadcast_axes;
 }
 
 }  // namespace pir

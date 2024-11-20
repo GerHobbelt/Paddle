@@ -14,7 +14,6 @@
 
 import argparse
 import hashlib
-import os
 import pathlib
 import sys
 
@@ -54,40 +53,67 @@ BACKENDS_BLACK_LIST = [
     "embedding_grad",
 ]
 
+# prim op with one input and one output, with no attribute
+UNARY_PRIM_VJP_OPS = [
+    'abs_grad',
+    'erf_grad',
+    'exp_grad',
+    'floor_grad',
+    'log_grad',
+    'sin_grad',
+    'cos_grad',
+    'tanh_grad',
+]
 
-PRIM_VJP = [
-    'divide_grad',
-    'sum_grad',
-    'cast_grad',
+# prim op with two inputs and one output, with no attribute
+BINARY_PRIM_VJP_OPS = [
     'add_grad',
+    'divide_grad',
     'subtract_grad',
     'multiply_grad',
     'elementwise_pow_grad',
+    'maximum_grad',
+]
+
+OTHER_PRIM_VJP_OPS = [
+    'assign_grad',
+    'cumsum_grad',
+    'sum_grad',
+    'cast_grad',
     'reshape_grad',
+    'roll_grad',
     'split_grad',
-    'tanh_grad',
     'transpose_grad',
     'concat_grad',
-    'erf_grad',
-    'exp_grad',
     'expand_grad',
-    'log_grad',
+    'gather_grad',
     'gather_nd_grad',
     'pad_grad',
     'max_grad',
-    'maximum_grad',
+    'scatter_grad',
+    'scatter_nd_add_grad',
     'slice_grad',
     'tile_grad',
-]  # vjp list of primitive op
+    'topk_grad',
+]
+
+# whole vjp list of primitive op vjp
+PRIM_VJP = UNARY_PRIM_VJP_OPS + BINARY_PRIM_VJP_OPS + OTHER_PRIM_VJP_OPS
+
 CUSTOM_VJP = [
-    'gelu_grad',
-    'layer_norm_grad',
     'dropout_grad',
+    'gelu_grad',
+    'hardswish_grad',
+    'instance_norm_grad',
+    'layer_norm_grad',
+    'leaky_relu_grad',
+    'relu_grad',
+    'sigmoid_grad',
     'silu_grad',
     'softmax_grad',
     'sqrt_grad',
-    'relu_grad',
 ]  # custom vjp list of composite op
+
 VJP_COMPS = PRIM_VJP + CUSTOM_VJP
 
 
@@ -353,6 +379,7 @@ def gen(
         compats,
         ir_fwds,
         ir_revs,
+        ir_update_fwds,
     ) = (
         load(prim_path),
         load(fwd_path),
@@ -360,13 +387,11 @@ def gen(
         load(compat_path),
         load(fwd_pd_op_path),
         load(rev_pd_op_path),
+        load(update_fwd_pd_op_path),
     )
     filter_compat_info(compats)
 
-    fwd_apis = fwds + ir_fwds
-    # replace old ir ops with pir ops
-    if os.path.exists(update_fwd_pd_op_path):
-        update_apis(fwd_apis, update_fwd_pd_op_path)
+    fwd_apis = fwds + ir_fwds + ir_update_fwds
 
     apis = [{**api, **{'is_fwd': True}} for api in fwd_apis]
     apis = apis + [{**api, **{'is_fwd': False}} for api in revs + ir_revs]

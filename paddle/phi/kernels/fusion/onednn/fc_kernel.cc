@@ -13,10 +13,10 @@
 // limitations under the License.
 
 #include <memory>
+#include "paddle/common/errors.h"
 #include "paddle/phi/backends/onednn/onednn_reuse.h"
 #include "paddle/phi/core/compat/convert_utils.h"
 #include "paddle/phi/core/enforce.h"
-#include "paddle/phi/core/errors.h"
 #include "paddle/phi/core/expect.h"
 #include "paddle/phi/core/kernel_registry.h"
 #include "paddle/phi/core/utils/data_type.h"
@@ -84,8 +84,8 @@ class FCOneDNNHandler
         dev_ctx_(dev_ctx) {
     this->memory_key_ = dev_ctx.GetInputsName("W")[0];
 
-    auto x_vec_dims = phi::vectorize(x->dims());
-    auto weights_vec_dims = phi::vectorize(weights->dims());
+    auto x_vec_dims = common::vectorize(x->dims());
+    auto weights_vec_dims = common::vectorize(weights->dims());
 
     int MB = 1;
     for (int i = 0; i < in_num_col_dims; ++i) {
@@ -382,7 +382,7 @@ void RecomputeOutputDims(const int in_num_col_dims,
                            output_dims,
                            in_num_col_dims,
                            padding_weights);
-  out->Resize(phi::make_ddim(output_dims));
+  out->Resize(common::make_ddim(output_dims));
   out->set_lod(x->lod());
 }
 
@@ -436,8 +436,8 @@ void RunKernel(const phi::OneDNNContext& dev_ctx,
       phi::funcs::CreateKey(dev_ctx,
                             dev_ctx.GetInputsName("Input")[0],
                             dev_ctx.GetInputsName("W")[0],
-                            phi::vectorize(input.dims()),
-                            phi::vectorize(w.dims())));
+                            common::vectorize(input.dims()),
+                            common::vectorize(w.dims())));
 
   auto inner_product_cache =
       std::static_pointer_cast<InnerProductCache>(dev_ctx.GetBlob(cache_key));
@@ -547,7 +547,7 @@ void RunKernel(const phi::OneDNNContext& dev_ctx,
   }
 
   const auto out_md =
-      dst_memory_p->get_desc().reshape(phi::vectorize(out->dims()));
+      dst_memory_p->get_desc().reshape(common::vectorize(out->dims()));
 
   if (dev_ctx.HasDnnAttr("fused_reshape2_shape")) {
     phi::funcs::SetOutMemDescWithReshape2FuseSupport(
@@ -567,17 +567,61 @@ void FCKernel(const Context& dev_ctx,
               const paddle::optional<DenseTensor>& bias,
               const int in_num_col_dims,
               const std::string& activation_type,
-              const bool use_mkldnn,
               const bool padding_weights,
-              const bool use_quantizer,
-              const std::string& mkldnn_data_type,
-              const float scale_in,
-              const std::vector<float>& scale_weights,
-              const float scale_out,
-              const bool force_fp32_output,
               DenseTensor* out) {
+  const bool use_mkldnn =
+      dev_ctx.HasDnnAttr("use_mkldnn")
+          ? PADDLE_GET_CONST(bool, dev_ctx.GetDnnAttr("use_mkldnn"))
+          : false;
+  const bool use_quantizer =
+      dev_ctx.HasDnnAttr("use_quantizer")
+          ? PADDLE_GET_CONST(bool, dev_ctx.GetDnnAttr("use_quantizer"))
+          : false;
+  const std::string mkldnn_data_type =
+      dev_ctx.HasDnnAttr("mkldnn_data_type")
+          ? PADDLE_GET_CONST(std::string,
+                             dev_ctx.GetDnnAttr("mkldnn_data_type"))
+          : "float32";
+  const float scale_in =
+      dev_ctx.HasDnnAttr("Scale_in")
+          ? PADDLE_GET_CONST(float, dev_ctx.GetDnnAttr("Scale_in"))
+          : 1.0f;
+  std::vector<float> tmp_scale_weights = {1.0f};
+  const std::vector<float> scale_weights =
+      dev_ctx.HasDnnAttr("Scale_weights")
+          ? PADDLE_GET_CONST(std::vector<float>,
+                             dev_ctx.GetDnnAttr("Scale_weights"))
+          : tmp_scale_weights;
+  const float scale_out =
+      dev_ctx.HasDnnAttr("Scale_out")
+          ? PADDLE_GET_CONST(float, dev_ctx.GetDnnAttr("Scale_out"))
+          : 1.0f;
+  const bool force_fp32_output =
+      dev_ctx.HasDnnAttr("force_fp32_output")
+          ? PADDLE_GET_CONST(bool, dev_ctx.GetDnnAttr("force_fp32_output"))
+          : false;
+  std::string mkldnn_data_type_list[] = {"float32", "int8", "bfloat16"};
+  PADDLE_ENFORCE_EQ(
+      std::find(std::begin(mkldnn_data_type_list),
+                std::end(mkldnn_data_type_list),
+                mkldnn_data_type) != std::end(mkldnn_data_type_list),
+      true,
+      phi::errors::InvalidArgument("The mkldnn_data_type shoule be [float32, "
+                                   "int8, bfloat16], but found %s.",
+                                   mkldnn_data_type.c_str()));
+  auto in_dims = input.dims();
+  if (use_mkldnn) {
+    PADDLE_ENFORCE_EQ(
+        in_dims.size() >= 2 && in_dims.size() <= 4,
+        true,
+        phi::errors::Unimplemented(
+            "The Input of fc is expected to be a 2-D, 3-D or 4-D tensor when "
+            "use_mkldnn is set. But received the number of Input's "
+            "dimensions is %d, Input's shape is %s.",
+            in_dims.size(),
+            in_dims));
+  }
   bool fuse_relu = activation_type == "relu";
-
   IF_CHANGE_FC_TW_TYPENAME((std::is_same<T, uint8_t>::value), ([&] {
                              if (force_fp32_output) {  // NOLINT
                                RunKernel<T, float, T_w>(dev_ctx,
