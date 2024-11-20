@@ -46,6 +46,8 @@ class AutoGrowthBestFitAllocator : public Allocator {
 
   // Release the memory block which is not used in pool.
   uint64_t ReleaseImpl(const phi::Place &place) override {
+    // TODO(vivienfanghuagood): the next line may cause the process to deadlock.
+    // std::lock_guard<SpinLock> guard(spinlock_);
     return FreeIdleChunks();
   }
 

@@ -87,7 +87,7 @@ class Buffer {
     PADDLE_ENFORCE_EQ(shape_.ndims(),
                       1,
                       ::common::errors::InvalidArgument(
-                          "Expected shape has 1 dimension, but recevied %d.",
+                          "Expected shape has 1 dimension, but received %d.",
                           shape_.ndims()));
     return static_cast<T*>(data_)[i0];
   }
@@ -95,7 +95,7 @@ class Buffer {
     PADDLE_ENFORCE_EQ(shape_.ndims(),
                       2,
                       ::common::errors::InvalidArgument(
-                          "Expected shape has 2 dimensions, but recevied %d.",
+                          "Expected shape has 2 dimensions, but received %d.",
                           shape_.ndims()));
     return static_cast<T*>(data_)[i0 * shape_[0] + i1];
   }
@@ -103,7 +103,7 @@ class Buffer {
     PADDLE_ENFORCE_EQ(shape_.ndims(),
                       3,
                       ::common::errors::InvalidArgument(
-                          "Expected shape has 3 dimensions, but recevied %d.",
+                          "Expected shape has 3 dimensions, but received %d.",
                           shape_.ndims()));
     return static_cast<T*>(
         data_)[i0 * shape_[1] * shape_[2] + i1 * shape_[2] + i2];

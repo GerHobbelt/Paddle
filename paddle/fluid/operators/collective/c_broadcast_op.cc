@@ -43,10 +43,6 @@ class CBroadcastOpMaker : public framework::OpProtoAndCheckerMaker {
     AddAttr<int>("root", "(int default 0) root id for broadcasting.")
         .SetDefault(0);
 
-    AddAttr<bool>(
-        "use_calc_stream",
-        "(bool default false) eject CUDA operations to calculation stream.")
-        .SetDefault(false);
     AddComment(R"DOC(
 CBroadcast Operator
 

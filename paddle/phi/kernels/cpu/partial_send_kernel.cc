@@ -20,13 +20,11 @@
 
 namespace phi {
 template <typename T, typename Context>
-void PartialSendOpCPUKernel(const Context& dev_ctx UNUSED,
-                            const DenseTensor& x UNUSED,
-                            int ring_id UNUSED,
-                            int peer UNUSED,
-                            bool use_calc_stream UNUSED,
-                            int num UNUSED,
-                            int id UNUSED) {
+void PartialSendKernel(const Context& dev_ctx UNUSED,
+                       const DenseTensor& x UNUSED,
+                       int peer UNUSED,
+                       int num UNUSED,
+                       int id UNUSED) {
   PADDLE_THROW(common::errors::Unavailable(
       "Do not support partial_send for cpu kernel now."));
 }
@@ -36,7 +34,7 @@ void PartialSendOpCPUKernel(const Context& dev_ctx UNUSED,
 PD_REGISTER_KERNEL(partial_send,
                    CPU,
                    ALL_LAYOUT,
-                   phi::PartialSendOpCPUKernel,
+                   phi::PartialSendKernel,
                    float,
                    double,
                    int,

@@ -19,7 +19,6 @@
 - c_concat
 - c_identity
 - c_reduce_sum
-- c_sync_calc_stream
 - c_sync_comm_stream
 - cast
 - conv2d_transpose
@@ -47,7 +46,6 @@
 - full_with_tensor
 - fused_batch_norm_act
 - fused_bn_add_activation
-- fused_multi_transformer
 - fused_softmax_mask
 - fused_softmax_mask_upper_triangle
 - gaussian
@@ -62,6 +60,7 @@
 - memcpy_d2h
 - memcpy_h2d
 - mish
+- mp_allreduce_sum
 - norm
 - one_hot
 - ones

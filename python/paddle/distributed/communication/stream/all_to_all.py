@@ -41,10 +41,10 @@ def _all_to_all_tensor_in_dygraph(
 ) -> task:
     if use_calc_stream:
         return group.process_group.all_to_all_tensor_on_calc_stream(
-            in_tensor, out_tensor
+            out_tensor, in_tensor
         )
 
-    task = group.process_group.all_to_all_tensor(in_tensor, out_tensor, sync_op)
+    task = group.process_group.all_to_all_tensor(out_tensor, in_tensor, sync_op)
     if sync_op:
         task.wait()
 
@@ -87,7 +87,7 @@ def _all_to_all_in_static_mode(
     sync_op: bool,
     use_calc_stream: bool,
 ) -> None:
-    op_type = 'alltoall'
+    op_type = 'all_to_all'
     ring_id = 0 if group is None else group.id
     nranks = dist.get_world_size()
     helper = framework.LayerHelper(op_type, **locals())
@@ -118,15 +118,16 @@ def _all_to_all_in_static_mode(
         ['float16', 'float32', 'float64', 'int32', 'int64', 'uint16'],
         'all_to_all',
     )
-    helper.append_op(
+    op = helper.append_op(
         type=op_type,
-        inputs={'X': [in_tensor]},
-        outputs={'Out': [out_tensor]},
+        inputs={'x': [in_tensor]},
+        outputs={'out': [out_tensor]},
         attrs={
             'ring_id': ring_id,
-            'use_calc_stream': sync_op,
         },
     )
+    if sync_op:
+        op.dist_attr.execution_stream = "default"
     # NOTE(liyurui): If the argument `out_tensor_or_tensor_list` is a tensor_list,
     # we need to split the result. So we should wait the result of all_to_all
     # before split if the communication is not on calc stream.
@@ -319,7 +320,7 @@ def alltoall_single(
             >>> else:
             ...     data = paddle.to_tensor([2, 3])
             >>> task = dist.stream.alltoall_single(output, data, sync_op=False)
-            >>> task.wait()  # type: ignore[union-attr]
+            >>> task.wait()
             >>> out = output.numpy()
             >>> print(out)
             >>> # [0, 2] (2 GPUs, out for rank 0)
@@ -339,7 +340,7 @@ def alltoall_single(
             ...                                 out_split_sizes,
             ...                                 in_split_sizes,
             ...                                 sync_op=False)
-            >>> task.wait()  # type: ignore[union-attr]
+            >>> task.wait()
             >>> out = output.numpy()
             >>> print(out)
             >>> # [[0., 0.], [1., 1.]]                     (2 GPUs, out for rank 0)

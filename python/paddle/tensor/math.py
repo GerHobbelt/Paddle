@@ -242,7 +242,8 @@ def scale(
                             Out=scale*(X+bias)
 
     Args:
-        x (Tensor): Input N-D Tensor of scale operator. Data type can be float32, float64, int8, int16, int32, int64, uint8.
+        x (Tensor): Input N-D Tensor of scale operator. Data type can be bfloat16, float16, float32, float64, int8, int16, int32,
+            int64, uint8, complex64, complex128.
         scale (float|Tensor): The scale factor of the input, it should be a float number or a 0-D Tensor with shape [] and data type as float32.
         bias (float): The bias to be put on the input.
         bias_after_scale (bool): Apply bias addition after or before scaling. It is useful for numeric stability in some circumstances.
@@ -294,9 +295,8 @@ def scale(
         out = _C_ops.scale(x, scale, float(bias), bias_after_scale)
         return dygraph_utils._append_activation_in_dygraph(out, act)
     elif in_pir_mode():
-        if act is None:
-            return _C_ops.scale(x, scale, float(bias), bias_after_scale)
-        raise ValueError("act is not implement in pir of scale api.")
+        out = _C_ops.scale(x, scale, float(bias), bias_after_scale)
+        return paddle.pir_utils.append_activation_in_pir(out, act)
     else:
         check_variable_and_dtype(
             x,
@@ -517,7 +517,7 @@ def pow(x: Tensor, y: float | Tensor, name: str | None = None) -> Tensor:
 
 
     Args:
-        x (Tensor): An N-D Tensor, the data type is float16, float32, float64, int32 or int64.
+        x (Tensor): An N-D Tensor, the data type is bfloat16, float16, float32, float64, int32 or int64.
         y (float|int|Tensor): If it is an N-D Tensor, its data type should be the same as `x`.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
@@ -711,8 +711,10 @@ def add(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
             shape(X) = (2, 3, 4, 5), shape(Y) = (2, 1), with axis=0
 
     Args:
-        x (Tensor): Tensor of any dimensions. Its dtype should be int32, int64, float32, float64.
-        y (Tensor): Tensor of any dimensions. Its dtype should be int32, int64, float32, float64.
+        x (Tensor): Tensor of any dimensions. Its dtype should be bool, bfloat16, float16, float32, float64,
+            int8, int16, int32, int64, uint8, complex64, complex128.
+        y (Tensor): Tensor of any dimensions. Its dtype should be bool, bfloat16, float16, float32, float64,
+            int8, int16, int32, int64, uint8, complex64, complex128.
         name (str|None, optional): For details, please refer to :ref:`api_guide_Name`. Generally, no setting is required. Default: None.
 
     Returns:
@@ -790,8 +792,8 @@ def logaddexp(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
             shape(X) = (2, 3, 4, 5), shape(Y) = (2, 1), with axis=0
 
     Args:
-        x (Tensor): Tensor of any dimensions. Its dtype should be int32, int64, float32, float64, float16.
-        y (Tensor): Tensor of any dimensions. Its dtype should be int32, int64, float32, float64, float16.
+        x (Tensor): Tensor of any dimensions. Its dtype should be int32, int64, bfloat16, float16, float32, float64.
+        y (Tensor): Tensor of any dimensions. Its dtype should be int32, int64, bfloat16, float16, float32, float64.
         name (str|None, optional): For details, please refer to :ref:`api_guide_Name`. Generally, no setting is required. Default: None.
 
     Returns:
@@ -830,8 +832,8 @@ def subtract(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         .. _Introduction to Tensor: ../../guides/beginner/tensor_en.html#chapter5-broadcasting-of-tensor
 
     Args:
-        x (Tensor): the input tensor, it's data type should be float32, float64, int32, int64.
-        y (Tensor): the input tensor, it's data type should be float32, float64, int32, int64.
+        x (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int16, int32, int64, complex64, complex128.
+        y (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int16, int32, int64, complex64, complex128.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -908,8 +910,10 @@ def divide(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         .. _Introduction to Tensor: ../../guides/beginner/tensor_en.html#chapter5-broadcasting-of-tensor
 
     Args:
-        x (Tensor): the input tensor, it's data type should be float32, float64, int32, int64.
-        y (Tensor): the input tensor, it's data type should be float32, float64, int32, int64.
+        x (Tensor): the input tensor, it's data type should be bool, bfloat16, float16, float32, float64,
+            int8, int16, int32, int64, uint8, complex64, complex128.
+        y (Tensor): the input tensor, it's data type should be bool, bfloat16, float16, float32, float64,
+            int8, int16, int32, int64, uint8, complex64, complex128.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -951,10 +955,10 @@ def divide_(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
 
 def floor_divide(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
     """
-    Floor divide two tensors element-wise and rounds the quotinents to the nearest integer toward zero. The equation is:
+    Floor divide two tensors element-wise and rounds the quotinents to the nearest integer toward negative infinite. The equation is:
 
     .. math::
-        out = trunc(x / y)
+        out = floor(x / y)
 
     - :math:`x`: Multidimensional Tensor.
     - :math:`y`: Multidimensional Tensor.
@@ -964,7 +968,6 @@ def floor_divide(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
 
         .. _Introduction to Tensor: ../../guides/beginner/tensor_en.html#chapter5-broadcasting-of-tensor
 
-        Also note that the name ``floor_divide`` can be misleading, as the quotinents are actually rounded toward zero, not toward negative infinite.
 
     Args:
         x (Tensor): the input tensor, it's data type should be uint8, int8, int32, int64, float32, float64, float16, bfloat16.
@@ -987,6 +990,12 @@ def floor_divide(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
             Tensor(shape=[4], dtype=int64, place=Place(cpu), stop_gradient=True,
             [2, 0, 2, 2])
 
+            >>> x = paddle.to_tensor([2, 3, 8, 7])
+            >>> y = paddle.to_tensor([1, -5, -3, -3])
+            >>> z = paddle.floor_divide(x, y)
+            >>> print(z)
+            Tensor(shape=[4], dtype=int64, place=Place(cpu), stop_gradient=True,
+            [2, -1, -3, -3])
     """
     if in_dynamic_or_pir_mode():
         return _C_ops.floor_divide(x, y)
@@ -1024,8 +1033,8 @@ def remainder(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         And `mod`, `floor_mod` are all functions with the same name
 
     Args:
-        x (Tensor): the input tensor, it's data type should be float16, float32, float64, int32, int64.
-        y (Tensor): the input tensor, it's data type should be float16, float32, float64, int32, int64.
+        x (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int32, int64.
+        y (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int32, int64.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -1105,8 +1114,8 @@ def multiply(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         .. _Introduction to Tensor: ../../guides/beginner/tensor_en.html#chapter5-broadcasting-of-tensor
 
     Args:
-        x (Tensor): the input tensor, its data type should be one of float32, float64, int32, int64, bool.
-        y (Tensor): the input tensor, its data type should be one of float32, float64, int32, int64, bool.
+        x (Tensor): the input tensor, its data type should be one of bfloat16, float16, float32, float64, int32, int64, bool, complex64, complex128.
+        y (Tensor): the input tensor, its data type should be one of bfloat16, float16, float32, float64, int32, int64, bool, complex64, complex128.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -1229,8 +1238,8 @@ def maximum(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         .. _Introduction to Tensor: ../../guides/beginner/tensor_en.html#chapter5-broadcasting-of-tensor
 
     Args:
-        x (Tensor): the input tensor, it's data type should be float32, float64, int32, int64.
-        y (Tensor): the input tensor, it's data type should be float32, float64, int32, int64.
+        x (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int32, int64.
+        y (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int32, int64.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -1291,8 +1300,8 @@ def minimum(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         .. _Introduction to Tensor: ../../guides/beginner/tensor_en.html#chapter5-broadcasting-of-tensor
 
     Args:
-        x (Tensor): the input tensor, it's data type should be float32, float64, int32, int64.
-        y (Tensor): the input tensor, it's data type should be float32, float64, int32, int64.
+        x (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int32, int64.
+        y (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int32, int64.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -1355,8 +1364,8 @@ def fmax(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         .. _Introduction to Tensor: ../../guides/beginner/tensor_en.html#chapter5-broadcasting-of-tensor
 
     Args:
-        x (Tensor): the input tensor, it's data type should be float16, float32, float64, int32, int64.
-        y (Tensor): the input tensor, it's data type should be float16, float32, float64, int32, int64.
+        x (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int32, int64.
+        y (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int32, int64.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -1419,8 +1428,8 @@ def fmin(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         .. _Introduction to Tensor: ../../guides/beginner/tensor_en.html#chapter5-broadcasting-of-tensor
 
     Args:
-        x (Tensor): the input tensor, it's data type should be float16, float32, float64, int32, int64.
-        y (Tensor): the input tensor, it's data type should be float16, float32, float64, int32, int64.
+        x (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int32, int64.
+        y (Tensor): the input tensor, it's data type should be bfloat16, float16, float32, float64, int32, int64.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -1479,7 +1488,8 @@ def sum(
     Computes the sum of tensor elements over the given dimension.
 
     Args:
-        x (Tensor): An N-D Tensor, the data type is bool, float16, float32, float64, int32 or int64.
+        x (Tensor): An N-D Tensor, the data type is bool, bfloat16, float16, float32, float64,
+            uint8, int8, int16, int32, int64, complex64, complex128.
         axis (int|list|tuple|None, optional): The dimensions along which the sum is performed. If
             :attr:`None`, sum all elements of :attr:`x` and return a
             Tensor with a single element, otherwise must be in the
@@ -1834,7 +1844,7 @@ def nansum(
     Computes the sum of tensor elements over the given axis, treating Not a Numbers (NaNs) as zero.
 
     Args:
-        x (Tensor): An N-D Tensor, the data type is float16, float32, float64, int32 or int64.
+        x (Tensor): An N-D Tensor, the data type is bfloat16, float16, float32, float64, int32 or int64.
         axis (int|list|tuple, optional): The dimensions along which the nansum is performed. If
             :attr:`None`, nansum all elements of :attr:`x` and return a
             Tensor with a single element, otherwise must be in the
@@ -2112,7 +2122,7 @@ def add_n(inputs: Tensor | Sequence[Tensor], name: str | None = None) -> Tensor:
 
     Args:
         inputs (Tensor|list[Tensor]|tuple[Tensor]):  A Tensor or a list/tuple of Tensors. The shape and data type of the list/tuple elements should be consistent.
-            Input can be multi-dimensional Tensor, and data types can be: float32, float64, int32, int64, complex64, complex128.
+            Input can be multi-dimensional Tensor, and data types can be: bfloat16, float16, float32, float64, int32, int64, complex64, complex128.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -2251,12 +2261,14 @@ def mm(input: Tensor, mat2: Tensor, name: str | None = None) -> Tensor:
     removed after matrix multiplication.
 
     Args:
-        input (Tensor): The input tensor which is a Tensor.
-        mat2 (Tensor): The input tensor which is a Tensor.
+        input (Tensor): The input tensor which is a Tensor. Support data types: bfloat16, float16, float32,
+            float64, int8, int32, int64, complex64, complex128.
+        mat2 (Tensor): The input tensor which is a Tensor. Support data types: bfloat16, float16, float32,
+            float64, int8, int32, int64, complex64, complex128.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
-        Tensor: The product Tensor.
+        Tensor: The product Tensor, with same data type of the input Tensor.
 
     ::
 
@@ -2880,7 +2892,7 @@ def max(
 
 
     Args:
-        x (Tensor): A tensor, the data type is float32, float64, int32, int64.
+        x (Tensor): A tensor, the data type is float8_e4m3fn, float8_e5m2, bfloat16, float16, float32, float64, int32, int64.
         axis (int|list|tuple|None, optional): The axis along which the maximum is computed.
             If :attr:`None`, compute the maximum over all elements of
             `x` and return a Tensor with a single element,
@@ -3038,7 +3050,7 @@ def min(
         while min propagates gradient to all of them.
 
     Args:
-        x (Tensor): A tensor, the data type is float32, float64, int32, int64.
+        x (Tensor): A tensor, the data type is bfloat16, float16, float32, float64, int32, int64.
         axis (int|list|tuple|None, optional): The axis along which the minimum is computed.
             If :attr:`None`, compute the minimum over all elements of
             `x` and return a Tensor with a single element,
@@ -3717,11 +3729,11 @@ def clip(
         Out = MIN(MAX(x, min), max)
 
     Args:
-        x (Tensor): An N-D Tensor with data type float16, float32, float64, int32 or int64.
+        x (Tensor): An N-D Tensor with data type bfloat16, float16, float32, float64, int32 or int64.
         min (float|int|Tensor, optional): The lower bound with type ``float`` , ``int`` or a ``0-D Tensor``
-            with shape [] and type ``int32``, ``float16``, ``float32``, ``float64``.
+            with shape [] and type ``bfloat16``, ``float16``, ``float32``, ``float64``, ``int32``.
         max (float|int|Tensor, optional): The upper bound with type ``float``, ``int`` or a ``0-D Tensor``
-            with shape [] and type ``int32``, ``float16``, ``float32``, ``float64``.
+            with shape [] and type ``bfloat16``, ``float16``, ``float32``, ``float64``, ``int32``.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -3871,7 +3883,7 @@ def trace(
     - Note that if offset is out of input's shape indicated by axis1 and axis2, 0 will be returned.
 
     Args:
-        x (Tensor): The input tensor x. Must be at least 2-dimensional. The input data type should be float32, float64, int32, int64.
+        x (Tensor): The input tensor x. Must be at least 2-dimensional. The input data type should be float16, float32, float64, int32, int64.
         offset (int, optional): Which diagonals in input tensor x will be taken. Default: 0 (main diagonals).
         axis1 (int, optional): The first axis with respect to take diagonal. Default: 0.
         axis2 (int, optional): The second axis with respect to take diagonal. Default: 1.
@@ -3969,7 +3981,8 @@ def diagonal(
     - If offset < 0, it is below the main diagonal.
 
     Args:
-        x (Tensor): The input tensor x. Must be at least 2-dimensional. The input data type should be bool, int32, int64, float16, float32, float64.
+        x (Tensor): The input tensor x. Must be at least 2-dimensional. The input data type should be bool, int32,
+            int64, bfloat16, float16, float32, float64.
         offset (int, optional): Which diagonals in input tensor x will be taken. Default: 0 (main diagonals).
         axis1 (int, optional): The first axis with respect to take diagonal. Default: 0.
         axis2 (int, optional): The second axis with respect to take diagonal. Default: 1.
@@ -4098,12 +4111,12 @@ def kron(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
     $$
 
     Args:
-        x (Tensor): the fist operand of kron op, data type: float16, float32, float64, int32 or int64.
-        y (Tensor): the second operand of kron op, data type: float16, float32, float64, int32 or int64. Its data type should be the same with x.
+        x (Tensor): the fist operand of kron op, data type: bfloat16, float16, float32, float64, int32 or int64.
+        y (Tensor): the second operand of kron op, data type: bfloat16, float16, float32, float64, int32 or int64. Its data type should be the same with x.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
-        Tensor: The output of kron, data type: float16, float32, float64, int32 or int64. Its data is the same with x.
+        Tensor: The output of kron, data type: bfloat16, float16, float32, float64, int32 or int64. Its data is the same with x.
 
     Examples:
         .. code-block:: python
@@ -4160,7 +4173,7 @@ def cumsum(
     Args:
         x (Tensor): The input tensor needed to be cumsumed.
         axis (int, optional): The dimension to accumulate along. -1 means the last dimension. The default (None) is to compute the cumsum over the flattened array.
-        dtype (str|paddle.dtype|np.dtype|None, optional): The data type of the output tensor, can be float16, float32, float64, int32, int64. If specified, the input tensor is casted to dtype before the operation is performed. This is useful for preventing data type overflows. The default value is None.
+        dtype (str|paddle.dtype|np.dtype|None, optional): The data type of the output tensor, can be bfloat16, float16, float32, float64, int32, int64. If specified, the input tensor is casted to dtype before the operation is performed. This is useful for preventing data type overflows. The default value is None.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -4533,8 +4546,8 @@ def cumprod(
         x (Tensor): the input tensor need to be cumproded.
         dim (int|None, optional): the dimension along which the input tensor will be accumulated. It need to be in the range of [-x.rank, x.rank),
                     where x.rank means the dimensions of the input tensor x and -1 means the last dimension.
-        dtype (str|paddle.dtype|np.dtype, optional): The data type of the output tensor, can be float32, float64, int32, int64, complex64,
-                    complex128. If specified, the input tensor is casted to dtype before the operation is performed.
+        dtype (str|paddle.dtype|np.dtype, optional): The data type of the output tensor, can be bfloat16, float16, float32, float64, int32, int64,
+                    complex64, complex128. If specified, the input tensor is casted to dtype before the operation is performed.
                     This is useful for preventing data type overflows. The default value is None.
         name (str|None, optional): Name for the operation (optional, default is None). For more information,
                     please refer to :ref:`api_guide_Name`.
@@ -4783,17 +4796,17 @@ def prod(
     Compute the product of tensor elements over the given axis.
 
     Args:
-        x (Tensor): The input tensor, its data type should be float32, float64, int32, int64.
+        x (Tensor): The input tensor, its data type should be bfloat16, float16, float32, float64, int32, int64.
         axis (int|list|tuple|None, optional): The axis along which the product is computed. If :attr:`None`,
             multiply all elements of `x` and return a Tensor with a single element,
             otherwise must be in the range :math:`[-x.ndim, x.ndim)`. If :math:`axis[i]<0`,
             the axis to reduce is :math:`x.ndim + axis[i]`. Default is None.
         keepdim (bool, optional): Whether to reserve the reduced dimension in the output Tensor. The result
             tensor will have one fewer dimension than the input unless `keepdim` is true. Default is False.
-        dtype (str|paddle.dtype|np.dtype, optional): The desired date type of returned tensor, can be float32, float64,
-            int32, int64. If specified, the input tensor is casted to dtype before operator performed.
-            This is very useful for avoiding data type overflows. The default value is None, the dtype
-            of output is the same as input Tensor `x`.
+        dtype (str|paddle.dtype|np.dtype, optional): The desired date type of returned tensor, can be bfloat16,
+            float16, float32, float64, int32, int64. If specified, the input tensor is casted to dtype before
+            operator performed. This is very useful for avoiding data type overflows. The default value is None,
+            the dtype of output is the same as input Tensor `x`.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -4884,7 +4897,7 @@ def sign(x: Tensor, name: str | None = None) -> Tensor:
     Returns sign of every element in `x`: 1 for positive, -1 for negative and 0 for zero.
 
     Args:
-        x (Tensor): The input tensor. The data type can be uint8, int8, int16, int32, int64, float16, float32 or float64.
+        x (Tensor): The input tensor. The data type can be uint8, int8, int16, int32, int64, bfloat16, float16, float32 or float64.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -5031,7 +5044,7 @@ def all(
     Computes the ``logical and`` of tensor elements over the given dimension.
 
     Args:
-        x (Tensor): An N-D Tensor, the input data type should be `bool`.
+        x (Tensor): An N-D Tensor, the input data type should be 'bool', 'float32', 'float64', 'int32', 'int64'.
         axis (int|list|tuple|None, optional): The dimensions along which the ``logical and`` is compute. If
             :attr:`None`, and all elements of :attr:`x` and return a
             Tensor with a single element, otherwise must be in the
@@ -5122,7 +5135,7 @@ def any(
     Computes the ``logical or`` of tensor elements over the given dimension, and return the result.
 
     Args:
-        x (Tensor): An N-D Tensor, the input data type should be `bool`.
+        x (Tensor): An N-D Tensor, the input data type should be 'bool', 'float32', 'float64', 'int32', 'int64'.
         axis (int|list|tuple|None, optional): The dimensions along which the ``logical or`` is compute. If
             :attr:`None`, and all elements of :attr:`x` and return a
             Tensor with a single element, otherwise must be in the
@@ -5246,7 +5259,7 @@ def conj(x: Tensor, name: str | None = None) -> Tensor:
 
     Args:
         x (Tensor): The input Tensor which hold the complex numbers.
-            Optional data types are:float16, complex64, complex128, float32, float64, int32 or int64.
+            Optional data types are: bfloat16, float16, complex64, complex128, float32, float64, int32 or int64.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -5596,7 +5609,8 @@ def neg(x: Tensor, name: str | None = None) -> Tensor:
     This function computes the negative of the Tensor elementwisely.
 
     Args:
-        x (Tensor): Input of neg operator, an N-D Tensor, with data type float32, float64, int8, int16, int32, or int64.
+        x (Tensor): Input of neg operator, an N-D Tensor, with data type bfloat16, float16, float32, float64, int8, int16, int32,
+            int64, uint8, complex64, complex128.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -6306,6 +6320,16 @@ def diff(
             Tensor(shape=[5], dtype=int64, place=Place(cpu), stop_gradient=True,
             [ 3,  1, -3,  5,  2])
 
+            >>> out = paddle.diff(x, n=2, append=y)
+            >>> out
+            Tensor(shape=[4], dtype=int64, place=Place(cpu), stop_gradient=True,
+            [-2, -4,  8, -3])
+
+            >>> out = paddle.diff(x, n=3, append=y)
+            >>> out
+            Tensor(shape=[3], dtype=int64, place=Place(cpu), stop_gradient=True,
+            [-2 ,  12, -11])
+
             >>> z = paddle.to_tensor([[1, 2, 3], [4, 5, 6]])
             >>> out = paddle.diff(z, axis=0)
             >>> out
@@ -6450,7 +6474,7 @@ def diff(
     if n > 1:
         for _ in range(n - 1):
             out = _diff_handler(
-                out, n=1, axis=axis, prepend=prepend, append=append, name=name
+                out, n=1, axis=axis, prepend=None, append=None, name=name
             )
     return out
 
@@ -6543,8 +6567,8 @@ def heaviside(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         .. _Introduction to Tensor: ../../guides/beginner/tensor_en.html#chapter5-broadcasting-of-tensor
 
     Args:
-        x (Tensor): The input tensor of Heaviside step function, it's data type should be float16, float32, float64, int32 or int64.
-        y (Tensor): The tensor that determines a Heaviside step function, it's data type should be float16, float32, float64, int32 or int64.
+        x (Tensor): The input tensor of Heaviside step function, it's data type should be bfloat16, float16, float32, float64, int32 or int64.
+        y (Tensor): The tensor that determines a Heaviside step function, it's data type should be bfloat16, float16, float32, float64, int32 or int64.
         name (str|None, optional): Name for the operation (optional, default is None). Normally there is no need for user to set this property. For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:

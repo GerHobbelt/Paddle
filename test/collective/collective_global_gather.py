@@ -90,7 +90,7 @@ class TestCollectiveGlobalGatherAPI(TestCollectiveAPIRunnerBase):
             )
             global_expert_count = []
             paddle.distributed.alltoall(
-                paddle.split(local_expert_count, 2, axis=0), global_expert_count
+                global_expert_count, paddle.split(local_expert_count, 2, axis=0)
             )
             global_expert_count = paddle.concat(global_expert_count, axis=0)
         exe = base.Executor(place)

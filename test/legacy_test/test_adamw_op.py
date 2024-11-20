@@ -156,7 +156,8 @@ class TestAdamW(OpTest):
 
 
 @unittest.skipIf(
-    not core.is_compiled_with_cuda(), "core is not compiled with CUDA"
+    not (core.is_compiled_with_cuda() or core.is_compiled_with_xpu()),
+    "core is not compiled with CUDA nor XPU",
 )
 class TestAdamW2(OpTest):
     def setUp(self):
@@ -209,7 +210,14 @@ class TestAdamW2(OpTest):
         }
 
     def test_check_output(self):
-        self.check_output_with_place(core.CUDAPlace(0), check_pir=True)
+        self.check_output_with_place(
+            (
+                core.CUDAPlace(0)
+                if not core.is_compiled_with_xpu()
+                else core.XPUPlace(0)
+            ),
+            check_pir=True,
+        )
 
 
 class TestAdamWOp(unittest.TestCase):
@@ -545,6 +553,8 @@ class TestAdamWOpMultiPrecisionWithMainGrad(unittest.TestCase):
         places = []
         if paddle.is_compiled_with_cuda():
             places.append('gpu')
+        if paddle.is_compiled_with_xpu():
+            places.append('xpu')
         return places
 
     def test_main(self):
@@ -581,11 +591,11 @@ class TestAdamWOpMultiPrecision(unittest.TestCase):
         )
 
         for idx in range(2):
-            if place == 'gpu' and use_amp:
+            if (place == 'gpu' or place == 'xpu') and use_amp:
                 model = paddle.amp.decorate(models=model, level='O2')
                 scaler = paddle.amp.GradScaler(init_loss_scaling=1024)
 
-            if place == 'gpu' and use_amp:
+            if (place == 'gpu' or place == 'xpu') and use_amp:
                 with paddle.amp.auto_cast(level='O2'):
                     output = model(input)
                     loss = paddle.mean(output)
@@ -610,6 +620,8 @@ class TestAdamWOpMultiPrecision(unittest.TestCase):
             places.append('cpu')
         if paddle.is_compiled_with_cuda():
             places.append('gpu')
+        if paddle.is_compiled_with_xpu():
+            places.append('xpu')
         return places
 
     def test_main(self):
@@ -621,14 +633,6 @@ class TestAdamWOpMultiPrecision(unittest.TestCase):
 
 class TestAdamWOpError(unittest.TestCase):
     def test_api_errors(self):
-        def test_weight_decay_dtype():
-            linear = paddle.nn.Linear(13, 5)
-            adam = paddle.optimizer.AdamW(
-                learning_rate=0.01,
-                parameters=linear.parameters(),
-                weight_decay=1,
-            )
-
         def test_parameters_dtype1():
             adam = paddle.optimizer.AdamW(
                 learning_rate=0.01,
@@ -674,7 +678,6 @@ class TestAdamWOpError(unittest.TestCase):
                 grad_clip=0.1,
             )
 
-        self.assertRaises(TypeError, test_weight_decay_dtype)
         self.assertRaises(TypeError, test_parameters_dtype1)
         self.assertRaises(TypeError, test_parameters_dtype2)
         self.assertRaises(AttributeError, test_parameters_dtype3)
@@ -728,7 +731,8 @@ def simple_lr_setting(param, decay_rate, n_layers):
 
 
 @unittest.skipIf(
-    not core.is_compiled_with_cuda(), "core is not compiled with CUDA"
+    not (core.is_compiled_with_cuda() or core.is_compiled_with_xpu()),
+    "core is not compiled with CUDA nor XPU",
 )
 class TestAdamWOpLayerwiseLR(TestAdamWOp):
     def setUp(self):
@@ -853,7 +857,12 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
             opt.step()
             opt.clear_gradients()
 
-            np.testing.assert_allclose(linear1.weight.numpy(), fc1_w, rtol=1e-6)
+            np.testing.assert_allclose(
+                linear1.weight.numpy(),
+                fc1_w,
+                atol=2e-9 if core.is_compiled_with_xpu() else 0,
+                rtol=1e-6,
+            )
             np.testing.assert_allclose(linear1.bias.numpy(), fc1_b, rtol=1e-6)
             np.testing.assert_allclose(linear2.weight.numpy(), fc2_w, rtol=1e-6)
             np.testing.assert_allclose(linear2.bias.numpy(), fc2_b, rtol=1e-6)
@@ -861,7 +870,11 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
     def test_adamw_op(self):
         with paddle.pir_utils.OldIrGuard():
             paddle.enable_static()
-            place = base.CUDAPlace(0)
+            place = (
+                base.CUDAPlace(0)
+                if not core.is_compiled_with_xpu()
+                else base.XPUPlace(0)
+            )
 
             learning_rate = 0.0001
             beta1 = 0.85
@@ -1052,7 +1065,11 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
     def test_adamw_op_with_pir(self):
         with paddle.pir_utils.IrGuard():
             paddle.enable_static()
-            place = base.CUDAPlace(0)
+            place = (
+                base.CUDAPlace(0)
+                if not core.is_compiled_with_xpu()
+                else base.XPUPlace(0)
+            )
 
             learning_rate = 0.0001
             beta1 = 0.85
@@ -1281,6 +1298,133 @@ class TestAdamWOpLayerwiseLR(TestAdamWOp):
                 np.testing.assert_allclose(params_and_gras[0], fc2_b, rtol=1e-6)
 
             paddle.disable_static()
+
+    def test_weight_decay_int(self):
+        paddle.disable_static()
+        linear1 = paddle.nn.Linear(
+            13, 8, bias_attr=paddle.nn.initializer.Constant(value=1.0)
+        )
+        linear2 = paddle.nn.Linear(
+            8, 5, bias_attr=paddle.nn.initializer.Constant(value=1.0)
+        )
+
+        # fix the linear name, simple_lr_setting function will use the name
+        linear1.weight.name = "linear_1.w_0"
+        linear1.bias.name = "linear_1.b_0"
+        linear2.weight.name = "linear_2.w_0"
+        linear2.bias.name = "linear_2.b_0"
+
+        fc1_w = np.array(linear1.weight)
+        fc1_w_mon1 = np.zeros_like(fc1_w)
+        fc1_w_mon2 = np.zeros_like(fc1_w)
+        fc1_b = np.array(linear1.bias)
+        fc1_b_mon1 = np.zeros_like(fc1_b)
+        fc1_b_mon2 = np.zeros_like(fc1_b)
+
+        fc2_w = np.array(linear2.weight)
+        fc2_w_mon1 = np.zeros_like(fc2_w)
+        fc2_w_mon2 = np.zeros_like(fc2_w)
+        fc2_b = np.array(linear2.bias)
+        fc2_b_mon1 = np.zeros_like(fc2_b)
+        fc2_b_mon2 = np.zeros_like(fc2_b)
+
+        simple_lr_fun = partial(simple_lr_setting, decay_rate=0.8, n_layers=2)
+        learning_rate = 0.001
+        weight_decay = 0
+        beta1 = 0.9
+        beta2 = 0.999
+
+        opt = paddle.optimizer.AdamW(
+            learning_rate=learning_rate,
+            parameters=[
+                {'params': linear1.parameters()},
+                {
+                    'params': linear2.parameters(),
+                },
+            ],
+            apply_decay_param_fun=lambda name: True,
+            weight_decay=weight_decay,
+            lr_ratio=simple_lr_fun,
+        )
+
+        def get_numpy_output(param, grad, moment1, moment2, lr_ratio, t):
+            np_inputs = {
+                'Param': param,
+                'Grad': grad,
+                'Moment1': moment1,
+                'Moment2': moment2,
+                'LearningRate': np.array([learning_rate]).astype("float32"),
+                'Beta1Pow': np.array([beta1**t]).astype("float32"),
+                'Beta2Pow': np.array([beta2**t]).astype("float32"),
+            }
+
+            np_attrs = {
+                'epsilon': 1e-8,
+                'beta1': beta1,
+                'beta2': beta2,
+                "lr_ratio": lr_ratio,
+                "coeff": float(weight_decay),
+                "with_decay": True,
+            }
+            param_out, moment1_out, moment2_out = adamw_step(
+                np_inputs, np_attrs
+            )
+            return param_out, moment1_out, moment2_out
+
+        for i in range(5):
+            a = paddle.to_tensor(
+                np.random.uniform(-1, 1, (2, 13)).astype("float32")
+            )
+            a1 = linear1(a)
+            out = linear2(a1)
+            out = paddle.mean(out)
+            out.backward()
+
+            fc1_w, fc1_w_mon1, fc1_w_mon2 = get_numpy_output(
+                fc1_w,
+                np.array(linear1.weight.grad),
+                fc1_w_mon1,
+                fc1_w_mon2,
+                simple_lr_fun(linear1.weight),
+                i + 1,
+            )
+            fc1_b, fc1_b_mon1, fc1_b_mon2 = get_numpy_output(
+                fc1_b,
+                np.array(linear1.bias.grad),
+                fc1_b_mon1,
+                fc1_b_mon2,
+                simple_lr_fun(linear1.bias),
+                i + 1,
+            )
+            fc2_w, fc2_w_mon1, fc2_w_mon2 = get_numpy_output(
+                fc2_w,
+                np.array(linear2.weight.grad),
+                fc2_w_mon1,
+                fc2_w_mon2,
+                simple_lr_fun(linear2.weight),
+                i + 1,
+            )
+            fc2_b, fc2_b_mon1, fc2_b_mon2 = get_numpy_output(
+                fc2_b,
+                np.array(linear2.bias.grad),
+                fc2_b_mon1,
+                fc2_b_mon2,
+                simple_lr_fun(linear2.bias),
+                i + 1,
+            )
+
+            opt.step()
+            opt.clear_gradients()
+
+            np.testing.assert_allclose(
+                linear1.weight.numpy(),
+                fc1_w,
+                atol=2e-9 if core.is_compiled_with_xpu() else 0,
+                rtol=1e-6,
+            )
+            np.testing.assert_allclose(linear1.bias.numpy(), fc1_b, rtol=1e-6)
+            np.testing.assert_allclose(linear2.weight.numpy(), fc2_w, rtol=1e-6)
+            np.testing.assert_allclose(linear2.bias.numpy(), fc2_b, rtol=1e-6)
 
 
 if __name__ == "__main__":

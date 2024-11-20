@@ -24,7 +24,8 @@ from paddle._typing import *  # noqa: F403
 
 # isort: on
 
-from typing import Any, Iterator, Literal, overload
+from collections.abc import Iterator
+from typing import Any, Literal, overload
 
 import numpy.typing as npt
 
@@ -237,6 +238,7 @@ class AbstractTensor:
     @property
     def grad_fn(self) -> Any: ...
     def is_contiguous(self) -> bool: ...
+    def is_coalesced(self) -> bool: ...
     def is_dense(self) -> bool: ...
     def is_dist(self) -> bool: ...
     @property

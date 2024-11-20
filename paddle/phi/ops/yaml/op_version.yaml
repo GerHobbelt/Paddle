@@ -89,6 +89,14 @@
         - add_input : ValueTensor
           comment : In order to support multi-tag task.
 
+- op : c_split
+  version :
+    - checkpoint : Upgrade c_split delete 1 attribute[use_calc_stream].
+      action :
+        - delete_attr : use_calc_stream
+          comment : eject CUDA operations to calculation stream.
+          default : false
+
 - op : clip
   version :
     - checkpoint :  Upgrade clip add a new input [Min]
@@ -311,6 +319,22 @@
           comment : If true, im_shape pixel offset is 1.
           default : "true"
 
+- op : global_gather
+  version :
+    - checkpoint : Upgrade global_gather delete 1 attribute[use_calc_stream].
+      action :
+        - delete_attr : use_calc_stream
+          comment : eject CUDA operations to calculation stream.
+          default : false
+
+- op : global_scatter
+  version :
+    - checkpoint : Upgrade global_scatter delete 1 attribute[use_calc_stream].
+      action :
+        - delete_attr : use_calc_stream
+          comment : eject CUDA operations to calculation stream.
+          default : false
+
 - op : greater_equal
   version :
     - checkpoint : Upgrade compare ops, add a new attribute [force_cpu]
@@ -474,6 +498,22 @@
         - add_attr : asvector
           comment : Compute as vector when axis is None and input is matrix.
           default : "false"
+
+- op : partial_allgather
+  version :
+    - checkpoint : Upgrade partial_allgather delete 1 attribute[use_calc_stream].
+      action :
+        - delete_attr : use_calc_stream
+          comment : eject CUDA operations to calculation stream.
+          default : false
+
+- op : partial_send
+  version :
+    - checkpoint : Upgrade partial_send delete 1 attribute[use_calc_stream].
+      action :
+        - delete_attr : use_calc_stream
+          comment : eject CUDA operations to calculation stream.
+          default : false
 
 - op : pixel_shuffle
   version :

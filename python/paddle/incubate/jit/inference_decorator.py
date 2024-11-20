@@ -34,6 +34,14 @@ _InputT = ParamSpec("_InputT")
 _RetT = TypeVar("_RetT")
 
 
+def is_inference_mode(function):
+    if isinstance(function, Layer):
+        return function.forward.__name__ == "innermost_decorator"
+    elif hasattr(function, "__name__"):
+        return function.__name__ == "innermost_decorator"
+    return False
+
+
 def get_inference_precision(precision_str):
     if precision_str == "float32":
         return PrecisionType.Float32
@@ -131,6 +139,15 @@ class InferenceEngine:
             )
         self.save_model_dir = os.path.join(self.save_model_dir, func.__name__)
 
+        import paddle.distributed as dist
+
+        n_ranks = dist.get_world_size()
+        if n_ranks > 1:
+            local_rank: int = dist.ParallelEnv().dev_id
+            self.save_model_dir = os.path.join(
+                self.save_model_dir, f"{n_ranks}_{local_rank}"
+            )
+
         self.precision_mode = kwargs.get("precision_mode")
         self.switch_ir_optim = kwargs.get("switch_ir_optim")
         self.switch_ir_debug = kwargs.get("switch_ir_debug")
@@ -140,6 +157,7 @@ class InferenceEngine:
         self.trt_precision_mode = kwargs.get("trt_precision_mode")
         self.trt_use_static = kwargs.get("trt_use_static")
         self.collect_shape = kwargs.get("collect_shape")
+        self.skip_prune_program = kwargs.get("skip_prune_program")
 
         default_delete_pass_lists = [
             "trt_prompt_tuning_embedding_eltwise_layernorm_fuse_pass",
@@ -302,7 +320,9 @@ class InferenceEngine:
             input_spec=input_specs,
             full_graph=True,
         )
-        paddle.jit.save(model, self.save_path, skip_prune_program=True)
+        paddle.jit.save(
+            model, self.save_path, skip_prune_program=self.skip_prune_program
+        )
 
         # save d2s_shapes
         assert len(self.d2s_input_names) == len(self.d2s_input_shapes)
@@ -455,6 +475,7 @@ def inference(
     enable_new_ir: bool = ...,
     exp_enable_use_cutlass: bool = ...,
     delete_pass_lists: list[str] | None = ...,
+    skip_prune_program: bool = ...,
 ) -> _InferenceDecorator: ...
 
 
@@ -475,6 +496,7 @@ def inference(
     enable_new_ir: bool = ...,
     exp_enable_use_cutlass: bool = ...,
     delete_pass_lists: list[str] | None = ...,
+    skip_prune_program: bool = ...,
 ) -> _LayerT: ...
 
 
@@ -495,6 +517,7 @@ def inference(
     enable_new_ir: bool = ...,
     exp_enable_use_cutlass: bool = ...,
     delete_pass_lists: list[str] | None = ...,
+    skip_prune_program: bool = ...,
 ) -> Callable[_InputT, _RetT]: ...
 
 
@@ -514,6 +537,7 @@ def inference(
     enable_new_ir=False,
     exp_enable_use_cutlass=False,
     delete_pass_lists=None,
+    skip_prune_program=False,
 ):
     """
     Converts dynamic graph APIs into static graph saved in disk. Then will use Paddle Inference to infer based on
@@ -538,6 +562,7 @@ def inference(
         enable_new_ir(bool, optional): Whether to enable new IR. Default is True.
         exp_enable_use_cutlass(bool, optional): Whether to enable use cutlass. Default is False.
         delete_pass_lists(list[str], optional): The list of pass names to delete. Default is None.
+        skip_prune_program(bool, optional): Whether to skip pruning program when converting dynamic graph APIs into static graph. Default is False.
 
     Returns:
         function (callable): the decorated function which can be used for inference.
@@ -572,14 +597,8 @@ def inference(
 
     """
     # if function has already been decorated by @paddle.incubate.jit.inference(), then we just return it.
-    if (
-        hasattr(function, "__name__")
-        and function.__name__ == "innermost_decorator"
-    ):
+    if is_inference_mode(function):
         return function
-    elif isinstance(function, Layer):
-        if function.forward.__name__ == "innermost_decorator":
-            return function
 
     used_as_at_decorator = function is None
 
@@ -604,9 +623,10 @@ def inference(
             enable_new_ir=enable_new_ir,
             exp_enable_use_cutlass=exp_enable_use_cutlass,
             delete_pass_lists=delete_pass_lists,
+            skip_prune_program=skip_prune_program,
         )
 
-        # This is the inner_most decorator, ie. when user invoke the function decorated by @paddle.incubate.jit.inference()
+        # This is the innermost_decorator, ie. when user invoke the function decorated by @paddle.incubate.jit.inference()
         # he is actually invoke this internel function.
         def innermost_decorator(*args, **kwargs):
             input_tensor_lists = infer_engine.get_input_tensor_lists(

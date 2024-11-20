@@ -109,7 +109,7 @@ struct DivideFunctor<
     T,
     typename std::enable_if<std::is_integral<T>::value>::type> {
   inline HOSTDEVICE T operator()(const T a, const T b) const {
-    // For int32/int64, need to check whether the divison is zero.
+    // For int32/int64, need to check whether the division is zero.
     PADDLE_ENFORCE(b != 0, DIV_ERROR_INFO);
     return a / b;
   }
@@ -543,7 +543,7 @@ struct RemainderFunctor {
     PADDLE_ENFORCE(b != 0, DIV_ERROR_INFO);
     T res = a % b;
 
-    // Accoding to #PR26732: in dividen % divsor
+    // According to #PR26732: in dividen % divsor
     // remainder shall have the same sign as divsor.
     if ((res != 0) && ((b ^ res) < 0)) res += b;
     return res;
@@ -557,7 +557,7 @@ struct RemainderFunctor<
   inline HOSTDEVICE T operator()(const T a, const T b) const {
     T res = fmod(a, b);
 
-    // Accoding to #PR26732: in dividen % divsor
+    // According to #PR26732: in dividen % divsor
     // remainder shall have the same sign as divsor.
     if ((res != 0) && ((res < 0) != (b < 0))) res += b;
     return res;
@@ -588,6 +588,114 @@ struct RemainderFunctor<dtype::bfloat16> {
     // remainder shall have the same sign as divsor.
     if ((res != 0.0f) && ((res < 0.0f) != (b_float < 0.0f))) res += b_float;
     return static_cast<dtype::bfloat16>(res);
+  }
+};
+
+// RemainderGradXFunctor
+template <typename T>
+struct RemainderGradXFunctor {
+  inline HOSTDEVICE T operator()(const T x, const T y, const T dout) const {
+    // dx = dout
+    return dout;
+  }
+};
+
+// RemainderGradYFunctor
+template <typename T, typename Enable = void>
+struct RemainderGradYFunctor {
+  inline HOSTDEVICE T operator()(const T x, const T y, const T dout) const {
+    // dy = -dout * (floor_div(x, y))
+    return -dout * static_cast<T>((std::floor(x / y)));
+  }
+};
+template <typename T>
+struct RemainderGradYFunctor<
+    T,
+    typename std::enable_if<std::is_floating_point<T>::value>::type> {
+  inline HOSTDEVICE T operator()(const T x, const T y, const T dout) const {
+    using MPType = typename phi::dtype::MPTypeTrait<T>::Type;
+    // dy = -dout * (floor_div(x, y))
+    auto x_ = static_cast<MPType>(x);
+    auto y_ = static_cast<MPType>(y);
+    return static_cast<T>(-static_cast<MPType>(dout) * (std::floor((x_ / y_))));
+  }
+};
+template <typename T>
+struct RemainderGradYFunctor<
+    T,
+    typename std::enable_if<std::is_integral<T>::value>::type> {
+  inline HOSTDEVICE T operator()(const T x, const T y, const T dout) const {
+    // dy = -dout * (floor_div(x, y))
+    if (phi::is_negative(x) != phi::is_negative(y)) {
+      // Subtracts one from the results of truncation division if the
+      // divisor and dividend have different sign(bit)s and the remainder of
+      // the division is nonzero
+      const auto quot = x / y;
+      const auto rem = x % y;
+      auto ret = rem ? quot - 1 : quot;
+      return -dout * static_cast<T>(ret);
+    }
+    return -dout * static_cast<T>(x / y);
+  }
+};
+
+// RemainderGradXYFunctor
+template <typename InT, typename OutT, typename Enable = void>
+struct RemainderGradXYFunctor {
+  inline HOSTDEVICE phi::Array<OutT, 2> operator()(const InT x,
+                                                   const InT y,
+                                                   const InT dout) {
+    phi::Array<OutT, 2> outs;
+    // dx = dout
+    outs[0] = static_cast<OutT>(dout);
+    // dy = -dout * (floor_div(x, y))
+    outs[1] = static_cast<OutT>(dout * static_cast<InT>(std::floor(x / y)));
+    return outs;
+  }
+};
+template <typename InT, typename OutT>
+struct RemainderGradXYFunctor<
+    InT,
+    OutT,
+    typename std::enable_if<std::is_floating_point<InT>::value>::type> {
+  inline HOSTDEVICE Array<OutT, 2> operator()(const InT x,
+                                              const InT y,
+                                              const InT dout) {
+    Array<OutT, 2> outs;
+    // dx = dout
+    outs[0] = static_cast<OutT>(dout);
+    // dy = -dout * (x / y)
+    using MPType = typename phi::dtype::MPTypeTrait<InT>::Type;
+    auto x_ = static_cast<MPType>(x);
+    auto y_ = static_cast<MPType>(y);
+    outs[1] =
+        static_cast<OutT>(static_cast<MPType>(-dout) * std::floor(x_ / y_));
+    return outs;
+  }
+};
+template <typename InT, typename OutT>
+struct RemainderGradXYFunctor<
+    InT,
+    OutT,
+    typename std::enable_if<std::is_integral<InT>::value>::type> {
+  inline HOSTDEVICE Array<OutT, 2> operator()(const InT x,
+                                              const InT y,
+                                              const InT dout) {
+    Array<OutT, 2> outs;
+    // dx = dout
+    outs[0] = static_cast<OutT>(dout);
+    // dy = -dout * (x / y)
+    if (phi::is_negative(x) != phi::is_negative(y)) {
+      // Subtracts one from the results of truncation division if the
+      // divisor and dividend have different sign(bit)s and the remainder of
+      // the division is nonzero
+      const auto quot = x / y;
+      const auto rem = x % y;
+      auto ret = rem ? quot - 1 : quot;
+      outs[1] = -static_cast<OutT>(dout) * static_cast<OutT>(ret);
+    }
+    outs[1] = -static_cast<OutT>(dout) * static_cast<OutT>(x / y);
+    return outs;
   }
 };
 

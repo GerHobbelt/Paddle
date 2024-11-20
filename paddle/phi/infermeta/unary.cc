@@ -586,7 +586,7 @@ void ClassCenterSampleInferMeta(const MetaTensor& label,
           "output of sampled local class center should not be null."));
   remapped_label->set_dims(label.dims());
   remapped_label->set_dtype(label.dtype());
-  sampled_local_class_center->set_dims(common::make_ddim({num_samples}));
+  sampled_local_class_center->set_dims(common::make_ddim({-1}));
   sampled_local_class_center->set_dtype(label.dtype());
 }
 
@@ -785,10 +785,6 @@ void CropInferMeta(const MetaTensor& x,
   for (int i = 0; i < static_cast<int>(shape_dims.size()); ++i) {
     if (shape_dims[i] > 0) {
       out_dims[i] = static_cast<int64_t>(shape_dims[i]);
-    } else {
-      if (shape_dims[i] == -1 && offsets_vec[i] != -1 && x_dim[i] != -1) {
-        out_dims[i] = x_dim[i] - static_cast<int64_t>(offsets_vec[i]);
-      }
     }
   }
   out->set_dims(common::make_ddim(out_dims));
@@ -1330,33 +1326,31 @@ void ExpandInferMeta(const MetaTensor& x,
                         "must be a positive integer.",
                         expand_shape.size()));
 
-  auto out_rank =
-      std::max(static_cast<size_t>(x_dims.size()), expand_shape.size());
-  std::vector<int64_t> out_shape(out_rank);
-  for (int i = 0; i < static_cast<int>(expand_shape.size()); ++i) {
-    if (x_dims[i] == -1) {  // NOLINT
-      out_shape[i] = -1;
-    } else if (expand_shape[i] == -1) {
-      if (static_cast<int>(x_dims.size()) > i) {
-        out_shape[i] = x_dims[i];
-      } else {
-        out_shape[i] = -1;
+  int out_rank = expand_shape.size();
+  const auto& out_shape = [&]() -> std::vector<int64_t> {
+    std::vector<int64_t> res = expand_shape;
+    int x_rank = x_dims.size();
+    const auto& DealWithMinusOne = [&]() {
+      for (int x_idx = x_rank - 1, out_idx = out_rank - 1; x_idx >= 0;
+           x_idx--, out_idx--) {
+        if (res[out_idx] == -1) {
+          res[out_idx] = x_dims[x_idx];
+        }
       }
-    } else if (expand_shape[i] == -2) {
+    };
+    const auto& DealWithMinusTwo = [&]() {
       // We use -2 to represent the element in expand_shape is a var.
-      out_shape[i] = -1;
-    } else {
-      PADDLE_ENFORCE_GT(
-          expand_shape[i],
-          0,
-          common::errors::InvalidArgument(
-              "The %uth element of 'shape' for expand_v2 op must be "
-              "greater than 0, but the value given is %d.",
-              i,
-              expand_shape[i]));
-      out_shape[i] = expand_shape[i];
-    }
-  }
+      for (int x_idx = x_rank - 1, out_idx = out_rank - 1; out_idx >= 0;
+           x_idx--, out_idx--) {
+        if (res[out_idx] == -2) {
+          res[out_idx] = -1;
+        }
+      }
+    };
+    DealWithMinusOne();
+    DealWithMinusTwo();
+    return res;
+  }();
 
   out->set_dims(common::make_ddim(out_shape));
   out->set_dtype(x.dtype());
@@ -2914,7 +2908,7 @@ void OneHotRawInferMeta(const MetaTensor& x,
 }
 
 void OneHotInferMeta(const MetaTensor& x,
-                     const Scalar& depth_t,
+                     const Scalar& num_classes,
                      MetaTensor* out) {
   auto x_dims = x.dims();
   PADDLE_ENFORCE_GE(x_dims.size(),
@@ -2922,13 +2916,13 @@ void OneHotInferMeta(const MetaTensor& x,
                     common::errors::InvalidArgument(
                         "Rank of Input(X) should be at least 0."));
 
-  int depth = depth_t.to<int>();
+  int num_classes_int = num_classes.to<int>();
   auto out_dims_vec = common::vectorize(x_dims);
-  out_dims_vec.push_back(depth);
+  out_dims_vec.push_back(num_classes_int);
   auto out_dims = common::make_ddim(out_dims_vec);
+
   out->set_dims(out_dims);
   out->share_lod(x);
-
   out->set_dtype(phi::DataType::FLOAT32);
 }
 
@@ -3138,8 +3132,6 @@ void Pad3dInferMeta(const MetaTensor& x,
 void PartialAllgatherInferMeta(const MetaTensor& x,
                                int nranks,
                                int rank,
-                               int ring_id,
-                               bool use_calc_stream,
                                MetaTensor* out) {
   PADDLE_ENFORCE_GE(
       nranks,
@@ -3158,23 +3150,12 @@ void PartialAllgatherInferMeta(const MetaTensor& x,
   out->set_dtype(x.dtype());
 }
 
-void PartialSendInferMeta(const MetaTensor& x,
-                          int ring_id,
-                          int peer,
-                          bool use_calc_stream,
-                          int num,
-                          int id) {
+void PartialSendInferMeta(const MetaTensor& x, int peer, int num, int id) {
   PADDLE_ENFORCE_GE(
       peer,
       0,
       common::errors::InvalidArgument(
           "The peer (%d) for partial_send op must be non-negative.", peer));
-  PADDLE_ENFORCE_GE(
-      ring_id,
-      0,
-      common::errors::InvalidArgument(
-          "The ring_id (%d) for partial_send op must be non-negative.",
-          ring_id));
   PADDLE_ENFORCE_GE(num,
                     1,
                     common::errors::InvalidArgument(
@@ -3709,6 +3690,17 @@ void ReduceInferMetaBase(const MetaTensor& x,
   out->set_dims(out_dim);
   out->set_dtype(x.dtype());
   out->set_layout(x.layout());
+}
+
+void ReduceSumInferMeta(const MetaTensor& x,
+                        const std::vector<int64_t>& axis,
+                        bool keep_dim,
+                        MetaTensor* out) {
+  bool reduce_all = false;
+  if (axis.empty()) {
+    reduce_all = true;
+  }
+  SumRawInferMeta(x, axis, keep_dim, reduce_all, DataType::UNDEFINED, out);
 }
 
 void ReduceInferMeta(const MetaTensor& x,
@@ -4717,6 +4709,17 @@ void SumInferMeta(const MetaTensor& x,
     reduce_all = true;
   }
   SumRawInferMeta(x, axis, keep_dim, reduce_all, dtype, out, config);
+}
+
+void DetInferMeta(const MetaTensor& x, MetaTensor* out, MetaConfig config) {
+  // remove the last two demension
+  auto out_dim = common::vectorize<int>(x.dims());
+  out_dim.pop_back();
+  out_dim.pop_back();
+
+  out->set_dims(common::make_ddim(out_dim));
+  out->set_dtype(x.dtype());
+  out->set_layout(x.layout());
 }
 
 void PartialSumInferMeta(const std::vector<const MetaTensor*>& xs,

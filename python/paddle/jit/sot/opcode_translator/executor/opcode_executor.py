@@ -82,9 +82,11 @@ from .variables import (
     ContainerVariable,
     DictVariable,
     GlobalVariable,
+    IterVariable,
     ListVariable,
     MethodVariable,
     NullVariable,
+    RangeVariable,
     SequenceIterVariable,
     SliceVariable,
     SymbolicVariable,
@@ -1055,8 +1057,11 @@ class OpcodeExecutorBase:
 
         retval = []
         for item in unpack_values:
-            assert isinstance(item, (TupleVariable, ListVariable))
-            retval.extend(item.get_wrapped_items())
+            if not isinstance(
+                item, (TupleVariable, ListVariable, RangeVariable)
+            ):
+                raise BreakGraphError(f"{type(item)} not support unpack")
+            retval.extend(item.get_iter().to_list())
 
         if instr.opname in {
             "BUILD_TUPLE_UNPACK_WITH_CALL",
@@ -1070,12 +1075,15 @@ class OpcodeExecutorBase:
             )
         )
 
+    @call_break_graph_decorator(push_n=1)
     def BUILD_TUPLE_UNPACK_WITH_CALL(self, instr: Instruction):
         self.build_seq_unpack(instr)
 
+    @call_break_graph_decorator(push_n=1)
     def BUILD_TUPLE_UNPACK(self, instr: Instruction):
         self.build_seq_unpack(instr)
 
+    @call_break_graph_decorator(push_n=1)
     def BUILD_LIST_UNPACK(self, instr: Instruction):
         self.build_seq_unpack(instr)
 
@@ -1560,6 +1568,7 @@ class OpcodeExecutorBase:
             self.stack.peek[instr.arg], key, value
         )
 
+    @call_break_graph_decorator(push_n=0)
     def LIST_EXTEND(self, instr: Instruction):
         list_value = self.stack.pop()
         assert isinstance(instr.arg, int)
@@ -1748,7 +1757,7 @@ class OpcodeExecutor(OpcodeExecutorBase):
         return Stop(state="Return")
 
     def get_compute_fn_and_update_changed_vars(
-        self, restore_names, stack, end_idx
+        self, restore_names, stack, end_idx, extra_store_vars
     ):
         """
         this function will:
@@ -1763,9 +1772,10 @@ class OpcodeExecutor(OpcodeExecutorBase):
             restore_names: the names used in resume functions.
             end_idx: instruction index where simulation get break.
             stack: current stack
+            extra_store_vars: for iterator, we need store the holder if it is a Tensor
         """
-        store_vars = list(OrderedSet(stack))
-        store_var_info = {var.id: None for var in stack}
+        store_vars = list(OrderedSet(list(stack) + extra_store_vars))
+        store_var_info = {var.id: [] for var in stack}
 
         for name in restore_names:
             _var = self.get_var(name, allow_undefined=True)
@@ -1773,7 +1783,8 @@ class OpcodeExecutor(OpcodeExecutorBase):
                 continue
             if _var not in stack:
                 store_vars.append(_var)
-            store_var_info[_var.id] = name
+            store_var_info.setdefault(_var.id, [])
+            store_var_info[_var.id].append(name)
 
         compile_graph_result = self._graph.compile_graph(*store_vars)
         graph_fn, _ = compile_graph_result
@@ -1864,7 +1875,7 @@ class OpcodeExecutor(OpcodeExecutorBase):
         # 4. compile codes before if
         update_var_names = list(true_fn_read_names | false_fn_read_names)
         var_loader = self.get_compute_fn_and_update_changed_vars(
-            update_var_names, self.stack, cur_index
+            update_var_names, self.stack, cur_index, []
         )
 
         # 5. create if sturcture and call true_fn and false_fn
@@ -1964,7 +1975,7 @@ class OpcodeExecutor(OpcodeExecutorBase):
 
         # 3. compile sub graph before call
         var_loader = self.get_compute_fn_and_update_changed_vars(
-            read_names, self.stack, cur_index
+            read_names, self.stack, cur_index, []
         )
 
         # 4. recover stack
@@ -2130,8 +2141,17 @@ class OpcodeExecutor(OpcodeExecutorBase):
 
         # 5. compile sub graph before for-loop
         update_names = list(loop_body_read_names | after_loop_read_names)
+        extra_store_vars = (
+            [iterator]
+            if isinstance(iterator, IterVariable)
+            and isinstance(iterator.hold, TensorVariable)
+            else []
+        )
         var_loader = self.get_compute_fn_and_update_changed_vars(
-            update_names, self.stack, self.indexof(for_iter)
+            update_names,
+            self.stack,
+            self.indexof(for_iter),
+            extra_store_vars,
         )
 
         # 6. prepare a new loop and call loop body

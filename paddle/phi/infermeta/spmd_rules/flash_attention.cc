@@ -268,6 +268,7 @@ SpmdInfo FlashAttInferSpmd(const DistMetaTensor& q,
 
   TensorDistAttr seed_offset = fixed_seed_offset_dist_attr;
   seed_offset.set_dims_mapping({-1});
+  seed_offset.set_process_mesh(out.process_mesh());
 
   VLOG(4) << "FlashAttInferSpmd:";
   VLOG(4) << "Einsum Notation: " << q_axes << "," << k_axes << "," << v_axes

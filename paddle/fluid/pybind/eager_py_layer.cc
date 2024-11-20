@@ -40,6 +40,8 @@ limitations under the License. */
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 
+using egr::ConvertToDistTensor;
+
 namespace paddle {
 namespace pybind {
 

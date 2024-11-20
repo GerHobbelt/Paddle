@@ -54,8 +54,6 @@ void CSplitKernel(const Context& ctx,
                   const DenseTensor& x,
                   int rank,
                   int nranks,
-                  int ring_id,
-                  bool use_calc_stream,
                   bool use_model_parallel,
                   DenseTensor* out) {
   auto place = ctx.GetPlace();

@@ -49,16 +49,23 @@ TensorDistAttr ToTensorDistAttr(const ProcessMesh& process_mesh,
     auto& placement = placements[i];
     if (placement->is_shard()) {
       auto shard_dim = dynamic_cast<const Shard&>(*placement).get_dim();
-      PADDLE_ENFORCE_EQ(
-          dim_map[shard_dim],
-          -1,
-          common::errors::InvalidArgument(
-              "Tensor dim %lld is already sharded on mesh dim %lld,"
-              " DistTensor operator implementation does not support things "
-              "like hybrid"
-              " sharding strategies yet (i.e. [Shard(0), Shard(0)])",
-              shard_dim,
-              dim_map[shard_dim]));
+      if (dim_map[shard_dim] != -1) {
+        LOG(WARNING) << "WARNING: Tensor dim " << shard_dim
+                     << " is already sharded on "
+                     << "mesh dim" << dim_map[shard_dim]
+                     << ". Sharding a tensor dim with "
+                     << "multiple mesh dim is not supported yet.";
+      }
+      // PADDLE_ENFORCE_EQ(
+      //     dim_map[shard_dim],
+      //     -1,
+      //     common::errors::InvalidArgument(
+      //         "Tensor dim %lld is already sharded on mesh dim %lld,"
+      //         " DistTensor operator implementation does not support things "
+      //         "like hybrid"
+      //         " sharding strategies yet (i.e. [Shard(0), Shard(0)])",
+      //         shard_dim,
+      //         dim_map[shard_dim]));
       dim_map[shard_dim] = i;
     }
   }
@@ -272,6 +279,10 @@ bool DistTensor::valid() const {
 }
 
 bool DistTensor::defined() const { return value_->holder_ != nullptr; }
+
+bool DistTensor::has_allocation() const {
+  return value_->holder_ != nullptr && (value_->holder_->ptr() || numel() != 0);
+}
 
 bool DistTensor::initialized() const {
   return value_->holder_ != nullptr && value_->holder_->ptr();

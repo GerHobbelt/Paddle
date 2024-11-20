@@ -40,7 +40,7 @@ def _alltoall(in_tensor_list, group=None, use_calc_stream=True):
             else group
         )
         out = paddle.empty(in_tensor_list.shape, in_tensor_list.dtype)
-        task = group.process_group.alltoall(in_tensor_list, out)
+        task = group.process_group.alltoall(out, in_tensor_list)
         task.wait()
         return out
     else:

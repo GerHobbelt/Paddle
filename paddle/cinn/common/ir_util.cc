@@ -18,9 +18,11 @@
 #include <unordered_set>
 
 #include "paddle/cinn/common/cas.h"
+#include "paddle/cinn/common/simplify_corner_case.h"
 #include "paddle/cinn/ir/ir_mutator.h"
 #include "paddle/cinn/ir/ir_printer.h"
 #include "paddle/cinn/ir/op/ir_operators.h"
+#include "paddle/cinn/ir/utils/ir_compare.h"
 #include "paddle/common/enforce.h"
 namespace cinn {
 namespace common {
@@ -91,10 +93,11 @@ Expr RampRelatedAdd(ir::Broadcast *broadcast, Expr other) {
 // ramp + ramp
 Expr RampRelatedAdd(ir::Ramp *ramp, ir::Ramp *other) {
   PADDLE_ENFORCE_NOT_NULL(
-      ramp, phi::errors::InvalidArgument("Ramp pointer should not be null."));
-  PADDLE_ENFORCE_NOT_NULL(
-      other,
-      phi::errors::InvalidArgument("Other ramp pointer should not be null."));
+      ramp,
+      ::common::errors::InvalidArgument("Ramp pointer should not be null."));
+  PADDLE_ENFORCE_NOT_NULL(other,
+                          ::common::errors::InvalidArgument(
+                              "Other ramp pointer should not be null."));
   if (ramp->lanes == other->lanes) {
     Expr base_add = cinn::common::AutoSimplify(ramp->base + other->base);
     Expr stride_add = cinn::common::AutoSimplify(ramp->stride + other->stride);
@@ -192,18 +195,20 @@ Expr IndiceToAbsOffset(const std::vector<Expr> &shape,
             "the current data type of shape[{}] is {}",
             i,
             shape[i].type()));
-    Expr indice_prod = indices[i];
-    optim::SimplifyCast(&indice_prod);
-    for (int j = i + 1; j < shape.size(); j++) {
-      indice_prod = RampRelatedMul(indice_prod, shape[j]);
-    }
+    Expr indice_cast = indices[i];
+    optim::SimplifyCast(&indice_cast);
     if (res.defined()) {
-      res = RampRelatedAdd(res, indice_prod);
+      res = RampRelatedAdd(RampRelatedMul(res, shape[i]), indice_cast);
     } else {
-      res = indice_prod;
+      res = indice_cast;
+    }
+
+    if (i > 0) {
+      res = cinn::common::AutoSimplify(res);
     }
   }
-  return cinn::common::AutoSimplify(res);
+
+  return res;
 }
 
 Expr IndiceToAbsOffset(const std::vector<int> &shape,
@@ -258,7 +263,7 @@ bool is_zero(Expr v) {
   auto *float_n = v.As<ir::FloatImm>();
 
   if (int_n) return int_n->value == 0;
-  if (float_n) return float_n->value = 0.f;
+  if (float_n) return float_n->value == 0.f;
   return false;
 }
 
@@ -280,7 +285,7 @@ Expr select(Expr cond, Expr true_value, Expr false_value) {
 Expr and_all(const std::vector<Expr> &conds) {
   PADDLE_ENFORCE_NE(conds.empty(),
                     true,
-                    phi::errors::InvalidArgument(
+                    ::common::errors::InvalidArgument(
                         "The conditions vector should not be empty."));
   Expr res = conds.front();
   for (int i = 1; i < conds.size(); i++) {
@@ -292,7 +297,7 @@ Expr and_all(const std::vector<Expr> &conds) {
 Expr or_all(const std::vector<Expr> &conds) {
   PADDLE_ENFORCE_NE(conds.empty(),
                     true,
-                    phi::errors::InvalidArgument(
+                    ::common::errors::InvalidArgument(
                         "The conditions vector should not be empty."));
   Expr res = conds.front();
   for (int i = 1; i < conds.size(); i++) {
@@ -411,7 +416,7 @@ std::vector<std::string> GatherItersToTensorProducer(
       if (op->tensor.as_tensor()->name == target_tensor_name) {
         PADDLE_ENFORCE_EQ(iters.empty(),
                           true,
-                          phi::errors::InvalidArgument(
+                          ::common::errors::InvalidArgument(
                               "The iterators vector should be empty."));
         for (auto &e : for_stack) {
           auto *for_n = e->As<ir::For>();
@@ -498,5 +503,104 @@ Expr min(Expr a, Expr b) {
   return ir::Min::Make(a, b);
 }
 
+bool ComparePriority(const ir::IndexExpr &lhs, const ir::IndexExpr &rhs) {
+  if (lhs.node_type() == ir::IrNodeTy::IntImm &&
+      rhs.node_type() != ir::IrNodeTy::IntImm)
+    return false;
+  if (rhs.node_type() == ir::IrNodeTy::IntImm &&
+      lhs.node_type() != ir::IrNodeTy::IntImm)
+    return true;
+  if (auto lhsVar = lhs.As<ir::_Var_>())
+    if (auto rhsVar = rhs.As<ir::_Var_>())
+      return std::make_tuple(lhsVar->name.length(), lhsVar->name) <=
+             std::make_tuple(rhsVar->name.length(), rhsVar->name);
+  auto lhsLen = lhs.length();
+  auto rhsLen = rhs.length();
+  if (lhsLen < rhsLen) return false;
+  // Add < Mul < Div < Mod.
+  else if (lhsLen == rhsLen)
+    return lhs.node_type() <= rhs.node_type();
+  else
+    return true;
+}
+
+bool IsSumPartialBySymbol(const ir::IndexExpr &expr,
+                          const ir::IndexExpr &symbol) {
+  // TODO(liujinnan): Check Ty
+  switch (expr.node_type()) {
+    case ir::IrNodeTy::IntImm: {
+      return false;
+    }
+    case ir::IrNodeTy::_Var_:
+      return expr == symbol;
+    case ir::IrNodeTy::Add:
+      return IsSumPartialBySymbol(expr->operand(0).as_index(), symbol) ||
+             IsSumPartialBySymbol(expr->operand(1).as_index(), symbol);
+    case ir::IrNodeTy::Mul: {
+      if (expr->operand(1).is_constant() &&
+          expr->operand(1).get_constant() == -1)
+        return IsSumPartialBySymbol(expr->operand(0).as_index(), symbol);
+      else
+        return expr->operand(0).as_index() == symbol ||
+               expr->operand(1).as_index() == symbol;
+    }
+
+    case ir::IrNodeTy::Div: {
+      return IsSumPartialBySymbol(expr->operand(0).as_index(), symbol);
+    }
+    case ir::IrNodeTy::Mod:
+      return false;
+  }
+}
+
+bool IsDivisiblieBySymbol(const ir::IndexExpr &expr,
+                          const ir::IndexExpr &symbol,
+                          const ir::IrNodeTy &ty) {
+  // TODO(liujinnan): Check Ty
+  switch (expr.node_type()) {
+    case ir::IrNodeTy::IntImm: {
+      auto imm = expr.As<ir::IntImm>();
+      return imm->value == 0;
+    }
+    case ir::IrNodeTy::_Var_:
+      return expr == symbol;
+    case ir::IrNodeTy::Add:
+      return IsDivisiblieBySymbol(expr->operand(0).as_index(), symbol, ty) &&
+             IsDivisiblieBySymbol(expr->operand(1).as_index(), symbol, ty);
+    case ir::IrNodeTy::Mul:
+      return IsDivisiblieBySymbol(expr->operand(0).as_index(), symbol, ty) ||
+             IsDivisiblieBySymbol(expr->operand(1).as_index(), symbol, ty);
+    case ir::IrNodeTy::Mod:
+      // Because S0 % 3 + S0 % 5 is not divisiblie by S0, so we push
+      // `expr.node_type()` into third parameter.
+      return IsDivisiblieBySymbol(
+                 expr->operand(0).as_index(), symbol, expr.node_type()) &&
+             IsDivisiblieBySymbol(
+                 expr->operand(1).as_index(), symbol, expr.node_type());
+    case ir::IrNodeTy::Div: {
+      if (ty != expr.node_type()) return false;
+      return IsDivisiblieBySymbol(
+          expr->operand(0).as_index(), symbol, expr.node_type());
+    }
+  }
+}
+
+bool ProveDivisible(const ir::IndexExpr &lhs, const ir::IndexExpr &rhs) {
+  if (IsZero(lhs % rhs)) return true;
+  // remove AutoSimplify later.
+  if (IsZero(AutoSimplify(lhs % rhs))) return true;
+  return false;
+}
+
+bool IsNegatedIndexExpr(const ir::IndexExpr &candidate,
+                        ir::IndexExpr &expr) {  // NOLINT
+  if (auto mul = candidate.As<ir::Mul>()) {
+    if (mul->b().is_constant() && mul->b().get_constant() == -1) {
+      expr = mul->a();
+      return true;
+    }
+  }
+  return false;
+}
 }  // namespace common
 }  // namespace cinn

@@ -984,7 +984,7 @@ static void ElemwiseGradBroadcast1CUDA(gpuStream_t stream,
     ElemwiseGradBroadcast1CUDAKernel<<<grid_size, block_size, 0, stream>>>(
         x, y, out, dout, h, w, is_xsize_larger, dx_op, dy_op, dx, dy);
   } else {
-    // suppose perfoemance improves with h increased.
+    // suppose performance improves with h increased.
     dim3 block_size = dim3(BLOCK_X, BLOCK_Y);
     dim3 grid_size = dim3((w + BLOCK_X - 1) / BLOCK_X);
     auto gplace = phi::GPUPlace(phi::backends::gpu::GetCurrentDeviceId());
@@ -1513,10 +1513,13 @@ void CommonGradBroadcastCUDA(const DenseTensor &x,
     VLOG(3) << "CommonBroadcast can_split_y:" << can_split_y
             << " can_split_x:" << can_split_x;
     // if both x and y into fast path then return
-    if (fast_broadcast_x && fast_broadcast_y) {
-      fast_broadcast = true;
-    }
-    if (can_split_y && can_split_x && fast_broadcast) return;
+
+    //* It's possible that some bugs are a result of early returns, comment out
+    // the code for checking.
+    // if (fast_broadcast_x && fast_broadcast_y) {
+    //   fast_broadcast = true;
+    // }
+    // if (can_split_y && can_split_x && fast_broadcast) return;
   }
 
   // Should remove memory copy, use reg instead.

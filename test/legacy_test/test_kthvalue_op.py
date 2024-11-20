@@ -20,7 +20,6 @@ from op_test import OpTest, convert_float_to_uint16
 import paddle
 from paddle import base
 from paddle.base import core
-from paddle.pir_utils import test_with_pir_api
 
 
 def cal_kthvalue(x, k, axis, keepdim=False):
@@ -46,9 +45,11 @@ class TestKthvalueOp(OpTest):
 
     def setUp(self):
         self.op_type = "kthvalue"
+        self.prim_op_type = "prim"
         self.python_api = paddle.kthvalue
+        self.public_python_api = paddle.kthvalue
         self.init_dtype()
-        self.input_data = np.random.random((2, 1, 2, 4, 10)).astype(self.dtype)
+        self.input_data = np.random.random([2, 1, 2, 4, 10]).astype(self.dtype)
         self.init_args()
         self.inputs = {'X': self.input_data}
         self.attrs = {'k': self.k, 'axis': self.axis}
@@ -63,7 +64,12 @@ class TestKthvalueOp(OpTest):
 
     def test_check_grad(self):
         paddle.enable_static()
-        self.check_grad({'X'}, 'Out', check_pir=True)
+        self.check_grad(
+            ['X'],
+            'Out',
+            check_pir=True,
+            check_prim_pir=True,
+        )
 
 
 class TestKthvalueOpFp16(TestKthvalueOp):
@@ -83,8 +89,10 @@ class TestKthvalueOpWithKeepdim(OpTest):
         self.init_args()
         self.init_dtype()
         self.op_type = "kthvalue"
+        self.prim_op_type = "prim"
         self.python_api = paddle.kthvalue
-        self.input_data = np.random.random((1, 3, 2, 4, 10)).astype(self.dtype)
+        self.public_python_api = paddle.kthvalue
+        self.input_data = np.random.random([1, 3, 2, 4, 10]).astype(self.dtype)
         self.inputs = {'X': self.input_data}
         self.attrs = {'k': self.k, 'axis': self.axis, 'keepdim': True}
         output, indices = cal_kthvalue(
@@ -98,7 +106,12 @@ class TestKthvalueOpWithKeepdim(OpTest):
 
     def test_check_grad(self):
         paddle.enable_static()
-        self.check_grad({'X'}, 'Out', check_pir=True)
+        self.check_grad(
+            ['X'],
+            'Out',
+            check_pir=True,
+            check_prim_pir=True,
+        )
 
 
 class TestKthvalueOpWithKeepdimFp16(TestKthvalueOpWithKeepdim):
@@ -208,7 +221,6 @@ class TestModeOpInStatic(unittest.TestCase):
         self.input_data = np.random.random((2, 20, 1, 2, 80)).astype(np.float64)
         self.k = 10
 
-    @test_with_pir_api
     def test_run_static(self):
         paddle.enable_static()
         with paddle.static.program_guard(

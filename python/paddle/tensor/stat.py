@@ -14,9 +14,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Literal, overload
+from typing import TYPE_CHECKING, Literal
 
-from typing_extensions import TypeAlias
+from typing_extensions import TypeAlias, overload
 
 import paddle
 from paddle import _C_ops
@@ -52,7 +52,8 @@ def mean(
     Computes the mean of the input tensor's elements along ``axis``.
 
     Args:
-        x (Tensor): The input Tensor with data type float32, float64.
+        x (Tensor): The input Tensor with data type bool, bfloat16, float16, float32,
+            float64, int32, int64, complex64, complex128.
         axis (int|list|tuple|None, optional): The axis along which to perform mean
             calculations. ``axis`` should be int, list(int) or tuple(int). If
             ``axis`` is a list/tuple of dimension(s), mean is calculated along
@@ -110,7 +111,17 @@ def mean(
         check_variable_and_dtype(
             x,
             'x/input',
-            ['uint16', "int32", 'float16', 'float32', 'float64'],
+            [
+                'bool',
+                'uint16',
+                'float16',
+                'float32',
+                'float64',
+                'int32',
+                'int64',
+                'complex64',
+                'complex128',
+            ],
             'mean/reduce_mean',
         )
         check_type(
@@ -266,7 +277,7 @@ def numel(x: Tensor, name: str | None = None) -> Tensor:
     Returns the number of elements for a tensor, which is a 0-D int64 Tensor with shape [].
 
     Args:
-        x (Tensor): The input Tensor, it's data type can be bool, float16, float32, float64, int32, int64, complex64, complex128.
+        x (Tensor): The input Tensor, it's data type can be bool, float16, float32, float64, uint8, int8, int32, int64, complex64, complex128.
         name (str|None, optional): Name for the operation (optional, default is None).
             For more information, please refer to :ref:`api_guide_Name`.
 
@@ -472,7 +483,7 @@ def median(
     Compute the median along the specified axis.
 
     Args:
-        x (Tensor): The input Tensor, it's data type can be float16, float32, float64, int32, int64.
+        x (Tensor): The input Tensor, it's data type can be bfloat16, float16, float32, float64, int32, int64.
         axis (int|None, optional): The axis along which to perform median calculations ``axis`` should be int.
             ``axis`` should be in range [-D, D), where D is the dimensions of ``x`` .
             If ``axis`` is less than 0, it works the same way as :math:`axis + D`.

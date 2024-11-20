@@ -25,6 +25,7 @@
 - mean_double_grad
 - mean_grad
 - mish_grad
+- mp_allreduce_sum_grad
 - norm_grad
 - pad_double_grad
 - pad_grad

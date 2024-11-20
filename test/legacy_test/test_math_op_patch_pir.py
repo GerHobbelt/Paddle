@@ -464,6 +464,96 @@ class TestMathOpPatchesPir(unittest.TestCase):
                     (output_x,) = exe.run(main_program, fetch_list=[x_T])
                     self.assertEqual(output_x.shape, tuple(out_shape))
 
+    def test_mT(self):
+        with paddle.pir_utils.IrGuard():
+            shape = [1]
+            x = paddle.rand(shape, dtype="float32")
+            self.assertRaises(ValueError, getattr, x, 'mT')
+
+            for ndim in range(2, 5):
+                # shape is [1, 2], [1, 2, 3], [1, 2, 3, 4]
+                shape = list(range(1, ndim + 1))
+                out_shape = list(shape)
+                out_shape[-2], out_shape[-1] = out_shape[-1], out_shape[-2]
+                main_program, exe, program_guard = new_program()
+                with program_guard:
+                    x = paddle.rand(shape, dtype="float32")
+                    x_mT = x.mT
+                    self.assertEqual(x_mT.shape, out_shape)
+                    (output_x,) = exe.run(main_program, fetch_list=[x_mT])
+                    self.assertEqual(output_x.shape, tuple(out_shape))
+
+            shape = [1, 2, 3, 0, 1]
+            out_shape = list(shape)
+            out_shape[-2], out_shape[-1] = out_shape[-1], out_shape[-2]
+            main_program, exe, program_guard = new_program()
+            with program_guard:
+                x = paddle.rand(shape, dtype="float32")
+                x_mT = x.mT
+                self.assertEqual(x_mT.shape, out_shape)
+                (output_x,) = exe.run(main_program, fetch_list=[x_mT])
+                self.assertEqual(output_x.shape, tuple(out_shape))
+
+            shape = [1, 2, 3, 1, 0]
+            out_shape = list(shape)
+            out_shape[-2], out_shape[-1] = out_shape[-1], out_shape[-2]
+            main_program, exe, program_guard = new_program()
+            with program_guard:
+                x = paddle.rand(shape, dtype="float32")
+                x_mT = x.mT
+                self.assertEqual(x_mT.shape, out_shape)
+                (output_x,) = exe.run(main_program, fetch_list=[x_mT])
+                self.assertEqual(output_x.shape, tuple(out_shape))
+
+            shape = [1, 2, 3, 0, 0]
+            out_shape = list(shape)
+            out_shape[-2], out_shape[-1] = out_shape[-1], out_shape[-2]
+            main_program, exe, program_guard = new_program()
+            with program_guard:
+                x = paddle.rand(shape, dtype="float32")
+                x_mT = x.mT
+                self.assertEqual(x_mT.shape, out_shape)
+                (output_x,) = exe.run(main_program, fetch_list=[x_mT])
+                self.assertEqual(output_x.shape, tuple(out_shape))
+
+            shape = [0, 2, 3, 0, 0]
+            out_shape = list(shape)
+            out_shape[-2], out_shape[-1] = out_shape[-1], out_shape[-2]
+            main_program, exe, program_guard = new_program()
+            with program_guard:
+                x = paddle.rand(shape, dtype="float32")
+                x_mT = x.mT
+                self.assertEqual(x_mT.shape, out_shape)
+                (output_x,) = exe.run(main_program, fetch_list=[x_mT])
+                self.assertEqual(output_x.shape, tuple(out_shape))
+
+        # test mT with dynamic shape
+        with paddle.pir_utils.IrGuard():
+            main_program, exe, program_guard = new_program()
+            with program_guard:
+                x = paddle.static.data(name="x", shape=[-1, 5], dtype='float32')
+                y = paddle.static.data(
+                    name="y", shape=[2, -1, -1], dtype='float32'
+                )
+                z = paddle.static.data(
+                    name="z", shape=[-1, 5, -1, -1], dtype='float32'
+                )
+                x_mT = x.mT
+                y_mT = y.mT
+                z_mT = z.mT
+
+                x_np = np.random.randn(12, 5).astype('float32')
+                y_np = np.random.randn(2, 3, 4).astype('float32')
+                z_np = np.random.randn(100, 5, 12, 13).astype('float32')
+                (x_mT_np, y_mT_np, z_mT_np) = exe.run(
+                    main_program,
+                    feed={"x": x_np, "y": y_np, "z": z_np},
+                    fetch_list=[x_mT, y_mT, z_mT],
+                )
+                np.testing.assert_array_equal(x_mT_np.shape, (5, 12))
+                np.testing.assert_array_equal(y_mT_np.shape, (2, 4, 3))
+                np.testing.assert_array_equal(z_mT_np.shape, (100, 5, 13, 12))
+
     def test_hash(self):
         with paddle.pir_utils.IrGuard():
             _, _, program_guard = new_program()
@@ -553,6 +643,48 @@ class TestMathOpPatchesPir(unittest.TestCase):
                 )
                 np.testing.assert_array_equal(res, a_np)
                 np.testing.assert_array_equal(res, b_np)
+
+    def test_abs(self):
+        # test for real number
+        x_np = np.random.uniform(-1, 1, [10, 1024]).astype(np.float32)
+        res = abs(x_np)
+        with paddle.pir_utils.IrGuard():
+            main_program, exe, program_guard = new_program()
+            with program_guard:
+                x = paddle.static.data(
+                    name='x', shape=[10, 1024], dtype="float32"
+                )
+                a = abs(x)
+                b = x.__abs__()
+                (a_np, b_np) = exe.run(
+                    main_program,
+                    feed={"x": x_np},
+                    fetch_list=[a, b],
+                )
+                np.testing.assert_array_equal(res, a_np)
+                np.testing.assert_array_equal(res, b_np)
+
+    def test_abs_complex(self):
+        # test for complex number
+        x_np = np.random.uniform(-1, 1, [10, 1024]).astype(
+            np.float32
+        ) + 1j * np.random.uniform(-1, 1, [10, 1024]).astype(np.float32)
+        res = abs(x_np)
+        with paddle.pir_utils.IrGuard():
+            main_program, exe, program_guard = new_program()
+            with program_guard:
+                x = paddle.static.data(
+                    name='x', shape=[10, 1024], dtype="complex64"
+                )
+                a = abs(x)
+                b = x.__abs__()
+                (a_np, b_np) = exe.run(
+                    main_program,
+                    feed={"x": x_np},
+                    fetch_list=[a, b],
+                )
+                np.testing.assert_allclose(res, a_np, rtol=2e-7, atol=0.0)
+                np.testing.assert_allclose(res, b_np, rtol=2e-7, atol=0.0)
 
     def test_builtin_type_conversion(self):
         with paddle.pir_utils.IrGuard():

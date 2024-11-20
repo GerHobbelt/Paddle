@@ -29,7 +29,6 @@ from .reshard import Resharder
 from .utils import (
     get_pp_stage,
     is_sequential_run,
-    use_new_executor,
 )
 
 PIR_PASS = [
@@ -498,22 +497,11 @@ class Parallelizer:
                 [main_program], [startup_program], self._pass_context
             )
 
-        if self._strategy.pipeline.enable and not use_new_executor():
-            config = copy.deepcopy(self._strategy.pipeline.to_dict())
-            config["dist_context"] = self._dist_context
-            auto_parallel_pipeline_pass = new_pass(
-                "auto_parallel_pipeline", config
-            )
-            auto_parallel_pipeline_pass.apply(
-                [main_program], [startup_program], self._pass_context
-            )
-
-        if use_new_executor():
-            self._check_dist_attr(
-                main_program,
-                self._strategy.pipeline.vpp_degree,
-                self._dist_context,
-            )
+        self._check_dist_attr(
+            main_program,
+            self._strategy.pipeline.vpp_degree,
+            self._dist_context,
+        )
 
         enable_ir = get_flags("FLAGS_enable_pir_in_executor")[
             'FLAGS_enable_pir_in_executor'
@@ -533,11 +521,7 @@ class Parallelizer:
         main_program._pass_opt = {}
         main_program._pass_opt['pass_list'] = ir_pass_list
 
-        if (
-            self.is_train
-            and self._strategy.pipeline.enable
-            and use_new_executor()
-        ):
+        if self.is_train and self._strategy.pipeline.enable:
             enable_send_recv_overlap = (
                 self._strategy.pipeline.enable_send_recv_overlap
             )

@@ -24,8 +24,6 @@ void CSplitKernel(const Context& dev_ctx,
                   const DenseTensor& x,
                   int rank,
                   int nranks,
-                  int ring_id,
-                  bool use_calc_stream,
                   bool use_model_parallel,
                   DenseTensor* out) {
   using XPUType = typename XPUTypeTrait<T>::Type;

@@ -31,6 +31,7 @@
 #include "paddle/cinn/optim/rearrange_load_instruction.h"
 #include "paddle/cinn/optim/remove_schedule_block.h"
 #include "paddle/cinn/optim/replace_const_param_to_integer.h"
+#include "paddle/cinn/optim/replace_cross_block_reduction.h"
 #include "paddle/cinn/optim/replace_cross_thread_reduction.h"
 #include "paddle/cinn/optim/trans_buffer_with_dynamic_shape.h"
 #include "paddle/cinn/optim/transform_gpu_forloop.h"
@@ -53,17 +54,14 @@ Expr Optimize(Expr e,
 
   auto copied = ir::ir_utils::IRCopy(e);
 
-  FoldCINNCallArguments(&copied);
-  TransformPolyForToFor(&copied);
   ReplaceConstParamToInteger(&copied);
   // Simplify already contains CastSimplify
   Simplify(&copied);
   ReplaceCrossThreadReduction(&copied);
-  UnrollLoop(&copied);
-  VLOG(4) << "After Optimize UnrollLoop:" << copied;
+  VLOG(4) << "After Optimize ReplaceCrossThreadReduction:" << copied;
+  ReplaceCrossBlockReduction(&copied);
+  VLOG(4) << "After Optimize ReplaceCrossBlockReduction:" << copied;
 
-  VectorizeLoops(&copied, target);
-  VLOG(4) << "After Optimize VectorizeLoops:" << copied;
   cinn::common::DefaultDeviceTarget().arch.Match(
       [&](std::variant<common::UnknownArch, common::X86Arch, common::ARMArch>) {
       },
@@ -116,10 +114,6 @@ Expr Optimize(Expr e,
 
 ir::Module Optimize(const ir::Module& module, const Target& target) {
   auto copied = ir::ir_utils::IRCopy(Expr(module));
-  ReplaceCrossThreadReduction(&copied);
-  UnrollLoop(&copied);
-  VectorizeLoops(&copied, Target());
-  VLOG(10) << "After VectorizeLoops:" << copied.as_module_ref();
   RemoveScheduleBlock(&copied);
   VLOG(10) << "After RemoveScheduleBlock:" << copied.as_module_ref();
   LowerFunctionCallBindVars(&copied);

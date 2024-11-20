@@ -82,15 +82,15 @@ CONVERT_TO_DISTTENSOR_AND_PARSE_PYTHON_C_TENSORS_TEMPLATE = (
 
 CONVERT_INPUT_TENSORS_TO_DIST_TENSOR_WITH_SINGLE_TENSOR_TEMPLATE = """
     const phi::distributed::ProcessMesh* mesh = nullptr;
-    if (InputsContainDistTensor(&mesh{input_names})) {{
-      ConvertAllInputsToDistTensor(mesh{input_single_tensor_names});
+    if (egr::InputsContainDistTensor(&mesh{input_names})) {{
+      egr::ConvertAllInputsToDistTensor(mesh{input_single_tensor_names});
       {optional_and_vector_convert_code}
     }}
 """
 
 CONVERT_INPUT_TENSORS_TO_DIST_TENSOR_WITHOUT_SINGLE_TENSOR_TEMPLATE = """
     const phi::distributed::ProcessMesh* mesh = nullptr;
-    if (InputsContainDistTensor(&mesh{input_names})) {{
+    if (egr::InputsContainDistTensor(&mesh{input_names})) {{
       {optional_and_vector_convert_code}
     }}
 """
@@ -189,10 +189,11 @@ PYTHON_C_WRAPPER_TEMPLATE = """
 #include "paddle/phi/backends/device_manager.h"
 #include "paddle/fluid/pybind/eager_utils.h"
 #include "paddle/fluid/pybind/exception.h"
-#include "paddle/fluid/platform/profiler/event_tracing.h"
+#include "paddle/phi/core/platform/profiler/event_tracing.h"
 #include "paddle/fluid/pybind/op_function_common.h"
 #include "paddle/fluid/eager/api/generated/eager_generated/forwards/dygraph_functions.h"
 #include "paddle/fluid/eager/api/manual/eager_manual/dygraph_forward_api.h"
+#include "paddle/fluid/eager/utils.h"
 #include "paddle/fluid/pybind/eager_custom_python_api.h"
 #include "paddle/fluid/pybind/eager.h"
 #include "paddle/fluid/pybind/eager_op_function.h"

@@ -34,13 +34,14 @@ namespace common {
 using namespace ir;  // NOLINT
 
 Expr AutoSimplify(
-    Expr u,
+    const Expr& u,
     const absl::flat_hash_map<std::string, CasInterval>& var_intervals) {
   VLOG(7) << "Begin AutoSimplify: " << u;
-  if (u.type().is_float()) {
-    return u;
+  Expr copied = ir::ir_utils::IRCopy(u);
+  if (copied.type().is_float()) {
+    return copied;
   }
-  u = detail::ConvertCinnToCAS(u);
+  copied = detail::ConvertCinnToCAS(copied);
   absl::flat_hash_map<std::string, CasInterval> s_var_intervals;
   for (auto& item : var_intervals) {
     if (item.second.e_l.defined() && item.second.e_r.defined()) {
@@ -52,10 +53,10 @@ Expr AutoSimplify(
                               CasInterval(item.second.l, item.second.r));
     }
   }
-  u = CasSimplify(u, s_var_intervals);
-  u = detail::ConvertCasToCinn(u);
-  VLOG(7) << "End AutoSimplify " << u;
-  return u;
+  copied = CasSimplify(copied, s_var_intervals);
+  copied = detail::ConvertCasToCinn(copied);
+  VLOG(7) << "End AutoSimplify " << copied;
+  return copied;
 }
 
 int gcd(int a, int b) {
@@ -1275,7 +1276,7 @@ Expr CasSimplifyMutator::SimplifyMod(Expr u) {
   if (a_mod && b_i) {
     VLOG(6) << "Simplify sequential mod";
     auto* a_b_i = a_mod->b().As<IntImm>();
-    if (a_b_i->value != 0 && a_b_i->value % b_i->value == 0) {
+    if (a_b_i && a_b_i->value != 0 && a_b_i->value % b_i->value == 0) {
       auto e = SimplifyMod(Mod::Make(a_mod->a(), b_i));
       VLOG(6) << "Reduce Mod from " << u << " to " << e;
       return e;
@@ -1342,9 +1343,12 @@ Expr CasSimplifyMutator::SimplifyMod(Expr u) {
         // case1: (32+(-x))%33 = 32-x%33 (0<=x<=32)
         // case2: (x-32))%33 = x%33 - 32%33 (0<=x<=32)
         Expr result;
-        if (SimplifySpecificSumMod(&result, a, b)) {
-          return result;
-        }
+        // TODO(phlrain): disable this simplify
+        /*
+              if (SimplifySpecificSumMod(&result, a, b)) {
+                return result;
+              }
+        */
       }
       return Mod::Make(a, b);
     }
@@ -1541,6 +1545,9 @@ Expr CasSimplifyMutator::SimplifySpecificSum(Expr tmp) {
                       2U,
                       ::common::errors::InvalidArgument(
                           "left_mul's operands size should be greater than 2"));
+
+    if (left_mul->operands().size() > 2) return tmp;
+
     Expr mul_left = left_mul->operand(0);
     Expr mul_right = left_mul->operand(1);
 
@@ -1637,7 +1644,6 @@ bool CASasSymbol(Expr expr) {
 
 Expr ConvertCinnToCAS(Expr expr) {
   VLOG(7) << "Begin ConvertCinnToCAS " << expr;
-  Expr copied = ir::ir_utils::IRCopy(expr);
   struct Mutator : public ir::IRMutator<ir::Expr*> {
     void operator()(Expr* expr) { Visit(expr); }
     void Visit(Expr* expr) { ir::IRMutator<>::Visit(expr, expr); }
@@ -1755,8 +1761,8 @@ Expr ConvertCinnToCAS(Expr expr) {
     }
   };
 
-  Mutator()(&copied);
-  return copied;
+  Mutator()(&expr);
+  return expr;
 }
 
 /**
@@ -1841,7 +1847,6 @@ Expr ReplaceMaxToConstant(Expr expr) {
 
 Expr ConvertCasToCinn(Expr expr) {
   VLOG(7) << "Begin ConvertCasToCinn : " << expr;
-  Expr copied = ir::ir_utils::IRCopy(expr);
 
   struct Mutator : ir::IRMutator<Expr*> {
     void operator()(Expr* expr) { Visit(expr); }
@@ -1936,8 +1941,8 @@ Expr ConvertCasToCinn(Expr expr) {
     }
   };
 
-  Mutator()(&copied);
-  return copied;
+  Mutator()(&expr);
+  return expr;
 }
 
 bool IsExprCasCompatible(Expr expr) {
@@ -2117,9 +2122,10 @@ Expr CasSimplifyMutator::SimplifyFracOp(Expr expr) {
         auto sum_a_prod_a_int = sum_a_prod->operand(0).As<IntImm>();
         auto& interval = var_intervals.at(sum_b_var->name);
         int b_abs = std::abs(bi->value);
-        int sum_prod_a_abs = std::abs(sum_a_prod_a_int->value);
-        if (sum_a_prod_a_int && (b_abs % sum_prod_a_abs == 0)) {
-          if (std::abs(interval.l) < sum_prod_a_abs &&
+        if (sum_a_prod_a_int) {
+          int sum_prod_a_abs = std::abs(sum_a_prod_a_int->value);
+          if (b_abs % sum_prod_a_abs == 0 &&
+              std::abs(interval.l) < sum_prod_a_abs &&
               std::abs(interval.r) < sum_prod_a_abs) {
             return CasSimplify(
                 Sum::Make({CasSimplify(FracOp::Make(a_sum->operands()[0], b),

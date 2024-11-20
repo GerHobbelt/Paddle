@@ -429,8 +429,10 @@ def _c_softmax_with_cross_entropy(
         else group.nranks
     )
 
-    input_dims = len(list(logits.shape))
-    label_dims = len(list(label.shape))
+    input_shape = list(logits.shape)
+    label_shape = list(label.shape)
+    input_dims = len(input_shape)
+    label_dims = len(label_shape)
     if input_dims - 1 != label_dims and input_dims != label_dims:
         raise ValueError(
             f'Expected input_dims - 1 = label_dims or input_dims == label_dims\
@@ -438,6 +440,12 @@ def _c_softmax_with_cross_entropy(
         )
     if input_dims - 1 == label_dims:
         label = paddle.unsqueeze(label, axis=-1)
+        label_shape = list(label.shape)
+    if label_shape[-1] < 1 or label_shape[-1] > input_shape[-1] * nranks:
+        raise ValueError(
+            f'Expected label_shape[-1] >= 1 and label_shape[-1] <= input_shape[-1] * nranks\
+             (got label_shape[-1] = {label_shape[-1]}, input_shape[-1] = {input_shape[-1]})'
+        )
 
     if in_dynamic_mode():
         softmax, loss = _legacy_C_ops.c_softmax_with_cross_entropy(

@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 
 
 def alltoall(
-    in_tensor_list: list[Tensor],
     out_tensor_list: list[Tensor],
+    in_tensor_list: list[Tensor],
     group: Group | None = None,
     sync_op: bool = True,
 ) -> task:
@@ -41,9 +41,9 @@ def alltoall(
         :align: center
 
     Args:
+        out_tensor_list (List[Tensor]): List of tensors to be gathered one per rank. The data type of each tensor should be the same as the input tensors.
         in_tensor_list (List[Tensor]): List of tensors to scatter one per rank. The data type of each tensor
             should be float16, float32, float64, int32, int64, int8, uint8, bool or bfloat16.
-        out_tensor_list (List[Tensor]): List of tensors to be gathered one per rank. The data type of each tensor should be the same as the input tensors.
         group (Group, optional): The group instance return by new_group or None for global default group. Default: None.
         sync_op (bool, optional): Whether this op is a sync op. The default value is True.
 
@@ -65,7 +65,7 @@ def alltoall(
             >>> else:
             ...     data1 = paddle.to_tensor([[13, 14, 15], [16, 17, 18]])
             ...     data2 = paddle.to_tensor([[19, 20, 21], [22, 23, 24]])
-            >>> dist.alltoall([data1, data2], out_tensor_list)
+            >>> dist.alltoall(out_tensor_list, [data1, data2])
             >>> print(out_tensor_list)
             >>> # [[[1, 2, 3], [4, 5, 6]], [[13, 14, 15], [16, 17, 18]]] (2 GPUs, out for rank 0)
             >>> # [[[7, 8, 9], [10, 11, 12]], [[19, 20, 21], [22, 23, 24]]] (2 GPUs, out for rank 1)
@@ -76,8 +76,8 @@ def alltoall(
 
 
 def alltoall_single(
-    in_tensor: Tensor,
     out_tensor: Tensor,
+    in_tensor: Tensor,
     in_split_sizes: list[int] | None = None,
     out_split_sizes: list[int] | None = None,
     group: Group | None = None,
@@ -90,8 +90,8 @@ def alltoall_single(
         ``alltoall_single`` is only supported in eager mode.
 
     Args:
-        in_tensor (Tensor): Input tensor. The data type should be float16, float32, float64, int32, int64, int8, uint8, bool or bfloat16.
         out_tensor (Tensor): Output Tensor. The data type should be the same as the data type of the input Tensor.
+        in_tensor (Tensor): Input tensor. The data type should be float16, float32, float64, int32, int64, int8, uint8, bool or bfloat16.
         in_split_sizes (list[int]|None, optional): Split sizes of ``in_tensor`` for dim[0]. If not given, dim[0] of ``in_tensor``
             must be divisible by group size and ``in_tensor`` will be scattered averagely to all participators. Default: None.
         out_split_sizes (list[int]|None, optional): Split sizes of ``out_tensor`` for dim[0]. If not given, dim[0] of ``out_tensor``
@@ -118,7 +118,7 @@ def alltoall_single(
             >>> # data for rank 0: [0, 1]
             >>> # data for rank 1: [2, 3]
             >>> output = paddle.empty([2], dtype='int64')
-            >>> dist.alltoall_single(data, output)
+            >>> dist.alltoall_single(output, data)
             >>> print(output)
             >>> # output for rank 0: [0, 2]
             >>> # output for rank 1: [1, 3]

@@ -118,7 +118,6 @@ if((WITH_GPU) AND (LINUX))
   set_tests_properties(test_semi_auto_llama_acc_align
                        PROPERTIES TIMEOUT "300" LABELS "RUN_TYPE=HYBRID")
 endif()
-
 if((WITH_GPU) AND (LINUX))
   py_test_modules(
     test_semi_auto_llama_save_load
@@ -129,4 +128,11 @@ if((WITH_GPU) AND (LINUX))
   )
   set_tests_properties(test_semi_auto_llama_save_load
                        PROPERTIES TIMEOUT "180" LABELS "RUN_TYPE=HYBRID")
+endif()
+if((WITH_GPU) AND (LINUX))
+  py_test_modules(
+    test_parallel_api_with_llama MODULES test_parallel_api_with_llama ENVS
+    "http_proxy=;https_proxy=;PYTHONPATH=../..:${PADDLE_BINARY_DIR}/python")
+  set_tests_properties(test_parallel_api_with_llama
+                       PROPERTIES TIMEOUT "300" LABELS "RUN_TYPE=HYBRID")
 endif()

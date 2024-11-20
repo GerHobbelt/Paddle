@@ -501,9 +501,8 @@ class BaseInliner : public ir::IRMutator<> {
   void Visit(const ir::Block* expr, Expr* op) override;
 
  protected:
-  //! Check if indices are validate. If so, set idx_vars_ properly.
-  bool UpdateAndCheckIndexVars(const std::vector<Expr>& indices,
-                               int expected_ndim);
+  //! Check if indices are validate. If so, set idx_expr_ properly.
+  bool UpdateAndCheckIndexVars(const std::vector<Expr>& indices);
 
   void SetIndexSubstitution(const std::vector<Expr>& indices);
 
@@ -513,7 +512,7 @@ class BaseInliner : public ir::IRMutator<> {
   //! The body of the block to be inlined
   Expr inlined_store_{nullptr};
   //! The indices used for indexing the buffer to be inlined
-  std::vector<Var> idx_vars_;
+  std::vector<Expr> idx_expr_;
   //! Replacing vars(idx_sub_var_) in indices to corresponding
   //! expr(idx_sub_expr_)
   std::vector<Var> idx_sub_var_;

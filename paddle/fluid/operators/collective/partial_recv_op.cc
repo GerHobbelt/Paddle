@@ -100,10 +100,6 @@ class PartialRecvOpMaker : public framework::OpProtoAndCheckerMaker {
 
     AddAttr<std::vector<int>>("out_shape", "shape of the output tensor.")
         .SetDefault(std::vector<int>());
-    AddAttr<bool>(
-        "use_calc_stream",
-        "(bool default false) eject CUDA operations to calculation stream.")
-        .SetDefault(false);
     AddAttr<int>("num", "(int default 1) The number of Output to be cut.")
         .SetDefault(1);
     AddAttr<int>("id",

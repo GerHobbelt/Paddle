@@ -159,6 +159,32 @@ void maximum_double_grad(const Tensor& x,
 }
 
 template <typename T>
+void where_double_grad(const Tensor& condition,
+                       const paddle::optional<Tensor>& grad_x_grad,
+                       const paddle::optional<Tensor>& grad_y_grad,
+                       Tensor* grad_out_grad) {
+  if (grad_out_grad) {
+    if (grad_x_grad && grad_y_grad) {
+      // ddz = ddx * cond + (1-cond) * ddy
+      auto condition_mask = cast<T>(condition, grad_x_grad.get().dtype());
+      auto ddout = condition_mask * grad_x_grad.get() +
+                   (1 - condition_mask) * grad_y_grad.get();
+      set_output<T>(ddout, grad_out_grad);
+    } else if (grad_x_grad) {
+      // ddz = ddx * cond
+      auto condition_mask = cast<T>(condition, grad_x_grad.get().dtype());
+      auto ddout = condition_mask * grad_x_grad.get();
+      set_output<T>(ddout, grad_out_grad);
+    } else if (grad_y_grad) {
+      // ddz = (1-cond) * ddy
+      auto condition_mask = cast<T>(condition, grad_y_grad.get().dtype());
+      auto ddout = (1 - condition_mask) * grad_y_grad.get();
+      set_output<T>(ddout, grad_out_grad);
+    }
+  }
+}
+
+template <typename T>
 void tanh_triple_grad(const Tensor& out,
                       const Tensor& grad_out_forward,
                       const Tensor& grad_x_grad_forward,
@@ -906,6 +932,55 @@ void abs_triple_grad(const Tensor& x,
   if (grad_grad_x_grad) {
     auto grad_grad_x_grad_tmp = sign<T>(x) * grad_out_grad_grad;
     set_output<T>(grad_grad_x_grad_tmp, grad_grad_x_grad);
+  }
+}
+
+template <typename T>
+void bmm_double_grad(const Tensor& x,
+                     const Tensor& y,
+                     const Tensor& grad_out,
+                     const paddle::optional<Tensor>& grad_x_grad,
+                     const paddle::optional<Tensor>& grad_y_grad,
+                     Tensor* x_grad,
+                     Tensor* y_grad,
+                     Tensor* grad_out_grad) {
+  if (x_grad) {
+    // dx' = bmm(dout, ddy.mT)
+    Tensor x_grad_tmp;
+    if (grad_y_grad) {
+      x_grad_tmp =
+          matmul<T>(grad_out, transpose<T>(grad_y_grad.get(), {0, 2, 1}));
+    } else {
+      x_grad_tmp = full<T>(common::vectorize(x.dims()), 0, x.dtype());
+    }
+    set_output<T>(x_grad_tmp, x_grad);
+  }
+  if (y_grad) {
+    // dy' = bmm(ddx.mT, dout)
+    Tensor y_grad_tmp;
+    if (grad_x_grad) {
+      y_grad_tmp =
+          matmul<T>(transpose<T>(grad_x_grad.get(), {0, 2, 1}), grad_out);
+    } else {
+      y_grad_tmp = full<T>(common::vectorize(y.dims()), 0, y.dtype());
+    }
+    set_output<T>(y_grad_tmp, y_grad);
+  }
+  if (grad_out_grad) {
+    // ddout = bmm(ddx, y) + bmm(x, ddy)
+    Tensor grad_out_grad_tmp;
+    if (grad_x_grad && grad_y_grad) {
+      grad_out_grad_tmp =
+          matmul<T>(grad_x_grad.get(), y) + matmul<T>(x, grad_y_grad.get());
+    } else if (grad_x_grad) {
+      grad_out_grad_tmp = matmul<T>(grad_x_grad.get(), y);
+    } else if (grad_y_grad) {
+      grad_out_grad_tmp = matmul<T>(x, grad_y_grad.get());
+    } else {
+      grad_out_grad_tmp =
+          full<T>(common::vectorize(grad_out.dims()), 0, grad_out.dtype());
+    }
+    set_output<T>(grad_out_grad_tmp, grad_out_grad);
   }
 }
 

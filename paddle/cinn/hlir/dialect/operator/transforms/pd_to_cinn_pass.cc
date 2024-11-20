@@ -114,8 +114,16 @@ class SumOpPattern : public pir::OpRewritePattern<paddle::dialect::SumOp> {
                             .dyn_cast<paddle::dialect::DataTypeAttribute>()
                             .data();
 
-    auto cinn_reduce = rewriter.Build<cinn::dialect::ReduceSumOp>(
-        op->operand_source(0), axis, keepdim, dtype);
+    auto in = op->operand_source(0);
+    auto in_data_type = in.type().dyn_cast<pir::DenseTensorType>().dtype();
+    if (in_data_type.isa<pir::Int32Type>() ||
+        in_data_type.isa<pir::BoolType>()) {
+      in = rewriter.Build<paddle::dialect::CastOp>(in, phi::DataType::INT64)
+               .result(0);
+    }
+    auto cinn_reduce =
+        rewriter.Build<cinn::dialect::ReduceSumOp>(in, axis, keepdim, dtype);
+
     rewriter.ReplaceAllUsesWith(op.result(0), cinn_reduce.result(0));
     rewriter.EraseOp(op);
     if (axes_full_op->use_empty()) {
@@ -541,7 +549,7 @@ class SplitOpPattern : public pir::OpRewritePattern<paddle::dialect::SplitOp> {
       } else {
         PADDLE_ENFORCE(
             false,
-            phi::errors::InvalidArgument(
+            ::common::errors::InvalidArgument(
                 "Currently only support pir::slice/split as downstream "
                 "op, but got: %s",
                 downstream_op->name()));
@@ -554,7 +562,7 @@ class SplitOpPattern : public pir::OpRewritePattern<paddle::dialect::SplitOp> {
     const auto &OnlyUsedBySplitOrSlice = [&]() -> bool {
       for (auto it = op.out().use_begin(); it != op.out().use_end();) {
         const pir::Operation *downstream_op = (it++)->owner();
-        if (!downstream_op->isa<::pir::SliceOp>() ||
+        if (!downstream_op->isa<::pir::SliceOp>() &&
             !downstream_op->isa<::pir::SplitOp>()) {
           return false;
         }
@@ -1138,6 +1146,98 @@ class GatherOpPattern
   }
 };
 
+class ReduceAsOpPattern
+    : public pir::OpRewritePattern<paddle::dialect::ReduceAsOp> {
+ public:
+  using pir::OpRewritePattern<paddle::dialect::ReduceAsOp>::OpRewritePattern;
+
+  bool Match(paddle::dialect::ReduceAsOp op) const override {
+    return CanReplaceWithReduce(op);
+  }
+
+  void Rewrite(paddle::dialect::ReduceAsOp op,
+               pir::PatternRewriter &rewriter) const override {
+    auto x_shape =
+        phi::vectorize(op->operand_source(0)
+                           .type()
+                           .dyn_cast<paddle::dialect::DenseTensorType>()
+                           .dims());
+
+    auto y_shape =
+        phi::vectorize(op->operand_source(1)
+                           .type()
+                           .dyn_cast<paddle::dialect::DenseTensorType>()
+                           .dims());
+
+    size_t x_rank = x_shape.size();
+    size_t y_rank = y_shape.size();
+
+    if (x_shape == y_shape) {
+      rewriter.ReplaceAllUsesWith(op.result(0), op.operand_source(0));
+    } else {
+      // Get reduc aixs and
+      int64_t compare_offset = x_rank - y_rank;
+      std::vector<int64_t> reduce_axis;
+      for (int64_t i = 0; i < compare_offset; ++i) {
+        reduce_axis.push_back(i);
+      }
+
+      for (size_t i = 0; i < y_rank; ++i) {
+        if (y_shape[i] == 1 && x_shape[i + compare_offset] != 1) {
+          reduce_axis.push_back(compare_offset + i);
+        }
+      }
+
+      bool keep_dim = (x_rank == y_rank);
+      auto pir_dtype =
+          op->operand_source(0).type().dyn_cast<pir::DenseTensorType>().dtype();
+      auto phi_dtype = paddle::dialect::TransToPhiDataType(pir_dtype);
+      auto sum_op = rewriter.Build<paddle::dialect::SumOp>(
+          op.operand_source(0), reduce_axis, phi_dtype, keep_dim);
+
+      auto new_output = sum_op.result(0);
+
+      if (phi::vectorize(new_output.type()
+                             .dyn_cast<paddle::dialect::DenseTensorType>()
+                             .dims()) != y_shape) {
+        // add reshape op here
+        new_output =
+            rewriter.Build<paddle::dialect::ReshapeOp>(new_output, y_shape)
+                .result(0);
+      }
+
+      rewriter.ReplaceAllUsesWith(op.result(0), new_output);
+    }
+
+    rewriter.EraseOp(op);
+  }
+
+ private:
+  bool CanReplaceWithReduce(paddle::dialect::ReduceAsOp op) const {
+    auto x_shape =
+        phi::vectorize(op->operand_source(0)
+                           .type()
+                           .dyn_cast<paddle::dialect::DenseTensorType>()
+                           .dims());
+
+    auto y_shape =
+        phi::vectorize(op->operand_source(1)
+                           .type()
+                           .dyn_cast<paddle::dialect::DenseTensorType>()
+                           .dims());
+
+    bool x_has_dynamic_shape =
+        std::find(x_shape.begin(), x_shape.end(), -1) != x_shape.end();
+    bool y_has_dynamic_shape =
+        std::find(y_shape.begin(), y_shape.end(), -1) != y_shape.end();
+    if (x_has_dynamic_shape || y_has_dynamic_shape) {
+      return false;
+    }
+
+    return true;
+  }
+};
+
 PdOpToCinnOpPass::PdOpToCinnOpPass()
     : pir::PatternRewritePass("pd_to_cinn_pass", 1) {}
 
@@ -1170,6 +1270,7 @@ pir::RewritePatternSet PdOpToCinnOpPass::InitializePatterns(
   ps.Add<SigmoidOpPattern>(context);
   ps.Add<GatherOpPattern>(context);
   ps.Add<FlattenOpPattern>(context);
+  ps.Add<ReduceAsOpPattern>(context);
 
   return ps;
 }

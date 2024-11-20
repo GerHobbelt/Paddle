@@ -25,6 +25,7 @@
 #include "paddle/fluid/framework/convert_utils.h"
 #include "paddle/fluid/framework/operator.h"
 #include "paddle/fluid/pir/dialect/operator/ir/control_flow_op.h"
+#include "paddle/fluid/pir/dialect/operator/ir/manual_op.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_attribute.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_dialect.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_type.h"
@@ -47,6 +48,7 @@
 #include "paddle/pir/include/core/parameter.h"
 #include "paddle/pir/include/core/program.h"
 #include "paddle/pir/include/pass/pass.h"
+#include "paddle/pir/include/pass/pass_registry.h"
 #include "paddle/pir/include/pattern_rewrite/frozen_rewrite_pattern_set.h"
 #include "paddle/pir/include/pattern_rewrite/pattern_match.h"
 #include "paddle/pir/include/pattern_rewrite/pattern_rewrite_driver.h"
@@ -61,8 +63,6 @@ class AutoMixedPrecisionPass : public pir::Pass {
         precision_mode_(phi::DataType::FLOAT16),
         enable_low_precision_io_(false),
         context_(nullptr),
-        black_list_(),
-        white_list_(),
         op_run_low_precision_(),
         op_should_not_handle_(),
         cached_cast_ops_() {}
@@ -76,7 +76,7 @@ class AutoMixedPrecisionPass : public pir::Pass {
             "When using AutoMixedPrecisionPass, place attribute is required!"
             "Use Set method to set the place attribute."));
     PADDLE_ENFORCE_EQ(
-        Has("__mixed_precision_mode__"),
+        Has("mixed_precision_mode"),
         true,
         common::errors::InvalidArgument(
             "Pass initialize failed."
@@ -84,28 +84,51 @@ class AutoMixedPrecisionPass : public pir::Pass {
             "required!"
             "Use Set method to set the scope attribute."));
 
+    PADDLE_ENFORCE_EQ(Has("enable_low_precision_io"),
+                      true,
+                      common::errors::InvalidArgument(
+                          "Pass initialize failed."
+                          "When using AutoMixedPrecisionPass, "
+                          "enable_low_precision_io attribute is "
+                          "required!"
+                          "Use Set method to set the scope attribute."));
+
+    PADDLE_ENFORCE_EQ(
+        Has("mixed_black_list"),
+        true,
+        common::errors::InvalidArgument(
+            "Pass initialize failed."
+            "When using AutoMixedPrecisionPass, mixed_black_list attribute is "
+            "required!"
+            "Use Set method to set the scope attribute."));
+
+    PADDLE_ENFORCE_EQ(
+        Has("mixed_white_list"),
+        true,
+        common::errors::InvalidArgument(
+            "Pass initialize failed."
+            "When using AutoMixedPrecisionPass, mixed_white_list attribute is "
+            "required!"
+            "Use Set method to set the scope attribute."));
+
     place_ = Get<phi::Place>(pir::Pass::kPlaceAttr);
-    precision_mode_ = Get<phi::DataType>("__mixed_precision_mode__");
+    precision_mode_ = Get<phi::DataType>("mixed_precision_mode");
     context_ = context;
-    enable_low_precision_io_ = false;
+    enable_low_precision_io_ = Get<bool>("enable_low_precision_io");
+    black_list_ = Get<std::unordered_set<std::string>>("mixed_black_list");
+    white_list_ = Get<std::unordered_set<std::string>>("mixed_white_list");
     SetDefaultBlacklist();
     return true;
   }
 
   void Run(pir::Operation* op) override {
-    for (size_t i = 0; i < op->num_regions(); ++i) {
-      auto& region = op->region(i);
-      for (auto& block : region) {
-        GetOpPrecision(&block);
-        UpdateOpPrecision(&block);
-        pir::Builder builder = pir::Builder(context_, &block);
-        ProcessBlock(&block, builder);
-      }
-    }
+    SubBlockRun(op->GetParentProgram()->block());
+    AddStatistics(op_run_low_precision_.size());
   }
 
   bool CanApplyOn(pir::Operation* op) const override {
-    return op->num_regions() > 0 && place_ == paddle::PlaceType::kGPU &&
+    return op->num_regions() > 0 && op->isa<pir::ModuleOp>() &&
+           place_ == paddle::PlaceType::kGPU &&
            (precision_mode_ == phi::DataType::FLOAT16 ||
             precision_mode_ == phi::DataType::BFLOAT16);
   }
@@ -134,6 +157,7 @@ class AutoMixedPrecisionPass : public pir::Pass {
         paddle::dialect::SumOp::name(),
         paddle::dialect::SigmoidCrossEntropyWithLogitsOp::name(),
         paddle::dialect::CrossEntropyWithSoftmax_Op::name(),
+        paddle::dialect::ArrayToTensorOp::name(),
     });
   }
 
@@ -164,6 +188,10 @@ class AutoMixedPrecisionPass : public pir::Pass {
         auto backend = ConvertPlaceToBackend(place_);
         support_low_precision =
             OpSupportPrecision(op_type, backend, precision_mode_);
+        if (op->isa<paddle::dialect::ScaleOp>() && !OpHasFloatResult(op)) {
+          support_low_precision = false;
+          op_should_not_handle_.insert(op);
+        }
       } else {  // pd op without float result
         support_low_precision = false;
         op_should_not_handle_.insert(op);
@@ -436,8 +464,10 @@ class AutoMixedPrecisionPass : public pir::Pass {
       if (result.type().isa<paddle::dialect::DenseTensorType>() &&
           IsDenseTensorTypeFloat(
               result.type().dyn_cast<paddle::dialect::DenseTensorType>())) {
+        return true;
       } else if (result.type().isa<pir::VectorType>() &&
                  IsVectorTypeFloat(result.type().dyn_cast<pir::VectorType>())) {
+        return true;
       }
     }
     return false;
@@ -479,6 +509,9 @@ class AutoMixedPrecisionPass : public pir::Pass {
   bool IsOperandHasDenseTensorType(pir::OpOperand operand) const {
     return operand.type() &&
            operand.type().isa<paddle::dialect::DenseTensorType>();
+  }
+  bool IsOperandHasDenseTensorVectorType(pir::OpOperand operand) const {
+    return operand.type() && operand.type().isa<pir::VectorType>();
   }
 
   void DoInsertCastOp(pir::Operation* op,
@@ -585,7 +618,6 @@ class AutoMixedPrecisionPass : public pir::Pass {
       SetResultDataType(op->result(0), precision_mode_, builder.ir_context());
       return;
     }
-
     // Other pd ops
     if (OpRunLowPrecision(op)) {
       auto phi_kernel =
@@ -658,13 +690,57 @@ class AutoMixedPrecisionPass : public pir::Pass {
       auto phi_dtype = phi::DataType::FLOAT32;
       for (size_t i = 0; i < op->num_operands(); i++) {
         auto operand = op->operand(i);
-        if (!IsOperandHasDenseTensorType(operand)) continue;
-        auto operand_phi_dtype = GetPhiDataTypeFromOpOperand(operand);
-        if (IsPhiDataTypeFloat(operand_phi_dtype) &&
-            operand_phi_dtype == precision_mode_) {
-          DoInsertCastOp(op, operand, phi_dtype, builder);
+        if (IsOperandHasDenseTensorType(operand)) {
+          auto operand_phi_dtype = GetPhiDataTypeFromOpOperand(operand);
+          if (IsPhiDataTypeFloat(operand_phi_dtype) &&
+              operand_phi_dtype == precision_mode_) {
+            DoInsertCastOp(op, operand, phi_dtype, builder);
+          }
+        } else if (IsOperandHasDenseTensorVectorType(operand)) {
+          auto defining_op_ = operand.source().defining_op();
+          if (defining_op_->isa<pir::CombineOp>()) {
+            auto input_num = defining_op_->num_operands();
+            for (size_t i = 0; i < input_num; ++i) {
+              auto operand = defining_op_->operand(i);
+              auto operand_phi_dtype = GetPhiDataTypeFromOpOperand(operand);
+              if (IsPhiDataTypeFloat(operand_phi_dtype) &&
+                  operand_phi_dtype != phi::DataType::FLOAT32) {
+                DoInsertCastOp(
+                    defining_op_, operand, phi::DataType::FLOAT32, builder);
+              }
+            }
+            std::vector<pir::Type> inputs_type(input_num);
+            for (size_t idx = 0; idx < input_num; ++idx) {
+              inputs_type[idx] = defining_op_->operand(idx).type();
+            }
+            auto new_vec_type =
+                pir::VectorType::get(builder.ir_context(), inputs_type);
+            defining_op_->result(0).set_type(new_vec_type);
+          }
+        } else {
+          continue;
         }
       }
+    }
+  }
+
+  void SubOpRun(pir::Operation* op) {
+    for (auto& region : *op) {
+      for (auto& block : region) {
+        SubBlockRun(&block);  // subblock
+      }
+    }
+  }
+
+  void SubBlockRun(pir::Block* block) {
+    GetOpPrecision(block);
+    UpdateOpPrecision(block);
+    pir::Builder builder = pir::Builder(context_, block);
+    ProcessBlock(block, builder);
+    cached_cast_ops_.clear();
+    op_should_not_handle_.clear();
+    for (auto& op : *block) {
+      SubOpRun(&op);
     }
   }
 };
@@ -677,3 +753,5 @@ std::unique_ptr<Pass> CreateAutoMixedPrecisionPass() {
 }
 
 }  // namespace pir
+
+REGISTER_IR_PASS(auto_mixed_precision_pass, AutoMixedPrecisionPass);

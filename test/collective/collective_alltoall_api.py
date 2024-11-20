@@ -108,7 +108,7 @@ class TestCollectiveAllToAllAPI(TestCollectiveAPIRunnerBase):
             tindata.desc.set_need_check_feed(False)
             tindata = paddle.split(tindata, 2, axis=0)
             tout_data = []
-            paddle.distributed.alltoall(tindata, tout_data)
+            paddle.distributed.alltoall(tout_data, tindata)
             return tout_data
 
     def get_model_new(

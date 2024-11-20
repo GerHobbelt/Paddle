@@ -141,6 +141,12 @@ repos:
     hooks:
     -   id: cmakelint
         args: [--config=./tools/codestyle/.cmakelintrc]
+        # Exclude some files has false positive warnings
+        # Need to fix them in the future
+        exclude: |
+            (?x)^(
+                cmake/external/onnxruntime.cmake
+                )$
 # Others
 -   repo: local
     hooks:

@@ -297,6 +297,8 @@ struct IRCopyVisitor : public ir::IRVisitorRequireReImpl<Expr> {
     func->args = op->args;
     func->body = Visit(&op->body);
     func->temp_bufs = op->temp_bufs;
+    func->temp_spaces = op->temp_spaces;
+    func->num_output_tensors = op->num_output_tensors;
 
     func->device_api = op->device_api;
 
@@ -457,6 +459,28 @@ struct IRCopyVisitor : public ir::IRVisitorRequireReImpl<Expr> {
   Expr Visit(const ir::_Dim_* op) override {
     return ir::_Dim_::Make(op->name, op->sym_dim);
   }
+  Expr Visit(const ir::IterMark* op) override {
+    Expr source = Visit(&(op->source));
+    Expr extent = Visit(&(op->extent));
+
+    return IterMark::Make(source, extent);
+  }
+  Expr Visit(const ir::IterSplit* op) override {
+    Expr source = Visit(&(op->source));
+    Expr lower_factor = Visit(&(op->lower_factor));
+    Expr extent = Visit(&(op->extent));
+    Expr scale = Visit(&(op->scale));
+
+    return IterSplit::Make(source, lower_factor, extent, scale);
+  }
+  Expr Visit(const ir::IterSum* op) override {
+    std::vector<IndexExpr> args;
+    for (const auto& v : op->args) {
+      args.push_back(Visit(&v));
+    }
+    Expr base = Visit(&(op->base));
+    return IterSum::Make(args, base);
+  }
 
 #define __(x__) Expr Visit(const ir::intrinsics::x__* op);
   INTRINSIC_KIND_FOR_EACH(__)
@@ -526,7 +550,7 @@ Expr IRCopyVisitor::Visit(const ir::intrinsics::BuiltinIntrin* op) {
       op->name, op->args, op->id, op->arg_nums, op->type());
 }
 }  // namespace
-Expr IRCopy(Expr x, bool copy_buffer_node) {
+Expr IRCopy(const Expr& x, bool copy_buffer_node) {
   IRCopyVisitor visitor(copy_buffer_node);
   auto copied = visitor.Visit(&x);
   return copied;

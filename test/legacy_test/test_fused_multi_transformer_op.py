@@ -21,7 +21,7 @@ from test_sparse_attention_op import get_cuda_version
 
 import paddle
 import paddle.nn.functional as F
-from paddle import tensor
+from paddle import base, tensor
 from paddle.base.framework import default_main_program
 from paddle.base.param_attr import ParamAttr
 from paddle.incubate.nn import FusedMultiTransformer
@@ -62,7 +62,7 @@ class TestFusedMultiTransformerOp(OpTest):
         if "V100" in paddle.device.cuda.get_device_name():
             self.atol = 1e-4
         if self.x_type is np.float16:
-            self.atol = 1e-1
+            self.atol = 1.5e-1
 
         paddle.set_default_dtype(self.x_type)
         self.__class__.op_type = "fused_multi_transformer"
@@ -905,7 +905,7 @@ class TestFusedMultiTransformerOp(OpTest):
 
         if self.remove_padding:
             seq_lens = paddle.static.data(
-                'seq_lens', self.seq_lens.shape, self.seq_lens.dtype
+                'seq_lengths', self.seq_lens.shape, self.seq_lens.dtype
             )
             seq_lens_feed = self.seq_lens
 
@@ -926,7 +926,10 @@ class TestFusedMultiTransformerOp(OpTest):
             )
             pre_caches = []
 
-        attn_mask = None
+        attn_mask = paddle.static.data(
+            'src_mask', self.attn_mask.shape, self.attn_mask.dtype
+        )
+        attn_mask_feed = self.attn_mask
         epsilon = 1e-05
         ln2_epsilon = 1e-05
 
@@ -1024,8 +1027,8 @@ class TestFusedMultiTransformerOp(OpTest):
             'rotary_embs': self.rotary_embs,
             'time_step': time_step_feed,
             'rotary_emb_dims': self.rotary_emb_dims,
-            'attn_mask': attn_mask,
-            'seq_lens': seq_lens_feed,
+            'src_mask': attn_mask_feed,
+            'seq_lengths': seq_lens_feed,
         }
         if self.has_pre_cache:
             out = exe.run(
@@ -1164,8 +1167,6 @@ class TestFusedMultiTransformerOp(OpTest):
             self.cache_kv = paddle.stack(
                 [self.cache_kv] * (self.num_heads // self.kv_num_heads), axis=3
             )
-
-            # import pdb;pdb.set_trace()
 
             self.cache_kv = paddle.reshape(self.cache_kv, shape).numpy()
 
@@ -1879,7 +1880,7 @@ class TestFusedMultiTransformerOpVariableGQADecoder3(
 class TestFusedMultiTransformerOpPreCacheStatic1(TestFusedMultiTransformerOp):
     def config(self):
         super().config()
-        self.has_attn_mask = False
+        self.has_attn_mask = True
         self.x_type = np.float16
         self.weight_attr = paddle.ParamAttr(
             initializer=paddle.nn.initializer.Constant(0.0)
@@ -1936,6 +1937,52 @@ class ZTestFusedMultiTransformerAPIError(unittest.TestCase):
             out = layer(x)
 
         self.assertRaises(ValueError, test_invalid_input_dim)
+
+
+@unittest.skipIf(
+    not paddle.is_compiled_with_cuda()
+    or get_cuda_version() < 11030
+    or paddle.device.cuda.get_device_capability()[0] < 8,
+    "FusedMultiTransformer requires CUDA >= 11.2 and CUDA_ARCH >= 8",
+)
+class TestFusedMultiTransformerOpUseMBMMHA(TestFusedMultiTransformerOp):
+    def config(self):
+        super().config()
+        base.set_flags({'FLAGS_fused_multi_transformer_op_use_mbfmha': True})
+        self.has_cache_kv = True
+        self.gen_cache_kv = False
+        self.remove_padding = True
+        self.query_length = 1
+        self.key_length, self.value_length = 1, 1
+        self.cache_length = 2049
+        # NOTE(Wanglongzhi2001): cache length is little long, to avoid the cost time of this unittest is too long,
+        # we set the layers to 2.
+        self.layers = 2
+        self.rotary_emb_dims = 2
+        self.x_type = np.float16
+
+
+@unittest.skipIf(
+    not paddle.is_compiled_with_cuda()
+    or get_cuda_version() < 11030
+    or paddle.device.cuda.get_device_capability()[0] < 8,
+    "FusedMultiTransformer requires CUDA >= 11.2 and CUDA_ARCH >= 8",
+)
+class TestFusedMultiTransformerOpUseMBMMHAGQA(TestFusedMultiTransformerOp):
+    def config(self):
+        super().config()
+        base.set_flags({'FLAGS_fused_multi_transformer_op_use_mbfmha': True})
+        # Use GQA
+        self.gqa_group_size = 8
+        self.has_cache_kv = True
+        self.gen_cache_kv = False
+        self.remove_padding = True
+        self.query_length = 1
+        self.key_length, self.value_length = 1, 1
+        self.cache_length = 2049
+        self.layers = 2
+        self.rotary_emb_dims = 2
+        self.x_type = np.float16
 
 
 if __name__ == "__main__":

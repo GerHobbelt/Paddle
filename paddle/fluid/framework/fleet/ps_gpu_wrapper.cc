@@ -38,7 +38,7 @@ limitations under the License. */
 #if defined(PADDLE_WITH_PSCORE) && defined(PADDLE_WITH_HETERPS)
 #include "paddle/fluid/framework/fleet/heter_ps/graph_gpu_wrapper.h"
 #endif
-#include "paddle/fluid/platform/timer.h"
+#include "paddle/phi/core/platform/timer.h"
 #if defined(PADDLE_WITH_PSCORE)
 #include "paddle/fluid/distributed/ps/table/depends/feature_value.h"
 #endif
@@ -115,6 +115,20 @@ void PSGPUWrapper::InitAfsApi(const std::string& fs_name,
       fs_name.c_str(), fs_user.c_str(), pass_wd.c_str(), conf.c_str());
   if (ret != 0) {
     VLOG(0) << "AFS Init Error";
+  }
+  use_afs_api_ = 1;
+}
+#endif
+
+#if defined(PADDLE_WITH_PSCORE)
+void PSGPUWrapper::InitAfsApi(const std::string& fs_name,
+                              const std::string& fs_user,
+                              const std::string& pass_wd,
+                              const std::string& conf) {
+  int ret = afs_handle_.Init(fs_name, fs_user, pass_wd, conf);
+  if (ret != 0) {
+    VLOG(0) << "AFS Init Error";
+    return;
   }
   use_afs_api_ = 1;
 }

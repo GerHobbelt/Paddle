@@ -70,10 +70,6 @@ class CBroadcastOpXPUKernel : public framework::OpKernel<T> {
       stream = comm->stream();
       VLOG(3) << "old BKCLCommContext has rid " << ring_id;
     }
-    if (ctx.Attr<bool>("use_calc_stream")) {
-      auto dev_ctx = phi::DeviceContextPool::Instance().Get(place);
-      stream = static_cast<phi::XPUContext*>(dev_ctx)->x_context()->xpu_stream;
-    }
     if (comm_ctx) {
       comm_ctx->Broadcast(out, *x, root, stream);
     } else {

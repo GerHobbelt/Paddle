@@ -23,7 +23,6 @@ namespace phi {
 
 template <typename T, typename Context>
 void PartialRecvKernel(const Context& dev_ctx,
-                       int ring_id UNUSED,
                        int peer,
                        DataType type,
                        const std::vector<int>& out_shape,

@@ -1402,6 +1402,56 @@ void ElementwisePowGradKernel(const Context& dev_ctx,
 
 /*
 ******************************
+    Remainder Grad
+******************************
+*/
+// RemainderGradDx
+template <typename T>
+struct RemainderGradDx {
+  HOSTDEVICE T operator()(T x, T y, T out UNUSED, T dout) const {
+    // dx = dout
+    return dout;
+  }
+};
+
+// RemainderGradDy
+template <typename T, typename Enable = void>
+struct RemainderGradDy {
+  HOSTDEVICE T operator()(T x, T y, T out UNUSED, T dout) const {
+    return -dout * (std::floor(static_cast<double>(x / y)));
+  }
+};
+template <typename T>
+struct RemainderGradDy<
+    T,
+    typename std::enable_if<std::is_floating_point<T>::value>::type> {
+  HOSTDEVICE T operator()(T x, T y, T out UNUSED, T dout) const {
+    using MPType = typename phi::dtype::MPTypeTrait<T>::Type;
+    auto x_ = static_cast<MPType>(x);
+    auto y_ = static_cast<MPType>(y);
+    return static_cast<T>(-static_cast<MPType>(dout) * (std::floor((x_ / y_))));
+  }
+};
+template <typename T>
+struct RemainderGradDy<
+    T,
+    typename std::enable_if<std::is_integral<T>::value>::type> {
+  HOSTDEVICE T operator()(T x, T y, T out UNUSED, T dout) const {
+    // dy = -dout * (x / y)
+    if (phi::is_negative(x) != phi::is_negative(y)) {
+      // Subtracts one from the results of truncation division if the
+      // divisor and dividend have different sign(bit)s and the remainder of
+      // the division is nonzero
+      const auto quot = x / y;
+      const auto rem = x % y;
+      auto ret = rem ? quot - 1 : quot;
+      return -dout * ret;
+    }
+    return -dout * (x / y);
+  }
+};
+/*
+******************************
     Copysign Grad
 ******************************
 */

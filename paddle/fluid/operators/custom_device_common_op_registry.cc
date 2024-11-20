@@ -1406,7 +1406,7 @@ void RegisterCustomDeviceCommonKernel(const std::string& dev_type) {
                                                        phi::dtype::float16>) {}
 
   REGISTER_OP_CUSTOM_DEVICE_KERNEL(
-      c_sync_calc_stream,
+      sync_calc_stream,
       device_type,
       paddle::operators::CSyncCalcStreamCustomDeviceKernel<phi::CustomContext,
                                                            int16_t>,

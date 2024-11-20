@@ -128,8 +128,7 @@ void GaussianInferMeta(const IntArray& shape,
   out->set_layout(DataLayout::NCHW);
 }
 
-void PartialRecvInferMeta(int ring_id,
-                          int peer,
+void PartialRecvInferMeta(int peer,
                           DataType dtype,
                           const std::vector<int>& out_shape,
                           int num,
@@ -140,12 +139,6 @@ void PartialRecvInferMeta(int ring_id,
       0,
       common::errors::InvalidArgument(
           "The peer (%d) for partial_recv op must be non-negative.", peer));
-  PADDLE_ENFORCE_GE(
-      ring_id,
-      0,
-      common::errors::InvalidArgument(
-          "The ring_id (%d) for partial_recv op must be non-negative.",
-          ring_id));
   PADDLE_ENFORCE_GE(num,
                     1,
                     common::errors::InvalidArgument(
@@ -183,6 +176,8 @@ void PartialRecvInferMeta(int ring_id,
   out->set_dims(common::make_ddim(out_shape));
   out->set_dtype(dtype);
 }
+
+void LoadInferMeta(MetaTensor* out, MetaConfig config) {}
 
 void RandpermInferMeta(int n, DataType dtype, MetaTensor* out) {
   out->set_dims(common::make_ddim({n}));

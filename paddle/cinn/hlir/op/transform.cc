@@ -1484,7 +1484,8 @@ std::shared_ptr<OpStrategy> StrategyForSliceSymbolic(
       return value.value();
     }
     if (attrs.attr_store.find("starts") != attrs.attr_store.end()) {
-      return ToCinnExprs(GetIntVectorFromAttr(attrs.attr_store.at("starts")));
+      return ToCinnExprs(
+          GetIntVectorFromAttr<int64_t>(attrs.attr_store.at("starts")));
     } else {
       PADDLE_THROW(::common::errors::InvalidArgument(
           "The Slice op doesn't find [starts] attribute!"));
@@ -1500,7 +1501,8 @@ std::shared_ptr<OpStrategy> StrategyForSliceSymbolic(
       return value.value();
     }
     if (attrs.attr_store.find("ends") != attrs.attr_store.end()) {
-      return ToCinnExprs(GetIntVectorFromAttr(attrs.attr_store.at("ends")));
+      return ToCinnExprs(
+          GetIntVectorFromAttr<int64_t>(attrs.attr_store.at("ends")));
     } else {
       PADDLE_THROW(::common::errors::InvalidArgument(
           "The Slice op doesn't find [ends] attribute!"));

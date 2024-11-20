@@ -499,16 +499,9 @@ void Pad3dInferMeta(const MetaTensor& x,
 void PartialAllgatherInferMeta(const MetaTensor& x,
                                int nranks,
                                int rank,
-                               int ring_id,
-                               bool use_calc_stream,
                                MetaTensor* out);
 
-void PartialSendInferMeta(const MetaTensor& x,
-                          int ring_id,
-                          int peer,
-                          bool use_calc_stream,
-                          int num,
-                          int id);
+void PartialSendInferMeta(const MetaTensor& x, int peer, int num, int id);
 
 void PixelShuffleInferMeta(const MetaTensor& x,
                            int upscale_factor,
@@ -590,6 +583,11 @@ void WeightQuantizeInferMeta(const MetaTensor& x,
                              MetaTensor* scale);
 
 void RealAndImagInferMeta(const MetaTensor& x, MetaTensor* out);
+
+void ReduceSumInferMeta(const MetaTensor& x,
+                        const std::vector<int64_t>& axis,
+                        bool keep_dim,
+                        MetaTensor* out);
 
 void ReduceInferMeta(const MetaTensor& x,
                      const std::vector<int64_t>& axis,
@@ -772,6 +770,10 @@ void SumInferMeta(const MetaTensor& x,
                   const IntArray& axis,
                   DataType dtype,
                   bool keep_dim,
+                  MetaTensor* out,
+                  MetaConfig config = MetaConfig());
+
+void DetInferMeta(const MetaTensor& x,
                   MetaTensor* out,
                   MetaConfig config = MetaConfig());
 

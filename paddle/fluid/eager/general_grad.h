@@ -25,8 +25,8 @@
 #include "paddle/fluid/eager/grad_tensor_holder.h"
 #include "paddle/fluid/eager/utils.h"
 #include "paddle/fluid/platform/enforce.h"
-#include "paddle/fluid/platform/profiler/event_tracing.h"
 #include "paddle/phi/core/platform/profiler.h"
+#include "paddle/phi/core/platform/profiler/event_tracing.h"
 
 namespace egr {
 
@@ -66,7 +66,7 @@ class GeneralGrad {
 
         PADDLE_ENFORCE_NOT_NULL(
             target_node,
-            common::errors::Fatal("There is no grad op for %s:[%d] or it's"
+            common::errors::Fatal("There is no grad op for %s:[%d] or it's "
                                   "stop_gradient=True.",
                                   msg,
                                   i));

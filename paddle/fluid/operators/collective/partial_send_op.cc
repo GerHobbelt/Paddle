@@ -67,10 +67,6 @@ class PartialSendMaker : public framework::OpProtoAndCheckerMaker {
         .SetDefault(0);
     AddAttr<int>("peer", "(int default 0) rank id for receiver.").SetDefault(0);
 
-    AddAttr<bool>(
-        "use_calc_stream",
-        "(bool default false) eject CUDA operations to calculation stream.")
-        .SetDefault(false);
     AddAttr<int>("num", "(int default 1) The number of Input to be cut.")
         .SetDefault(1);
     AddAttr<int>("id",

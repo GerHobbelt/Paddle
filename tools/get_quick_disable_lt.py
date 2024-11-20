@@ -18,11 +18,24 @@ import sys
 import httpx
 
 import paddle
+from paddle.base import core
+
+
+def get_disable_ut_by_url(url):
+    ssl._create_default_https_context = ssl._create_unverified_context
+    f = httpx.get(url, timeout=None, follow_redirects=True)
+    data = f.text
+    status_code = f.status_code
+    if len(data.strip()) == 0 or status_code != 200:
+        sys.exit(1)
+    else:
+        lt = data.strip().split('\n')
+        lt = '^' + '$|^'.join(lt) + '$'
+        return lt
 
 
 def download_file():
     """Get disabled unit tests"""
-    ssl._create_default_https_context = ssl._create_unverified_context
     sysstr = sys.platform
     if sysstr == 'win32':
         url = "https://sys-p0.bj.bcebos.com/prec/{}".format('disable_ut_win')
@@ -32,16 +45,23 @@ def download_file():
     if paddle.is_compiled_with_rocm():
         url = "https://sys-p0.bj.bcebos.com/prec/{}".format('disable_ut_rocm')
 
-    f = httpx.get(url, timeout=None, follow_redirects=True)
-    data = f.text
-    status_code = f.status_code
-    if len(data.strip()) == 0 or status_code != 200:
-        sys.exit(1)
-    else:
-        lt = data.strip().split('\n')
-        lt = '^' + '$|^'.join(lt) + '$'
-        print(lt)
-        sys.exit(0)
+    disabled_ut_list = get_disable_ut_by_url(url)
+
+    if paddle.is_compiled_with_xpu():
+        xpu_version = core.get_xpu_device_version(0)
+        if xpu_version != core.XPUVersion.XPU3:
+            url = "https://sys-p0.bj.bcebos.com/prec/{}".format(
+                'disable_ut_xpu_kl2'
+            )
+        else:
+            url = "https://sys-p0.bj.bcebos.com/prec/{}".format(
+                'disable_ut_xpu_kl3'
+            )
+        external_xpu = get_disable_ut_by_url(url)
+        disabled_ut_list = disabled_ut_list + "|" + external_xpu
+
+    print(disabled_ut_list)
+    sys.exit(0)
 
 
 if __name__ == '__main__':

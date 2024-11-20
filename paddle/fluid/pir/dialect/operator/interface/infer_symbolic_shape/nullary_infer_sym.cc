@@ -246,6 +246,52 @@ bool EmptyOpInferSymbolicShape(pir::Operation *op,
   }
 }
 
+bool EyeOpInferSymbolicShape(pir::Operation *op,
+                             pir::InferSymbolicShapeContext *infer_context) {
+  std::vector<symbol::DimExpr> out_shape;
+  symbol::DimExpr num_columns_dim;
+  symbol::DimExpr num_rows_dim;
+  if (op->HasAttribute("num_rows")) {
+    int num_rows_int = op->attribute<pir::Int64Attribute>("num_rows").data();
+    num_rows_dim = symbol::DimExpr(num_rows_int);
+  } else if (op->operand_source(0)) {
+    const auto &num_rows_shape_or_data =
+        infer_context->GetShapeOrDataForValue(op->operand_source(0));
+    if (num_rows_shape_or_data.data().has_value()) {
+      num_rows_dim =
+          symbol::DimExpr(num_rows_shape_or_data.data().value().at(0));
+    } else {
+      num_rows_dim = symbol::DimExpr(infer_context->GetNextSymName());
+    }
+  }
+
+  if (op->HasAttribute("num_columns")) {
+    int num_columns_int =
+        op->attribute<pir::Int64Attribute>("num_columns").data();
+    if (num_columns_int == -1) {
+      num_columns_dim = num_rows_dim;
+    } else {
+      num_columns_dim = symbol::DimExpr(num_columns_int);
+    }
+  } else if (op->operand_source(1)) {
+    const auto &num_columns_shape_or_data =
+        infer_context->GetShapeOrDataForValue(op->operand_source(1));
+    if (num_columns_shape_or_data.data().has_value()) {
+      num_columns_dim =
+          symbol::DimExpr(num_columns_shape_or_data.data().value().at(0));
+    } else {
+      num_columns_dim = symbol::DimExpr(infer_context->GetNextSymName());
+    }
+  }
+  out_shape.emplace_back(num_rows_dim);
+  out_shape.emplace_back(num_columns_dim);
+
+  infer_context->SetShapeOrDataForValue(
+      op->result(0),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs(out_shape)});
+  return true;
+}
 bool FeedOpInferSymbolicShape(pir::Operation *op,
                               pir::InferSymbolicShapeContext *infer_context) {
   std::string name =
@@ -307,6 +353,11 @@ bool FullOpInferSymbolicShape(pir::Operation *op,
   infer_context->SetShapeOrDataForValue(
       op->result(0), symbol::ShapeOrDataDimExprs(shape_data));
   return true;
+}
+
+bool Full_OpInferSymbolicShape(pir::Operation *op,
+                               pir::InferSymbolicShapeContext *infer_context) {
+  return FullOpInferSymbolicShape(op, infer_context);
 }
 
 bool FullIntArrayOpInferSymbolicShape(
@@ -409,19 +460,87 @@ bool RandintOpInferSymbolicShape(
   }
 }
 
-// bool ReadFileOpInferSymbolicShape(pir::Operation *op,
-//                                   pir::InferSymbolicShapeContext
-//                                   *infer_context) {
-//   // pass
-//   return true;
-// }
+bool ReadFileOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  symbol::DimExpr unique_dim_sym = infer_context->GetNextSymName();
 
-// bool RecvV2OpInferSymbolicShape(pir::Operation *op,
-//                                 pir::InferSymbolicShapeContext
-//                                 *infer_context) {
-//   // pass
-//   return true;
-// }
+  const std::vector<symbol::DimExpr> &out_shape = [&] {
+    std::vector<symbol::DimExpr> shape;
+    shape.emplace_back(symbol::DimExpr(1));
+    shape.emplace_back(unique_dim_sym);
+    return shape;
+  }();
+
+  infer_context->SetShapeOrDataForValue(
+      op->result(0),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs(out_shape)});
+
+  return true;
+}
+
+bool RecvV2OpInferSymbolicShape(pir::Operation *op,
+                                pir::InferSymbolicShapeContext *infer_context) {
+  const int ring_id = op->attribute<pir::Int32Attribute>("ring_id").data();
+  const bool dynamic_shape =
+      op->attribute<pir::BoolAttribute>("dynamic_shape").data();
+  const int peer = op->attribute<pir::Int32Attribute>("peer").data();
+
+  PADDLE_ENFORCE_GE(
+      peer,
+      0,
+      common::errors::InvalidArgument(
+          "The peer (%d) for recv_v2 op must be non-negative.", peer));
+
+  PADDLE_ENFORCE_GE(
+      ring_id,
+      0,
+      common::errors::InvalidArgument(
+          "The ring_id (%d) for recv_v2 op must be non-negative.", ring_id));
+
+  const std::vector<int> out_shape =
+      paddle::dialect::details::GetVectorAttr<int>(op, "out_shape");
+  if (!dynamic_shape) {
+    PADDLE_ENFORCE_GE(out_shape.size(),
+                      1,
+                      common::errors::InvalidArgument(
+                          "The size of the output shape must be greater than 0 "
+                          "but the value given is %d.",
+                          out_shape.size()));
+
+    std::vector<symbol::DimExpr> output_shape;
+    for (size_t i = 0; i < out_shape.size(); ++i) {
+      PADDLE_ENFORCE_GE(out_shape[i],
+                        1,
+                        common::errors::InvalidArgument(
+                            "The shape attribute for recv_v2 must be set "
+                            "explicitly, but the %dth element is %d which "
+                            "is less than 1. Or dynamic_shape should be set to "
+                            "True for both send_v2 and recv_v2.",
+                            i,
+                            out_shape[i]));
+      output_shape.push_back(symbol::DimExpr(out_shape[i]));
+    }
+
+    infer_context->SetShapeOrDataForValue(
+        op->result(0),
+        symbol::ShapeOrDataDimExprs{
+            symbol::TensorShapeOrDataDimExprs(output_shape)});
+  }
+
+  return true;
+}
+
+bool SeedOpInferSymbolicShape(pir::Operation *op,
+                              pir::InferSymbolicShapeContext *infer_context) {
+  std::vector<symbol::DimExpr> dims = {symbol::DimExpr(1)};
+
+  infer_context->SetShapeOrDataForValue(
+      op->result(0),
+      symbol::ShapeOrDataDimExprs{symbol::TensorShapeOrDataDimExprs(dims)});
+
+  return true;
+}
 
 bool TrilIndicesOpInferSymbolicShape(
     pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {

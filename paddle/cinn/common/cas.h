@@ -95,7 +95,7 @@ struct CasInterval {
 using cas_intervals_t = absl::flat_hash_map<std::string, CasInterval>;
 
 Expr AutoSimplify(
-    Expr u,
+    const Expr& u,
     const absl::flat_hash_map<std::string, CasInterval>& var_intervals = {});
 
 //! Simplify a CAS expression.

@@ -3022,7 +3022,7 @@ static void GenerateForwardDygraphFile(const std::string& forward_cc_path,
       "#include \"paddle/fluid/eager/api/utils/global_utils.h\"\n"
       "#include \"paddle/fluid/imperative/amp_utils.h\"\n"
       "#include \"paddle/fluid/eager/amp_auto_cast.h\"\n"
-      "#include \"paddle/fluid/platform/profiler/event_tracing.h\"\n\n";
+      "#include \"paddle/phi/core/platform/profiler/event_tracing.h\"\n\n";
 
   std::string forward_cc_include_str =
       paddle::string::Sprintf(FORWARD_INCLUDE_TEMPLATE);
@@ -3419,7 +3419,6 @@ std::map<std::string, std::set<std::string>> op_passing_outs_map = {
     {"assign_value", {"Out"}},
     {"split", {"Out"}},
     {"concat", {"Out"}},
-    {"fused_multi_transformer", {"CacheKVOut"}},
     {"fused_multi_transformer_int8", {"CacheKVOut"}},
     {"group_norm", {"Mean", "Variance"}},
     {"resnet_basic_block",
@@ -3458,14 +3457,6 @@ std::map<std::string, std::set<std::string>> op_ins_map = {
       "GateBias",
       "OutLinearWeight",
       "OutLinearBias"}},
-    {"fused_multi_transformer",
-     {"X",          "LnScale",       "LnBias",
-      "QKVW",       "QKVBias",       "CacheKV",
-      "PreCaches",  "RotaryPosEmb",  "BeamCacheOffset",
-      "TimeStep",   "SeqLengths",    "SrcMask",
-      "OutLinearW", "OutLinearBias", "FFNLnScale",
-      "FFNLnBias",  "FFN1Weight",    "FFN1Bias",
-      "FFN2Weight", "FFN2Bias"}},
     {"fused_multi_transformer_int8",
      {"X",           "LnScale",           "LnBias",       "QKVW",
       "QKVBias",     "CacheKV",           "TimeStep",     "SrcMask",
@@ -3767,7 +3758,6 @@ std::map<std::string, std::set<std::string>> op_outs_map = {
       "Beta1PowOut",
       "Beta2PowOut",
       "MasterParamOut"}},
-    {"fused_multi_transformer", {"CacheKVOut", "Out"}},
     {"fused_multi_transformer_int8", {"CacheKVOut", "Out"}},
     {"resnet_basic_block",
      {"Y",         "Conv1",     "SavedMean1", "SavedInvstd1", "Mean1Out",

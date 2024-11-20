@@ -15,6 +15,7 @@
 #include "paddle/phi/kernels/allclose_kernel.h"
 
 #include <cmath>
+#include <type_traits>
 
 #include "glog/logging.h"
 #include "paddle/phi/core/enforce.h"
@@ -56,24 +57,46 @@ void AllCloseKernel(const Context& dev_ctx,
   *out_data = true;
 
   auto num = x.numel();
-  for (int64_t i = 0; i < num; ++i) {
-    const T a = in_a[i], b = in_b[i];
-    bool val = false;
-    if (std::isnan(a) || std::isnan(b)) {
-      val = equal_nan && std::isnan(a) == std::isnan(b);
-    } else {
-      T left = (a > b ? a - b : b - a);
-      T right = atol_v + (b > 0 ? rtol_v * b : (-rtol_v) * b);
-      T diff = (left > right ? left - right : right - left);
-      val = a == b || left <= right || diff <= 1e-15;
+  if (std::is_same<T, int32_t>::value || std::is_same<T, int64_t>::value ||
+      std::is_same<T, bool>::value) {
+    for (int64_t i = 0; i < num; ++i) {
+      const double a = static_cast<double>(in_a[i]),
+                   b = static_cast<double>(in_b[i]);
+      double left = (a > b ? a - b : b - a);
+      double right = atol_v + (b > 0 ? rtol_v * b : (-rtol_v) * b);
+      double diff = (left > right ? left - right : right - left);
+      bool val = a == b || left <= right || diff <= 1e-15;
+      *out_data &= val;
     }
-    *out_data &= val;
+  } else {
+    for (int64_t i = 0; i < num; ++i) {
+      const T a = in_a[i], b = in_b[i];
+      bool val = false;
+      if (std::isnan(static_cast<double>(a)) ||
+          std::isnan(static_cast<double>(b))) {
+        val = equal_nan && std::isnan(static_cast<double>(a)) ==
+                               std::isnan(static_cast<double>(b));
+      } else {
+        T left = (a > b ? a - b : b - a);
+        T right = atol_v + (b > 0 ? rtol_v * b : (-rtol_v) * b);
+        T diff = (left > right ? left - right : right - left);
+        val = a == b || left <= right || diff <= 1e-15;
+      }
+      *out_data &= val;
+    }
   }
 }
 
 }  // namespace phi
 
-PD_REGISTER_KERNEL(
-    allclose, CPU, ALL_LAYOUT, phi::AllCloseKernel, float, double) {
+PD_REGISTER_KERNEL(allclose,
+                   CPU,
+                   ALL_LAYOUT,
+                   phi::AllCloseKernel,
+                   float,
+                   double,
+                   bool,
+                   int,
+                   int64_t) {
   kernel->OutputAt(0).SetDataType(phi::DataType::BOOL);
 }

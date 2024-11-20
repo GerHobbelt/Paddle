@@ -211,6 +211,36 @@ void MinimumGradKernel(const Context& dev_ctx,
 }
 
 template <typename T, typename Context>
+void RemainderGradKernel(const Context& dev_ctx,
+                         const DenseTensor& x,
+                         const DenseTensor& y,
+                         const DenseTensor& dout,
+                         DenseTensor* dx,
+                         DenseTensor* dy) {
+  const auto place = dev_ctx.GetPlace();
+  int axis = -1;
+  if (dx != nullptr && dy != nullptr) {
+    std::vector<const DenseTensor*> ins = {&x, &y, &dout};
+    GetGradXAndYOut<T>(dev_ctx,
+                       place,
+                       axis,
+                       ins,
+                       dout,
+                       dx,
+                       dy,
+                       funcs::RemainderGradXYFunctor<T, T>());
+  } else if (dx != nullptr && dy == nullptr) {
+    std::vector<const DenseTensor*> ins = {&x, &y, &dout};
+    GetGradXOrYOut<T>(
+        dev_ctx, place, axis, ins, dout, dx, funcs::RemainderGradXFunctor<T>());
+  } else if (dy != nullptr && dx == nullptr) {
+    std::vector<const DenseTensor*> ins = {&x, &y, &dout};
+    GetGradXOrYOut<T>(
+        dev_ctx, place, axis, ins, dout, dy, funcs::RemainderGradYFunctor<T>());
+  }
+}
+
+template <typename T, typename Context>
 void CopySignGradKernel(const Context& dev_ctx,
                         const DenseTensor& x,
                         const DenseTensor& y,
@@ -288,6 +318,17 @@ PD_REGISTER_KERNEL(minimum_grad,
                    GPU,
                    ALL_LAYOUT,
                    phi::MinimumGradKernel,
+                   float,
+                   double,
+                   int,
+                   int64_t,
+                   phi::dtype::float16,
+                   phi::dtype::bfloat16) {}
+
+PD_REGISTER_KERNEL(remainder_grad,
+                   GPU,
+                   ALL_LAYOUT,
+                   phi::RemainderGradKernel,
                    float,
                    double,
                    int,

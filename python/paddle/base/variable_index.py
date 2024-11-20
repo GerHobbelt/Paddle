@@ -438,7 +438,7 @@ def _setitem_static(x, indices, values):
         values(Tensor|Number|Ndarray): values to be assigned to the x.
     """
     from . import in_dynamic_or_pir_mode
-    from .framework import Variable, default_main_program, in_pir_mode
+    from .framework import Variable, in_pir_mode
 
     is_tensor_array = is_tensor_array_type(x)
 
@@ -557,7 +557,9 @@ def _setitem_static(x, indices, values):
                     _global_inplace_map,
                 )
 
-                _global_inplace_map.add(default_main_program(), x, output)
+                _global_inplace_map.add(
+                    paddle.static.default_main_program(), x, output
+                )
             return output
         else:
             helper = paddle.base.layer_helper.LayerHelper(
@@ -572,7 +574,7 @@ def _setitem_static(x, indices, values):
                 output = helper.create_variable_for_type_inference(
                     dtype=x.dtype
                 )
-            cur_block = default_main_program().current_block()
+            cur_block = paddle.static.default_main_program().current_block()
             cur_block.append_op(
                 type="set_value",
                 inputs=inputs,
@@ -680,7 +682,9 @@ def _setitem_static(x, indices, values):
                 _global_inplace_map,
             )
 
-            _global_inplace_map.add(default_main_program(), x, output)
+            _global_inplace_map.add(
+                paddle.static.default_main_program(), x, output
+            )
         else:
             helper = paddle.base.layer_helper.LayerHelper(
                 'set_value', **locals()
@@ -694,7 +698,7 @@ def _setitem_static(x, indices, values):
                 output = helper.create_variable_for_type_inference(
                     dtype=x.dtype
                 )
-            cur_block = default_main_program().current_block()
+            cur_block = paddle.static.default_main_program().current_block()
             cur_block.append_op(
                 type="set_value",
                 inputs=inputs,
@@ -792,9 +796,8 @@ def get_tensor_with_basic_indexing(
                     attrs['decrease_axis'],
                 )
         else:
-            from .framework import default_main_program
 
-            target_block = default_main_program().current_block()
+            target_block = paddle.static.default_main_program().current_block()
 
             slice_out_var = target_block.create_var(
                 name=unique_name.generate_with_ignorable_key(

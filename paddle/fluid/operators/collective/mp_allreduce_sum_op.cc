@@ -40,10 +40,6 @@ class MpAllReduceSumOpMaker : public framework::OpProtoAndCheckerMaker {
     AddAttr<int>("ring_id", "(int default 0) communication ring id.")
         .SetDefault(0);
 
-    AddAttr<bool>(
-        "use_calc_stream",
-        "(bool default false) eject CUDA operations to calculation stream.")
-        .SetDefault(false);
     AddComment(string::Sprintf(R"DOC(
 MpAllReduceSum Operator
 
@@ -82,13 +78,3 @@ REGISTER_OPERATOR(mp_allreduce_sum,
                   ops::MpAllReduceSumOpGradMaker<paddle::imperative::OpBase>,
                   ops::MpAllReduceSumOpMaker,
                   ops::MpAllReduceSumInplaceInferer);
-
-PD_REGISTER_STRUCT_KERNEL(mp_allreduce_sum,
-                          CPU,
-                          ALL_LAYOUT,
-                          ops::MpAllReduceSumCPUKernel,
-                          float,
-                          double,
-                          int,
-                          int64_t,
-                          phi::dtype::float16) {}

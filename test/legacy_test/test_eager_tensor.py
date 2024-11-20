@@ -13,9 +13,11 @@
 # limitations under the License.
 
 import copy
+import itertools
 import unittest
 
 import numpy as np
+from utils import dygraph_guard
 
 import paddle
 import paddle.nn.functional as F
@@ -540,6 +542,17 @@ class TestEagerTensor(unittest.TestCase):
                 np.array(copy_selected_rows.get_tensor()),
                 np.array(selected_rows.get_tensor()),
             )
+
+    def test_deep_copy_0size_tensor(self):
+        x = paddle.to_tensor(np.array([]))
+        x_copy = copy.deepcopy(x)
+        self.assertEqual(x_copy.stop_gradient, x.stop_gradient)
+        self.assertEqual(x_copy.persistable, x.persistable)
+        self.assertEqual(x_copy.type, x.type)
+        self.assertEqual(x_copy.dtype, x.dtype)
+        self.assertEqual(x_copy.shape, x.shape)
+        self.assertEqual(str(x_copy.place), str(x.place))
+        np.testing.assert_array_equal(x.numpy(), x_copy.numpy())
 
     # test some patched methods
     def test_set_value(self):
@@ -1187,6 +1200,159 @@ class TestEagerTensor(unittest.TestCase):
 
         self.assertEqual(a_str, expected)
 
+    def test___cuda_array_interface__(self):
+        """test Tensor.__cuda_array_interface__"""
+        with dygraph_guard():
+            # raise AttributeError for cpu tensor.
+            cpu_place = paddle.CPUPlace()
+            cpu_tensor = paddle.rand([3, 3]).to(device=cpu_place)
+            self.assertRaises(
+                AttributeError,
+                getattr,
+                cpu_tensor,
+                '__cuda_array_interface__',
+            )
+
+            if paddle.device.is_compiled_with_cuda():
+                gpu_place = paddle.CUDAPlace(0)
+                # raise AttributeError for sparse tensor.
+                sparse_tensor = (
+                    paddle.rand([3, 3]).to(device=gpu_place).to_sparse_coo(2)
+                )
+                self.assertRaises(
+                    AttributeError,
+                    getattr,
+                    sparse_tensor,
+                    '__cuda_array_interface__',
+                )
+
+                # strides should be None if contiguous
+                tensor = paddle.randn([3, 3]).to(device=gpu_place)
+                interface = tensor.__cuda_array_interface__
+                self.assertIsNone(interface["strides"])
+
+                # strides should be tuple of int if not contiguous
+                tensor = paddle.randn([10, 10]).to(device=gpu_place)
+                tensor = tensor[::2]
+                interface = tensor.__cuda_array_interface__
+                self.assertEqual(interface["strides"], (80, 4))
+
+                # data_ptr should be 0 if tensor is 0-size
+                tensor = paddle.randn([0, 10]).to(device=gpu_place)
+                interface = tensor.__cuda_array_interface__
+                self.assertEqual(interface["data"][0], 0)
+
+                # raise AttributeError for tensor that requires grad.
+                tensor = paddle.randn([3, 3]).to(device=gpu_place)
+                tensor.stop_gradient = False
+                self.assertRaises(
+                    RuntimeError,
+                    getattr,
+                    tensor,
+                    '__cuda_array_interface__',
+                )
+
+                # check supports of dtypes
+                for dtype in [
+                    paddle.complex64,
+                    paddle.complex128,
+                    paddle.bfloat16,
+                    paddle.float16,
+                    paddle.float32,
+                    paddle.float64,
+                    paddle.uint8,
+                    paddle.int8,
+                    paddle.int16,
+                    paddle.int32,
+                    paddle.int64,
+                    paddle.bool,
+                ]:
+                    tensor = (
+                        paddle.uniform([10, 10], min=-10.0, max=10.0)
+                        .to(device=gpu_place)
+                        .astype(dtype)
+                    )
+                    interface = tensor.__cuda_array_interface__
+                    self.assertIn("typestr", interface)
+                    self.assertIsInstance(interface["typestr"], str)
+
+                    self.assertIn("shape", interface)
+                    self.assertIsInstance(interface["shape"], tuple)
+
+                    self.assertIn("strides", interface)
+                    self.assertTrue(
+                        isinstance(interface["strides"], tuple)
+                        or interface["strides"] is None
+                    )
+
+                    self.assertIn("data", interface)
+                    self.assertIsInstance(interface["data"], tuple)
+                    self.assertEqual(len(interface["data"]), 2)
+
+                    self.assertIn("version", interface)
+                    self.assertEqual(interface["version"], 2)
+
+    def test_tensor__format__(self):
+        # test for floating point scalar
+        for width in range(0, 5):
+            paddle_scalar = paddle.randn([])
+            numpy_scalar = paddle_scalar.numpy()
+            format_spec = f".{width}f"
+            self.assertEqual(
+                paddle_scalar.__format__(format_spec),
+                numpy_scalar.__format__(format_spec),
+            )
+            format_spec = f".{width}e"
+            self.assertEqual(
+                paddle_scalar.__format__(format_spec),
+                numpy_scalar.__format__(format_spec),
+            )
+            format_spec = f".{width}g"
+            self.assertEqual(
+                paddle_scalar.__format__(format_spec),
+                numpy_scalar.__format__(format_spec),
+            )
+
+            format_spec = "{:.{}f}"
+            self.assertEqual(
+                format_spec.format(paddle_scalar, width),
+                format_spec.format(numpy_scalar, width),
+            )
+
+        # test for integer scalar
+        for width in range(0, 5):
+            paddle_scalar = paddle.uniform([], min=-100, max=100).to("int64")
+            numpy_scalar = paddle_scalar.numpy()
+            format_spec = f"{width}d"
+            self.assertEqual(
+                paddle_scalar.__format__(format_spec),
+                numpy_scalar.__format__(format_spec),
+            )
+            format_spec = f"{width}o"
+            self.assertEqual(
+                paddle_scalar.__format__(format_spec),
+                numpy_scalar.__format__(format_spec),
+            )
+            format_spec = f"{width}x"
+            self.assertEqual(
+                paddle_scalar.__format__(format_spec),
+                numpy_scalar.__format__(format_spec),
+            )
+
+            format_spec = "{:{}d}"
+            self.assertEqual(
+                format_spec.format(paddle_scalar, width),
+                format_spec.format(numpy_scalar, width),
+            )
+
+        # test for tensor that ndim > 0, expected to raise TypeError
+        paddle_scalar = paddle.uniform([1], min=-100, max=100)
+        self.assertRaises(TypeError, paddle_scalar.__format__, ".3f")
+
+        # test for float scalar but format_spec is 'd', expected to raise ValueError
+        paddle_scalar = paddle.uniform([], min=-100, max=100)
+        self.assertRaises(ValueError, paddle_scalar.__format__, "3d")
+
 
 class TestEagerTensorSetitem(unittest.TestCase):
     def func_setUp(self):
@@ -1425,13 +1591,13 @@ class TestEagerTensorTo(unittest.TestCase):
         self.np_x = np.random.random((3, 8, 8))
         self.x = paddle.to_tensor(self.np_x, dtype="float32")
 
-    def func_test_to_api(self):
+    def func_test_private_to_api(self):
         x_double = self.x._to(dtype="double")
         self.assertEqual(x_double.dtype, paddle.float64)
         np.testing.assert_allclose(self.np_x, x_double, rtol=1e-05)
 
         x_ = self.x._to()
-        self.assertEqual(self.x.dtype, paddle.float64)
+        self.assertEqual(self.x.dtype, paddle.float32)
         np.testing.assert_allclose(self.np_x, x_, rtol=1e-05)
 
         if paddle.base.is_compiled_with_cuda():
@@ -1470,9 +1636,62 @@ class TestEagerTensorTo(unittest.TestCase):
         self.assertRaises(ValueError, self.x._to, device=1)
         self.assertRaises(AssertionError, self.x._to, blocking=1)
 
+    def func_test_public_to_api(self):
+        # test for Tensor.to
+        dtypes = [
+            paddle.int32,
+            paddle.int64,
+            paddle.float32,
+            paddle.float64,
+            paddle.complex64,
+        ]
+        places = [paddle.CPUPlace()]
+        if paddle.base.is_compiled_with_cuda():
+            places.append(paddle.CUDAPlace(0))
+
+        for src_place, src_dtype in itertools.product(places, dtypes):
+            src = paddle.to_tensor(
+                [1.0, 2.0, 3.0], dtype=src_dtype, place=src_place
+            )
+            self.assertEqual(src.dtype, src_dtype)
+            self.assertEqual(str(src.place), str(src_place))
+            src_data_ptr = src.data_ptr()
+
+            for dst_place, dst_dtype in itertools.product(places, dtypes):
+                dst = src.to(dtype=dst_dtype, device=dst_place)
+                # test for non-inplace operation
+                self.assertEqual(src_data_ptr, src.data_ptr())
+
+                # test for correctness of Tensor.to
+                self.assertEqual(dst.dtype, dst_dtype)
+                self.assertEqual(str(dst.place), str(dst_place))
+                dst_data_ptr = dst.data_ptr()
+
+                if src_place == dst_place and src_dtype == dst_dtype:
+                    # just return self
+                    self.assertEqual(src_data_ptr, dst_data_ptr)
+                    self.assertEqual(src.dtype, dst.dtype)
+                    self.assertEqual(str(src.place), str(dst.place))
+                elif src_place != dst_place and src_dtype == dst_dtype:
+                    # creating new tensor from src
+                    self.assertNotEqual(src_data_ptr, dst_data_ptr)
+                    self.assertEqual(src.dtype, dst.dtype)
+                    self.assertNotEqual(str(src.place), str(dst.place))
+                elif src_place == dst_place and src_dtype != dst_dtype:
+                    # creating new tensor from src
+                    self.assertNotEqual(src_data_ptr, dst_data_ptr)
+                    self.assertNotEqual(src.dtype, dst.dtype)
+                    self.assertEqual(str(src.place), str(dst.place))
+                else:
+                    # creating new tensor from src
+                    self.assertNotEqual(src_data_ptr, dst_data_ptr)
+                    self.assertNotEqual(src.dtype, dst.dtype)
+                    self.assertNotEqual(str(src.place), str(dst.place))
+
     def test_to_api(self):
         self.func_setUp()
-        self.func_test_to_api()
+        self.func_test_private_to_api()
+        self.func_test_public_to_api()
 
 
 class TestEagerTensorInitEagerTensorFromTensorWithDevice(unittest.TestCase):
@@ -1532,6 +1751,19 @@ class TestEagerTensorGradNameValue(unittest.TestCase):
         b.backward()
         # Note, for new dygraph, there are no generated grad name, so we skip the name check.
         self.assertIsNotNone(a._grad_value())
+
+
+class TestDenseTensorToTensor(unittest.TestCase):
+    def test_same_place_data_ptr_consistency(self):
+        places = [paddle.CPUPlace()]
+        if paddle.is_compiled_with_cuda():
+            places.append(paddle.CUDAPlace(0))
+        for place in places:
+            x = paddle.rand([3, 5]).to(device=place)
+            x_dense = x.get_tensor()
+            y = paddle.to_tensor(x_dense, place=place)
+
+            self.assertEqual(x.data_ptr(), y.data_ptr())
 
 
 if __name__ == "__main__":

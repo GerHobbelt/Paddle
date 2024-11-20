@@ -21,8 +21,6 @@ void PartialAllGatherOpCPUKernel(const Context &dev_ctx,
                                  const DenseTensor &x,
                                  int nranks,
                                  int rank,
-                                 int ring_id,
-                                 bool use_calc_stream,
                                  DenseTensor *out) {
   PADDLE_THROW(common::errors::Unavailable(
       "Do not support partial_allgather for cpu kernel now."));

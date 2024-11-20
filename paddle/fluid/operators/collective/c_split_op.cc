@@ -26,11 +26,11 @@ class CSplitOp : public framework::OperatorWithKernel {
   void InferShape(framework::InferShapeContext* ctx) const override {
     PADDLE_ENFORCE_EQ(ctx->HasInput("X"),
                       true,
-                      phi::errors::InvalidArgument(
+                      common::errors::InvalidArgument(
                           "The input 'X' for c_split must be provided."));
     PADDLE_ENFORCE_EQ(ctx->HasOutput("Out"),
                       true,
-                      phi::errors::InvalidArgument(
+                      common::errors::InvalidArgument(
                           "The output 'Out' for c_split must be provided."));
     int nranks = ctx->Attrs().Get<int>("nranks");
     int rank = ctx->Attrs().Get<int>("rank");
@@ -103,10 +103,6 @@ class CSplitOpMaker : public framework::OpProtoAndCheckerMaker {
     AddAttr<int>("rank", "(int default 0) rank id.").SetDefault(0);
     AddAttr<int>("nranks", "(int default 1) number of ranks.").SetDefault(1);
     AddAttr<int>("ring_id", "(int default 0) ring id.").SetDefault(0);
-    AddAttr<bool>(
-        "use_calc_stream",
-        "(bool default false) eject CUDA operations to calculation stream.")
-        .SetDefault(false);
     AddAttr<bool>("use_model_parallel",
                   "(bool default false) use this op with model parallel.")
         .SetDefault(true);
