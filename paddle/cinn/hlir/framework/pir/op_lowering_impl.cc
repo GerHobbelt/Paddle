@@ -386,7 +386,6 @@ std::vector<ir::LoweredFunc> OpLowererImpl::PostProcess(
     // 4.Apply low level pass
     if (i != func_bodies.size() - 1) {
       func = optim::Optimize(func, target_, false);
-      optim::RearrangeLoadInstruction(&(func->body));
     } else {
       func = optim::Optimize(func, common::DefaultHostTarget(), false);
     }

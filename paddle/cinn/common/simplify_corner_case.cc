@@ -24,11 +24,11 @@ namespace cinn {
 namespace common {
 // S0 / (S1 * S2) * S1 * S2 + S4 % (S1 * S2) ==> S0
 // s.t. (S4 - S0) % (S1 * S2) == 0
-static std::pair<bool, ir::IndexExpr> DivMulAddModCornerCase(
-    const ir::IndexExpr& lhs, const ir::IndexExpr& rhs) {
+std::optional<ir::IndexExpr> DivMulAddModCornerCase(const ir::IndexExpr& lhs,
+                                                    const ir::IndexExpr& rhs) {
   auto lhsMul = lhs.As<ir::Mul>();
   auto rhsMod = rhs.As<ir::Mod>();
-  if (!lhsMul || !rhsMod) return std::make_pair(false, ir::IndexExpr());
+  if (!lhsMul || !rhsMod) return std::nullopt;
 
   // Why inner is lhs of Mul? beacuse we sort by expr length, and the length of
   // inner is longer in this case.
@@ -48,21 +48,21 @@ static std::pair<bool, ir::IndexExpr> DivMulAddModCornerCase(
 
   // Check if the inner expression is a div
   auto innerDiv = inner.As<ir::Div>();
-  if (!innerDiv) return std::make_pair(false, ir::IndexExpr());
+  if (!innerDiv) return std::nullopt;
   if (innerDiv->b().as_index() == rhsMod->b().as_index() &&
       innerDiv->b().as_index() == mult_outer &&
       ProveDivisible(rhsMod->a().as_index() - innerDiv->a().as_index(),
                      mult_outer)) {
-    return std::make_pair(true, innerDiv->a().as_index());
+    return innerDiv->a().as_index();
   }
-  return std::make_pair(false, ir::IndexExpr());
+  return std::nullopt;
 }
 
 // (S0 + S1 - (S0 + S1) % S2) % S2 == 0
 // (S0 + S1 - (S0 + S1) % S2) / S2 == (S0 + S1) / S2
-static std::pair<bool, ir::IndexExpr> SubModCornerCase(const ir::IndexExpr& lhs,
-                                                       const ir::IndexExpr& rhs,
-                                                       bool isDiv) {
+std::optional<ir::IndexExpr> SubModCornerCase(const ir::IndexExpr& lhs,
+                                              const ir::IndexExpr& rhs,
+                                              bool isDiv) {
   auto flatten = GetFlattenExprs<ir::Add>(lhs);
 
   for (int64_t i = 0, e = flatten.size(); i < e; ++i) {
@@ -73,7 +73,7 @@ static std::pair<bool, ir::IndexExpr> SubModCornerCase(const ir::IndexExpr& lhs,
     // Check if the negation term is a mod
     auto innerMod = beforeNegation.As<ir::Mod>();
     if (!innerMod) continue;
-    if (innerMod->b() != rhs) continue;
+    if (!ProveDivisible(innerMod->b(), rhs)) continue;
 
     // Check if the sum of all other terms is equal to the lhs of mod
     auto diff = ir::IndexExpr(0);
@@ -82,12 +82,24 @@ static std::pair<bool, ir::IndexExpr> SubModCornerCase(const ir::IndexExpr& lhs,
     diff = isNeg ? diff - innerMod->a().as_index()
                  : diff + innerMod->a().as_index();
     if (IsZero(diff)) {
-      if (!isDiv) return std::make_pair(true, ir::IndexExpr(0));
-      return isNeg ? std::make_pair(true, innerMod->a().as_index() / rhs)
-                   : std::make_pair(true, -(innerMod->a().as_index() / rhs));
+      if (!isDiv) return ir::IndexExpr(0);
+      return isNeg ? innerMod->a().as_index() / rhs
+                   : -(innerMod->a().as_index() / rhs);
     }
   }
-  return std::make_pair(false, ir::IndexExpr());
+  return std::nullopt;
+}
+
+// (S0 + S1) / (S0 + S1) == 1
+// (S0 + S1) % (S0 + S1) == 0
+std::optional<ir::IndexExpr> MultiArgsDivAndMod(const ir::IndexExpr& lhs,
+                                                const ir::IndexExpr& rhs,
+                                                bool isDiv) {
+  // TODO(liujinnan): Dealing with multiple relationships.
+  if (lhs == rhs) {
+    return isDiv ? ir::IndexExpr(1) : ir::IndexExpr(0);
+  }
+  return std::nullopt;
 }
 
 std::optional<ir::IndexExpr> SimplifyCornerCase(const ir::IndexExpr& expr) {
@@ -113,8 +125,8 @@ std::optional<ir::IndexExpr> SimplifyCornerCase(const ir::IndexExpr& expr) {
 
 std::optional<ir::IndexExpr> SimplifyAddCornerCase(const ir::IndexExpr& lhs,
                                                    const ir::IndexExpr& rhs) {
-  auto ret = DivMulAddModCornerCase(lhs, rhs);
-  if (ret.first) return ret.second;
+  if (DivMulAddModCornerCase(lhs, rhs).has_value())
+    return DivMulAddModCornerCase(lhs, rhs).value();
 
   // Add other corner cases
   return std::nullopt;
@@ -128,18 +140,21 @@ std::optional<ir::IndexExpr> SimplifyMulCornerCase(const ir::IndexExpr& lhs,
 
 std::optional<ir::IndexExpr> SimplifyDivCornerCase(const ir::IndexExpr& lhs,
                                                    const ir::IndexExpr& rhs) {
-  auto ret = SubModCornerCase(lhs, rhs, true);
-  if (ret.first) return ret.second;
+  if (SubModCornerCase(lhs, rhs, true).has_value())
+    return SubModCornerCase(lhs, rhs, true).value();
+  if (MultiArgsDivAndMod(lhs, rhs, true).has_value())
+    return MultiArgsDivAndMod(lhs, rhs, true).value();
   // Add other corner cases
   return std::nullopt;
 }
 
 std::optional<ir::IndexExpr> SimplifyModCornerCase(const ir::IndexExpr& lhs,
                                                    const ir::IndexExpr& rhs) {
-  auto ret = SubModCornerCase(lhs, rhs, false);
-  if (ret.first) return ret.second;
-
+  if (SubModCornerCase(lhs, rhs, false).has_value())
+    return SubModCornerCase(lhs, rhs, false).value();
   // Add other corner cases
+  if (MultiArgsDivAndMod(lhs, rhs, false).has_value())
+    return MultiArgsDivAndMod(lhs, rhs, false).value();
   return std::nullopt;
 }
 

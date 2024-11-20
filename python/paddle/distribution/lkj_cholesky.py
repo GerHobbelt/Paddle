@@ -316,7 +316,7 @@ class LKJCholesky(distribution.Distribution):
         r = r * z1m_cumprod_sqrt_shifted
         return r
 
-    def sample(self, sample_shape: Sequence[int] = ()) -> Tensor:
+    def sample(self, sample_shape: Sequence[int] = []) -> Tensor:
         """Generate a sample using the specified sampling method."""
         if not isinstance(sample_shape, Sequence):
             raise TypeError('sample shape must be Sequence object.')

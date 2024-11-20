@@ -66,6 +66,21 @@ std::ostream &operator<<(std::ostream &os, IrNodeTy type) {
   return os;
 }
 
+std::ostream &operator<<(std::ostream &os, StmtNodeTy type) {
+  switch (type) {
+#define __m(t__)                         \
+  case StmtNodeTy::t__:                  \
+    os << "<stmt node: " << #t__ << ">"; \
+    break;
+
+    NODETY_FORALL_STMT(__m)
+#undef __m
+    default:
+      PADDLE_THROW(
+          ::common::errors::InvalidArgument("unknown StmtNodeTy found"));
+  }
+}
+
 Expr Zero(const Type &type) {
   if (type.is_bfloat16()) return Expr(bfloat16(0.f));
   if (type.is_float16()) return Expr(float16(0.f));
@@ -249,8 +264,6 @@ bool Expr::is_var() const { return As<_Var_>(); }
 
 bool Expr::is_index() const {
   switch (node_type()) {
-    case ir::IrNodeTy::Cast:
-      [[fallthrough]];
     case ir::IrNodeTy::_Var_:
       [[fallthrough]];
     case ir::IrNodeTy::IntImm: {

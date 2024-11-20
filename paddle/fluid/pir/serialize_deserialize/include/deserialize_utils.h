@@ -266,6 +266,9 @@ pir::TypeAttribute deserializeAttrFromJson<pir::TypeAttribute, pir::Type>(
 
 pir::Attribute parseAttr(Json* attr_json) {
   std::string attr_name = attr_json->at(ID).template get<std::string>();
+  if (attr_name == NULL_TYPE) {
+    return pir::Attribute();
+  }
   pir::IrContext* ctx = pir::IrContext::Instance();
   std::pair<std::string, std::string> name = GetContentSplitByDot(attr_name);
 

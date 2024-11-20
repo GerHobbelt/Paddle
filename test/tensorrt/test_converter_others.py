@@ -86,6 +86,300 @@ class TestMulticlassNMS3Marker(TensorRTBaseTest):
         self.check_marker(expected_result=False)
 
 
+def set_value(
+    x, starts, ends, steps, axes, decrease_axes, none_axes, shape, values
+):
+    output = _C_ops.set_value(
+        x,
+        starts,
+        ends,
+        steps,
+        axes,
+        decrease_axes,
+        none_axes,
+        shape,
+        values,
+    )
+    return output
+
+
+def set_value_(
+    x, starts, ends, steps, axes, decrease_axes, none_axes, shape, values
+):
+    output = _C_ops.set_value_(
+        x,
+        starts,
+        ends,
+        steps,
+        axes,
+        decrease_axes,
+        none_axes,
+        shape,
+        values,
+    )
+    return output
+
+
+def set_value_with_tensor(
+    x, values, starts, ends, steps, axes, decrease_axes, none_axes, shape
+):
+    output = _C_ops.set_value_with_tensor(
+        x,
+        values,
+        starts,
+        ends,
+        steps,
+        axes,
+        decrease_axes,
+        none_axes,
+        shape,
+    )
+    return output
+
+
+def set_value_with_tensor_(
+    x, values, starts, ends, steps, axes, decrease_axes, none_axes, shape
+):
+    output = _C_ops.set_value_with_tensor_(
+        x,
+        values,
+        starts,
+        ends,
+        steps,
+        axes,
+        decrease_axes,
+        none_axes,
+        shape,
+    )
+    return output
+
+
+class TestSetValueTRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = set_value
+        self.api_args = {
+            "x": np.ones([10, 2]).astype(np.float32),
+            "starts": [0],
+            "ends": [1],
+            "steps": [1],
+            "axes": [1],
+            "decrease_axes": [],
+            "none_axes": [],
+            "shape": [],
+            "values": [10.0],
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [1, 2]}
+        self.max_shape = {"x": [20, 2]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
+# starts/ends/steps is not one element
+class TestSetValueMarkerCase1(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = set_value
+        self.api_args = {
+            "x": np.ones([10, 2]).astype(np.float32),
+            "starts": [0, 0],
+            "ends": [1, 1],
+            "steps": [1, 1],
+            "axes": [1],
+            "decrease_axes": [],
+            "none_axes": [],
+            "shape": [],
+            "values": [10.0],
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [1, 2]}
+        self.max_shape = {"x": [20, 2]}
+
+    def test_trt_result(self):
+        self.check_marker(expected_result=False)
+
+
+# decrease_axes has element
+class TestSetValueMarkerCase2(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = set_value
+        self.api_args = {
+            "x": np.ones([10, 2]).astype(np.float32),
+            "starts": [0],
+            "ends": [1],
+            "steps": [1],
+            "axes": [1],
+            "decrease_axes": [1],
+            "none_axes": [],
+            "shape": [],
+            "values": [10.0],
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [1, 2]}
+        self.max_shape = {"x": [20, 2]}
+
+    def test_trt_result(self):
+        self.check_marker(expected_result=False)
+
+
+# values has more than one element
+class TestSetValueMarkerCase3(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = set_value
+        self.api_args = {
+            "x": np.ones([10, 2]).astype(np.float32),
+            "starts": [0],
+            "ends": [1],
+            "steps": [1],
+            "axes": [1],
+            "decrease_axes": [],
+            "none_axes": [],
+            "shape": [],
+            "values": [10.0, 0],
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [1, 2]}
+        self.max_shape = {"x": [20, 2]}
+
+    def test_trt_result(self):
+        self.check_marker(expected_result=False)
+
+
+# values has int element
+class TestSetValueMarkerCase4(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = set_value
+        self.api_args = {
+            "x": np.ones([10, 2]).astype(np.float32),
+            "starts": [0],
+            "ends": [1],
+            "steps": [1],
+            "axes": [1],
+            "decrease_axes": [],
+            "none_axes": [],
+            "shape": [],
+            "values": [10],
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [1, 2]}
+        self.max_shape = {"x": [20, 2]}
+
+    def test_trt_result(self):
+        self.check_marker(expected_result=False)
+
+
+# starts is not constant value
+class TestSetValueMarkerCase5(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = set_value
+        self.api_args = {
+            "x": np.ones([10, 2]).astype(np.float32),
+            "starts": np.zeros([1]).astype(np.int32),
+            "ends": [1],
+            "steps": [1],
+            "axes": [1],
+            "decrease_axes": [],
+            "none_axes": [],
+            "shape": [],
+            "values": [10.0],
+        }
+        self.program_config = {"feed_list": ["x", "starts"]}
+        self.min_shape = {"x": [1, 2]}
+        self.max_shape = {"x": [20, 2]}
+
+    def test_trt_result(self):
+        self.check_marker(expected_result=False)
+
+
+class TestSetValue_TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = set_value_
+        self.api_args = {
+            "x": np.ones([10, 2]).astype(np.float32),
+            "starts": [0],
+            "ends": [1],
+            "steps": [1],
+            "axes": [1],
+            "decrease_axes": [],
+            "none_axes": [],
+            "shape": [],
+            "values": [10.0],
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [1, 2]}
+        self.max_shape = {"x": [20, 2]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
+class TestSetValueWithTensorTRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = set_value_with_tensor
+        self.api_args = {
+            "x": np.ones([2, 3, 3]).astype(np.float32),
+            "values": np.random.randn(2, 2, 3).astype(np.float32),
+            "starts": [0],
+            "ends": [2],
+            "steps": [1],
+            "axes": [1],
+            "decrease_axes": [],
+            "none_axes": [],
+            "shape": [],
+        }
+        self.program_config = {"feed_list": ["x", "values"]}
+        self.min_shape = {"x": [1, 3, 3], "values": [1, 2, 3]}
+        self.max_shape = {"x": [4, 3, 3], "values": [4, 2, 3]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
+# values is int type
+class TestSetValueWithTensorMarkerCase1(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = set_value_with_tensor
+        self.api_args = {
+            "x": np.ones([2, 3, 3]).astype(np.float32),
+            "values": np.random.randn(2, 2, 3).astype(np.int32),
+            "starts": [0],
+            "ends": [2],
+            "steps": [1],
+            "axes": [1],
+            "decrease_axes": [],
+            "none_axes": [],
+            "shape": [],
+        }
+        self.program_config = {"feed_list": ["x", "values"]}
+        self.min_shape = {"x": [1, 3, 3], "values": [1, 2, 3]}
+        self.max_shape = {"x": [4, 3, 3], "values": [4, 2, 3]}
+
+    def test_trt_result(self):
+        self.check_marker(expected_result=False)
+
+
+class TestSetValueWithTensor_TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = set_value_with_tensor_
+        self.api_args = {
+            "x": np.ones([2, 3, 3]).astype(np.float32),
+            "values": np.random.randn(2, 2, 3).astype(np.float32),
+            "starts": [0],
+            "ends": [2],
+            "steps": [1],
+            "axes": [1],
+            "decrease_axes": [],
+            "none_axes": [],
+            "shape": [],
+        }
+        self.program_config = {"feed_list": ["x", "values"]}
+        self.min_shape = {"x": [1, 3, 3], "values": [1, 2, 3]}
+        self.max_shape = {"x": [4, 3, 3], "values": [4, 2, 3]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
 class TestShareDataTRTPattern(TensorRTBaseTest):
     def setUp(self):
         self.python_api = api_wrapper

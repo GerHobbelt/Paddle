@@ -263,12 +263,12 @@ from .tensor.logic import (
     is_empty,
     is_tensor,
     isclose,
+    less,
+    less_,
     less_equal,
     less_equal_,
     less_than,
-    less_than as less,
     less_than_,
-    less_than_ as less_,
     logical_and,
     logical_and_,
     logical_not,
@@ -595,6 +595,7 @@ from .utils.dlpack import (
 # CINN has to set a flag to include a lib
 if is_compiled_with_cinn():
     import os
+    import sys
     from importlib import resources
 
     package_dir = os.path.dirname(os.path.abspath(__file__))
@@ -603,8 +604,17 @@ if is_compiled_with_cinn():
     if os.path.exists(cuh_file):
         os.environ.setdefault('runtime_include_dir', runtime_include_dir)
 
-    data_file_path = resources.files('paddle.cinn_config')
-    os.environ['CINN_CONFIG_PATH'] = str(data_file_path)
+    if sys.version_info >= (3, 9):
+
+        data_file_path = resources.files('paddle.cinn_config')
+        os.environ['CINN_CONFIG_PATH'] = str(data_file_path)
+    else:
+        import pkg_resources
+
+        data_file_path = pkg_resources.resource_filename(
+            'paddle.cinn_config', ''
+        )
+        os.environ['CINN_CONFIG_PATH'] = data_file_path
 
 if __is_metainfo_generated and is_compiled_with_cuda():
     import os

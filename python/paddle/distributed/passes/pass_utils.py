@@ -317,6 +317,12 @@ def set_pir_skip_gc_vars(num_micro_batches, job_types, sub_programs, jobs):
                 len(type_to_var_names[job_type]) == 0
             ), f"The {job_type} sub_program can't have skip_gc_vars. But it is {type_to_var_names[job_type]}."
 
+    no_need_buffer_vars = core.get_no_need_buffer_values(type_to_program)
+
+    for job_type, var_set in no_need_buffer_vars.items():
+        if len(var_set) > 0:
+            type_to_var_names[job_type] = type_to_var_names[job_type] - var_set
+
     for job in jobs:
         job_type = job.type()
         job.set_skip_gc_vars(type_to_var_names[job_type])

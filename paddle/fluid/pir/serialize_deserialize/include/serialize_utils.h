@@ -264,6 +264,11 @@ Json writeType(const pir::Type& type) {
 SERIALIZE_ATTR_TO_JSON(pir::TypeAttribute, writeType(attr.data()));
 
 Json writeAttr(const pir::Attribute& attr) {
+  if (!attr) {
+    Json attr_json = Json::object();
+    attr_json[ID] = NULL_TYPE;
+    return attr_json;
+  }
   if (attr.dialect().name() == pir::BuiltinDialect::name()) {
     VLOG(8) << "write BuiltinAttr ... ";
     return AttrTypeWriter::WriteBuiltInAttr(attr);

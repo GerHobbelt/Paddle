@@ -28,6 +28,9 @@
 #include "paddle/fluid/eager/api/manual/eager_manual/nodes/nodes.h"
 #include "paddle/phi/api/include/sparse_api.h"
 
+using egr::ConvertAllInputsToDistTensor;
+using egr::InputsContainDistTensor;
+
 COMMON_DECLARE_bool(check_nan_inf);
 
 paddle::small_vector<std::vector<paddle::Tensor>, egr::kSlotSmallVectorSize>
@@ -62,6 +65,14 @@ Conv2dGradNodeFinal::operator()(
   auto& groups = this->groups_;
   auto& dilations = this->dilations_;
   auto& data_format = this->data_format_;
+
+  // Convert All Inputs to DistTensor if Necessary
+  const phi::distributed::ProcessMesh* mesh = nullptr;
+  bool inputs_contain_dist_tensor = InputsContainDistTensor(&mesh, grad_out);
+  if (inputs_contain_dist_tensor) {
+    ConvertAllInputsToDistTensor(mesh, input, filter);
+  }
+
   // Prepare Grad function call
 
   const auto& out_metas = OutputMeta();
@@ -82,9 +93,9 @@ Conv2dGradNodeFinal::operator()(
           : &returns[1][0];
 
   // Set DistAttr of Out Tensor for semi-auto parallel
-  if (IsRunAutoParallel()) {
+  if (IsRunAutoParallel() || inputs_contain_dist_tensor) {
     egr::EagerUtils::SetGradOutputDistAttr(
-        out_metas, {0, 1}, api_output_0, api_output_1);
+        out_metas, {0, 1}, *mesh, api_output_0, api_output_1);
   }
 
   // Runtime check if we need next grad

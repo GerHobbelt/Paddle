@@ -22,6 +22,7 @@
 
 #include "paddle/cinn/backends/cuda_util.h"
 #include "paddle/cinn/common/cas.h"
+#include "paddle/cinn/common/integer_set.h"
 #include "paddle/cinn/common/ir_util.h"
 #include "paddle/cinn/ir/ir.h"
 #include "paddle/cinn/ir/ir_mutator.h"
@@ -43,27 +44,17 @@ PD_DECLARE_bool(cinn_longlong2int_for_integer);
 namespace cinn {
 namespace optim {
 
-/**
- * 1. Determine the grid and block dimensions.
- * It takes the domains like `[0, 20]` or `[0, min(20, M/2)]`, the domain should
- * have a integer right bound.
- *
- * 2. Replace the grid/thread iterators with something like `threadIdx.x`,
- * `threadIdx.y`.
- *
- * 3. Remove the forloops owning the gpu axis.
- *   1. if the extent is an IntImm, just remove this forloop.
- *   2. if the extent is a Min, replace the forloop with an IfThenElse, with
- * forloop's condition, new check will add (if the min of forloop is not zero).
- *
- * @param expr The expression to mutate.
- */
-void RemoveGpuForloopsAxis(ir::LoweredFunc fn) {
+void RemoveGpuForLoops(ir::LoweredFunc fn) {
   struct Mutator : public ir::IRMutator<Expr *> {
     using ir::IRMutator<>::Visit;
-    void operator()(ir::LoweredFunc fn) { Visit(fn.As<ir::_LoweredFunc_>()); }
+    void operator()(ir::Expr *expr) { ir::IRMutator<>::Visit(expr, expr); }
+
+    explicit Mutator(const ir::CudaAxisInfo &cuda_axis_info)
+        : cuda_axis_info_(cuda_axis_info) {}
 
    private:
+    ir::CudaAxisInfo cuda_axis_info_;
+
     void Visit(const ir::For *op, Expr *expr) override {
       switch (op->for_type()) {
         case ir::ForType::GPUBlock:
@@ -90,20 +81,42 @@ void RemoveGpuForloopsAxis(ir::LoweredFunc fn) {
     }
 
     bool NeedToReplaceForloopWithIfThenElse(const ir::For *n) const {
+      // If the loop doesn't start from 0.
+      if (n->min != cinn::common::make_const(0)) {
+        return true;
+      }
+
+      // Get dim_size from the functions's cuda_axis_info as pre-condition.
+      ir::Expr dim_size;
+      switch (n->bind_info().for_type) {
+        case ir::ForType::GPUThread:
+          dim_size = cuda_axis_info_.block_dim(n->bind_info().offset);
+          break;
+        case ir::ForType::GPUBlock:
+          dim_size = cuda_axis_info_.grid_dim(n->bind_info().offset);
+          break;
+      }
+      if (!dim_size.defined()) {
+        return true;
+      }
+
+      // If we can prove the loop's extent >= dim_size, then it's safe not
+      // to add the IfThenElse guard.
+      common::cas_intervals_t var_intervals =
+          common::CollectVarIntervalsOfExprs({n->extent, dim_size});
+      common::SymbolicExprAnalyzer analyzer{var_intervals};
+      std::optional<bool> proved_ge = analyzer.ProveGE(n->extent, dim_size);
+      if (proved_ge.value_or(false)) {
+        return false;
+      }
       return true;
     }
 
     void ReplaceForloopWithIfThenElse(Expr *expr) {
       auto *for_n = expr->As<ir::For>();
-      auto *poly_for_n = expr->As<ir::PolyFor>();
-      PADDLE_ENFORCE_EQ(for_n || poly_for_n,
-                        true,
-                        ::common::errors::InvalidArgument(
-                            "PolyFor is not exist, please check."));
 
       Expr condition;
-
-      auto condition_append = [&](Expr new_cond) {
+      const auto AppendCondition = [&](Expr new_cond) {
         if (condition.defined()) {
           condition = ir::And::Make(condition, new_cond);
         } else {
@@ -111,35 +124,21 @@ void RemoveGpuForloopsAxis(ir::LoweredFunc fn) {
         }
       };
 
-      if (for_n) {
-        // for(i, 2, 100);
-        //        ^
-        if (for_n->min != cinn::common::make_const(0)) {
-          condition_append(ir::GE::Make(for_n->loop_var, for_n->min));
-        }
-
-        // for(i, 2, min(M/2, 20)
-        //            ^
-        condition_append(ir::LT::Make(for_n->loop_var, for_n->extent));
-      } else {
-        if (poly_for_n->init != cinn::common::make_const(0)) {
-          condition_append(
-              ir::GE::Make(poly_for_n->iterator, poly_for_n->init));
-        }
-
-        condition_append(poly_for_n->condition);
+      // for(i, 2, 100);
+      //        ^
+      if (for_n->min != cinn::common::make_const(0)) {
+        AppendCondition(ir::GE::Make(for_n->loop_var, for_n->min));
       }
+      // for(i, 2, min(M/2, 20)
+      //            ^
+      AppendCondition(ir::LT::Make(for_n->loop_var, for_n->extent));
 
       PADDLE_ENFORCE_EQ(condition.defined(),
                         true,
                         ::common::errors::InvalidArgument(
                             "Condition is not defined, please check."));
 
-      VLOG(3) << "GPU replacing\n" << *expr;
-      VLOG(3) << "\nto\n";
-      auto if_n = ir::IfThenElse::Make(condition, for_n->body);
-      VLOG(3) << if_n;
-      *expr = if_n;
+      *expr = ir::IfThenElse::Make(condition, for_n->body);
     }
 
     void Visit(const ir::PolyFor *op, Expr *expr) override {
@@ -163,8 +162,8 @@ void RemoveGpuForloopsAxis(ir::LoweredFunc fn) {
     }
   };
 
-  Mutator mutator;
-  mutator(fn);
+  Mutator mutator(fn->cuda_axis_info);
+  mutator(&fn->body);
 }
 
 /**

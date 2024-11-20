@@ -155,6 +155,8 @@ NEED_GEN_STATIC_ONLY_APIS = [
     'qkv_unpack_mha',
     'hash',
     'beam_search_decode',
+    'nop',
+    'nop_',
 ]
 
 NO_NEED_GEN_STATIC_ONLY_APIS = [
@@ -241,8 +243,6 @@ NO_NEED_GEN_STATIC_ONLY_APIS = [
     'partial_recv',
     'partial_allgather',
     'partial_allgather_',
-    'nop',
-    'nop_',
     'gemm_epilogue',
     'push_dense',
     'legacy_matmul',

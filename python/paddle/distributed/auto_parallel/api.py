@@ -66,6 +66,7 @@ from paddle.io.dataloader.batch_sampler import (
 from paddle.optimizer import Optimizer
 
 from .moe_utils import (
+    _cal_local_shape,
     _dist_reshape,
     _NdMeshAlltoAll,
     _reshard_mesh_shape,
@@ -459,14 +460,24 @@ def moe_global_mesh_tensor(
     )
     process_ids = np.array(mesh.process_ids).reshape(mesh.shape)
     local_coord = np.where(process_ids == dist.get_rank())
-    local_tensor_idx = local_coord[local_mesh_dim][0]
-    # local_tensor_idx = mesh.process_ids.index(dist.get_rank())
+    # when rank is not in current mesh, local_coord is empty, so we should calculate the
+    # local tensor's shape.
+    if local_coord[0].size == 0:
+        local_tensor_idx = 0
+    else:
+        local_tensor_idx = local_coord[local_mesh_dim][0]
     local_tensor = local_tensor_list[local_tensor_idx]
 
     if paddle.in_dynamic_mode():
-        global_dims = _cal_global_shape(
-            local_tensor._local_value().shape, mesh, placements
-        )
+        if local_coord[0].size == 0:
+            local_tensor_shape = _cal_local_shape(
+                local_tensor_list[0].shape, local_mesh_list[0], local_placements
+            )
+        else:
+            local_tensor_shape = (
+                local_tensor_list[local_tensor_idx]._local_value().shape
+            )
+        global_dims = _cal_global_shape(local_tensor_shape, mesh, placements)
         resharded_local_tensor_list = []
         for i, tensor in enumerate(local_tensor_list):
             tensor.get_tensor()._unsafe_set_skip_check_mesh(True)
@@ -547,7 +558,9 @@ class _moe_sub_mesh_tensors(PyLayer):
             assert check_placements_equal(
                 global_placements, dist_tensor.placements
             ), f"the global_placements ({global_placements}) is not equal to dist_tensor's placements ({dist_tensor.placements})."
-            local_shape = dist_tensor._local_value().shape
+            local_shape = _cal_local_shape(
+                dist_tensor.shape, global_mesh, global_placements
+            )
             for idx, placement in enumerate(local_placements):
                 if placement.is_shard():
                     shard_dim = placement.get_dim()
@@ -579,7 +592,10 @@ class _moe_sub_mesh_tensors(PyLayer):
         mesh = ctx.global_mesh
         process_ids = np.array(mesh.process_ids).reshape(mesh.shape)
         local_coord = np.where(process_ids == dist.get_rank())
-        local_tensor_idx = local_coord[ctx.local_mesh_dim][0]
+        if local_coord[0].size == 0:
+            local_tensor_idx = 0
+        else:
+            local_tensor_idx = local_coord[ctx.local_mesh_dim][0]
         local_grad = grad_tensor[local_tensor_idx]
         global_tensor = paddle.Tensor(
             local_grad._local_value(),
@@ -976,7 +992,7 @@ def shard_layer(
         )
 
 
-def get_placement_with_sharding(param, sharding_mesh_axis):
+def get_placement_with_sharding(param, sharding_axis):
     shard_axis = -1
     for placement in param.placements:
         if isinstance(placement, dist.Shard):
@@ -995,7 +1011,7 @@ def get_placement_with_sharding(param, sharding_mesh_axis):
 
     new_placements = param.placements
     if placement_with_sharding is not None:
-        new_placements[sharding_mesh_axis] = placement_with_sharding
+        new_placements[sharding_axis] = placement_with_sharding
 
     return new_placements
 
@@ -1024,7 +1040,7 @@ class _ShardOptimizer(Optimizer):
         ):
             self._shard_clip = True
         self._shard_fn = shard_fn
-        self._sharding_mesh_axis = None
+        self._sharding_axis = None
         self._sharding_degree = None
         self.gradient_accumulation_steps = gradient_accumulation_steps
 
@@ -1032,7 +1048,7 @@ class _ShardOptimizer(Optimizer):
             self._shard_fn, (ShardingStage1, ShardingStage2, ShardingStage3)
         ):
             self._set_and_check_sharding_prop_from_param()
-            self._shard_fn._set_sharding_mesh_axis(self._sharding_mesh_axis)
+            self._shard_fn._set_sharding_axis(self._sharding_axis)
 
         # Invoke register hook for sharding stage 2 strategy
         if isinstance(self._shard_fn, ShardingStage2):
@@ -1050,12 +1066,12 @@ class _ShardOptimizer(Optimizer):
             len(self._shard_fn._mesh._shape) == 1
         ):
             self._sharding_degree = self._shard_fn._mesh.get_dim_size(0)
-            self._sharding_mesh_axis = 0
+            self._sharding_axis = 0
         elif (self._shard_fn._mesh is not None) and (
             'dp' in self._shard_fn._mesh.dim_names
         ):
             self._sharding_degree = self._shard_fn._mesh.get_dim_size('dp')
-            self._sharding_mesh_axis = 0
+            self._sharding_axis = 0
         else:
             param_list = self._inner_opt._parameter_list
             for param in param_list:
@@ -1074,7 +1090,7 @@ class _ShardOptimizer(Optimizer):
                         for idx, placement in enumerate(placements):
                             if isinstance(placement, dist.Replicate):
                                 self._sharding_degree = mesh.dim_size(idx)
-                                self._sharding_mesh_axis = idx
+                                self._sharding_axis = idx
                                 break
                     elif any(
                         isinstance(placement, dist.Partial)
@@ -1084,12 +1100,12 @@ class _ShardOptimizer(Optimizer):
                 else:
                     # check the placement on sharding axis is Replicate
                     assert isinstance(
-                        placements[self._sharding_mesh_axis], dist.Replicate
-                    ), "The placement on sharding_mesh_axis should be Replicate"
+                        placements[self._sharding_axis], dist.Replicate
+                    ), "The placement on sharding_axis should be Replicate"
 
                     # check the sharding degree since it has already been set
                     assert (
-                        mesh.dim_size(self._sharding_mesh_axis)
+                        mesh.dim_size(self._sharding_axis)
                         == self._sharding_degree
                     ), "The sharding degree of all parameters must be equal currently."
 
@@ -1100,9 +1116,9 @@ class _ShardOptimizer(Optimizer):
         if self._sharding_degree is None and all_params_replicated_on_each_mesh:
             global_mesh = fleet.auto.get_mesh()
             self._sharding_degree = global_mesh.get_dim_size(
-                self._shard_fn._shard_dims
+                self._shard_fn._sharding_mesh_dim
             )
-            self._sharding_mesh_axis = 0
+            self._sharding_axis = 0
 
         assert (
             self._sharding_degree is not None
@@ -1160,7 +1176,7 @@ class _ShardOptimizer(Optimizer):
             # in pir mode, reshard pass will automatically handle inplace case, so no extra work is required here.
             if not isinstance(param, pir.Value):
                 new_placement = param.placements
-                new_placement[self._sharding_mesh_axis] = dist.Replicate()
+                new_placement[self._sharding_axis] = dist.Replicate()
                 out_param = dist.reshard(
                     param, param.process_mesh, new_placement
                 )
@@ -1306,13 +1322,13 @@ class _ShardOptimizer(Optimizer):
 
 
 class _ShardingStageBase:
-    def __init__(self, mesh, shard_dims, shard_axis):
+    def __init__(self, mesh, sharding_mesh_dim):
         self._mesh = mesh
-        self._sharding_mesh_axis = shard_axis
-        self._shard_dims = shard_dims
+        self._sharding_axis = 0
+        self._sharding_mesh_dim = sharding_mesh_dim
 
-    def _set_sharding_mesh_axis(self, sharding_mesh_axis):
-        self._sharding_mesh_axis = sharding_mesh_axis
+    def _set_sharding_axis(self, sharding_axis):
+        self._sharding_axis = sharding_axis
 
     def shard_master_weight(
         self, param: Tensor, master_weight: Tensor
@@ -1324,7 +1340,7 @@ class _ShardingStageBase:
                     data_op.name() == "pd_op.data"
                 ), "The master weight must be a result of data op."
                 placements = get_placement_with_sharding(
-                    param, self._sharding_mesh_axis
+                    param, self._sharding_axis
                 )
                 dim_map, partial_status = to_dim_map(
                     placements, len(master_weight.shape)
@@ -1352,8 +1368,7 @@ class ShardingStage1(_ShardingStageBase):
 
     Args:
         mesh(None|paddle.distributed.ProcessMesh): If mesh is not None, the `ProcessMesh` object describes the Cartesian topology of the used processes for dense type parameters. Note: Currently, only one mesh configuration is supported for all dense parameters. If there is a need for multiple mesh configurations, please configure them yourself in the upper layer networking code.
-        shard_dims(None|int|str): The sharding dimension in the mesh.
-        shard_axis(int): The sharding axis of the weight tensor.
+        sharding_mesh_dim(None|int|str): The sharding dimension in the mesh.
 
     Examples:
         .. code-block:: python
@@ -1389,17 +1404,16 @@ class ShardingStage1(_ShardingStageBase):
     def __init__(
         self,
         mesh: ProcessMesh | None = None,
-        shard_dims: int | str | None = None,
-        shard_axis: int = 0,
+        sharding_mesh_dim: int | str | None = None,
     ) -> None:
-        super().__init__(mesh, shard_dims, shard_axis)
+        super().__init__(mesh, sharding_mesh_dim)
 
     def __call__(self, key: str, param: Tensor, accumulator: Tensor) -> Tensor:
         if param.is_dist():
             # Only deal with momentum in optimizer, beta should be replicated cross param's mesh
             if 'beta' not in key:
                 placements = get_placement_with_sharding(
-                    param, self._sharding_mesh_axis
+                    param, self._sharding_axis
                 )
             else:
                 placements = [
@@ -1446,8 +1460,7 @@ class ShardingStage2(_ShardingStageBase):
 
     Args:
         mesh(None|paddle.distributed.ProcessMesh): If mesh is not None, the `ProcessMesh` object describes the Cartesian topology of the used processes for dense type parameters. Note: Currently, only one mesh configuration is supported for all dense parameters. If there is a need for multiple mesh configurations, please configure them yourself in the upper layer networking code.
-        shard_dims(None|int|str): The sharding dimension name in the mesh.
-        shard_axis(int): The sharding axis of the weight tensor.
+        sharding_mesh_dim(None|int|str): The sharding dimension name in the mesh.
 
     Examples:
         .. code-block:: python
@@ -1483,17 +1496,16 @@ class ShardingStage2(_ShardingStageBase):
     def __init__(
         self,
         mesh: ProcessMesh | None = None,
-        shard_dims: int | str | None = None,
-        shard_axis: int = 0,
+        sharding_mesh_dim: int | str | None = None,
     ) -> None:
-        super().__init__(mesh, shard_dims, shard_axis)
+        super().__init__(mesh, sharding_mesh_dim)
 
     def __call__(self, key: str, param: Tensor, accumulator: Tensor) -> Tensor:
         if param.is_dist():
             # Only deal with momentum in optimizer, beta should be replicated cross param's mesh
             if 'beta' not in key:
                 placements = get_placement_with_sharding(
-                    param, self._sharding_mesh_axis
+                    param, self._sharding_axis
                 )
             else:
                 placements = [
@@ -1564,8 +1576,7 @@ class ShardingStage3(_ShardingStageBase):
 
     Args:
         mesh(None|paddle.distributed.ProcessMesh): If mesh is not None, the `ProcessMesh` object describes the Cartesian topology of the used processes for dense type parameters. Note: Currently, only one mesh configuration is supported for all dense parameters. If there is a need for multiple mesh configurations, please configure them yourself in the upper layer networking code.
-        shard_dims(None|int|str): The sharding dimension name in the mesh.
-        shard_axis(int): The sharding axis of the weight tensor.
+        sharding_mesh_dim(None|int|str): The sharding dimension name in the mesh.
 
     Examples:
         .. code-block:: python
@@ -1601,10 +1612,9 @@ class ShardingStage3(_ShardingStageBase):
     def __init__(
         self,
         mesh: ProcessMesh | None = None,
-        shard_dims: int | str | None = None,
-        shard_axis: int = 0,
+        sharding_mesh_dim: int | str | None = None,
     ) -> None:
-        super().__init__(mesh, shard_dims, shard_axis)
+        super().__init__(mesh, sharding_mesh_dim)
 
     def _shard_parameter(self, param):
         if param.is_dense() and self._mesh is not None:
@@ -1614,7 +1624,7 @@ class ShardingStage3(_ShardingStageBase):
             param._to_dist_(placements, self._mesh)
         if param.is_dist():
             new_placements = get_placement_with_sharding(
-                param, self._sharding_mesh_axis
+                param, self._sharding_axis
             )
             shard_param = dist.reshard(
                 param, param.process_mesh, new_placements
@@ -1625,8 +1635,8 @@ class ShardingStage3(_ShardingStageBase):
     def _unshard_parameter(self, param):
         if param.is_dist():
             new_placements = param.placements
-            if isinstance(new_placements[self._sharding_mesh_axis], dist.Shard):
-                new_placements[self._sharding_mesh_axis] = dist.Replicate()
+            if isinstance(new_placements[self._sharding_axis], dist.Shard):
+                new_placements[self._sharding_axis] = dist.Replicate()
 
             new_param = dist.reshard(param, param.process_mesh, new_placements)
             param.get_tensor()._share_data_with(new_param.get_tensor())
@@ -1641,7 +1651,7 @@ class ShardingStage3(_ShardingStageBase):
                     for placement in placements
                 ):
                     placements = get_placement_with_sharding(
-                        param, self._sharding_mesh_axis
+                        param, self._sharding_axis
                     )
 
             else:
@@ -2244,7 +2254,7 @@ class DistModel:
             )
             dist.fleet.init(is_collective=True)
 
-        if os.environ.get('FLAGS_enable_sharding_stage1_tensor_fusion', False):
+        if int(os.environ.get('FLAGS_enable_sharding_stage1_tensor_fusion', 0)):
             if isinstance(optimizer, _ShardOptimizer) and use_pir_api():
                 shard_fn = optimizer._shard_fn
                 optimizer = optimizer._inner_opt

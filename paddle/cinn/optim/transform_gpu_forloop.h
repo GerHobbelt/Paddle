@@ -33,29 +33,34 @@ void OptimizeExprGPU(Expr* expr);
 */
 
 /**
- * Remove the forloops of block and thread axis, add the kernel launch thread
- * dimension information to the outermost LoweredFunc.
+ * Remove the GPU block/thread-bound For loops, add IfThenElse guards if needed.
  *
- * For example, input the code:
- * \code
- * // Note here, the outermost expression should be a LoweredFunc
- * _LoweredFunc_:
- *   for (blockIdx.x, 0, 10)
- *     for (threadIdx.x, 0, 20)
- *       A(blockIdx.x, threadIdx.x)
- * \endcode
+ * It's usually safe to remove bound loops, because when launching the kernel,
+ * we are expected to choose dim sizes that match the extents of these loops.
+ * However, there are cases where we cannot simply remove a loop, but need to
+ * add an IfThenElse as guard:
+ *   1) if the loop doesn't start from 0.
+ *   2) if we cannot prove that the loop's extent is always equal to or greater
+ *      than the corresponding dim size.
  *
- * will be modified to
- * \code
- * _LoweredFunc_<blockDim:10, threadDim:20>:
- *   A(blockIdx.x, threadIdx.x)
- * \endcode
+ * Example 1:
+ *   # assume blockDim.x == 256
+ *   thread_bind[threadIdx.x] for (k, 0, 256):
+ *     ScheduleBlock(A)
+ * =>
+ *   ScheduleBlock(A)
  *
- * \note For that the dimensions of each threadIdx or blockIdx should be
- * constant, so this only takes For nodes, not \note PolyFor nodes is allowed to
- * be GPU related.
+ * Example 2:
+ *   # assume gridDim.x == 8
+ *   thread_bind[blockIdx.x] for (k, 2, min(S0, 8)):
+ *     ScheduleBlock(A)
+ * =>
+ *   if (blockIdx.x >= 2 && blockIdx.x < min(S0, 8)):
+ *     ScheduleBlock(A)
+ *
+ * @param fn The LoweredFunc to process.
  */
-void RemoveGpuForloopsAxis(ir::LoweredFunc fn);
+void RemoveGpuForLoops(ir::LoweredFunc fn);
 
 /**
  * Add __syncthreads() to shared memory producer.

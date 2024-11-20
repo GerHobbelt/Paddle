@@ -111,6 +111,7 @@ class TestLearningRate(unittest.TestCase):
             engine._optimizer._apply_optimize(
                 loss, startup_program=None, params_grads=params_grads
             )
+        apply_mix2dist_pass(dist_program)
         sgd_idx = 0
         ops = dist_program.global_block().ops
         for op in ops:

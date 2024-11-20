@@ -172,7 +172,7 @@ DistTensor::DistTensor(const std::shared_ptr<phi::DenseTensor>& local_value,
   } else {
     value_ = std::make_shared<DenseTensor>(
         std::make_shared<phi::Allocation>(nullptr, 0, local_value->place()),
-        phi::DenseTensorMeta(local_value->dtype(), global_dims_));
+        phi::DenseTensorMeta(local_value->dtype(), phi::make_ddim({0})));
   }
 }
 
@@ -197,6 +197,11 @@ DistTensor::DistTensor(const std::shared_ptr<phi::DenseTensor>& global_value,
     : global_dims_(global_value->dims()) {
   process_mesh_ = process_mesh;
   placements_ = placements;
+  // If the dims.size() == -1, the dims=[0] by default, which is not consistent
+  // and will cause ToTensorDistAttr‘s error.
+  if (global_dims_ == DDim()) {
+    global_dims_ = phi::make_ddim({});
+  }
   dist_attr_ = ToTensorDistAttr(process_mesh_, placements_, global_dims_);
 
   // If the current rank doesn't in process_mesh, we should create an

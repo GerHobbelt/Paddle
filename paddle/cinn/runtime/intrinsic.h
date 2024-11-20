@@ -129,6 +129,8 @@ static const char* debug_log_repr = "cinn_print_debug_string";
 
 static const char* cuda_sync_threads = "__syncthreads";
 
+static const char* cuda_builtin_assume = "__builtin_assume";
+
 static const char* parallel_launch = "cinn_backend_parallel_launch";
 
 }  // namespace intrinsic

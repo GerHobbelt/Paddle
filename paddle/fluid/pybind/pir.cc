@@ -1580,7 +1580,9 @@ void BindVectorType(py::module *m) {
 }
 void BindAttribute(py::module *m) {
   py::class_<Attribute> ir_attr(*m, "Attribute", py::module_local());
-  ir_attr.def("__eq__", &Attribute::operator==)
+  ir_attr.def(py::init<>())
+      .def("__bool__", [](Attribute &self) { return static_cast<bool>(self); })
+      .def("__eq__", &Attribute::operator==)
       .def("__str__",
            [](Attribute &self) {
              std::ostringstream print_stream;

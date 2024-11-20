@@ -62,6 +62,7 @@ from .dispatcher import Dispatcher
 from .function_graph import FunctionGraph
 from .instr_flag import (
     CALL_FUNCTION_EX_FLAG as CFE,
+    CONVERT_VALUE_FLAG as CV,
     FORMAT_VALUE_FLAG as FV,
     MAKE_FUNCTION_FLAG as MF,
     IntrinsicsUnaryFunctions,
@@ -1596,7 +1597,7 @@ class OpcodeExecutorBase:
         if isinstance(value, ConstantVariable):
             result = value.get_py_value()
             if convert_fn is not None:
-                result = getattr(result, convert_fn)(result)
+                result = getattr(result, convert_fn)()
 
             if not isinstance(result, str) or fmt_spec != "":
                 result = format(result, fmt_spec)
@@ -1606,6 +1607,54 @@ class OpcodeExecutorBase:
             )
         else:
             raise FallbackError(f"Do not support format {type(value)} now")
+
+    def CONVERT_VALUE(self, instr: Instruction):
+        value = self.stack.pop()
+        flag = instr.arg
+        if flag == CV.CV_STR:
+            convert_fn = "__str__"
+        elif flag == CV.CV_REPR:
+            convert_fn = "__repr__"
+        elif flag == CV.CV_ASCII:
+            convert_fn = "__ascii__"
+        else:
+            raise InnerError(
+                f"Unexpected conversion flag {flag} in {instr.opname}"
+            )
+        if isinstance(value, ConstantVariable):
+            result = value.get_py_value()
+            result = getattr(result, convert_fn)()
+            self.stack.push(
+                ConstantVariable(result, self._graph, DummyTracker([value]))
+            )
+        else:
+            raise FallbackError(
+                f"Do not support format {type(value)} now in {instr.opname} now"
+            )
+
+    def FORMAT_WITH_SPEC(self, instr: Instruction):
+        # unlike the former FORMAT_VALUE, the FORMAT_WITH_SPEC opcode has no parameter flag.
+        raw_spec = self.stack.pop()
+        value = self.stack.pop()
+        if isinstance(value, ConstantVariable) and isinstance(
+            raw_spec, ConstantVariable
+        ):
+            spec = raw_spec.get_py_value()
+            result = value.get_py_value()
+            result = format(result, spec)
+            if result is None:
+                raise InnerError(
+                    f"The format operation failed in {instr.opname}"
+                )
+            self.stack.push(
+                ConstantVariable(
+                    result, self._graph, DummyTracker([raw_spec, value])
+                )
+            )
+        else:
+            raise FallbackError(
+                f"Do not support format {type(value)} or {type(spec)} in {instr.opname} now"
+            )
 
     def FORMAT_SIMPLE(self, instr: Instruction):
         value = self.stack.pop()

@@ -172,13 +172,15 @@ bool TensorSortHelper(const paddle::Tensor &t1, const paddle::Tensor &t2) {
   return t1.name() < t2.name();
 }
 
-std::unique_ptr<::pir::Program> ApplyIrPass(::pir::Program *program,
-                                            phi::Place place) {
+std::unique_ptr<::pir::Program> ApplyIrPass(
+    ::pir::Program *program,
+    phi::Place place,
+    const std::set<std::string> &no_need_buffer_names) {
   auto ir_res = paddle::dialect::PdOpLowerToKernelPass(program, place);
 
   if (FLAGS_pir_apply_inplace_pass) {
     ::pir::PassManager pm(::pir::IrContext::Instance(), 3);
-    pm.AddPass(::pir::CreateInplacePass());
+    pm.AddPass(::pir::CreateInplacePass(no_need_buffer_names));
     pm.Run(ir_res.get());
 
     if (FLAGS_print_ir) {
@@ -314,7 +316,7 @@ std::unique_ptr<::pir::Program> ConstructForwardIrProgram(
   }
   auto program = TranslateLegacyProgramToProgram(local_program);
 
-  return ApplyIrPass(program.get(), place);
+  return ApplyIrPass(program.get(), place, {});
 }
 
 std::unique_ptr<::pir::Program> ConstructBackwardIrProgram(

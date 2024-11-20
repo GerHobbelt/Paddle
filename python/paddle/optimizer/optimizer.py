@@ -809,7 +809,11 @@ class Optimizer:
     def _create_param_lr(self, param_and_grad):
         # create learning rate tensor for every parameter
         param = param_and_grad[0]
-        if hasattr(param, 'optimize_attr') and param.optimize_attr is not None:
+        if (
+            hasattr(param, 'optimize_attr')
+            and param.optimize_attr is not None
+            and 'learning_rate' in param.optimize_attr
+        ):
             param_lr = param.optimize_attr['learning_rate']
             if isinstance(param_lr, (Variable, paddle.pir.Value)):
                 return param_lr

@@ -709,15 +709,19 @@ def get_symbolic_from_meta(meta: MetaInfo) -> SymbolicValue:
         value = SymbolicBool()
     elif meta.dtype in [
         paddle.int8,
+        paddle.uint8,
         paddle.int16,
         paddle.int32,
         paddle.int64,
     ]:
         value = SymbolicInt()
     elif meta.dtype in [
+        paddle.bfloat16,
         paddle.float16,
         paddle.float32,
         paddle.float64,
+        paddle.float8_e4m3fn,
+        paddle.float8_e5m2,
     ]:
         value = SymbolicFloat()
     else:

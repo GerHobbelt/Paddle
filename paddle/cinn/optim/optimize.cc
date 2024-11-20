@@ -20,6 +20,7 @@
 #include "paddle/cinn/optim/call_arg_list_to_pod_value.h"
 #include "paddle/cinn/optim/cast_bool_to_int8.h"
 #include "paddle/cinn/optim/eliminate_broadcast_in_forloop.h"
+#include "paddle/cinn/optim/eliminate_invariant_loop.h"
 #include "paddle/cinn/optim/extern_call_process.h"
 #include "paddle/cinn/optim/fold_cinn_call_arguments.h"
 #include "paddle/cinn/optim/if_fusion.h"
@@ -37,6 +38,7 @@
 #include "paddle/cinn/optim/transform_gpu_forloop.h"
 #include "paddle/cinn/optim/transform_polyfor_to_for.h"
 #include "paddle/cinn/optim/unroll_loops.h"
+#include "paddle/cinn/optim/vectorize_for_trans.h"
 #include "paddle/cinn/optim/vectorize_loops.h"
 
 namespace cinn {
@@ -57,6 +59,8 @@ ir::LoweredFunc Optimize(ir::LoweredFunc fn,
   ReplaceConstParamToInteger(&copied->body);
   // Simplify already contains CastSimplify
   Simplify(&copied->body);
+  EliminateInvariantLoop(&copied->body);
+  VLOG(4) << "After Optimize EliminateInvariantLoop:" << copied;
   ReplaceCrossThreadReduction(copied);
   VLOG(4) << "After Optimize ReplaceCrossThreadReduction:" << copied;
   ReplaceCrossBlockReduction(copied);
@@ -69,7 +73,7 @@ ir::LoweredFunc Optimize(ir::LoweredFunc fn,
 #ifdef CINN_WITH_CUDA
         ir::SetCudaAxisInfo(copied);
         if (remove_gpu_for_loops) {
-          RemoveGpuForloopsAxis(copied);
+          RemoveGpuForLoops(copied);
         }
         CudaSyncThreadsDropIfThenElse(copied);
     // CudaTransBufferWithDynamicShape(&copied);
@@ -79,7 +83,7 @@ ir::LoweredFunc Optimize(ir::LoweredFunc fn,
 #ifdef CINN_WITH_HIP
         ir::SetCudaAxisInfo(copied);
         if (remove_gpu_for_loops) {
-          RemoveGpuForloopsAxis(copied);
+          RemoveGpuForLoops(copied);
         }
         CudaSyncThreadsDropIfThenElse(copied);
     // CudaTransBufferWithDynamicShape(&copied);
@@ -100,6 +104,12 @@ ir::LoweredFunc Optimize(ir::LoweredFunc fn,
 
   IfFusion(&copied->body);
   VLOG(10) << "After Optimize IfFusion" << copied;
+
+  VectorizeForTrans(&copied->body);
+  VLOG(10) << "After Optimize vectorize" << copied;
+
+  Simplify(&copied->body);
+  VLOG(10) << "After Optimize Simplify" << copied;
 
   return copied;
 }

@@ -12,13 +12,27 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+
 import numpy as np
 import tensorrt as trt
 
+from paddle.base.log_helper import get_logger
 from paddle.tensorrt.converter_utils import (
+    add_1D_constant_layer,
+    fill_constant_layer,
+    get_shape_tensor_element,
     get_trt_plugin,
+    trt_concat,
+    trt_prod,
+    trt_shape,
+    trt_sum,
 )
 from paddle.tensorrt.register import converter_registry
+
+_logger = get_logger(
+    __name__, logging.INFO, fmt='%(asctime)s-%(levelname)s: %(message)s'
+)
 
 
 @converter_registry.register("pd_op.multiclass_nms3", trt_version="8.x")
@@ -136,6 +150,146 @@ def multiclass_nms3_converter(network, paddle_op, inputs):
         constant_layer.get_output(0),
         batch_nms_layer.get_output(0),
     )
+
+
+@converter_registry.register("pd_op.set_value", trt_version="8.x")
+@converter_registry.register("pd_op.set_value_", trt_version="8.x")
+@converter_registry.register("pd_op.set_value_with_tensor", trt_version="8.x")
+@converter_registry.register("pd_op.set_value_with_tensor_", trt_version="8.x")
+def set_value_converter(network, paddle_op, inputs):
+    x = inputs[0]
+    if (
+        paddle_op.name() == "pd_op.set_value"
+        or paddle_op.name() == "pd_op.set_value_"
+    ):
+        starts = (
+            paddle_op.operands()[1]
+            .source()
+            .get_defining_op()
+            .attrs()["value"][0]
+        )
+        ends = (
+            paddle_op.operands()[2]
+            .source()
+            .get_defining_op()
+            .attrs()["value"][0]
+        )
+        steps = (
+            paddle_op.operands()[3]
+            .source()
+            .get_defining_op()
+            .attrs()["value"][0]
+        )
+    else:
+        starts = (
+            paddle_op.operands()[2]
+            .source()
+            .get_defining_op()
+            .attrs()["value"][0]
+        )
+        ends = (
+            paddle_op.operands()[3]
+            .source()
+            .get_defining_op()
+            .attrs()["value"][0]
+        )
+        steps = (
+            paddle_op.operands()[4]
+            .source()
+            .get_defining_op()
+            .attrs()["value"][0]
+        )
+    axes = paddle_op.attrs()["axes"][0]
+
+    input_dims = x.shape
+
+    # check params and refill
+    if axes < 0:
+        axes += len(input_dims)
+
+    if ends < 0:
+        ends += input_dims[axes]
+
+    if ends >= input_dims[axes]:
+        ends = input_dims[axes]
+
+    if (
+        paddle_op.name() == "pd_op.set_value_with_tensor"
+        or paddle_op.name() == "pd_op.set_value_with_tensor_"
+    ):
+        updates = inputs[1]
+    else:
+        value = paddle_op.attrs().get("values")
+        input_shape_tensor = trt_shape(network, x)
+        vec_tensor = []
+        for i in range(len(input_dims)):
+            vec_tensor.append(
+                get_shape_tensor_element(network, input_shape_tensor, i)
+            )
+
+        axes_vec = [(ends - 1 - starts) / steps + 1]
+        vec_tensor[axes] = add_1D_constant_layer(network, axes_vec)
+        output_shape_tensor = trt_concat(network, vec_tensor, 0)
+        updates = fill_constant_layer(
+            network, output_shape_tensor, len(x.shape), value, x.dtype
+        )
+
+    _logger.info(f"Set_value_op: input's dimension is {input_dims}")
+
+    value_rank = len(updates.shape)
+    input_rank = len(x.shape)
+
+    op_name = paddle_op.name()
+    assert value_rank == input_rank, (
+        "value's rank is not equal to input's rank, "
+        'you should modify trt_config(a TensorRTConfig object) and set trt_config.disable_ops = ["{op_name}"] to forbid this op '
+    )
+    _logger.info(f"Set_value_op: updates tensor's simension is {updates.shape}")
+
+    # calculate dims
+    update_dims = updates.shape
+    assert (
+        update_dims[axes] > 0
+    ), "the update value shape[{axes}] must be greater than 0, but received {update_dims[axes]}"
+    assert (
+        input_dims[axes] > 0
+    ), "the input shape[{axes}] must be greater than 0, but received {input_dims[axes]}"
+    input_dims_rank = len(input_dims)
+    assert (
+        axes <= input_dims_rank
+    ), "The axes {axes} is larger than total axes {input_dims_rank}"
+    assert (
+        starts <= input_dims[axes]
+    ), "The start {starts} of dim {axes} is larger than origin shape {input_dims[axes]}"
+
+    target_update_dim = (ends - 1 - starts) / steps + 1
+    assert (
+        update_dims[axes] == target_update_dim
+    ), "the {axes}th axis of update dim error, should be {target_update_dim}, but we got {update_dims[axes]}"
+
+    shape_0 = [1] * len(update_dims)
+    shape_weight = trt.Weights(np.array([0], dtype=np.float32))
+    zero_tensor = network.add_constant(shape_0, shape_weight).get_output(0)
+
+    indice_tensor = trt_prod(network, zero_tensor, updates)
+    cast_layer = network.add_identity(indice_tensor)
+    cast_layer.set_output_type(0, trt.int32)
+    indice_tensor = cast_layer.get_output(0)
+
+    shape_1 = [1] * len(update_dims)
+    shape_1[axes] = update_dims[axes]
+    tmp_1 = []
+    for i in range(starts, ends, steps):
+        tmp_1.append(i)
+    shape_weight = trt.Weights(np.array(tmp_1, dtype=np.int32))
+    one_tensor = network.add_constant(shape_1, shape_weight).get_output(0)
+
+    indice_tensor = trt_sum(network, indice_tensor, one_tensor)
+    layer = network.add_scatter(
+        x, indice_tensor, updates, trt.ScatterMode.ELEMENT
+    )
+    layer.axis = axes
+    return layer.get_output(0)
 
 
 @converter_registry.register("pd_op.share_data", trt_version="8.x")

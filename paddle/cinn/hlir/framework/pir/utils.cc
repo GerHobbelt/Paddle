@@ -424,14 +424,52 @@ bool IsSupportInCinn(const ::pir::Operation& op) {
 }
 }  // namespace
 
+bool IsComplex(const ::pir::Operation& op) {
+  const auto& IsComplexType = [&](const ::pir::Value& value) -> bool {
+    if (!value) {
+      return false;
+    }
+    auto type = value.type();
+    if (!type) {
+      return false;
+    }
+    if (type.isa<paddle::dialect::DenseTensorType>()) {
+      auto dtype = type.dyn_cast<paddle::dialect::DenseTensorType>().dtype();
+      if (dtype && (dtype.isa<::pir::Complex64Type>() ||
+                    dtype.isa<::pir::Complex128Type>())) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  for (size_t i = 0; i < op.num_operands(); ++i) {
+    if (IsComplexType(op.operand_source(i))) {
+      return true;
+    }
+  }
+
+  for (size_t i = 0; i < op.num_results(); ++i) {
+    if (IsComplexType(op.result(i))) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 bool CompatibleInfo::IsDeniedForCinn(const ::pir::Operation& op) {
-  bool flag = IsDeniedInCinn(op) || CauseNewSymbolicShape(op);
+  bool flag = IsDeniedInCinn(op) || CauseNewSymbolicShape(op) || IsComplex(op);
   VLOG(4) << "CompatibleInfo::IsDeniedForCinn of " << op.name()
           << " is: " << flag;
   return flag;
 }
 
 bool CompatibleInfo::IsSupportForCinn(const ::pir::Operation& op) {
+  // check input or output
+  if (IsComplex(op)) {
+    return false;
+  }
   const bool not_builtin_op = op.dialect()->name() != "builtin";
   const bool flag = IsSupportInCinn(op) && not_builtin_op;
 

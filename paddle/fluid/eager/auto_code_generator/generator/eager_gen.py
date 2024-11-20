@@ -286,6 +286,8 @@ paddle::small_vector<std::vector<paddle::Tensor>, egr::kSlotSmallVectorSize> {}:
 
   // Collect GradIn Tensors, Attrs and Recovered TensorWrappers
 {}
+  // Convert All Inputs to DistTensor if Necessary
+{}
   // Prepare Grad function call
 {}
   // Runtime check if we need next grad
@@ -651,9 +653,23 @@ CREATE_RECOVER_OPTIONAL_VECTOR_TENSOR_TEMPLATE = """
 """
 
 SET_GRAD_OUT_DIST_ATTR_TEMPLATE = """
-  if (IsRunAutoParallel()) {{
-    egr::EagerUtils::SetGradOutputDistAttr(out_metas, {}, {});
+  if (IsRunAutoParallel() || inputs_contain_dist_tensor) {{
+    egr::EagerUtils::SetGradOutputDistAttr(out_metas, {}, *mesh, {});
   }}
+"""
+
+CONVERT_INPUT_TENSORS_TO_DIST_TENSOR_TEMPLATE = """
+  const phi::distributed::ProcessMesh* mesh = nullptr;
+  bool inputs_contain_dist_tensor = egr::InputsContainDistTensor(&mesh{grad_inputs_names});
+  if (inputs_contain_dist_tensor) {{
+    egr::ConvertAllInputsToDistTensor(mesh{wrapper_inputs_names});
+  }}
+"""
+
+INPUT_CONTAIN_DIST_TENSOR_TEMPLATE = """
+  const phi::distributed::ProcessMesh* mesh = nullptr;
+  bool inputs_contain_dist_tensor = false;
+  egr::InputsContainDistTensor(&mesh{grad_inputs_names});
 """
 
 CHECK_BACKWARD_INPLACE_TEMPLATE = """
@@ -2409,6 +2425,8 @@ class DygraphNodeGenerator(DygraphFunctionGeneratorBase):
         get_grad_in_args_list = []
         grad_api_out_args_list = []
         fwd_positions_list = []
+        grad_inputs_names = []
+        wrapper_inputs_names = []
 
         # Fill Grad Ins with Zero
         fill_zero_str = ""
@@ -2450,6 +2468,7 @@ class DygraphNodeGenerator(DygraphFunctionGeneratorBase):
         ) in backward_forward_inputs_map.items():
             tensor_wrapper_name = GetSavedName(name)
             transformed_tensor_name = self.TransformToNextGradName(name)
+            wrapper_inputs_names.append(transformed_tensor_name)
 
             is_optional = name in self.optional_inputs
             tensor_wrapper_recover_str = f"{indent}auto {transformed_tensor_name} = egr::EagerUtils::RecoverTensorWrapper(&this->{tensor_wrapper_name});"
@@ -2523,6 +2542,7 @@ class DygraphNodeGenerator(DygraphFunctionGeneratorBase):
             grad_api_position,
         ) in backward_grad_inputs_map.items():
             transformed_tensor_name = self.TransformToNextGradName(name)
+            grad_inputs_names.append(transformed_tensor_name)
 
             is_optional = name in self.optional_inputs
             if IsPlainTensorType(ttype):
@@ -2905,12 +2925,29 @@ if (paddle::prim::PrimCommonUtils::IsEagerPrimEnabled() && !need_skip) {{
 
         log_str = AFTER_LOG_PRINT_TEMPLATE.format(var_str)
 
+        if len(wrapper_inputs_names) > 0:
+            convert_input_to_dist_tensor_str = (
+                CONVERT_INPUT_TENSORS_TO_DIST_TENSOR_TEMPLATE.format(
+                    grad_inputs_names=", " + ", ".join(grad_inputs_names),
+                    wrapper_inputs_names=", " + ", ".join(wrapper_inputs_names),
+                )
+            )
+        elif not is_invoke_forward_api:
+            convert_input_to_dist_tensor_str = (
+                INPUT_CONTAIN_DIST_TENSOR_TEMPLATE.format(
+                    grad_inputs_names=", " + ", ".join(grad_inputs_names),
+                )
+            )
+        else:
+            convert_input_to_dist_tensor_str = ""
+
         self.node_definition_str = GRAD_FUNCTION_TEMPLATE.format(
             grad_node_name,
             self.backward_api_name,
             grad_node_name,
             fill_zero_str,
             get_grad_in_args_str,
+            convert_input_to_dist_tensor_str,
             grad_function_prepare_str,
             compute_require_next_grad_str,
             set_out_dist_attr_str,

@@ -49,11 +49,11 @@ ir::IndexExpr IterMapToExprNormalizer::ConvertIterSum(ir::IterSum* expr) {
 }
 
 ir::IndexExpr IterMapToExprNormalizer::ConvertIterSplit(ir::IterSplit* expr) {
-  // quick branch
-  if (IsZero(expr->scale) || IsOne(expr->extent)) return ir::IndexExpr(0);
   ir::IndexExpr source;
   ir::IterMark* mark = expr->source.As<ir::IterMark>();
   if (auto opt = mark->source.As<ir::_Var_>()) {
+    // For unit loop, we can't simplify loop_var to `0`.
+    if (IsOne(mark->extent)) return opt;
     source = opt;
   } else if (auto opt = mark->source.As<ir::IterSum>()) {
     source = ConvertIterSum(opt);
@@ -62,6 +62,11 @@ ir::IndexExpr IterMapToExprNormalizer::ConvertIterSplit(ir::IterSplit* expr) {
     Visit(&(mark->source), &(mark->source));
     source = mark->source;
   }
+
+  // quick branch
+  if (IsZero(expr->scale) || IsOne(expr->extent))
+    return ir::Zero(expr->extent.type());
+
   if (analyzer_.ProveEQ(expr->extent, mark->extent).value_or(false) &&
       IsOne(expr->lower_factor)) {
     return source * expr->scale;
@@ -642,8 +647,7 @@ void IterMapRewriter::AddToLhs(ir::IterSum* lhs,
   if (sign > 0) {
     lhs->args.push_back(rhs_expr);
   } else {
-    rhs_expr.As<ir::IterSplit>()->scale =
-        ir::Zero(rhs.scale.type()).as_index() - rhs.scale;
+    rhs_expr.As<ir::IterSplit>()->scale = -rhs.scale;
     lhs->args.push_back(rhs_expr);
   }
 }

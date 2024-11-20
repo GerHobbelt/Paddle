@@ -113,7 +113,7 @@ class TestOpRole(unittest.TestCase):
 
         apply_mix2dist_pass(main_program)
         apply_partition_pass(main_program)
-        ReshardPasses.apply_reshard_pass(main_program, [])
+        ReshardPasses.apply_reshard_pass(main_program)
 
         std_ops = [
             'pd_op.data:0',

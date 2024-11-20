@@ -1373,5 +1373,8 @@ struct RfCreater : public ir::IRMutator<> {
   int rf_axis_;
 };
 
+// Judge the `For` node of input `expr` hold dynamic `extent` or not.
+bool ContainDynamicShape(const Expr& expr);
+
 }  // namespace ir
 }  // namespace cinn

@@ -633,63 +633,6 @@ void BindTensor(pybind11::module &m) {  // NOLINT
                     >>> print(t.lod())
                     [[0, 2, 5]]
            )DOC")
-      // Set above comments of set_lod.
-      .def(
-          "recursive_sequence_lengths",
-          [](phi::DenseTensor &self) -> std::vector<std::vector<size_t>> {
-            // output the length-based lod info
-            LoD lod = phi::ConvertToLengthBasedLoD(self.lod());
-            std::vector<std::vector<size_t>> new_lod;
-            new_lod.reserve(lod.size());
-            std::copy(lod.begin(), lod.end(), std::back_inserter(new_lod));
-            return new_lod;
-          },
-          R"DOC(
-           Return the recursive sequence lengths corresponding to of the LodD
-           of the Tensor.
-
-           Returns:
-                list[list[int]]: The recursive sequence lengths.
-
-           Examples:
-                .. code-block:: python
-
-                    >>> import paddle
-                    >>> import numpy as np
-
-                    >>> t = paddle.framework.core.Tensor()
-                    >>> t.set(np.ndarray([5, 30]), paddle.CPUPlace())
-                    >>> t.set_recursive_sequence_lengths([[2, 3]])
-                    >>> print(t.recursive_sequence_lengths())
-                    [[2, 3]]
-           )DOC")
-      .def(
-          "has_valid_recursive_sequence_lengths",
-          [](phi::DenseTensor &self) -> bool {
-            // Check that the lod info is valid and match the outermost
-            // dimension of the Tensor data
-            return CheckLoD(
-                self.lod(),
-                static_cast<int>(common::vectorize(self.dims()).front()));
-          },
-          R"DOC(
-           Check whether the LoD of the Tensor is valid.
-
-           Returns:
-               bool: Whether the LoD is valid.
-
-           Examples:
-                .. code-block:: python
-
-                    >>> import paddle
-                    >>> import numpy as np
-
-                    >>> t = paddle.framework.core.Tensor()
-                    >>> t.set(np.ndarray([5, 30]), paddle.CPUPlace())
-                    >>> t.set_recursive_sequence_lengths([[2, 3]])
-                    >>> print(t.has_valid_recursive_sequence_lengths())
-                    True
-           )DOC")
       .def("_as_type",
            [](const phi::DenseTensor &self,
               paddle::framework::proto::VarType::Type type) {

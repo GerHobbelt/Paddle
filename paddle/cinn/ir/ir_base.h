@@ -116,6 +116,7 @@ class Dim;
 #define NODETY_CONTROL_OP_FOR_INTRINSIC(macro__) \
   macro__(IntrinsicOp)                      \
 
+// TODO(Hongqing-work): change NODETY_FORALL to NODETY_FORALL_EXPR
 #define NODETY_FORALL(__m)              \
   NODETY_PRIMITIVE_TYPE_FOR_EACH(__m)   \
   NODETY_OP_FOR_EACH(__m)               \
@@ -126,6 +127,16 @@ class Dim;
   NODETY_PRIMITIVE_TYPE_FOR_EACH(__m)                    \
   NODETY_OP_FOR_EACH(__m)                                \
   NODETY_CONTROL_OP_FOR_EACH(__m)
+
+#define NODETY_FORALL_STMT(macro__) \
+  macro__(Let)                      \
+  macro__(Store)                    \
+  macro__(Alloc)                    \
+  macro__(Free)                     \
+  macro__(IfThenElse)               \
+  macro__(For)                      \
+  macro__(Schedule)                 \
+  macro__(Evaluate)
 // clang-format on
 
 //! Define IrNodeTy
@@ -143,6 +154,13 @@ enum class IrNodeTy {
 #undef __m
 // @}
 
+//! Define StmtNodeTy
+// @{
+#define __m(x__) x__,
+enum class StmtNodeTy { kUnk = -1, NODETY_FORALL_STMT(__m) };
+#undef __m
+// @}
+
 //! String representations for IrNodeTy.
 // @{
 #define __m(x__) #x__,
@@ -152,6 +170,7 @@ const std::vector<std::string> kIrNodeTyReprs(
 // @}
 
 std::ostream& operator<<(std::ostream& os, IrNodeTy type);
+std::ostream& operator<<(std::ostream& os, StmtNodeTy type);
 
 struct Expr;
 

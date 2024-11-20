@@ -2281,10 +2281,6 @@ class OpTest(unittest.TestCase):
                     ),
                 )
 
-            def _compare_list(self, name, actual, expect):
-                """if expect is a tuple, we need to compare list."""
-                raise NotImplementedError("base class, not implement!")
-
             def compare_single_output_with_expect(self, name, expect):
                 actual, actual_np = self.find_actual_value(name)
                 # expect_np = expect[0] if isinstance(expect, tuple) else expect
@@ -2301,8 +2297,6 @@ class OpTest(unittest.TestCase):
                 )
                 # modify there for fp32 check
                 self._compare_numpy(name, actual_np, expect_np)
-                if isinstance(expect, (tuple, list)):
-                    self._compare_list(name, actual, expect)
 
             def compare_outputs_with_expects(self):
                 for out_name, out_dup in Operator.get_op_outputs(self.op_type):
@@ -2387,14 +2381,6 @@ class OpTest(unittest.TestCase):
                     actual_np = convert_uint16_to_float(actual_np)
                     atol = max(atol, 0.03)
                 return actual_np, expect_np
-
-            def _compare_list(self, name, actual, expect):
-                """if expect is a tuple, we need to compare list."""
-                self.op_test.assertListEqual(
-                    actual.recursive_sequence_lengths(),
-                    expect[1],
-                    "Output (" + name + ") has different lod at " + str(place),
-                )
 
         class DygraphChecker(Checker):
             def init(self):
@@ -2481,23 +2467,6 @@ class OpTest(unittest.TestCase):
                         imperative_expect.value().get_tensor()
                     )
                     return imperative_expect, imperative_expect_t
-
-            def _compare_list(self, name, actual, expect):
-                """if expect is a tuple, we need to compare list."""
-                with base.dygraph.base.guard(place=place):
-                    self.op_test.assertListEqual(
-                        actual.value()
-                        .get_tensor()
-                        .recursive_sequence_lengths(),
-                        expect[1],
-                        "Operator ("
-                        + self.op_type
-                        + ") Output ("
-                        + name
-                        + ") has different lod at "
-                        + str(place)
-                        + " in dygraph mode",
-                    )
 
             def _is_skip_name(self, name):
                 # if in final state and kernel signature don't have name, then skip it.
@@ -2622,23 +2591,6 @@ class OpTest(unittest.TestCase):
                     )
                     expect_t = np.array(expect)
                     return expect, expect_t
-
-            def _compare_list(self, name, actual, expect):
-                """if expect is a tuple, we need to compare list."""
-                with paddle.pir.core.program_guard(place=place):
-                    self.op_test.assertListEqual(
-                        actual.value()
-                        .get_tensor()
-                        .recursive_sequence_lengths(),
-                        expect[1],
-                        "Operator ("
-                        + self.op_type
-                        + ") Output ("
-                        + name
-                        + ") has different lod at "
-                        + str(place)
-                        + " in dygraph mode",
-                    )
 
             def _is_skip_name(self, name):
                 # if in final state and kernel signature don't have name, then skip it.

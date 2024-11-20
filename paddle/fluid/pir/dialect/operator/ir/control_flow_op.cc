@@ -19,6 +19,7 @@ paddle::dialect::IfOp, paddle::dialect::WhileOp, paddle::dialect::HasElementsOp,
 #else
 #include "paddle/fluid/pir/dialect/operator/ir/control_flow_op.h"
 
+#include "paddle/fluid/pir/dialect/distributed/ir/dist_tools.h"
 #include "paddle/fluid/pir/dialect/kernel/ir/kernel_type.h"
 #include "paddle/fluid/pir/dialect/operator/ir/api_builder.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_type.h"
@@ -61,6 +62,26 @@ void IfOp::Build(pir::Builder &builder,             // NOLINT
                  std::unique_ptr<pir::Block> &&true_block,
                  std::unique_ptr<pir::Block> &&false_block) {
   VLOG(4) << "Start build IfOp";
+#ifdef PADDLE_WITH_DISTRIBUTE
+  std::vector<pir::Value> values{cond};
+  if (true_block && !true_block->empty() &&
+      true_block->back().isa<pir::YieldOp>()) {
+    for (auto value : true_block->back().operands_source()) {
+      values.push_back(value);
+    }
+  }
+  if (false_block && !false_block->empty() &&
+      false_block->back().isa<pir::YieldOp>()) {
+    for (auto value : false_block->back().operands_source()) {
+      values.push_back(value);
+    }
+  }
+  ProcessMeshAttribute op_mesh;
+  if (HasDistInput(values, &op_mesh)) {
+    CvtAllInputsToDist(values, op_mesh);
+  }
+#endif
+
   if (true_block && !true_block->empty() &&
       true_block->back().isa<pir::YieldOp>()) {
     auto &op = true_block->back();

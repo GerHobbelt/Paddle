@@ -1450,4 +1450,76 @@ const std::vector<std::string> GetInstructionCallStack(
   }
   return vec_str;
 }
+
+bool IsNoNeedBuffer(pir::Operation* op, pir::Value value) {
+  paddle::dialect::OpYamlInfoInterface op_info_interface =
+      op->dyn_cast<paddle::dialect::OpYamlInfoInterface>();
+  std::unique_ptr<paddle::dialect::OpYamlInfoParser> info_parser(nullptr);
+  if (op_info_interface) {
+    info_parser = std::make_unique<paddle::dialect::OpYamlInfoParser>(
+        op_info_interface.GetOpInfo(), paddle::dialect::IsLegacyOp(op->name()));
+    auto& no_need_buffer_ids = info_parser->NoNeedBufferIds();
+    for (auto no_need_buffer_id : no_need_buffer_ids) {
+      if (value == op->operand_source(no_need_buffer_id)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+std::unordered_map<std::string, std::set<std::string>> GetNoNeedBufferValues(
+    const std::unordered_map<std::string, std::shared_ptr<::pir::Program>>&
+        type_to_ir_program) {
+  std::unordered_map<std::string, std::set<std::string>> shadow_output_values;
+  std::set<std::string> no_need_buffer_vars;
+
+  for (auto& pair : type_to_ir_program) {
+    std::shared_ptr<::pir::Program> program = pair.second;
+    // Iterate over the block_args and data_op output, and if all ops in all
+    // programs using this value are of the no_need_buffer type, then insert
+    // this value into the no_need_buffer set.
+    for (const auto& [name, value] : program->block()->kwargs()) {
+      for (auto it = value.use_begin(); it != value.use_end(); ++it) {
+        if (IsNoNeedBuffer(it->owner(), value)) {
+          no_need_buffer_vars.insert(name);
+        } else {
+          no_need_buffer_vars.erase(name);
+        }
+      }
+    }
+    for (auto& op : *program->block()) {
+      if (op.isa<paddle::dialect::DataOp>()) {
+        pir::Value value = op.result(0);
+        std::string name = op.attribute<pir::StrAttribute>("name").AsString();
+        for (auto it = value.use_begin(); it != value.use_end(); ++it) {
+          if (IsNoNeedBuffer(it->owner(), value)) {
+            no_need_buffer_vars.insert(name);
+          } else {
+            no_need_buffer_vars.erase(name);
+          }
+        }
+      }
+      // Retrieve the value names of all shadow_output_op for each program.
+      if (op.isa<pir::ShadowOutputOp>()) {
+        shadow_output_values[pair.first].insert(
+            op.attribute<pir::StrAttribute>("output_name").AsString());
+      }
+    }
+  }
+
+  for (auto& pair : shadow_output_values) {
+    std::set<std::string>& value_set = pair.second;
+    std::set<std::string> intersection;
+    std::set_intersection(value_set.begin(),
+                          value_set.end(),
+                          no_need_buffer_vars.begin(),
+                          no_need_buffer_vars.end(),
+                          std::inserter(intersection, intersection.begin()));
+    value_set = std::move(intersection);
+  }
+
+  return shadow_output_values;
+}
+
 }  // namespace paddle::framework::interpreter

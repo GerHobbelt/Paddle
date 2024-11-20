@@ -427,7 +427,7 @@ bool GaussianOpInferSymbolicShape(
 
 bool RandpermOpInferSymbolicShape(
     pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
-  int64_t n = op->attribute<pir::Int64Attribute>("n").data();
+  int n = op->attribute<pir::Int32Attribute>("n").data();
   std::vector<symbol::DimExpr> out_shape = {n};
   infer_context->SetShapeOrDataForValue(
       op->result(0),

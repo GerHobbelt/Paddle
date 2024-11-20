@@ -23,7 +23,8 @@ import paddle
 import paddle.distributed as dist
 from paddle import LazyGuard
 from paddle.distributed.auto_parallel.intermediate.parallelize import (
-    parallelize,
+    parallelize_model,
+    parallelize_optimizer,
 )
 from paddle.distributed.auto_parallel.intermediate.tensor_parallel import (
     ColWiseParallel,
@@ -262,7 +263,13 @@ class TestParallelAPI:
                         "lm_head": SequenceParallelEnd(),
                     }
             mp_config = {'parallelize_plan': plan}
-        layer, optimizer = parallelize(
+        layer = parallelize_model(
+            layer,
+            dp_config=dp_config,
+            mp_config=mp_config,
+            pp_config=pp_config,
+        )
+        optimizer = parallelize_optimizer(
             layer,
             optimizer,
             dp_config=dp_config,

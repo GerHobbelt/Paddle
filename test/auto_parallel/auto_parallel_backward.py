@@ -16,8 +16,8 @@ import paddle
 import paddle.distributed as dist
 
 
-class TestMultiplyGradAutoParallel:
-    def __init__(self):
+class TestBackwardAutoParallel:
+    def init_data(self):
         self.mesh = dist.ProcessMesh([0], dim_names=['d0'])
 
         self.x = paddle.to_tensor([[1]])
@@ -30,14 +30,22 @@ class TestMultiplyGradAutoParallel:
 
         self.z = dist.shard_tensor(self.z, self.mesh, [dist.Replicate()])
 
-    def run_test_case(self):
+    def run_test_case1(self):
+        self.init_data()
         o = self.x * self.y
         o = o + self.z
         o = o.sum()
+        o.backward()
 
+    def run_test_case2(self):
+        self.init_data()
+        o = self.x + self.y
+        o = o - self.z
+        o = o.sum()
         o.backward()
 
 
-# python -m paddle.distributed.launch --device=0 auto_parallel_multiply_grad.py
+# python -m paddle.distributed.launch --device=0 auto_parallel_backward.py
 if __name__ == '__main__':
-    TestMultiplyGradAutoParallel().run_test_case()
+    TestBackwardAutoParallel().run_test_case1()
+    TestBackwardAutoParallel().run_test_case2()

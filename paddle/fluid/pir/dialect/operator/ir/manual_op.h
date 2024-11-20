@@ -813,7 +813,8 @@ class TEST_API ArrayPopOp
                      paddle::dialect::InferMetaInterface,
                      paddle::dialect::GetKernelTypeForVarInterface,
                      InplaceTrait,
-                     paddle::dialect::ForwardOnlyTrait> {
+                     paddle::dialect::ForwardOnlyTrait,
+                     paddle::dialect::InferSymbolicShapeInterface> {
  public:
   using Op::Op;
   static const char *name() { return "pd_op.array_pop"; }
@@ -840,6 +841,7 @@ class TEST_API ArrayPopOp
   static std::vector<pir::Type> InferMeta(
       const std::vector<pir::Value> &input_values,
       pir::AttributeMap *p_attributes);
+  bool InferSymbolicShape(pir::InferSymbolicShapeContext *infer_context);
 };
 
 class ShareVarOp : public pir::Op<ShareVarOp, pir::SideEffectTrait> {

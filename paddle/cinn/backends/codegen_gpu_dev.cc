@@ -148,6 +148,7 @@ void CodeGenGpuDev::Visit(const ir::_LoweredFunc_ *op) {
 
   std::vector<Expr> new_body;
 
+  auto axis_range_assumptions = op->PrepareAxisRangeAssumptions();
   auto alloca_temp_buffers = op->PrepareAllocTempBufferExprs();
   auto temp_buffer_alias = GenerateBufferAliasExprs(op, op->temp_bufs);
   auto alis_var_exprs = op->CudaAliasVarExprs();
@@ -156,6 +157,7 @@ void CodeGenGpuDev::Visit(const ir::_LoweredFunc_ *op) {
 
 #define APPEND_TO_NEW_BODY(field__) \
   new_body.insert(std::end(new_body), std::begin(field__), std::end(field__));
+  APPEND_TO_NEW_BODY(axis_range_assumptions)
   APPEND_TO_NEW_BODY(alloca_temp_buffers)
   APPEND_TO_NEW_BODY(temp_buffer_alias)
   APPEND_TO_NEW_BODY(alis_var_exprs)

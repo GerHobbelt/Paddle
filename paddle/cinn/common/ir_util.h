@@ -22,6 +22,7 @@
 
 #include "paddle/cinn/common/bfloat16.h"
 #include "paddle/cinn/common/float16.h"
+#include "paddle/cinn/common/integer_set.h"
 #include "paddle/cinn/ir/ir.h"
 
 namespace cinn {
@@ -36,6 +37,9 @@ Expr PrecedingAxisToAbsOffset(const std::vector<Expr> &shape,
                               int preceding_n_axis);
 
 Expr CastIfNeeded(Expr body, Type type);
+
+ir::IndexExpr MergeMulMod(SymbolicExprAnalyzer *analyzer,
+                          const ir::IndexExpr &base);
 
 //! Substitute vars to other expressions.
 //! @param expr The expression to do modification.

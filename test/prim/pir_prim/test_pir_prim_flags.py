@@ -129,15 +129,7 @@ class TestPrimBackwardBlacklistFlags(unittest.TestCase):
 
     def test_prim_backward_blacklist(self):
         core._set_prim_all_enabled(True)
-        core._set_prim_backward_blacklist("tanh_grad", "exp_grad")
-        self.train()
-        core._set_prim_all_enabled(False)
-
-    def test_prim_backward_blacklist_flag(self):
-        core._set_prim_all_enabled(True)
-        paddle.set_flags(
-            {"FLAGS_prim_backward_blacklist": "tanh_grad;exp_grad"}
-        )
+        core._set_prim_backward_blacklist("pd_op.tanh_grad", "pd_op.exp_grad")
         self.train()
         core._set_prim_all_enabled(False)
 

@@ -19,6 +19,8 @@ gather_srcs(
   intrinsic_ops.cc
   layout.cc
   schedule_block_graph.cc
+  stmt.cc
+  stmt_visitors.cc
   dim.cc)
 
 add_subdirectory(ir_analyzer)

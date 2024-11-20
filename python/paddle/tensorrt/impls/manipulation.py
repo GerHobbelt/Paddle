@@ -32,7 +32,7 @@ from paddle.tensorrt.converter_utils import (
     trt_less,
     trt_max,
     trt_min,
-    trt_mul,
+    trt_prod,
     trt_reshape,
     trt_shape,
     trt_sub,
@@ -456,7 +456,7 @@ def split_with_num_converter(network, paddle_op, inputs):
     is_negative_axis = trt_less(network, axis_tensor, zero_tensor)
     is_negative_axis_int = cast_tensor(network, is_negative_axis, trt.int32)
 
-    axis_adjustment = trt_mul(
+    axis_adjustment = trt_prod(
         network, is_negative_axis_int, input_shape_size_tensor
     )
 
@@ -539,7 +539,7 @@ def split_converter(network, paddle_op, inputs):
     is_negative_axis = trt_less(network, axis_tensor, zero_tensor)
     is_negative_axis_int = cast_tensor(network, is_negative_axis, trt.int32)
 
-    axis_adjustment = trt_mul(
+    axis_adjustment = trt_prod(
         network, is_negative_axis_int, input_shape_size_tensor
     )
     axis_tensor = trt_sum(network, axis_tensor, axis_adjustment)
@@ -716,7 +716,7 @@ def tile_converter(network, paddle_op, inputs):
     start = [0] * max(rank, repeat_rank)
     stride = [1] * max(rank, repeat_rank)
     output_shape = [0] * max(rank, repeat_rank)
-    output_shape_tensor = trt_mul(
+    output_shape_tensor = trt_prod(
         network, input_shape_tensor, repeat_expand_tensor
     )
 
@@ -886,12 +886,12 @@ def roll_converter(network, paddle_op, inputs):
         # 1.sub_value mod input_axis
         input1 = trt_sub(network, input_axis, input_shift)
         tmp_div_res = trt_floor_div(network, input1, input_axis)
-        tmp_prod_res = trt_mul(network, tmp_div_res, input_axis)
+        tmp_prod_res = trt_prod(network, tmp_div_res, input_axis)
         start = trt_sub(network, input1, tmp_prod_res)
         # 2.avoid start less than 0,start mod input_axis
         start = trt_sum(network, start, input_axis)
         tmp_div_res1 = trt_floor_div(network, start, input_axis)
-        tmp_prod_res1 = trt_mul(network, tmp_div_res1, input_axis)
+        tmp_prod_res1 = trt_prod(network, tmp_div_res1, input_axis)
         start = trt_sub(network, start, tmp_prod_res1)
         zero_tensor = add_1D_constant_layer(network, 0)
         step = add_1D_constant_layer(network, 1)

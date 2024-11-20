@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from .parallel_base import parallelize_model_and_optimizer
+from .parallel_base import ParallelOptimizer, parallelize_model_and_optimizer
 from .pipeline_parallel import pipeline_parallel
 from .sharded_data_parallel import sharded_data_parallel
 from .tensor_parallel import tensor_parallel
@@ -43,3 +43,21 @@ def parallelize(
         )
     model, optimizer = parallelize_model_and_optimizer(model, optimizer)
     return model, optimizer
+
+
+def parallelize_model(
+    model, mesh=None, dp_config=None, mp_config=None, pp_config=None
+):
+    model, _ = parallelize(model, None, mesh, dp_config, mp_config, pp_config)
+    return model
+
+
+def parallelize_optimizer(
+    model, optimizer, mesh=None, dp_config=None, mp_config=None, pp_config=None
+):
+    level = None
+    if dp_config is not None:
+        level = dp_config.get('sharding_level')
+    optimizer = ParallelOptimizer(optimizer, level)
+    optimizer = optimizer.parallelize(model.parameters())
+    return optimizer

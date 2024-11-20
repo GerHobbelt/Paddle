@@ -1595,5 +1595,17 @@ std::vector<int> SampleTile(utils::LinearRandomEngine::StateType* rand_seed,
   tile.push_back(extent);
   return tile;
 }
+
+bool ContainDynamicShape(const Expr& expr) {
+  auto loop_nodes = ir::ir_utils::CollectIRNodesWithoutTensor(
+      expr, [&](const Expr* x) { return x->As<ir::For>(); });
+  for (const auto& n : loop_nodes) {
+    auto for_node = n.As<ir::For>();
+    // we only deal static index shape now.
+    if (!for_node->extent.is_index()) return true;
+    if (for_node->extent.as_index().IsDynamic()) return true;
+  }
+  return false;
+}
 }  // namespace ir
 }  // namespace cinn

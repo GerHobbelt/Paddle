@@ -1194,30 +1194,12 @@ struct EmbeddingOpTranscriber : public OpTranscriber {
       const auto& output_vars = op_desc.Output("Out");
       const auto& output_name = output_vars[0];
 
-      const dialect::DenseTensorType& out_tensor_type = std::get<1>(out_info);
       pir::Value& out_value = std::get<2>(out_info);
-
-      ValueInfo ids_info = GetTensorInfoByVarName(
-          op_desc, op_desc.Input("Ids", true), param_map, "Ids");
-      const std::vector<int64_t>& ids_shape = std::get<0>(ids_info);
-
-      ValueInfo w_info = GetTensorInfoByVarName(
-          op_desc, op_desc.Input("W", true), param_map, "W");
-
-      const std::vector<int64_t>& w_shape = std::get<0>(w_info);
-
-      std::vector<int64_t> out_new_shape(
-          ids_shape.begin(), ids_shape.begin() + ids_shape.size() - 1);
-      out_new_shape.insert(out_new_shape.end(), w_shape[1]);
-
       pir::Builder builder(ctx, operation->GetParent());
-      dialect::ReshapeOp reshape_op_out =
-          builder.Build<dialect::ReshapeOp>(out_value, out_new_shape);
-      pir::Value out_new = reshape_op_out.out();
-      VLOG(6) << "[" << op_desc.Type() << "] out_shape change from "
-              << out_tensor_type.dims() << " to "
-              << common::make_ddim(out_new_shape);
-
+      std::vector<int64_t> axis = {-2};
+      dialect::SqueezeOp squeeze_op_out =
+          builder.Build<dialect::SqueezeOp>(out_value, axis);
+      pir::Value out_new = squeeze_op_out.out();
       param_map->PushValue(output_name,
                            VariableDefiningInfo(out_new, false, -1));
     }

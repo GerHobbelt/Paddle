@@ -1029,6 +1029,8 @@ struct IndexExpr : public Expr {
 
   IndexExpr Normalize() const;
 
+  bool IsDynamic() const;
+
   // count the `IndeExpr` length, each node has weight 1, e.g.
   // S0,          length = 1
   // S0 + S1,     length = 3

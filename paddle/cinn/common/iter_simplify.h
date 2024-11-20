@@ -49,9 +49,11 @@ class IterMapRewriter : public ir::IRMutator<> {
                            const SymbolicExprAnalyzer& analyzer)
       : analyzer_(analyzer) {
     for (const auto& iter : input_iters) {
-      if (IsOne(iter->upper_bound)) {
-        var_map_[iter->name] = ir::IterSum::Make({}, iter->lower_bound);
-      } else if (IsZero(iter->lower_bound)) {
+      // Remove unit extent `for` ?
+      // if (IsOne(iter->upper_bound)) {
+      //   var_map_[iter->name] = ir::IterSum::Make({}, iter->lower_bound);
+      // }
+      if (IsZero(iter->lower_bound)) {
         auto tmp =
             ir::IterMark::Make(ir::IndexExpr(iter.ptr()), iter->upper_bound);
         auto mark = tmp.As<ir::IterMark>();

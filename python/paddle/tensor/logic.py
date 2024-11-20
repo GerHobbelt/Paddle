@@ -1013,6 +1013,49 @@ def less_than_(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         return _C_ops.less_than_(x, y)
 
 
+def less(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
+    """
+    Returns the truth value of :math:`x < y` elementwise, which is equivalent function to the overloaded operator `<`.
+
+    Note:
+        The output has no gradient.
+
+    Args:
+        x (Tensor): First input to compare which is N-D tensor. The input data type should be bool, bfloat16, float16, float32, float64, uint8, int8, int16, int32, int64.
+        y (Tensor): Second input to compare which is N-D tensor. The input data type should be bool, bfloat16, float16, float32, float64, uint8, int8, int16, int32, int64.
+        name (str|None, optional): The default value is None.  Normally there is no need for
+            user to set this property.  For more information, please refer to :ref:`api_guide_Name`.
+
+    Returns:
+        Tensor: The output shape is same as input :attr:`x`. The output data type is bool.
+
+    Examples:
+        .. code-block:: python
+
+            >>> import paddle
+            >>> x = paddle.to_tensor([1, 2, 3])
+            >>> y = paddle.to_tensor([1, 3, 2])
+            >>> result1 = paddle.less(x, y)
+            >>> print(result1)
+            Tensor(shape=[3], dtype=bool, place=Place(cpu), stop_gradient=True,
+            [False, True , False])
+    """
+
+    # Directly call less_than API
+    return less_than(x, y, name)
+
+
+@inplace_apis_in_dygraph_only
+def less_(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
+    r"""
+    Inplace version of ``less_`` API, the output Tensor will be inplaced with input ``x``.
+    Please refer to :ref:`api_paddle_less`.
+    """
+
+    # Directly call less_than_ API
+    return less_than_(x, y, name)
+
+
 def not_equal(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
     """
     Returns the truth value of :math:`x != y` elementwise, which is equivalent function to the overloaded operator `!=`.

@@ -74,7 +74,9 @@ class TestSemiAutoParallelShardingStage1:
         batch = dist.shard_tensor(batch, self._mesh, [dist.Shard(0)])
         # shard optimizer with stage 1 fn
         opt = paddle.optimizer.AdamW(parameters=linear.parameters())
-        opt = dist.shard_optimizer(opt, dist.ShardingStage1(shard_dims="dp"))
+        opt = dist.shard_optimizer(
+            opt, dist.ShardingStage1(sharding_mesh_dim="dp")
+        )
         for _ in range(5):
             loss = linear(batch)
             loss.backward()
@@ -106,6 +108,31 @@ class TestSemiAutoParallelShardingStage1:
             for batch_id, (image, label) in enumerate(dist_loader()):
                 loss = dist_model(image, label)
 
+    def test_sharding_stage_1_overlap_to_static(self):
+        paddle.distributed.auto_parallel.set_mesh(self._mesh)
+        data_loader = create_data_loader()
+        layer = DemoNet(self._mesh, "sharding_demonet")
+        opt = paddle.optimizer.SGD(
+            learning_rate=0.1, parameters=layer.parameters()
+        )
+        opt = dist.shard_optimizer(opt, dist.ShardingStage1(self._mesh))
+        loss_fn = nn.MSELoss()
+
+        dist_loader = dist.shard_dataloader(
+            dataloader=data_loader,
+            meshes=[self._mesh],
+            shard_dims=0,
+        )
+        strategy = dist.Strategy()
+        strategy.sharding.enable = True
+        strategy.sharding.enable_overlap = True
+        dist_model = dist.to_static(layer, dist_loader, loss_fn, opt, strategy)
+
+        dist_model.train()
+        for epoch in range(2):
+            for batch_id, (image, label) in enumerate(dist_loader()):
+                loss = dist_model(image, label)
+
     def run_test_case(self):
         if self._backend == "cpu":
             paddle.set_device("cpu")
@@ -118,6 +145,7 @@ class TestSemiAutoParallelShardingStage1:
         self.test_pure_sharding_stage_1()
         self.test_sharding_stage_1_to_static()
         self.test_pure_sharding_multi_mesh_stage_1()
+        self.test_sharding_stage_1_overlap_to_static()
 
 
 if __name__ == '__main__':

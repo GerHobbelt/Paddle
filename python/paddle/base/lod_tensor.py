@@ -102,9 +102,6 @@ def create_lod_tensor(data, recursive_seq_lens, place):
         tensor = core.DenseTensor()
         tensor.set(data, place)
         tensor.set_recursive_sequence_lengths(recursive_seq_lens)
-        assert (
-            tensor.has_valid_recursive_sequence_lengths()
-        ), "the provided lod info is invalid"
         return tensor
     else:
         raise TypeError(

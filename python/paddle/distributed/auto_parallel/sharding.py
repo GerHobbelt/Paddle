@@ -27,9 +27,13 @@ from paddle.distributed.auto_parallel.static.process_group import (
 from paddle.distributed.auto_parallel.static.reshard_funcs.nd_mesh_reshard_func import (
     get_1D_sub_process_mesh,
 )
+from paddle.distributed.fleet.meta_optimizers.common import OpRole
 from paddle.distributed.fleet.utils.tensor_fusion_helper import (
     align,
     get_current_device_type,
+)
+from paddle.distributed.passes.pass_utils import (
+    AutoParallelStreamType,
 )
 from paddle.framework import (
     _current_expected_place_ as _get_device,
@@ -102,8 +106,8 @@ class ShardingOptimizerStage1(Optimizer):
         else:
             self.pp_meshes.add(mesh)
 
-        self._sharding_mesh_axis = mesh._dim_names.index("dp")
-        self._sharding_degree = mesh._shape[self._sharding_mesh_axis]
+        self._sharding_axis = mesh._dim_names.index("dp")
+        self._sharding_degree = mesh._shape[self._sharding_axis]
         self._mp_mesh_axis = -1
         self._mp_degree = 1
         if "mp" in mesh._dim_names:
@@ -121,12 +125,17 @@ class ShardingOptimizerStage1(Optimizer):
         self._place.set_place(place)
 
         comm_buffer_size_MB = self._strategy.sharding.comm_buffer_size_MB
+        if comm_buffer_size_MB < 0:
+            comm_buffer_size_MB = 256
+
         parameters_dict = {}
         grads_dict = {}
         has_dist_param = False
         has_not_dist_param = False
-
+        new_params_grads = []
         for param, grad in params_grads:
+            if grad is None:
+                continue
             param_dist_attr = param.dist_attr()
             grad_dist_attr = grad.dist_attr()
             assert (
@@ -138,9 +147,6 @@ class ShardingOptimizerStage1(Optimizer):
             assert (
                 param_dist_attr.process_mesh == grad_dist_attr.process_mesh
             ), f"Parameter and grad should have same process_mesh. but received name:{param.name}, parameter:{param}, grad: {grad}."
-            assert (
-                self._sharding_mesh_axis in grad_dist_attr.partial_dims
-            ), f"gradient should partial in sharding mesh axis. but received parameter name:{param.name}, sharding_mesh_axis:{self._sharding_mesh_axis}, grad: {grad}."
 
             assert (
                 param_dist_attr.process_mesh in self.pp_meshes
@@ -148,7 +154,7 @@ class ShardingOptimizerStage1(Optimizer):
 
             if dist.get_rank() in param_dist_attr.process_mesh.process_ids:
                 sub_mesh = get_1D_sub_process_mesh(
-                    param_dist_attr.process_mesh, self._sharding_mesh_axis
+                    param_dist_attr.process_mesh, self._sharding_axis
                 )
                 assert (
                     sorted(sub_mesh.process_ids) == self._sharding_group.ranks
@@ -175,6 +181,19 @@ class ShardingOptimizerStage1(Optimizer):
                 param._local_shape == grad._local_shape
             ), f"Parameter and grad should have same local shape. but received name:{param.name}, parameter:{param}, grad: {grad}."
 
+            if self._sharding_axis not in grad_dist_attr.partial_dims:
+                new_params_grads.append((param, grad))
+                if param.optimize_attr is None:
+                    param.optimize_attr = {'no_fusion': True}
+                else:
+                    param.optimize_attr["no_fusion"] = True
+                continue
+            else:
+                if param.optimize_attr is None:
+                    param.optimize_attr = {'no_fusion': False}
+                else:
+                    param.optimize_attr["no_fusion"] = False
+
             if (
                 self._mp_degree > 1
                 and self._mp_mesh_axis in param_dist_attr.dims_mapping
@@ -195,7 +214,6 @@ class ShardingOptimizerStage1(Optimizer):
         last_op = target_block.ops[-1]
 
         group_size = comm_buffer_size_MB * 1024 * 1024
-        new_params_grads = []
         for mesh, parameters in parameters_dict.items():
             grads = grads_dict[mesh]
             var_groups = OrderedDict()
@@ -212,6 +230,9 @@ class ShardingOptimizerStage1(Optimizer):
                     )
                     group_param_list.append(parameters[index])
                     group_grad_list.append(grads[index])
+
+                if self._strategy.sharding.enable_overlap:
+                    self._reduce_scatter_overlap(group_grad_list, target_block)
 
                 slice_param_dict, main_shard_fused_param, main_fused_param = (
                     self._fuse_group_param(group_param_list)
@@ -297,7 +318,10 @@ class ShardingOptimizerStage1(Optimizer):
                             * align_size
                             // core.size_of_dtype(dtype)
                         )
-                pir.reset_insertion_point_to_end()
+
+                if not self._strategy.sharding.enable_overlap:
+                    pir.reset_insertion_point_to_end()
+
                 shard_size = fused_grad._local_shape[0] // self._sharding_degree
                 rank = self._sharding_group.ranks.index(dist.get_rank())
                 rank_begin = rank * shard_size
@@ -310,11 +334,23 @@ class ShardingOptimizerStage1(Optimizer):
                     fused_grad, self._sharding_group.id, self._sharding_degree
                 )
 
+                if self._strategy.sharding.enable_overlap:
+                    shard_fused_grad.get_defining_op().set_execution_stream(
+                        AutoParallelStreamType.SHARDING_STREAM.value
+                    )
+                pir.reset_insertion_point_to_end()
+
                 paddle._C_ops.share_var(
                     [view_shard_fused_grad, shard_fused_grad]
                 )
+
+                slice_param_list = []
+                for slice_param, param_info in slice_param_dict.items():
+                    slice_param_list.append(slice_param)
+
                 all_gather_param_info_list.append(
                     (
+                        slice_param_list,
                         main_shard_fused_param,
                         main_fused_param,
                     )
@@ -328,7 +364,7 @@ class ShardingOptimizerStage1(Optimizer):
                     partail_status = (
                         group_grad_list[index].dist_attr().partial_status
                     )
-                    partail_status.pop(self._sharding_mesh_axis)
+                    partail_status.pop(self._sharding_axis)
                     slice_grad_dist_attr = pir.create_tensor_dist_attribute(
                         slice_grad.process_mesh, [-1], partail_status
                     )
@@ -346,16 +382,88 @@ class ShardingOptimizerStage1(Optimizer):
             self._inner_opt._grad_clip.has_dist_param = has_dist_param
             self._inner_opt._grad_clip.has_not_dist_param = has_not_dist_param
         self._inner_opt.apply_gradients(new_params_grads)
+
         for (
+            slice_param_list,
             shard_param,
             fused_param,
         ) in all_gather_param_info_list:
-            allgather_value = paddle._C_ops.all_gather(
-                shard_param, self._sharding_group.id, self._sharding_degree
-            )
+            if self._strategy.sharding.enable_overlap:
+                last_idx = None
+                last_op = None
+                for op in slice_param_list[-1].all_used_ops():
+                    idx = target_block.ops.index(op)
+                    if last_idx is None or idx > last_idx:
+                        last_idx = idx
+                        last_op = op
+
+                # NOTE: add dependency between opt op and allgather_value for correctness
+                tmp = paddle._C_ops.nop(last_op.results()[0])
+                tmp.get_defining_op().set_execution_stream(
+                    AutoParallelStreamType.SHARDING_STREAM.value
+                )
+
+                allgather_value = paddle._C_ops.all_gather(
+                    shard_param, self._sharding_group.id, self._sharding_degree
+                )
+                allgather_value.get_defining_op().set_execution_stream(
+                    AutoParallelStreamType.SHARDING_STREAM.value
+                )
+            else:
+                allgather_value = paddle._C_ops.all_gather(
+                    shard_param, self._sharding_group.id, self._sharding_degree
+                )
             paddle._C_ops.share_var([fused_param, allgather_value])
+
         start_index = target_block.ops.index(last_op) + 1
         return target_block.ops[start_index:]
+
+    def _reduce_scatter_overlap(self, group_grad_list, target_block):
+        '''
+        In order to overlap computation and reduce_scatter communication, we need to:
+          a. place reduce_scatter in communication stream
+          b. place reduce_scatter op and its producer ops after the last grad define op
+        This function will complete the item b.
+        '''
+        insertion_info = {"idx": None, "op": None}
+        # 1. move ops after the grad op
+        for grad in group_grad_list:
+            stack = [grad.get_defining_op()]
+            grad_op = None
+            advance_ops = []
+            # 1.1 get the grad define op
+            while len(stack) > 0:
+                op = stack.pop()
+                if op.op_role == int(OpRole.Backward):
+                    grad_op = op
+                    break
+                if op.num_operands() == 1:  # only one operand
+                    stack.append(op.operand_source(0).get_defining_op())
+                    if op.op_role != int(OpRole.Backward):
+                        advance_ops.append(op)
+                else:
+                    break
+            if grad_op is not None:
+                new_idx = target_block.ops.index(grad_op) + 1
+                # 1.2 move ops
+                for op in advance_ops:
+                    old_idx = target_block.ops.index(op)
+                    if new_idx != old_idx:
+                        target_block.move_op(op, new_idx)
+                # 2.1 get insertion point
+                if (
+                    insertion_info["idx"] is None
+                    or new_idx > insertion_info["idx"]
+                ):
+                    insertion_info["idx"] = new_idx
+                    if len(advance_ops) > 0:
+                        insertion_info["op"] = advance_ops[-1]
+                    else:
+                        insertion_info["op"] = grad_op
+
+        # 2.2 set insertion point
+        if insertion_info["op"] is not None:
+            pir.set_insertion_point_after(insertion_info["op"])
 
     def _fuse_group_param(self, group_param_list):
         startup_program = paddle.static.default_startup_program()

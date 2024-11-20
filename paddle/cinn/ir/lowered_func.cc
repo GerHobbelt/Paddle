@@ -151,6 +151,35 @@ void _LoweredFunc_::PrepareAllocOutputBufferExprs() {
   }
 }
 
+std::vector<Expr> _LoweredFunc_::PrepareAxisRangeAssumptions() const {
+  std::vector<Expr> assumption_exprs;
+
+  const auto AssumeAxisLT = [&](std::string axis, const Expr& dim_size) {
+    if (!dim_size.defined()) {
+      return;
+    }
+    if (dim_size == common::make_const(1)) {
+      return;
+    }
+    Expr expr_lt = LT::Make(Var(axis), dim_size);
+    Expr call_lt = Call::Make(Void(),
+                              runtime::intrinsic::cuda_builtin_assume,
+                              {expr_lt},
+                              {},
+                              CallType::Intrinsic);
+    assumption_exprs.push_back(call_lt);
+  };
+
+  AssumeAxisLT("blockIdx.x", cuda_axis_info.grid_dim(0));
+  AssumeAxisLT("blockIdx.y", cuda_axis_info.grid_dim(1));
+  AssumeAxisLT("blockIdx.z", cuda_axis_info.grid_dim(2));
+  AssumeAxisLT("threadIdx.x", cuda_axis_info.block_dim(0));
+  AssumeAxisLT("threadIdx.y", cuda_axis_info.block_dim(1));
+  AssumeAxisLT("threadIdx.z", cuda_axis_info.block_dim(2));
+
+  return assumption_exprs;
+}
+
 std::vector<Expr> _LoweredFunc_::PrepareAllocTempBufferExprs() const {
   std::vector<Expr> alloc_temp_buffer_exprs;
   for (auto& temp_buf : temp_bufs) {

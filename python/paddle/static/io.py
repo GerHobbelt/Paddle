@@ -620,7 +620,14 @@ def save_inference_model(
         legacy_format=legacy_format,
     )
 
-    save_to_file(model_path, program_bytes)
+    save_to_file(
+        (
+            os.path.join(os.path.dirname(model_path), "__model__")
+            if kwargs.get('separate_parameters', False)
+            else model_path
+        ),
+        program_bytes,
+    )
 
     vars = list(filter(is_persistable, program.list_vars()))
 
@@ -637,7 +644,11 @@ def save_inference_model(
             dirname=save_dirname,
             main_program=program,
             predicate=is_persistable,
-            filename=params_filename,
+            filename=(
+                None
+                if kwargs.get('separate_parameters', False)
+                else params_filename
+            ),
         )
 
 

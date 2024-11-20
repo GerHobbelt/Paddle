@@ -4699,6 +4699,34 @@ phi::DataType ArrayPopOp::GetKernelTypeForVar(
   return expected_kernel_dtype;
 }
 
+bool ArrayPopOp::InferSymbolicShape(
+    pir::InferSymbolicShapeContext *infer_context) {
+  const auto &input_shape_or_data =
+      infer_context->GetShapeOrDataForValue(input())
+          .dyn_cast<symbol::RankedTensorArrayShapeOrDataDimExprs>();
+  std::vector<symbol::DimExpr> input_shape = input_shape_or_data.GetShapeHint();
+  size_t input_rank = input_shape.size();
+  auto gen_shape_with_size = [&](size_t size) {
+    std::vector<symbol::DimExpr> shape;
+    for (size_t i = 0; i < size; ++i) {
+      shape.push_back(infer_context->GetNextSymName());
+    }
+    return shape;
+  };
+  std::vector<symbol::DimExpr> out_shape = gen_shape_with_size(input_rank);
+  std::vector<symbol::DimExpr> array_out_shape =
+      gen_shape_with_size(input_rank);
+  infer_context->SetShapeOrDataForValue(
+      array_out(),
+      symbol::ShapeOrDataDimExprs{
+          symbol::RankedTensorArrayShapeOrDataDimExprs(array_out_shape)});
+  infer_context->SetShapeOrDataForValue(
+      out(),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs(out_shape)});
+  return true;
+}
+
 }  // namespace paddle::dialect
 
 IR_DEFINE_EXPLICIT_TYPE_ID(paddle::dialect::SplitGradOp)

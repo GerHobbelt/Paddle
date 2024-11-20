@@ -16,7 +16,7 @@ import unittest
 import collective.test_communication_api_base as test_base
 
 
-class TestMultiplyGradAutoParallel(test_base.CommunicationTestDistBase):
+class TestBackwardAutoParallel(test_base.CommunicationTestDistBase):
     def setUp(self):
         super().setUp(
             num_of_devices=1,
@@ -31,7 +31,7 @@ class TestMultiplyGradAutoParallel(test_base.CommunicationTestDistBase):
         )
         for envs in envs_list:
             self.run_test_case(
-                "auto_parallel_multiply_grad.py",
+                "auto_parallel_backward.py",
                 user_defined_envs=envs,
             )
 
