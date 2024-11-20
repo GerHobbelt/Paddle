@@ -62,15 +62,12 @@ _RetT = TypeVar(
 
 class _Transform(Protocol, Generic[_InputT, _RetT]):
     @overload
-    def __call__(self, data: _InputT) -> _RetT:
-        ...
+    def __call__(self, data: _InputT) -> _RetT: ...
 
     @overload
-    def __call__(self, data: tuple[_InputT, ...]) -> tuple[_RetT, ...]:
-        ...
+    def __call__(self, data: tuple[_InputT, ...]) -> tuple[_RetT, ...]: ...
 
-    def __call__(self, data) -> Any:
-        ...
+    def __call__(self, data) -> Any: ...
 
 
 __all__ = []
@@ -152,12 +149,10 @@ class Compose(_Transform[_InputT, _RetT]):
         self.transforms = transforms
 
     @overload
-    def __call__(self, data: _InputT) -> _RetT:
-        ...
+    def __call__(self, data: _InputT) -> _RetT: ...
 
     @overload
-    def __call__(self, data: tuple[_InputT, ...]) -> tuple[_RetT, ...]:
-        ...
+    def __call__(self, data: tuple[_InputT, ...]) -> tuple[_RetT, ...]: ...
 
     def __call__(self, data) -> Any:
         for f in self.transforms:
@@ -308,12 +303,10 @@ class BaseTransform(_Transform[_InputT, _RetT]):
         pass
 
     @overload
-    def __call__(self, inputs: _InputT) -> _RetT:
-        ...
+    def __call__(self, inputs: _InputT) -> _RetT: ...
 
     @overload
-    def __call__(self, inputs: tuple[_InputT, ...]) -> tuple[_RetT, ...]:
-        ...
+    def __call__(self, inputs: tuple[_InputT, ...]) -> tuple[_RetT, ...]: ...
 
     def __call__(self, inputs) -> Any:
         """Apply transform on single input data"""
@@ -464,11 +457,11 @@ class Resize(BaseTransform[_InputT, _RetT]):
 
             >>> fake_img = Image.fromarray((np.random.rand(256, 300, 3) * 255.).astype(np.uint8))
             >>> transform = Resize(size=224)
-            >>> converted_img = transform(fake_img)
+            >>> converted_img = transform(fake_img) # type: ignore[call-overload]
             >>> print(converted_img.size)
             (262, 224)
             >>> transform = Resize(size=(200,150))
-            >>> converted_img = transform(fake_img)
+            >>> converted_img = transform(fake_img) # type: ignore[call-overload]
             >>> print(converted_img.size)
             (150, 200)
     """
@@ -619,7 +612,13 @@ class RandomResizedCrop(BaseTransform[_InputT, _RetT]):
         w = paddle.ones([1], dtype="int32") * (width + 1)
 
         def cond(counter, ten, i, j, h, w):
-            return (counter < ten) and (w > width or h > height)
+            return paddle.logical_and(
+                counter < ten,
+                paddle.logical_or(
+                    w > width,
+                    h > height,
+                ),
+            )
 
         def body(counter, ten, i, j, h, w):
             target_area = (
@@ -638,7 +637,10 @@ class RandomResizedCrop(BaseTransform[_InputT, _RetT]):
             )
 
             i = paddle.static.nn.cond(
-                0 < w <= width and 0 < h <= height,
+                paddle.logical_and(
+                    paddle.logical_and(0 < h, h <= height),
+                    paddle.logical_and(0 < w, w <= width),
+                ),
                 lambda: paddle.uniform(shape=[1], min=0, max=height - h).astype(
                     "int32"
                 ),
@@ -646,7 +648,10 @@ class RandomResizedCrop(BaseTransform[_InputT, _RetT]):
             )
 
             j = paddle.static.nn.cond(
-                0 < w <= width and 0 < h <= height,
+                paddle.logical_and(
+                    paddle.logical_and(0 < h, h <= height),
+                    paddle.logical_and(0 < w, w <= width),
+                ),
                 lambda: paddle.uniform(shape=[1], min=0, max=width - w).astype(
                     "int32"
                 ),
@@ -677,7 +682,7 @@ class RandomResizedCrop(BaseTransform[_InputT, _RetT]):
                 lambda: paddle.static.nn.cond(
                     in_ratio > self.ratio[1],
                     lambda: [
-                        paddle.round(height * self.ratio[1]),
+                        paddle.round(height * self.ratio[1]).astype("int32"),
                         height.astype("int32"),
                     ],
                     lambda: [width.astype("int32"), height.astype("int32")],
@@ -689,7 +694,10 @@ class RandomResizedCrop(BaseTransform[_InputT, _RetT]):
             return i, j, h, w, counter
 
         return paddle.static.nn.cond(
-            0 < w <= width and 0 < h <= height,
+            paddle.logical_and(
+                paddle.logical_and(0 < h, h <= height),
+                paddle.logical_and(0 < w, w <= width),
+            ),
             lambda: [i, j, h, w, counter],
             lambda: central_crop(width, height),
         )
@@ -1031,10 +1039,10 @@ class BrightnessTransform(BaseTransform[_InputT, _RetT]):
 
             >>> transform = BrightnessTransform(0.4)
             >>> fake_img = Image.fromarray((np.random.rand(224, 224, 3) * 255.).astype(np.uint8))
-            >>> print(fake_img.load()[1,1])
+            >>> print(fake_img.load()[1,1]) # type: ignore[index]
             (60, 169, 34)
             >>> # doctest: +SKIP('random sample in Brightness function')
-            >>> fake_img = transform(fake_img)
+            >>> fake_img = transform(fake_img) # type: ignore[call-overload]
             >>> print(fake_img.load()[1,1])
             (68, 192, 38)
 
@@ -1786,7 +1794,7 @@ class RandomRotation(BaseTransform[_InputT, _RetT]):
         degrees: float | Sequence[float],
         interpolation: _InterpolationPil | _InterpolationCv2 = 'nearest',
         expand: bool = False,
-        center: tuple[float, float] = None,
+        center: tuple[float, float] | None = None,
         fill: Size3 = 0,
         keys: _TransformInputKeys | None = None,
     ) -> None:
@@ -2188,7 +2196,13 @@ class RandomErasing(BaseTransform[_InputT, _RetT]):
         log_ratio = np.log(np.array(ratio))
 
         def cond(counter, ten, erase_h, erase_w):
-            return counter < ten and (erase_h >= h or erase_w >= w)
+            return paddle.logical_and(
+                counter < ten,
+                paddle.logical_or(
+                    erase_h >= h,
+                    erase_w > w,
+                ),
+            )
 
         def body(counter, ten, erase_h, erase_w):
             erase_area = (
@@ -2228,7 +2242,7 @@ class RandomErasing(BaseTransform[_InputT, _RetT]):
 
         zero = paddle.zeros([1]).astype("int32")
         top = paddle.static.nn.cond(
-            erase_h < h and erase_w < w,
+            paddle.logical_and(erase_h < h, erase_w < w),
             lambda: paddle.uniform(
                 shape=[1], min=0, max=h - erase_h + 1
             ).astype("int32"),
@@ -2236,7 +2250,7 @@ class RandomErasing(BaseTransform[_InputT, _RetT]):
         )
 
         left = paddle.static.nn.cond(
-            erase_h < h and erase_w < w,
+            paddle.logical_and(erase_h < h, erase_w < w),
             lambda: paddle.uniform(
                 shape=[1], min=0, max=w - erase_w + 1
             ).astype("int32"),
@@ -2244,15 +2258,19 @@ class RandomErasing(BaseTransform[_InputT, _RetT]):
         )
 
         erase_h = paddle.static.nn.cond(
-            erase_h < h and erase_w < w, lambda: erase_h, lambda: h
+            paddle.logical_and(erase_h < h, erase_w < w),
+            lambda: erase_h,
+            lambda: h,
         )
 
         erase_w = paddle.static.nn.cond(
-            erase_h < h and erase_w < w, lambda: erase_w, lambda: w
+            paddle.logical_and(erase_h < h, erase_w < w),
+            lambda: erase_w,
+            lambda: w,
         )
 
         v = paddle.static.nn.cond(
-            erase_h < h and erase_w < w, lambda: v, lambda: img
+            paddle.logical_and(erase_h < h, erase_w < w), lambda: v, lambda: img
         )
 
         return top, left, erase_h, erase_w, v, counter
