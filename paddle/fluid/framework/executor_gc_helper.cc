@@ -85,7 +85,7 @@ static bool VarCanBeDeleted(const std::string &name,
 
   return type == proto::VarType::LOD_TENSOR ||
          type == proto::VarType::SELECTED_ROWS ||
-         type == proto::VarType::LOD_TENSOR_ARRAY;
+         type == proto::VarType::DENSE_TENSOR_ARRAY;
 }
 
 std::unordered_map<const OperatorBase *, std::vector<std::string>>

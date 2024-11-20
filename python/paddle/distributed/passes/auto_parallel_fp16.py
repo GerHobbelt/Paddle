@@ -289,7 +289,7 @@ class FP16State:
             # var = self.program.global_block().var(var_name)
 
         # NOTE(JZ-LIANG) "array_" is a hack to adopt for ernie3.0 inference, since there is
-        # a trick which make the LOD_TENSOR_ARRAY to the float32 in while block to reset the LOD_TENSOR_ARRAY
+        # a trick which make the DENSE_TENSOR_ARRAY to the float32 in while block to reset the DENSE_TENSOR_ARRAY
         if (
             var is None
             or var.type not in __amp_utils__._valid_types

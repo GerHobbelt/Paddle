@@ -98,9 +98,9 @@ class LlamaMLP(nn.Layer):
             self.intermediate_size, self.hidden_size, bias_attr=False
         )
 
-    def forward(self, x):
+    def forward(self, x, test_for_list_input_output):
         out = self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
-        return out
+        return out, test_for_list_input_output
 
 
 class LlamaRMSNorm(nn.Layer):
@@ -144,7 +144,7 @@ class LlamaDecoderLayer(nn.Layer):
 
         residual = hidden_states
         hidden_states = self.post_attention_layernorm(hidden_states)
-        hidden_states = self.mlp(hidden_states)
+        hidden_states, _ = self.mlp(hidden_states, "ONLY_FOR_TEST")
         hidden_states = residual + hidden_states
 
         return hidden_states

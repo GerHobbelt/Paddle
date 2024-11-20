@@ -85,7 +85,7 @@ class TensorConfig:
 
 class VarType(enum.Enum):
     LOD_TENSOR = 1
-    LOD_TENSOR_ARRAY = 2
+    DENSE_TENSOR_ARRAY = 2
     STEP_SCOPES = 3
 
 
@@ -174,8 +174,8 @@ class BlockConfig:
                 self.vars_var_type is not None
                 and name in self.vars_var_type.keys()
             ):
-                if self.vars_var_type[name] == VarType.LOD_TENSOR_ARRAY:
-                    var_desc.set_type(core.VarDesc.VarType.LOD_TENSOR_ARRAY)
+                if self.vars_var_type[name] == VarType.DENSE_TENSOR_ARRAY:
+                    var_desc.set_type(core.VarDesc.VarType.DENSE_TENSOR_ARRAY)
                 elif self.vars_var_type[name] == VarType.STEP_SCOPES:
                     var_desc.set_type(core.VarDesc.VarType.STEP_SCOPES)
                     continue
@@ -213,10 +213,10 @@ class BlockConfig:
                     ):
                         if (
                             op_config.outputs_var_type[v]
-                            == VarType.LOD_TENSOR_ARRAY
+                            == VarType.DENSE_TENSOR_ARRAY
                         ):
                             var_desc.set_type(
-                                core.VarDesc.VarType.LOD_TENSOR_ARRAY
+                                core.VarDesc.VarType.DENSE_TENSOR_ARRAY
                             )
                         elif (
                             op_config.outputs_var_type[v] == VarType.STEP_SCOPES
@@ -442,10 +442,10 @@ def create_fake_model(program_config):
                     ):
                         if (
                             op_config.outputs_var_type[v]
-                            == VarType.LOD_TENSOR_ARRAY
+                            == VarType.DENSE_TENSOR_ARRAY
                         ):
                             var_desc.set_type(
-                                core.VarDesc.VarType.LOD_TENSOR_ARRAY
+                                core.VarDesc.VarType.DENSE_TENSOR_ARRAY
                             )
                         elif (
                             op_config.outputs_var_type[v] == VarType.STEP_SCOPES

@@ -64,7 +64,7 @@ LoadCombine operator loads phi::DenseTensor variables from a file, which could b
 loaded in memory already. The file should contain one or more LoDTensors
 serialized using the SaveCombine operator. The
 LoadCombine operator applies a deserialization strategy to appropriately load
-the LodTensors, and this strategy complements the serialization strategy used
+the DenseTensors, and this strategy complements the serialization strategy used
 in the SaveCombine operator. Hence, the LoadCombine operator is tightly coupled
 with the SaveCombine operator, and can only deserialize one or more LoDTensors
 that were saved using the SaveCombine operator.

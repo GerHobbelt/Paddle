@@ -301,7 +301,7 @@ void BindVarDesc(pybind11::module *m) {
       .value("FETCH_LIST", pd::proto::VarType::FETCH_LIST)
       .value("STEP_SCOPES", pd::proto::VarType::STEP_SCOPES)
       .value("LOD_RANK_TABLE", pd::proto::VarType::LOD_RANK_TABLE)
-      .value("LOD_TENSOR_ARRAY", pd::proto::VarType::LOD_TENSOR_ARRAY)
+      .value("DENSE_TENSOR_ARRAY", pd::proto::VarType::DENSE_TENSOR_ARRAY)
       .value("PLACE_LIST", pd::proto::VarType::PLACE_LIST)
       .value("READER", pd::proto::VarType::READER)
       .value("RAW", pd::proto::VarType::RAW)

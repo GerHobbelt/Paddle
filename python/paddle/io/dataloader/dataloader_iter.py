@@ -260,8 +260,8 @@ class _DataLoaderIterSingleProcess(_DataLoaderIterBase):
                 break
 
             try:
-                # pack as LoDTensorArray
-                array = core.LoDTensorArray()
+                # pack as DenseTensorArray
+                array = core.DenseTensorArray()
                 for slot in batch:
                     if isinstance(slot, paddle.Tensor):
                         slot = slot.value().get_tensor()
@@ -626,8 +626,8 @@ class _DataLoaderIterMultiProcess(_DataLoaderIterBase):
                         self._resume_worker_cnt -= 1
                         continue
                     try:
-                        # pack as LoDTensorArray
-                        array = core.LoDTensorArray()
+                        # pack as DenseTensorArray
+                        array = core.DenseTensorArray()
                         if self._use_shared_memory:
                             for tensor in batch:
                                 array.append(tensor)

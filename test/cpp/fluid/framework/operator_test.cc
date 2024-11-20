@@ -437,7 +437,7 @@ TEST(IndicateVarDataTypeTest, other) {
                             "(indicate_other_data_type_test) Operator used to "
                             "determine kernel data type "
                             "is empty or not phi::DenseTensor or SelectedRows "
-                            "or LoDTensorArray.") != std::string::npos);
+                            "or DenseTensorArray.") != std::string::npos);
   }
   ASSERT_TRUE(caught);
 }

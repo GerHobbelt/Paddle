@@ -42,7 +42,7 @@ class TestTensorArrayToTensorError(unittest.TestCase):
             self.assertRaises(TypeError, test_list_Variable)
 
 
-class TestLoDTensorArrayStack(unittest.TestCase):
+class TestDenseTensorArrayStack(unittest.TestCase):
     """Test case for stack mode of tensor_array_to_tensor."""
 
     def setUp(self):

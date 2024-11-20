@@ -149,8 +149,8 @@ TEST(test_layer, test_runtime_context) {
 
   ctx->SetOutputType(
       "Out", framework::proto::VarType::SELECTED_ROWS, framework::ALL_ELEMENTS);
-  ctx->SetOutputType("Out", framework::proto::VarType::LOD_TENSOR_ARRAY);
-  ASSERT_EQ(framework::proto::VarType::LOD_TENSOR_ARRAY, vout->Type());
+  ctx->SetOutputType("Out", framework::proto::VarType::DENSE_TENSOR_ARRAY);
+  ASSERT_EQ(framework::proto::VarType::DENSE_TENSOR_ARRAY, vout->Type());
   ASSERT_EQ(framework::proto::VarType::SELECTED_ROWS, vout_b->Type());
 
   ctx->SetOutputDataType(
@@ -163,7 +163,7 @@ TEST(test_layer, test_runtime_context) {
   // no throw, but do nothing
   ASSERT_NO_THROW(
       ctx->InsertVar("vout", framework::proto::VarType::LOD_TENSOR));
-  ASSERT_EQ(framework::proto::VarType::LOD_TENSOR_ARRAY, vout->Type());
+  ASSERT_EQ(framework::proto::VarType::DENSE_TENSOR_ARRAY, vout->Type());
 
   ASSERT_ANY_THROW(ctx->HasVar("vin"));
   ASSERT_ANY_THROW(ctx->InputVars("X"));

@@ -1333,12 +1333,64 @@ bool LuUnpackOpInferSymbolicShape(
   return true;
 }
 
-// bool MatrixRankTolOpInferSymbolicShape(pir::Operation *op,
-//                                        pir::InferSymbolicShapeContext
-//                                        *infer_context) {
-//   // pass
-//   return true;
-// }
+bool MatrixRankTolOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  const auto &x_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(0)).shape();
+  const auto &tol_shape_or_data =
+      infer_context->GetShapeOrDataForValue(op->operand_source(1));
+  std::vector<symbol::DimExpr> tol_shape = tol_shape_or_data.shape();
+  size_t x_rank = x_shape.size();
+  PADDLE_ENFORCE_GE(x_rank,
+                    2,
+                    common::errors::InvalidArgument(
+                        "The dims of input must be greater than 2"));
+  bool hermitian = GetBoolAttr(op, "hermitian");
+  if (hermitian) {
+    infer_context->AddEqualCstr(x_shape[x_rank - 2], x_shape[x_rank - 1]);
+  }
+  std::vector<symbol::DimExpr> x_shape_batch = [&] {
+    std::vector<symbol::DimExpr> x_shape_batch;
+    for (size_t i = 0; i < x_rank - 2; ++i) {
+      x_shape_batch.push_back(x_shape[i]);
+    }
+    return x_shape_batch;
+  }();
+
+  int diff = x_shape_batch.size() - tol_shape.size();
+  if (diff > 0) {
+    for (int i = 0; i < diff; i++) {
+      tol_shape.emplace(tol_shape.begin(), 1);
+    }
+  } else {
+    for (int i = 0; i < -diff; i++) {
+      x_shape_batch.emplace(x_shape_batch.begin(), 1);
+    }
+  }
+
+  const std::vector<symbol::DimExpr> shapes = [&] {
+    std::vector<symbol::DimExpr> shapes;
+    symbol::DimExprBuilder builder;
+    for (size_t i = 0; i < x_shape_batch.size(); i++) {
+      if (x_shape_batch[i] == tol_shape[i]) {
+        shapes.emplace_back(x_shape_batch[i]);
+      } else if (x_shape_batch[i] == 1) {
+        shapes.emplace_back(tol_shape[i]);
+      } else if (tol_shape[i] == 1) {
+        shapes.emplace_back(x_shape_batch[i]);
+      } else {
+        shapes.emplace_back(builder.Broadcast(x_shape_batch[i], tol_shape[i]));
+        infer_context->AddBroadcastableCstr(x_shape_batch[i], tol_shape[i]);
+      }
+    }
+    return shapes;
+  }();
+
+  symbol::ShapeOrDataDimExprs shape_data{
+      symbol::TensorShapeOrDataDimExprs(shapes)};
+  infer_context->SetShapeOrDataForValue(op->result(0), shape_data);
+  return true;
+}
 
 bool MaskedSelectOpInferSymbolicShape(
     pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
@@ -1908,12 +1960,30 @@ bool SequenceMaskOpInferSymbolicShape(
   return true;
 }
 
-// bool ShuffleBatchOpInferSymbolicShape(pir::Operation *op,
-//                                       pir::InferSymbolicShapeContext
-//                                       *infer_context) {
-//   // pass
-//   return true;
-// }
+bool ShuffleBatchOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  const auto &x_shape =
+      infer_context->GetShapeOrDataForValue(op->operand_source(0)).shape();
+  infer_context->SetShapeOrDataForValue(
+      op->result(0),
+      symbol::ShapeOrDataDimExprs{symbol::TensorShapeOrDataDimExprs(x_shape)});
+  infer_context->SetShapeOrDataForValue(
+      op->result(2),
+      symbol::ShapeOrDataDimExprs{symbol::TensorShapeOrDataDimExprs({1})});
+  const symbol::DimExpr shuffleidx = [&] {
+    symbol::DimExpr shuffleidx{1};
+    for (const auto &i : x_shape) {
+      shuffleidx = shuffleidx * i;
+    }
+    return shuffleidx;
+  }();
+
+  infer_context->SetShapeOrDataForValue(
+      op->result(1),
+      symbol::ShapeOrDataDimExprs{
+          symbol::TensorShapeOrDataDimExprs({shuffleidx})});
+  return true;
+}
 
 bool StftOpInferSymbolicShape(pir::Operation *op,
                               pir::InferSymbolicShapeContext *infer_context) {

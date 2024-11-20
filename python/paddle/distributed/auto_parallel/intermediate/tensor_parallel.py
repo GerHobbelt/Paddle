@@ -156,6 +156,139 @@ class PrepareLayerOutput(PlanBase):
         layer.register_forward_post_hook(self.fn(process_mesh=process_mesh))
 
 
+def sp_split(x, process_mesh, need_transpose):
+    index = process_mesh.dim_names.index('mp')  # get the axis for the split
+    if isinstance(x, tuple):
+        target_x = x[0]
+    else:
+        target_x = x
+    assert isinstance(target_x, paddle.Tensor)
+    assert len(target_x.shape) == 3
+    if need_transpose:
+        target_x = paddle.transpose(target_x, perm=[1, 0, 2])
+    placements = target_x.placements
+    if placements is None:
+        placements = [dist.Replicate() for _ in range(len(process_mesh.shape))]
+    placements[index] = dist.Shard(0)
+    target_x = dist.reshard(target_x, process_mesh, placements)
+    if isinstance(x, tuple):
+        x = list(x)
+        x[0] = target_x
+        x = tuple(x)
+    else:
+        x = target_x
+
+    return x
+
+
+def sp_reduce_scatter(x, process_mesh, need_transpose):
+    index = process_mesh.dim_names.index('mp')  # get the axis for the split
+    if isinstance(x, tuple):
+        target_x = x[0]
+    else:
+        target_x = x
+    assert isinstance(target_x, paddle.Tensor)
+    assert len(target_x.shape) == 3
+    placements = target_x.placements
+    if placements is None:
+        placements = [dist.Replicate() for _ in range(len(process_mesh.shape))]
+    placements[index] = dist.Replicate()
+    target_x = dist.reshard(target_x, process_mesh, placements)
+    if need_transpose:
+        target_x = paddle.transpose(target_x, perm=[1, 0, 2])
+    if isinstance(x, tuple):
+        x = list(x)
+        x[0] = target_x
+        x = tuple(x)
+    else:
+        x = target_x
+
+    return x
+
+
+class SequenceParallelBegin(PlanBase):
+    """
+    With need_transpose=True, this plan will transpose and reshard the output from [b, s, h] to [s/mp, b, h].
+    With need_transpose=False, this plan will reshard the output from [s, b, h] to [s/mp, b, h].
+
+    This plan marks the beginning of the sp and should be added to the LAST layer before the sp range.
+    DON'T mark any layer in the sp range.
+    """
+
+    def __init__(self, need_transpose=True):
+        super().__init__()
+        self.need_transpose = need_transpose
+
+    def sequence_parallel_begin(self, process_mesh):
+        def begin(layer, input, output=None):
+            return sp_split(output, process_mesh, self.need_transpose)
+
+        return begin
+
+    def apply(self, layer, process_mesh, shard_weight=None, shard_bias=None):
+        layer.register_forward_post_hook(
+            self.sequence_parallel_begin(process_mesh)
+        )
+
+
+class SequenceParallelEnd(PlanBase):
+    """
+    With need_transpose=True, this plan will reshard and transpose the input from [s/mp, b, h] to [b, s, h].
+    With need_transpose=False, this plan will reshard the input from [s/mp, b, h] to [s, b, h].
+
+    This plan marks the ending of the sp and should be added to the FIRST layer after the sp range.
+    DON'T mark any layer in the sp range.
+    """
+
+    def __init__(self, need_transpose=True):
+        super().__init__()
+        self.need_transpose = need_transpose
+
+    def sequence_parallel_end(self, process_mesh):
+        def end(layer, input, output=None):
+            return sp_reduce_scatter(input, process_mesh, self.need_transpose)
+
+        return end
+
+    def apply(self, layer, process_mesh, shard_weight=None, shard_bias=None):
+        layer.register_forward_pre_hook(
+            self.sequence_parallel_end(process_mesh)
+        )
+
+
+class SequenceParallel(PlanBase):
+    """
+    Do sequence parallel on the layer. Note the input should be in [b, s, h] format.
+    """
+
+    def __init__(self):
+        super().__init__()
+
+    def sequence_parallel_begin(self, process_mesh):
+        def begin(layer, input, output=None):
+            return sp_split(input, process_mesh, True)
+
+        return begin
+
+    def sequence_parallel_end(self, process_mesh):
+        def end(layer, input, output=None):
+            return sp_reduce_scatter(output, process_mesh, True)
+
+        return end
+
+    def apply(self, layer, process_mesh, shard_weight=None, shard_bias=None):
+        logging.warning(
+            "Sequence parallel with the usage of SequenceParallel may not reach the best throughput. "
+            "Try to use SequenceParallelBegin/End to achieve better performance"
+        )
+        layer.register_forward_pre_hook(
+            self.sequence_parallel_begin(process_mesh)
+        )
+        layer.register_forward_post_hook(
+            self.sequence_parallel_end(process_mesh)
+        )
+
+
 class TensorParallel(ParallelModel):
     def __init__(self, model, parallelize_plan=None):
         super().__init__(model)
@@ -207,7 +340,10 @@ class TensorParallel(ParallelModel):
                 key = key.replace(".bias", "")
                 shard_weight = False
             re_find = re.match(key, name)
-            if key == name or (re_find is not None and re_find.string == name):
+            if key == name or (
+                re_find is not None
+                and int(re_find.end()) - int(re_find.start()) == len(name)
+            ):
                 if isinstance(plan, PlanBase):
                     plan = [plan]
                 plans.append([plan, shard_weight, shard_bias])
@@ -217,15 +353,14 @@ class TensorParallel(ParallelModel):
         if self.parallelize_plan is None:
             return
         for name, layer in model.named_sublayers():
-            if len(layer.sublayers()) == 0:
-                plans = self.match_layer(name)
-                if len(plans) > 0:
-                    for plan in plans:
-                        real_plan, shard_weight, shard_bias = plan
-                        for p in real_plan:
-                            p.apply(
-                                layer, self.get_mesh(), shard_weight, shard_bias
-                            )
+            plans = self.match_layer(name)
+            if len(plans) > 0:
+                for plan in plans:
+                    real_plan, shard_weight, shard_bias = plan
+                    for p in real_plan:
+                        p.apply(
+                            layer, self.get_mesh(), shard_weight, shard_bias
+                        )
         return model
 
 

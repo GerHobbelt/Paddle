@@ -15,6 +15,9 @@
 #include "paddle/fluid/distributed/collective/async_load.h"
 #include "paddle/phi/common/memory_utils.h"
 
+COMMON_DECLARE_bool(use_stream_safe_cuda_allocator);
+COMMON_DECLARE_bool(use_cuda_malloc_async_allocator);
+
 namespace paddle {
 namespace distributed {
 
@@ -26,9 +29,15 @@ AsyncLoad::Task::~Task() {}
 
 bool AsyncLoad::Task::IsCompleted() { return load_event_.Query(); }
 
-void AsyncLoad::Task::Synchronize() {
-  const auto* calc_ctx = phi::DeviceContextPool::Instance().Get(task_place_);
+void AsyncLoad::Task::CudaSynchronize() {
+  const auto* calc_ctx =
+      platform::DeviceContextPool::Instance().Get(task_place_);
   load_event_.Wait(platform::Place2DeviceType(task_place_), calc_ctx);
+}
+
+void AsyncLoad::Task::CpuSynchronize() {
+  // cudaEventSynchronize
+  load_event_.Finish();
 }
 
 void AsyncLoad::Task::UpdateWaitChain(const phi::DeviceContext& ctx) {
@@ -82,6 +91,11 @@ std::shared_ptr<AsyncLoad::Task> AsyncLoad::Offload(
   auto stream = load_ctx_->stream();
   phi::memory_utils::Copy(
       dst->place(), dst_ptr, src.place(), src_ptr, size, stream);
+
+  if (FLAGS_use_stream_safe_cuda_allocator ||
+      FLAGS_use_cuda_malloc_async_allocator) {
+    memory::RecordStream(src.Holder(), stream);
+  }
 
   // 3. record event on offload stream
   auto task = CreateTask(place);

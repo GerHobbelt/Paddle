@@ -213,7 +213,7 @@ class SendOpV2CUDAKernel : public framework::OpKernel<T> {
                                           "support phi::TensorArray for now."));
       auto& x_array = x_var->Get<phi::TensorArray>();
       for (size_t idx = 0; idx < x_array.size(); idx++) {
-        VLOG(3) << "LodTensorArray: idx(" << idx << ")";
+        VLOG(3) << "DenseTensorArray: idx(" << idx << ")";
         auto& x = x_array.at(idx);
         int numel = x.numel();
         ncclDataType_t dtype = phi::ToNCCLDataType(x.dtype());

@@ -135,7 +135,18 @@ std::set<phi::DataType> _complex_dtypes{
 //     '__truediv__',
 //     '__rdiv__',
 //     '__rtruediv__',
+//     '__floordiv__',
+//     '__pow__',
+//     '__rpow__',
+//     '__mod__',
+//     '__rmod__',
 //     '__matmul__',
+//     '__gt__',
+//     '__ge__',
+//     '__lt__',
+//     '__le__',
+//     '__eq__',
+//     '__ne__'
 
 void SetDevice(phi::Place place) {
   if (phi::is_gpu_place(place)) {
@@ -1059,6 +1070,97 @@ static PyObject* tensor__mod__method(TensorObject* self,
   EAGER_CATCH_AND_THROW_RETURN_NULL
 }
 
+static PyObject* tensor__rmod__method(TensorObject* self,
+                                      PyObject* args,
+                                      PyObject* kwargs) {
+  phi::RecordEvent pythonc_record_event(
+      "__rmod__ pybind_patch_func", phi::TracerEventType::UserDefined, 1);
+  EAGER_TRY
+
+  VLOG(6) << "Running Eager tensor__rmod__method";
+
+  // Set Device ID
+  auto place = egr::Controller::Instance().GetExpectedPlace();
+  SetDevice(place);
+
+  paddle::Tensor ret;
+
+  paddle::Tensor self_tensor = self->tensor;
+  PyObject* other_obj = PyTuple_GET_ITEM(args, 0);
+
+  // 1. scalar exists cases
+  // there is no scalar_mod function for __rmod__ now
+  if (PyFloat_Check(other_obj) || PyCheckInteger(other_obj) ||
+      IsNumpyType(other_obj)) {
+    if (PyFloat_Check(other_obj)) {
+      if (_supported_int_dtype_.find(self_tensor.dtype()) !=
+          _supported_int_dtype_.end()) {
+        eager_gil_scoped_release guard;
+        self_tensor = cast_ad_func(self_tensor, DataType::FLOAT32);
+      }
+    } else if (PyCheckInteger(other_obj) &&
+               self_tensor.dtype() == DataType::BOOL) {
+      eager_gil_scoped_release guard;
+      self_tensor = cast_ad_func(self_tensor, DataType::INT64);
+    }
+  } else if (PyComplex_Check(other_obj)) {
+    if (is_support_complex(self_tensor.dtype()) == false) {
+      eager_gil_scoped_release guard;
+      self_tensor = cast_ad_func(
+          self_tensor, promoteTypes(self_tensor.dtype(), DataType::COMPLEX64));
+    }
+  }
+
+  // 2. create or get tensor for other_obj
+  paddle::Tensor other_tensor;
+  if (PyCheckTensor(other_obj)) {
+    auto& self_tensor_ref_addr = self->tensor;
+    auto& other_tensor_ref_addr = CastPyArg2Tensor(other_obj, 0);
+    const phi::distributed::ProcessMesh* mesh = nullptr;
+    if (InputsContainDistTensor(
+            &mesh, self_tensor_ref_addr, other_tensor_ref_addr)) {
+      ConvertAllInputsToDistTensor(
+          mesh, self_tensor_ref_addr, other_tensor_ref_addr);
+    }
+    self_tensor = self_tensor_ref_addr;
+    other_tensor = other_tensor_ref_addr;
+  } else {
+    if (IsNumpyArray(other_obj)) {
+      py::object numpy_value =
+          py::reinterpret_borrow<py::object>(py::handle(other_obj));
+      other_tensor = paddle::empty({}, phi::DataType::FLOAT32, place);
+      InitTensorWithNumpyValue(numpy_value, place, &other_tensor);
+    } else {
+      paddle::experimental::Scalar value =
+          CastPyArg2Scalar(other_obj, "__rmod__", 0);
+      if (PyComplex_Check(other_obj)) {
+        eager_gil_scoped_release guard;
+        other_tensor =
+            full_ad_func({1}, value, DataType::COMPLEX64, self_tensor.place());
+      } else {
+        eager_gil_scoped_release guard;
+        other_tensor = full_ad_func(self_tensor.shape(),
+                                    value,
+                                    self_tensor.dtype(),
+                                    self_tensor.place());
+      }
+    }
+    const phi::distributed::ProcessMesh* mesh = nullptr;
+    if (InputsContainDistTensor(&mesh, self_tensor, other_tensor)) {
+      ConvertAllInputsToDistTensor(mesh, self_tensor, other_tensor);
+    }
+  }
+
+  // 3. calculation
+  VLOG(6) << "Calling remainder_ad_func in tensor__rmod__method";
+  {
+    eager_gil_scoped_release guard;
+    ret = remainder_ad_func(other_tensor, self_tensor);
+  }
+  return ToPyObject(ret);
+  EAGER_CATCH_AND_THROW_RETURN_NULL
+}
+
 static PyObject* tensor__matmul__method(TensorObject* self,
                                         PyObject* args,
                                         PyObject* kwargs) {
@@ -1450,6 +1552,96 @@ static PyObject* tensor__floordiv__method(TensorObject* self,
   {
     eager_gil_scoped_release guard;
     ret = floor_divide_ad_func(self_tensor, other_tensor);
+  }
+
+  return ToPyObject(ret);
+  EAGER_CATCH_AND_THROW_RETURN_NULL
+}
+
+static PyObject* tensor__rfloordiv__method(TensorObject* self,
+                                           PyObject* args,
+                                           PyObject* kwargs) {
+  phi::RecordEvent pythonc_record_event(
+      "__rfloordiv__ pybind_patch_func", phi::TracerEventType::UserDefined, 1);
+  EAGER_TRY
+  VLOG(6) << "Running Eager tensor__rfloordiv__method";
+
+  // Set Device ID
+  auto place = egr::Controller::Instance().GetExpectedPlace();
+  SetDevice(place);
+
+  paddle::Tensor ret;
+  paddle::Tensor self_tensor = self->tensor;
+
+  PyObject* other_obj = PyTuple_GET_ITEM(args, 0);
+
+  // 1. scalar exists cases or not
+  // there is no scalar case for rfloordiv, but alse need to cast self_tensor
+  // in need.
+  if (PyFloat_Check(other_obj) || PyCheckInteger(other_obj) ||
+      IsNumpyType(other_obj)) {
+    if (PyFloat_Check(other_obj)) {
+      if (_supported_int_dtype_.find(self_tensor.dtype()) !=
+          _supported_int_dtype_.end()) {
+        eager_gil_scoped_release guard;
+        self_tensor = cast_ad_func(self_tensor, DataType::FLOAT32);
+      }
+    } else if (PyCheckInteger(other_obj) &&
+               self_tensor.dtype() == DataType::BOOL) {
+      eager_gil_scoped_release guard;
+      self_tensor = cast_ad_func(self_tensor, DataType::INT64);
+    }
+  } else if (PyComplex_Check(other_obj)) {
+    if (is_support_complex(self_tensor.dtype()) == false) {
+      eager_gil_scoped_release guard;
+      self_tensor = cast_ad_func(
+          self_tensor, promoteTypes(self_tensor.dtype(), DataType::COMPLEX64));
+    }
+  }
+
+  // 2. create or get tensor for other_obj
+  paddle::Tensor other_tensor;
+  if (PyCheckTensor(other_obj)) {
+    auto& self_tensor_ref_addr = self->tensor;
+    auto& other_tensor_ref_addr = CastPyArg2Tensor(other_obj, 0);
+    const phi::distributed::ProcessMesh* mesh = nullptr;
+    if (InputsContainDistTensor(
+            &mesh, self_tensor_ref_addr, other_tensor_ref_addr)) {
+      ConvertAllInputsToDistTensor(
+          mesh, self_tensor_ref_addr, other_tensor_ref_addr);
+    }
+    self_tensor = self_tensor_ref_addr;
+    other_tensor = other_tensor_ref_addr;
+  } else {
+    if (IsNumpyArray(other_obj)) {
+      py::object numpy_value =
+          py::reinterpret_borrow<py::object>(py::handle(other_obj));
+      other_tensor = paddle::empty({}, phi::DataType::FLOAT32, place);
+      InitTensorWithNumpyValue(numpy_value, place, &other_tensor);
+    } else {
+      paddle::experimental::Scalar value =
+          CastPyArg2Scalar(other_obj, "__rfloordiv__", 0);
+      if (PyComplex_Check(other_obj)) {
+        eager_gil_scoped_release guard;
+        other_tensor =
+            full_ad_func({1}, value, DataType::COMPLEX64, self_tensor.place());
+      } else {
+        eager_gil_scoped_release guard;
+        other_tensor =
+            full_ad_func({1}, value, self_tensor.dtype(), self_tensor.place());
+      }
+    }
+    const phi::distributed::ProcessMesh* mesh = nullptr;
+    if (InputsContainDistTensor(&mesh, self_tensor, other_tensor)) {
+      ConvertAllInputsToDistTensor(mesh, self_tensor, other_tensor);
+    }
+  }
+
+  // 3. calculation
+  VLOG(6) << "Calling floor_divide_ad_func in tensor__rfloordiv__method";
+  {
+    eager_gil_scoped_release guard;
+    ret = floor_divide_ad_func(other_tensor, self_tensor);
   }
 
   return ToPyObject(ret);
@@ -1871,6 +2063,10 @@ PyMethodDef math_op_patch_methods[] = {  // NOLINT
      (PyCFunction)(void (*)())tensor__floordiv__method,
      METH_VARARGS | METH_KEYWORDS,
      nullptr},
+    {"__rfloordiv__",
+     (PyCFunction)(void (*)())tensor__rfloordiv__method,
+     METH_VARARGS | METH_KEYWORDS,
+     nullptr},
     {"__pow__",
      (PyCFunction)(void (*)())tensor__pow__method,
      METH_VARARGS | METH_KEYWORDS,
@@ -1881,6 +2077,10 @@ PyMethodDef math_op_patch_methods[] = {  // NOLINT
      nullptr},
     {"__mod__",
      (PyCFunction)(void (*)())tensor__mod__method,
+     METH_VARARGS | METH_KEYWORDS,
+     nullptr},
+    {"__rmod__",
+     (PyCFunction)(void (*)())tensor__rmod__method,
      METH_VARARGS | METH_KEYWORDS,
      nullptr},
     {"__matmul__",

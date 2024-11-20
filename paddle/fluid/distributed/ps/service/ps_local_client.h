@@ -146,7 +146,7 @@ class PsLocalClient : public PSClient {
     return fut;
   }
 
-  // recv table from server and save it in LodTensor
+  // recv table from server and save it in DenseTensor
   virtual int32_t RecvAndSaveTable(const uint64_t table_id UNUSED,
                                    const std::string& path UNUSED) {
     return 0;

@@ -93,7 +93,7 @@ bool KernelSupportPrecision(
 inline bool VarNodeHasDtype(Node* var_node) {
   auto type = var_node->Var()->GetType();
   return (type == VarType::SELECTED_ROWS) || (type == VarType::LOD_TENSOR) ||
-         (type == VarType::LOD_TENSOR_ARRAY) || (type == VarType::STRINGS) ||
+         (type == VarType::DENSE_TENSOR_ARRAY) || (type == VarType::STRINGS) ||
          (type == VarType::VOCAB) || (type == VarType::SPARSE_COO) ||
          (type == VarType::SPARSE_CSR);
 }

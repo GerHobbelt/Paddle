@@ -129,7 +129,7 @@ class LoDTensor2BatchFunctor {
     //                     0 is the first sequence,
     //                     2 is the third sequence.
     // The max_seqlen represents batch size after rearranging the
-    // input LodTensor. It is also the maximum length of input sequence.
+    // input DenseTensor. It is also the maximum length of input sequence.
 
     phi::LoD batch_lods;
     batch_lods.emplace_back(std::vector<size_t>{0});

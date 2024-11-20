@@ -36,12 +36,6 @@ Tensor full_with_tensor(const Tensor& shape,
                         Place place = Place());
 
 template <typename T>
-Tensor reshape_with_tensor(const Tensor& x, const Tensor& shape);
-
-template <typename T>
-Tensor expand_with_tensor(const Tensor& x, const Tensor& shape);
-
-template <typename T>
 Tensor arange_with_tensor(const Tensor& start,
                           const Tensor& end,
                           const Tensor& step,

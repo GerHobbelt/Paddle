@@ -1248,7 +1248,7 @@ def append_var_from_block_desc_static(
             if var_type in [
                 core.VarDesc.VarType.SELECTED_ROWS,
                 core.VarDesc.VarType.LOD_TENSOR,
-                core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+                core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
             ]:
                 data_type = var_desc.dtype()
                 var_shape = var_desc.shape()
@@ -1257,7 +1257,7 @@ def append_var_from_block_desc_static(
                 var_shape = None
             if var_type in [
                 core.VarDesc.VarType.LOD_TENSOR,
-                core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+                core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
             ]:
                 lod_level = var_desc.lod_level()
             else:

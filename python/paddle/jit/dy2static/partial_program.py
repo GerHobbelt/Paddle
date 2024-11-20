@@ -152,7 +152,7 @@ class PartialProgramLayer:
         **1. This is a very low level API. Users should not use this API
              directly. Please use `partial_program_from(concrete_program)`
              to create it.
-        **2. LoDTensorArray is not currently supported in the output.
+        **2. DenseTensorArray is not currently supported in the output.
 
     Args:
         main_program(Program): The main program that contains ops need to be executed.

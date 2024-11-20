@@ -225,7 +225,7 @@ class RecvOpV2CUDAKernel : public framework::OpKernel<T> {
                                           "support LoDTensorArray for now."));
       auto out_array = out_var->GetMutable<phi::TensorArray>();
       for (size_t idx = 0; idx < out_array->size(); ++idx) {
-        VLOG(3) << "LodTensorArray: idx(" << idx << ")";
+        VLOG(3) << "DenseTensorArray: idx(" << idx << ")";
         auto out = &out_array->at(idx);
         auto out_dims = out->dims();
         ctx.cuda_device_context().Alloc<T>(out);

@@ -465,7 +465,7 @@ void DetectionMAPOpKernel(const Context& dev_ctx,
   PADDLE_ENFORCE_EQ(
       label_lod.size(),
       1UL,
-      common::errors::InvalidArgument("Only support LodTensor of lod_level "
+      common::errors::InvalidArgument("Only support DenseTensor of lod_level "
                                       "with 1 in label, but received %d.",
                                       label_lod.size()));
   PADDLE_ENFORCE_EQ(label_lod[0].size(),

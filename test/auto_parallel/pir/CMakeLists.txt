@@ -66,6 +66,8 @@ if(WITH_DISTRIBUTE AND WITH_GPU)
     test_semi_auto_parallel_simple_net_ep ENVS FLAGS_enable_pir_api=1)
   set_tests_properties(test_semi_auto_parallel_simple_net_ep
                        PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 60)
+  py_test_modules(test_custom_spec_pir MODULES test_custom_spec_pir ENVS
+                  FLAGS_enable_pir_api=1)
 endif()
 py_test_modules(test_pir_1f1b_plan MODULES test_pir_1f1b_plan ENVS
                 FLAGS_enable_pir_api=1)

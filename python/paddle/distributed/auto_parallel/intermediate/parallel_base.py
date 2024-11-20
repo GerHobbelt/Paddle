@@ -40,7 +40,12 @@ class ParallelOptimizer:
             return self.optimizer
         # 1.replace optimizer parameters
         self.optimizer._parameter_list = parallelized_parameters
-
+        if isinstance(parallelized_parameters[0], dict):
+            self.optimizer._param_groups = []
+            for param_group in self.parallelized_parameters:
+                self.optimizer._add_param_group(param_group.copy())
+        else:
+            self.optimizer._param_groups = self.optimizer._parameter_list
         # 2.wrap with shard_optimizer
         mesh = fleet.auto.get_mesh()
         if self.level == "os":

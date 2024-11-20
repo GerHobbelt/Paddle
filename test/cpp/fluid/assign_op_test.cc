@@ -45,7 +45,7 @@ TEST(AssignOp, AssignLoDTensor) {
   }
 }
 
-TEST(AssignOp, AssignLoDTensorArray) {
+TEST(AssignOp, AssignDenseTensorArray) {
   phi::CPUPlace cpu_place;
   phi::CPUContext ctx(cpu_place);
 

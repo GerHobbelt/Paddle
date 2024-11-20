@@ -37,7 +37,7 @@ from paddle.static.io import deserialize_program
 _valid_types = [
     core.VarDesc.VarType.LOD_TENSOR,
     core.VarDesc.VarType.SELECTED_ROWS,
-    core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+    core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
 ]
 
 paddle.enable_static()

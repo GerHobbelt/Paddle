@@ -326,19 +326,33 @@ std::shared_ptr<OpStrategy> StrategyForScaleSymbolic(
         out = Compute(
             A->shape,
             [=](const std::vector<Expr> &indice) {
+              Expr cast_A_indice =
+                  should_upscale_fp32
+                      ? ir::Cast::Make(cinn::common::F32(), A(indice))
+                      : A(indice);
+
               Expr cast_scale = should_upscale_fp32
                                     ? Expr(scale)
                                     : ir::Cast::Make(A->type(), Expr(scale));
               Expr cast_bias = should_upscale_fp32
                                    ? Expr(bias)
                                    : ir::Cast::Make(A->type(), Expr(bias));
-              Expr cast_A_indice =
-                  should_upscale_fp32
-                      ? ir::Cast::Make(cinn::common::F32(), A(indice))
-                      : A(indice);
-              Expr add_result = bias_after_scale
-                                    ? cast_scale * cast_A_indice + cast_bias
-                                    : cast_scale * (cast_A_indice + cast_bias);
+              Expr add_result;
+              if (scale == 1.0f) {
+                if (bias == 0.0f) {
+                  add_result = cast_A_indice;
+                } else {
+                  add_result = cast_A_indice + cast_bias;
+                }
+              } else {
+                if (bias == 0.0f) {
+                  add_result = cast_scale * cast_A_indice;
+                } else {
+                  add_result = bias_after_scale
+                                   ? cast_scale * cast_A_indice + cast_bias
+                                   : cast_scale * (cast_A_indice + cast_bias);
+                }
+              }
               return should_upscale_fp32 ? ir::Cast::Make(A->type(), add_result)
                                          : add_result;
             },

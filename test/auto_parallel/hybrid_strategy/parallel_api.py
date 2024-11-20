@@ -35,9 +35,10 @@ from paddle.distributed.auto_parallel.intermediate.sharded_data_parallel import 
 )
 from paddle.distributed.auto_parallel.intermediate.tensor_parallel import (
     ColWiseParallel,
-    PrepareLayerInput,
-    PrepareLayerOutput,
     RowWiseParallel,
+    SequenceParallel,
+    SequenceParallelBegin,
+    SequenceParallelEnd,
     tensor_parallel,
 )
 from paddle.io import BatchSampler, DataLoader, Dataset
@@ -147,6 +148,9 @@ class TestParallelAPI:
         self.sequence_parallel = False
         if os.getenv("sequence_parallel") == "true":
             self.sequence_parallel = True
+        self.prepare_input_output = False
+        if os.getenv("prepare_input_output") == "true":
+            self.sequence_parallel = True
 
         seed = int(os.getenv("seed", 2024))
         np.random.seed(seed)
@@ -165,18 +169,6 @@ class TestParallelAPI:
         ).reshape(mesh_shape)
         global_mesh = dist.ProcessMesh(mesh_arr, dim_names)
         dist.auto_parallel.set_mesh(global_mesh)
-
-    def output_transpose(self, process_mesh):
-        def transpose(layer, input, output=None):
-            return paddle.transpose(output, perm=[1, 0, 2])
-
-        return transpose
-
-    def input_transpose(self, process_mesh):
-        def transpose(layer, input, output=None):
-            return paddle.transpose(input, perm=[1, 0, 2])
-
-        return transpose
 
     def check_mp(self, layer):
         if self.mp == 1:
@@ -244,34 +236,46 @@ class TestParallelAPI:
                     "llama.layers.*.mlp.down_proj": RowWiseParallel(),
                     "lm_head.weight": ColWiseParallel(),
                 }
-            if self.sequence_parallel:
-                plan = {
-                    "llama.embed_tokens": [
-                        ColWiseParallel(),
-                        PrepareLayerOutput(self.output_transpose),
-                    ],
-                    "llama.layers.*.self_attn.q_proj": [
-                        ColWiseParallel(),
-                        PrepareLayerOutput(self.output_transpose),
-                    ],
-                    "llama.layers.*.self_attn.k_proj": [
-                        ColWiseParallel(),
-                        PrepareLayerOutput(self.output_transpose),
-                    ],
-                    "llama.layers.*.self_attn.v_proj": [
-                        ColWiseParallel(),
-                        PrepareLayerOutput(self.output_transpose),
-                    ],
-                    "llama.layers.*.self_attn.o_proj": [
-                        RowWiseParallel(),
-                        PrepareLayerInput(self.input_transpose),
-                    ],
-                    "llama.layers.*.mlp.gate_proj": ColWiseParallel(),
-                    "llama.layers.*.mlp.up_proj": ColWiseParallel(),
-                    "llama.layers.*.mlp.down_proj": RowWiseParallel(),
-                    "lm_head.weight": ColWiseParallel(),
-                    "lm_head": PrepareLayerInput(self.input_transpose),
-                }
+            else:
+                if self.prepare_input_output:
+                    plan = {
+                        "llama.embed_tokens": ColWiseParallel(),
+                        "llama.layers.*.self_attn.q_proj": ColWiseParallel(),
+                        "llama.layers.*.self_attn.k_proj": ColWiseParallel(),
+                        "llama.layers.*.self_attn.v_proj": ColWiseParallel(),
+                        "llama.layers.*.self_attn.o_proj": RowWiseParallel(),
+                        "llama.layers.*.mlp.gate_proj": ColWiseParallel(),
+                        "llama.layers.*.mlp.up_proj": ColWiseParallel(),
+                        "llama.layers.*.mlp.down_proj": RowWiseParallel(),
+                        "lm_head.weight": ColWiseParallel(),
+                        "llama.layers.*.input_layernorm": SequenceParallel(),
+                        "llama.layers.*.post_attention_layernorm": SequenceParallel(),
+                        "llama.norm": SequenceParallel(),
+                    }
+                else:
+                    plan = {
+                        "llama.embed_tokens": [
+                            ColWiseParallel(),
+                            SequenceParallelBegin(),
+                        ],
+                        "llama.layers.*.self_attn.q_proj": ColWiseParallel(),
+                        "llama.layers.*.self_attn.k_proj": ColWiseParallel(),
+                        "llama.layers.*.self_attn.v_proj": ColWiseParallel(),
+                        "llama.layers.*.self_attn.o_proj": RowWiseParallel(),
+                        "llama.layers.*.self_attn": [
+                            SequenceParallelEnd(),
+                            SequenceParallelBegin(),
+                        ],
+                        "llama.layers.*.mlp.gate_proj": ColWiseParallel(),
+                        "llama.layers.*.mlp.up_proj": ColWiseParallel(),
+                        "llama.layers.*.mlp.down_proj": RowWiseParallel(),
+                        "llama.layers.*.mlp": [
+                            SequenceParallelEnd(need_transpose=False),
+                            SequenceParallelBegin(need_transpose=False),
+                        ],
+                        "lm_head.weight": ColWiseParallel(),
+                        "lm_head": SequenceParallelEnd(),
+                    }
             layer, optimizer = tensor_parallel(layer, plan, optimizer)
         layer, optimizer = parallelize_model_and_optimizer(layer, optimizer)
         self.check_mp(layer)

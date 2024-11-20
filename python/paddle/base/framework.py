@@ -6031,7 +6031,7 @@ class Program:
                         [
                             core.VarDesc.VarType.LOD_TENSOR,
                             core.VarDesc.VarType.SELECTED_ROWS,
-                            core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+                            core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
                         ],
                     ),
                     "dtype": get_var_desc_attr_or_none(
@@ -6040,7 +6040,7 @@ class Program:
                         [
                             core.VarDesc.VarType.LOD_TENSOR,
                             core.VarDesc.VarType.SELECTED_ROWS,
-                            core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+                            core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
                         ],
                     ),
                     "lod_level": get_var_desc_attr_or_none(
@@ -6048,7 +6048,7 @@ class Program:
                         "lod_level",
                         [
                             core.VarDesc.VarType.LOD_TENSOR,
-                            core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+                            core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
                         ],
                     ),
                     "error_clip": (

@@ -119,6 +119,11 @@ def test_sqrt(x: int):
     return math.sqrt(x)
 
 
+@check_no_breakgraph
+def test_log(x: int):
+    return math.log(x)
+
+
 class TestBuiltinDispatch(TestCaseBase):
     def test_dispatch_len(self):
         self.assert_results(dispatch_len, paddle.to_tensor([1, 2, 3]))
@@ -250,6 +255,9 @@ class TestBuiltinDispatch(TestCaseBase):
 
     def test_dispatch_sqrt(self):
         self.assert_results(test_sqrt, 9)
+
+    def test_dispatch_log(self):
+        self.assert_results(test_log, math.e)
 
 
 def run_getattr(x: paddle.Tensor):

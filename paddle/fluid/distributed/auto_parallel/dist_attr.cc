@@ -33,7 +33,7 @@ std::vector<int64_t> get_tensor_shape(const VarDesc* tensor) {
   if (tensor == nullptr) return std::vector<int64_t>();
   switch (tensor->GetType()) {
     case framework::proto::VarType::READER:
-    case framework::proto::VarType::LOD_TENSOR_ARRAY:
+    case framework::proto::VarType::DENSE_TENSOR_ARRAY:
     case framework::proto::VarType::STEP_SCOPES:
     case framework::proto::VarType::FEED_MINIBATCH:
     case framework::proto::VarType::FETCH_LIST:

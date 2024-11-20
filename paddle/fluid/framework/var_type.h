@@ -35,7 +35,7 @@ inline proto::VarType::Type ToVarType(int type) {
     case proto::VarType::SELECTED_ROWS:
     case proto::VarType::SPARSE_COO:
     case proto::VarType::LOD_RANK_TABLE:
-    case proto::VarType::LOD_TENSOR_ARRAY:
+    case proto::VarType::DENSE_TENSOR_ARRAY:
     case proto::VarType::FETCH_LIST:
     case proto::VarType::READER:
       return static_cast<proto::VarType::Type>(type);
@@ -54,7 +54,7 @@ inline void VisitVarType(const framework::Variable& var, Visitor visitor) {
     case proto::VarType::LOD_RANK_TABLE:
       visitor(var.Get<LoDRankTable>());
       return;
-    case proto::VarType::LOD_TENSOR_ARRAY:
+    case proto::VarType::DENSE_TENSOR_ARRAY:
       visitor(var.Get<phi::TensorArray>());
       return;
     case proto::VarType::SELECTED_ROWS:

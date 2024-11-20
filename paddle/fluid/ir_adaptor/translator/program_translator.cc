@@ -761,7 +761,7 @@ const VariableDefiningInfo& ProgramTranslator::CreateUndefinedVariable(
   auto dtype = ::phi::TransToPhiDataType(var_desc->GetDataType());
   auto val = pir::Value(nullptr);
   if (var_desc->GetType() ==
-      paddle::framework::proto::VarType::LOD_TENSOR_ARRAY) {
+      paddle::framework::proto::VarType::DENSE_TENSOR_ARRAY) {
     val = builder.Build<dialect::CreateArrayOp>(dtype).result(0);
     VLOG(10) << "[undefined variable] " << var_name << " " << val.type();
   } else {

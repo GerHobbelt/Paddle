@@ -947,7 +947,10 @@ class Engine:
             )
             self._job_plan = core.Plan(jobs, type_to_program)
 
-        if self._strategy.fused_passes.fused_passes_list is not None:
+        if (
+            self._strategy.fused_passes.fused_passes_list is not None
+            and self._strategy.fused_passes.fused_passes_list
+        ):
             pm = pir.PassManager()
             for p in self._strategy.fused_passes.fused_passes_list:
                 # Temporary implementation, it will be refined when auto_parallel refactored

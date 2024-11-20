@@ -213,7 +213,7 @@ class PSClient {
                                               int64_t *total_send_data,
                                               void *done) = 0;
 
-  // recv table from server and save it in LodTensor
+  // recv table from server and save it in DenseTensor
   virtual int32_t RecvAndSaveTable(const uint64_t table_id,
                                    const std::string &path) = 0;
 

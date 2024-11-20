@@ -1061,5 +1061,16 @@ void gather_nd_double_grad(const Tensor& grad_out,
   }
 }
 
+template <typename T>
+void reshape_double_grad(const Tensor& grad_out,
+                         const Tensor& grad_x_grad,
+                         Tensor* grad_out_grad) {
+  if (grad_out_grad) {
+    // ddout = reshape(ddx, ddout.shape)
+    auto grad_out_grad_tmp = reshape<T>(grad_x_grad, grad_out.shape());
+    set_output<T>(grad_out_grad_tmp, grad_out_grad);
+  }
+}
+
 }  // namespace prim
 }  // namespace paddle

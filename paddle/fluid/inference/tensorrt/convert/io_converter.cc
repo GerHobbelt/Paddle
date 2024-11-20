@@ -107,7 +107,7 @@ class DefaultIOConverter : public EngineIOConverter {
   }
 };
 
-// fluid LodTensor <-> tensorrt ITensor
+// fluid DenseTensor <-> tensorrt ITensor
 REGISTER_TENSORRT_IO_CONVERTER(default, DefaultIOConverter);
 
 }  // namespace tensorrt

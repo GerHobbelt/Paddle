@@ -351,7 +351,7 @@ class LayerNormDecompHelper {
     if (static_norm_shape_) {
       return reshape<T>(s, normlized_shape_);
     } else {
-      return backend::reshape_with_tensor<T>(
+      return backend::reshape<T>(
           s, get_slice_vec<T>(shape<T>(x), begin_norm_axis_, x_rank_));
     }
   }

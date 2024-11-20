@@ -328,6 +328,16 @@
   backward : subtract_double_grad
   inplace : (out_grad -> x_grad)
 
+- backward_op : tensor_unfold_grad
+  forward : tensor_unfold (Tensor input, int64_t axis, int64_t size, int64_t step) -> Tensor(out)
+  args : (Tensor input, Tensor out_grad, int64_t axis, int64_t size, int64_t step)
+  output : Tensor(input_grad)
+  infer_meta :
+    func : StridedUnChangedInferMeta
+    param : [input]
+  kernel :
+    func : tensor_unfold_grad
+
 - backward_op : tile_double_grad
   forward : tile_grad (Tensor x, Tensor grad_out, IntArray repeat_times) -> Tensor(grad_x)
   args : (Tensor grad_x_grad, IntArray repeat_times)

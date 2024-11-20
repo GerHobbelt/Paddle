@@ -842,7 +842,7 @@ class TEST_API ArrayPopOp
       pir::AttributeMap *p_attributes);
 };
 
-class ShareVarOp : public pir::Op<ShareVarOp> {
+class ShareVarOp : public pir::Op<ShareVarOp, pir::SideEffectTrait> {
  public:
   using Op::Op;
   static const char *name() { return "pd_op.share_var"; }

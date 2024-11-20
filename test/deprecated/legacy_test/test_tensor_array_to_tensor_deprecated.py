@@ -23,7 +23,7 @@ from paddle.base import core
 paddle.enable_static()
 
 
-class TestLoDTensorArrayConcat(unittest.TestCase):
+class TestDenseTensorArrayConcat(unittest.TestCase):
     """Test case for concat mode of tensor_array_to_tensor."""
 
     def setUp(self):
@@ -38,7 +38,7 @@ class TestLoDTensorArrayConcat(unittest.TestCase):
 
         input_arr = block.create_var(
             name="tmp_lod_tensor_array",
-            type=core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+            type=core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
         )
         input_arr.persistable = True
         input_arr_var = scope.var('tmp_lod_tensor_array')
@@ -80,7 +80,7 @@ class TestLoDTensorArrayConcat(unittest.TestCase):
 
         out_grad = block.create_var(
             name="tmp_lod_tensor_array@GRAD",
-            type=core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+            type=core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
         )
         out_grad.persistable = True
 

@@ -108,7 +108,7 @@ class InferShapeArgumentMappingContext : public phi::ArgumentMappingContext {
     return std::all_of(var_types.begin(),
                        var_types.end(),
                        [](const proto::VarType::Type& type) {
-                         return type == proto::VarType::LOD_TENSOR_ARRAY;
+                         return type == proto::VarType::DENSE_TENSOR_ARRAY;
                        });
   }
 
@@ -210,7 +210,7 @@ bool CompatMetaTensor::is_tensor_array() const {
     return var->IsType<phi::TensorArray>();
   } else {
     auto* var = PADDLE_GET_CONST(VarDesc*, var_);
-    return var->GetType() == proto::VarType::LOD_TENSOR_ARRAY;
+    return var->GetType() == proto::VarType::DENSE_TENSOR_ARRAY;
   }
 }
 
@@ -409,7 +409,7 @@ void CompatMetaTensor::share_lod(const MetaTensor& meta_tensor) {
     // 'var->SetLodLevel' will fail. This case will happen when execute
     // 'test_hsigmoid_op.py'. So it is needed to assert 'var' type.
     if ((var && (var->GetType() != proto::VarType::LOD_TENSOR &&
-                 var->GetType() != proto::VarType::LOD_TENSOR_ARRAY)) ||
+                 var->GetType() != proto::VarType::DENSE_TENSOR_ARRAY)) ||
         (!meta_tensor.is_dense() && !meta_tensor.is_tensor_array())) {
       VLOG(3) << "this tensor or input metatensor is not phi::DenseTensor or "
                  "LoDTensorArray.";

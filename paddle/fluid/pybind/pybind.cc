@@ -2526,14 +2526,14 @@ All parameter, weight, gradient are variables in Paddle.
         return res;
       });
 
-  py::class_<phi::TensorArray> pylodtensorarray(m, "LoDTensorArray", R"DOC(
-    LoDTensorArray is array of LoDTensor, it supports operator[], len() and for-loop iteration.
+  py::class_<phi::TensorArray> pylodtensorarray(m, "DenseTensorArray", R"DOC(
+    DenseTensorArray is array of DenseTensor, it supports operator[], len() and for-loop iteration.
 
     Examples:
         .. code-block:: python
 
             >>> import paddle
-            >>> arr = paddle.framework.core.LoDTensorArray()
+            >>> arr = paddle.framework.core.DenseTensorArray()
 )DOC");
   g_framework_lodtensorarray_pytype =
       reinterpret_cast<PyTypeObject *>(pylodtensorarray.ptr());
@@ -2550,7 +2550,7 @@ All parameter, weight, gradient are variables in Paddle.
                                self.size(),
                                common::errors::InvalidArgument(
                                    "The index to set is larger than the size "
-                                   "of LoDTensorArray."));
+                                   "of DenseTensorArray."));
              self[i].ShareDataWith(t);
              self[i].set_lod(t.lod());
            })
@@ -2563,10 +2563,10 @@ All parameter, weight, gradient are variables in Paddle.
           },
           py::arg("tensor"),
           R"DOC(
-             Append a LoDensor to LoDTensorArray.
+             Append a DenseTensor to DenseTensorArray.
 
              Args:
-                   tensor (LoDTensor): The LoDTensor to be appended.
+                   tensor (DenseTensor): The DenseTensor to be appended.
 
              Returns:
                    None.
@@ -2577,7 +2577,7 @@ All parameter, weight, gradient are variables in Paddle.
                         >>> import paddle
                         >>> import numpy as np
 
-                        >>> arr = paddle.framework.core.LoDTensorArray()
+                        >>> arr = paddle.framework.core.DenseTensorArray()
                         >>> t = paddle.framework.core.LoDTensor()
                         >>> t.set(np.ndarray([5, 30]), paddle.CPUPlace())
                         >>> arr.append(t)
@@ -2595,7 +2595,7 @@ All parameter, weight, gradient are variables in Paddle.
           py::return_value_policy::take_ownership);
 
   py::class_<FetchList>(m, "FetchList", R"DOC( FetchList is a
-        vector of paddle::variant<LoDTensor, LoDTensorArray>.
+        vector of paddle::variant<LoDTensor, DenseTensorArray>.
         )DOC")
       .def(
           "_move_to_list",
@@ -2645,7 +2645,7 @@ All parameter, weight, gradient are variables in Paddle.
           py::arg("var"));
 
   py::class_<FetchUnmergedList>(m, "FetchUnmergedList", R"DOC(
-        FetchUnmergedList is 2-D array of FetchType(paddle::variant(LoDTensor, LoDTensorArray)).
+        FetchUnmergedList is 2-D array of FetchType(paddle::variant(LoDTensor, DenseTensorArray)).
         )DOC")
       .def(
           "_move_to_list",

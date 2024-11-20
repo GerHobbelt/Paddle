@@ -128,6 +128,8 @@ from .logic import (  # noqa: F401
     less_equal,
     less_equal_,
     less_than,
+    less_than as less,
+    less_than as less_,
     less_than_,
     logical_and,
     logical_and_,
@@ -139,6 +141,7 @@ from .logic import (  # noqa: F401
     logical_xor_,
     not_equal,
     not_equal_,
+    positive,
 )
 from .manipulation import (  # noqa: F401
     as_complex,
@@ -628,6 +631,8 @@ tensor_method_func = [
     'less_equal_',
     'less_than',
     'less_than_',
+    'less',
+    'less_',
     'logical_and',
     'logical_and_',
     'logical_not',
@@ -856,4 +861,5 @@ magic_method_func = [
     ('__or__', 'bitwise_or'),
     ('__xor__', 'bitwise_xor'),
     ('__invert__', 'bitwise_not'),
+    ('__pos__', 'positive'),
 ]

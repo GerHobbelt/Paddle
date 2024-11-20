@@ -49,11 +49,7 @@ int Internal_PyUnstable_InterpreterFrame_GetLine(_PyInterpreterFrame *frame) {
 int Internal_PyInterpreterFrame_GetLine(_PyInterpreterFrame *frame) {
 #endif
   int addr = _PyInterpreterFrame_LASTI(frame) * sizeof(_Py_CODEUNIT);
-#if PY_3_13_PLUS
-  return PyCode_Addr2Line(_PyFrame_GetCode(frame), addr);
-#else
-  return PyCode_Addr2Line(frame->f_code, addr);
-#endif
+  return PyCode_Addr2Line(PyFrame_GET_CODE(frame), addr);
 }
 
 static int Internal_PyFrame_OpAlreadyRan(_PyInterpreterFrame *frame,
@@ -62,15 +58,14 @@ static int Internal_PyFrame_OpAlreadyRan(_PyInterpreterFrame *frame,
   // This only works when opcode is a non-quickened form:
   assert(_PyOpcode_Deopt[opcode] == opcode);
   int check_oparg = 0;
+  for (_Py_CODEUNIT *instruction = _PyCode_CODE(PyFrame_GET_CODE(frame));
 #if PY_3_13_PLUS
-  for (_Py_CODEUNIT *instruction = _PyCode_CODE(_PyFrame_GetCode(frame));
        instruction < frame->instr_ptr;
-       instruction++) {
 #else
-  for (_Py_CODEUNIT *instruction = _PyCode_CODE(frame->f_code);
        instruction < frame->prev_instr;
-       instruction++) {
 #endif
+       instruction++) {
+
 #if PY_3_12_PLUS
     int check_opcode = _PyOpcode_Deopt[instruction->op.code];
     check_oparg |= instruction->op.arg;
@@ -225,9 +220,9 @@ bool Internal_PyFrame_HasHiddenLocals(_PyInterpreterFrame *frame) {
 
   return false;
 }
-static PyObject *framelocalsproxy_new(PyTypeObject *type,
-                                      PyObject *args,
-                                      PyObject *kwds) {
+static PyObject *Internal_framelocalsproxy_new(PyTypeObject *type,
+                                               PyObject *args,
+                                               PyObject *kwds) {
   if (PyTuple_GET_SIZE(args) != 1) {
     PyErr_Format(PyExc_TypeError,
                  "FrameLocalsProxy expected 1 argument, got %zd",
@@ -265,8 +260,8 @@ PyObject *Internal_PyFrameLocalsProxy_New(PyFrameObject *frame) {
     return NULL;
   }
 
-  PyObject *proxy =
-      (PyObject *)framelocalsproxy_new(&PyFrameLocalsProxy_Type, args, NULL);
+  PyObject *proxy = (PyObject *)Internal_framelocalsproxy_new(
+      &PyFrameLocalsProxy_Type, args, NULL);
   Py_DECREF(args);
   return proxy;
 }
@@ -634,11 +629,7 @@ PyFrameObject *Internal_PyFrame_MakeAndSetFrameObject(
   PyErr_Fetch(&error_type, &error_value, &error_traceback);
 #endif
 
-#if PY_3_13_PLUS
-  PyFrameObject *f = Internal_PyFrame_New_NoTrack(_PyFrame_GetCode(frame));
-#else
-  PyFrameObject *f = Internal_PyFrame_New_NoTrack(frame->f_code);
-#endif
+  PyFrameObject *f = Internal_PyFrame_New_NoTrack(PyFrame_GET_CODE(frame));
   if (f == NULL) {
 #if PY_3_12_PLUS
     Py_XDECREF(exc);
@@ -712,10 +703,8 @@ static void Internal_take_ownership(PyFrameObject *f,
   Py_ssize_t size =
       ((char *)&frame->localsplus[frame->stacktop]) - (char *)frame;
 
-#if PY_3_13_PLUS
-  Py_INCREF(_PyFrame_GetCode(frame));
-#elif PY_3_12_PLUS
-  Py_INCREF(frame->f_code);
+#if PY_3_12_PLUS
+  Py_INCREF(PyFrame_GET_CODE(frame));
 #endif
 
   memcpy((_PyInterpreterFrame *)f->_f_frame_data, frame, size);
@@ -723,13 +712,13 @@ static void Internal_take_ownership(PyFrameObject *f,
   f->f_frame = frame;
   frame->owner = FRAME_OWNED_BY_FRAME_OBJECT;
   if (_PyFrame_IsIncomplete(frame)) {
-// This may be a newly-created generator or coroutine frame. Since it's
-// dead anyways, just pretend that the first RESUME ran:
+    // This may be a newly-created generator or coroutine frame. Since it's
+    // dead anyways, just pretend that the first RESUME ran:
+    PyCodeObject *code = PyFrame_GET_CODE(frame);
+
 #if PY_3_13_PLUS
-    PyCodeObject *code = _PyFrame_GetCode(frame);
     frame->instr_ptr = _PyCode_CODE(code) + code->_co_firsttraceable + 1;
 #else
-    PyCodeObject *code = frame->f_code;
     frame->prev_instr = _PyCode_CODE(code) + code->_co_firsttraceable;
 #endif
   }
@@ -792,8 +781,8 @@ void Internal_PyFrame_Clear(_PyInterpreterFrame *frame) {
    * to have cleared the enclosing generator, if any. */
   assert(frame->owner != FRAME_OWNED_BY_GENERATOR ||
          _PyFrame_GetGenerator(frame)->gi_frame_state == FRAME_CLEARED);
-// GH-99729: Clearing this frame can expose the stack (via finalizers). It's
-// crucial that this frame has been unlinked, and is no longer visible:
+  // GH-99729: Clearing this frame can expose the stack (via finalizers). It's
+  // crucial that this frame has been unlinked, and is no longer visible:
 #if PY_3_13_PLUS
   assert(PyThreadState_GET()->current_frame != frame);
 #else

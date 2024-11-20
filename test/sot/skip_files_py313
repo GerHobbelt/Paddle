@@ -23,8 +23,6 @@ test/sot/test_builtin_range.py
 test/sot/test_builtin_zip.py
 test/sot/test_call_object.py
 test/sot/test_constant_graph.py
-test/sot/test_dataclass.py
-test/sot/test_delete_fast.py
 test/sot/test_dtype.py
 test/sot/test_dup_top.py
 test/sot/test_enumerate.py
@@ -36,7 +34,6 @@ test/sot/test_numpy.py
 test/sot/test_numpy_var_if.py
 test/sot/test_side_effects.py
 test/sot/test_simulate_initialize.py
-test/sot/test_sir_rollback.py
 test/sot/test_sot_cost_model.py
 test/sot/test_sot_dynamic_shape.py
 test/sot/test_sot_exception.py

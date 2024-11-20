@@ -402,6 +402,7 @@
   kernel :
     func : assign_pos
   traits : paddle::dialect::ForwardOnlyTrait
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : assign_value_
   args : (Tensor output, int[] shape, DataType dtype, Scalar[] values, Place place = {})
@@ -3292,6 +3293,7 @@
   kernel :
     func : matrix_rank_tol
   traits : paddle::dialect::ForwardOnlyTrait
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : max
   args : (Tensor x, IntArray axis={}, bool keepdim=false)
@@ -4506,7 +4508,7 @@
   traits : pir::SideEffectTrait
   data_transform :
     skip_transform : seed
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : shuffle_channel
   args : (Tensor x, int group = 1)
@@ -4947,18 +4949,6 @@
   backward : temporal_shift_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
 
-- op : tensor_unfold
-  args : (Tensor input, int64_t axis, int64_t size, int64_t step)
-  output : Tensor
-  infer_meta :
-    func : StridedUnChangedInferMeta
-    param : [input]
-  kernel :
-    func : tensor_unfold
-  backward : tensor_unfold_grad
-  no_need_buffer : input
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
-
 - op : thresholded_relu
   args : (Tensor x, float threshold = 1.0, float value = 0.0)
   output : Tensor(out)
@@ -5188,7 +5178,7 @@
     data_type: dtype
   no_need_buffer: input
   traits : pir::SideEffectTrait, paddle::dialect::ForwardOnlyTrait
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : unique_consecutive
   args : (Tensor x, bool return_inverse = false, bool return_counts = false, int[] axis = {}, DataType dtype = DataType::FLOAT32)

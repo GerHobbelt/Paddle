@@ -36,7 +36,7 @@ class TestDrawBlockGraphviz(unittest.TestCase):
         b.create_var(
             name='tensor_array',
             shape=[5, 10],
-            type=core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+            type=core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
         )
 
         # operator

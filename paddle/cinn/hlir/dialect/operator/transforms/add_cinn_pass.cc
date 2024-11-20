@@ -49,6 +49,7 @@
 #include "paddle/cinn/hlir/dialect/operator/transforms/lowering_pass/lower_cinn_fusion_op_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/pd_to_cinn_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/pir_to_py_code_converter.h"
+#include "paddle/cinn/hlir/dialect/operator/transforms/reduce_as_to_sum_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/remove_assign_out_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/replace_dynamic_expand_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/shape_ops_fallback_to_phi_pass.h"
@@ -120,6 +121,7 @@ void ApplyPdToCinnPass(
     const std::function<std::shared_ptr<::pir::PassManager>()>&
         CreatePassManager) {
   std::shared_ptr<pir::PassManager> pass_manager = CreatePassManager();
+  pass_manager->AddPass(cinn::dialect::ir::CreateReduceAsToSumPass());
   pass_manager->AddPass(pir::CreateFusedGemmEpiloguePass());
   if (FLAGS_enable_fuse_parallel_matmul_pass) {
     pass_manager->AddPass(cinn::dialect::ir::CreateFuseParallelMatmulPass());
@@ -132,6 +134,7 @@ void ApplyPdToCinnPass(
 
   pass_manager->AddPass(pir::CreateDeadCodeEliminationPass());
 
+  // pass_manager->EnableIRPrinting();
   pass_manager->Run(program);
 }
 

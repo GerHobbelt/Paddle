@@ -39,7 +39,7 @@ from ..auto_parallel.static.utils import OpRole
 __not_shape_var_type__ = [
     core.VarDesc.VarType.READER,
     core.VarDesc.VarType.STEP_SCOPES,
-    core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+    core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
     core.VarDesc.VarType.FEED_MINIBATCH,
     core.VarDesc.VarType.FETCH_LIST,
 ]

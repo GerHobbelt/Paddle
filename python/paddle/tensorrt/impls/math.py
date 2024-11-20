@@ -21,6 +21,7 @@ from paddle.tensorrt.converter_utils import (
     add_reduce_layer,
     broadcast,
     get_axes_for_reduce_op,
+    trt_cast,
     trt_div,
     trt_floor_div,
     trt_mul,
@@ -170,3 +171,17 @@ def all_converter(network, paddle_op, inputs):
     return add_cast_reduce_layer(
         network, paddle_op, inputs, trt.ReduceOperation.MIN
     )
+
+
+@converter_registry.register("pd_op.floor_divide", trt_version="8.x")
+def floor_divide_converter(network, paddle_op, inputs):
+    return add_elementwise_layer(
+        network, paddle_op, inputs, trt.ElementWiseOperation.FLOOR_DIV
+    )
+
+
+@converter_registry.register("pd_op.log", trt_version="8.x")
+def sqrt_converter(network, paddle_op, inputs):
+    input_tensor = trt_cast(network, inputs[0], trt.float32)
+    layer = network.add_unary(input_tensor, trt.UnaryOperation.LOG)
+    return layer.get_output(0)

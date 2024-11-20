@@ -391,10 +391,11 @@ void InferSymExprForAllValues(ModuleOp module_op) {
         std::unordered_map<pir::Value, symbol::ShapeOrDataDimExprs>
             symbol_shape_map;
         for (const auto& [_, value] : module_op.block().kwargs()) {
-          if (infer_context->HasShapeOrDataForValue(value)) {
-            symbol_shape_map.emplace(
-                value, infer_context->GetShapeOrDataForValue(value));
+          if (!infer_context->HasShapeOrDataForValue(value)) {
+            infer_context->SetSymbolForValueByStaticShape(value);
           }
+          symbol_shape_map.emplace(
+              value, infer_context->GetShapeOrDataForValue(value));
         }
         return symbol_shape_map;
       }();

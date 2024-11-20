@@ -17,6 +17,7 @@ import tensorrt as trt
 
 from paddle.tensorrt.converter_utils import (
     get_trt_plugin,
+    trt_mul,
 )
 from paddle.tensorrt.register import converter_registry
 
@@ -24,6 +25,8 @@ activation_type_map = {
     "pd_op.tanh": trt.ActivationType.TANH,
     "pd_op.relu": trt.ActivationType.RELU,
     "pd_op.sigmoid": trt.ActivationType.SIGMOID,
+    "pd_op.silu": trt.ActivationType.SIGMOID,
+    "pd_op.swish": trt.ActivationType.SIGMOID,
 }
 
 
@@ -99,3 +102,12 @@ def hardswish_converter(network, paddle_op, inputs):
         x, hardsigmoid_layer.get_output(0), trt.ElementWiseOperation.PROD
     )
     return hardswish_layer.get_output(0)
+
+
+@converter_registry.register("pd_op.swish", trt_version="8.x")
+@converter_registry.register("pd_op.silu", trt_version="8.x")
+def swish_silu_converter(network, paddle_op, inputs):
+    layer_output = network.add_activation(
+        inputs[0], activation_type_map[paddle_op.name()]
+    ).get_output(0)
+    return trt_mul(network, inputs[0], layer_output)

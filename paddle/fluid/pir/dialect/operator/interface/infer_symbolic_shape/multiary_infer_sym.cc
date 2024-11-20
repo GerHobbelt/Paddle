@@ -645,12 +645,24 @@ bool BilinearOpInferSymbolicShape(
   return true;
 }
 
-// bool AssignPosOpInferSymbolicShape(pir::Operation *op,
-//                                    pir::InferSymbolicShapeContext
-//                                    *infer_context) {
-//   // pass
-//   return true;
-// }
+bool AssignPosOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  const auto &eff_num_len_shape_or_data =
+      infer_context->GetShapeOrDataForValue(op->operand_source(2));
+  if (eff_num_len_shape_or_data.data()
+          .has_value()) {  // accoding to the kernel code
+    infer_context->SetShapeOrDataForValue(
+        op->result(0),
+        symbol::ShapeOrDataDimExprs{symbol::TensorShapeOrDataDimExprs(
+            {eff_num_len_shape_or_data.data()->at(0)})});
+  } else {
+    infer_context->SetShapeOrDataForValue(
+        op->result(0),
+        symbol::ShapeOrDataDimExprs{symbol::TensorShapeOrDataDimExprs(
+            {infer_context->GetNextSymName()})});
+  }
+  return true;
+}
 
 bool BroadcastTensorsOpInferSymbolicShape(
     pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {

@@ -73,7 +73,7 @@ TEST(test_var_helper, eager_var_helper) {
   InitializeVariable(&var1, paddle::framework::proto::VarType::STEP_SCOPES);
   InitializeVariable(&var2, paddle::framework::proto::VarType::LOD_RANK_TABLE);
   InitializeVariable(&var3,
-                     paddle::framework::proto::VarType::LOD_TENSOR_ARRAY);
+                     paddle::framework::proto::VarType::DENSE_TENSOR_ARRAY);
   InitializeVariable(&var4, paddle::framework::proto::VarType::STRINGS);
   InitializeVariable(&var5, paddle::framework::proto::VarType::VOCAB);
   InitializeVariable(&var6, paddle::framework::proto::VarType::READER);
@@ -103,7 +103,7 @@ TEST(test_var_helper, eager_var_helper) {
                                      egr_tensor2);
   ASSERT_ANY_THROW(GetPlace<egr::EagerVariable>(egr_tensor2));
   ASSERT_ANY_THROW(SetType<egr::EagerVariable>(
-      egr_tensor, paddle::framework::proto::VarType::LOD_TENSOR_ARRAY));
+      egr_tensor, paddle::framework::proto::VarType::DENSE_TENSOR_ARRAY));
 }
 }  // namespace imperative
 }  // namespace paddle

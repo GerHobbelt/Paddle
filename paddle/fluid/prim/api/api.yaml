@@ -51,3 +51,5 @@
 - sign
 - sigmoid
 - index_put
+- isnan
+- isfinite

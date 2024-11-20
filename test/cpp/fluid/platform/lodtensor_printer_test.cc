@@ -16,7 +16,7 @@
 #include "gtest/gtest.h"
 #include "paddle/fluid/framework/scope.h"
 
-TEST(LodTensorPrinter, PrintVar) {
+TEST(DenseTensorPrinter, PrintVar) {
   paddle::framework::Scope scope;
   std::stringstream ss;
   paddle::platform::PrintVar(&scope, "NotAVar", "We don't have var", &ss);

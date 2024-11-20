@@ -38,7 +38,7 @@ _logger = get_logger(
 _valid_types = [
     core.VarDesc.VarType.LOD_TENSOR,
     core.VarDesc.VarType.SELECTED_ROWS,
-    core.VarDesc.VarType.LOD_TENSOR_ARRAY,
+    core.VarDesc.VarType.DENSE_TENSOR_ARRAY,
 ]
 
 _fp16_guard_pattern = "__use_fp16__"

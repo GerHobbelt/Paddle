@@ -150,7 +150,7 @@ void PSendArrayKernel(const Context& dev_ctx,
   auto comm_ctx = GetCommContext(dev_ctx, peer);
   gpuStream_t stream = dev_ctx.stream();
   for (size_t idx = 0; idx < x_array.size(); idx++) {
-    VLOG(3) << "LodTensorArray: idx(" << idx << ")";
+    VLOG(3) << "DenseTensorArray: idx(" << idx << ")";
     auto x = x_array.at(idx);
     int numel = x.numel();
     ncclDataType_t dtype = ToNCCLDataType(x.type());

@@ -180,6 +180,12 @@ def dict_test_fromkeys_defalut(x, y):
     return d
 
 
+@check_no_breakgraph
+def dict_keyword_init():
+    d = dict(x=1, y=2)  # noqa: C408
+    return d["x"] + d["y"]
+
+
 class TestBuildDict(TestCaseBase):
     def test_build_map(self):
         self.assert_results(build_map, 1, paddle.to_tensor(2))
@@ -258,6 +264,9 @@ class TestDictMethods(TestCaseBase):
         self.assert_results(
             dict_test_fromkeys_defalut, [1, 2, 3, 4], paddle.to_tensor(1)
         )
+
+    def test_dict_keyword_init(self):
+        self.assert_results(dict_keyword_init)
 
 
 if __name__ == "__main__":

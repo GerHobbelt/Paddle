@@ -162,7 +162,7 @@ void PRecvArrayKernel(const Context& dev_ctx,
   auto comm_ctx = GetCommContext(dev_ctx, peer);
   gpuStream_t stream = dev_ctx.stream();
   for (size_t idx = 0; idx < out_shape.size(); ++idx) {
-    VLOG(3) << "LodTensorArray: idx(" << idx << ")";
+    VLOG(3) << "DenseTensorArray: idx(" << idx << ")";
     auto out = out_array->at(idx);
     auto out_dims = out.dims();
     dev_ctx.Alloc(&out, dtype);

@@ -21,7 +21,7 @@ import paddle
 from paddle import base
 
 
-class TestFetchLoDTensorArray(unittest.TestCase):
+class TestFetchDenseTensorArray(unittest.TestCase):
     def build_program(self, main_program, startup_program):
         with base.unique_name.guard():
             with base.program_guard(main_program, startup_program):

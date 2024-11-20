@@ -20,7 +20,7 @@ import paddle
 from paddle.base import core
 
 
-class TestLoDTensorArray(unittest.TestCase):
+class TestDenseTensorArray(unittest.TestCase):
     def test_get_set(self):
         scope = core.Scope()
         arr = scope.var('tmp_lod_tensor_array')

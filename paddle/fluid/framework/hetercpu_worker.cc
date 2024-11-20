@@ -200,7 +200,7 @@ void HeterCpuWorker::SetNeedDump(bool need_dump_field) {
 }
 
 // template <typename T>
-// std::string PrintLodTensorType(phi::DenseTensor* tensor,
+// std::string PrintDenseTensorType(phi::DenseTensor* tensor,
 //                                int64_t start, int64_t end) {
 //   auto count = tensor->numel();
 //   if (start < 0 || end > count) {
@@ -214,7 +214,7 @@ void HeterCpuWorker::SetNeedDump(bool need_dump_field) {
 //   return os.str();
 // }
 //
-// std::string PrintLodTensorIntType(phi::DenseTensor* tensor, int64_t start,
+// std::string PrintDenseTensorIntType(phi::DenseTensor* tensor, int64_t start,
 //                                   int64_t end) {
 //   auto count = tensor->numel();
 //   if (start < 0 || end > count) {
@@ -228,15 +228,15 @@ void HeterCpuWorker::SetNeedDump(bool need_dump_field) {
 //   return os.str();
 // }
 //
-// std::string PrintLodTensor(phi::DenseTensor* tensor, int64_t start, int64_t
+// std::string PrintDenseTensor(phi::DenseTensor* tensor, int64_t start, int64_t
 // end) {
 //   std::string out_val;
 //   if (tensor->type() == proto::VarType::FP32) {
-//     out_val = PrintLodTensorType<float>(tensor, start, end);
+//     out_val = PrintDenseTensorType<float>(tensor, start, end);
 //   } else if (tensor->type() == proto::VarType::INT64) {
-//     out_val = PrintLodTensorIntType(tensor, start, end);
+//     out_val = PrintDenseTensorIntType(tensor, start, end);
 //   } else if (tensor->type() == proto::VarType::FP64) {
-//     out_val = PrintLodTensorType<double>(tensor, start, end);
+//     out_val = PrintDenseTensorType<double>(tensor, start, end);
 //   } else {
 //     out_val = "unsupported type";
 //   }
@@ -281,7 +281,7 @@ void HeterCpuWorker::DumpParam() {
   //    }
   //    phi::DenseTensor* tensor = var->GetMutable<phi::DenseTensor>();
   //    int64_t len = tensor->numel();
-  //    os += PrintLodTensor(tensor, 0, len);
+  //    os += PrintDenseTensor(tensor, 0, len);
   //    writer_ << os;
   //  }
 }
@@ -1196,7 +1196,7 @@ void HeterCpuWorker::TrainFiles() {
         //           boost::lexical_cast<std::string>(output_dim);
         //       ars[i] = ars[i] + "\t" + field + ":" + output_dimstr;
         //       auto bound = GetTensorBound(tensor, i);
-        //       ars[i] += PrintLodTensor(tensor, bound.first, bound.second);
+        //       ars[i] += PrintDenseTensor(tensor, bound.first, bound.second);
         //     }
         //   }
         //   // #pragma omp parallel for

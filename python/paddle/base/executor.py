@@ -169,7 +169,7 @@ def as_numpy(tensor, copy=False):
     Returns:
         numpy.ndarray
     """
-    if isinstance(tensor, core.LoDTensorArray):
+    if isinstance(tensor, core.DenseTensorArray):
         return [as_numpy(t, copy) for t in tensor]
     if isinstance(tensor, list):
         return [as_numpy(t, copy) for t in tensor]

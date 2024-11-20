@@ -47,6 +47,9 @@ typedef _PyInterpreterFrame FrameObject;
 typedef struct PyInterpreterFrameProxy {
   PyObject_HEAD
   _PyInterpreterFrame *frame;
+  #if PY_3_13_PLUS
+  PyObject* locals;
+  #endif
 } PyInterpreterFrameProxy;
 // clang-format on
 
@@ -70,9 +73,8 @@ DECLARE_PROXY_PROPERTY(f_code)
 #if PY_3_13_PLUS
 static PyObject *PyInterpreterFrameProxy_property_f_locals(
     PyInterpreterFrameProxy *self, void *closure) {
-  PyObject *f_locals = Internal_PyFrame_GetLocals(self->frame);
-  Py_XINCREF(f_locals);
-  return f_locals;
+  Py_XINCREF(self->locals);
+  return self->locals;
 }
 #else
 DECLARE_PROXY_PROPERTY(f_locals)
@@ -134,6 +136,9 @@ PyInterpreterFrameProxy *PyInterpreterFrameProxy_New(
     return NULL;
   }
   self->frame = frame;
+#if PY_3_13_PLUS
+  self->locals = NULL;
+#endif
   return self;
 }
 
@@ -349,12 +354,13 @@ static PyObject *_custom_eval_frame(PyThreadState *tstate,
   // _PyFrame_FastToLocalsWithError directly. But this is an internal API, so we
   // copy many code from CPython project into our project.
 #if PY_3_13_PLUS
-  Internal_PyFrame_GetLocals(frame);
+  PyObject *f_locals = Internal_PyFrame_GetLocals(frame);
+  if (f_locals == NULL) {
 #else
   if (Internal_PyFrame_FastToLocalsWithError(frame) < 0) {
+#endif
     return NULL;
   }
-#endif
 #else
   if (frame->f_code->co_flags & 0x20) {
     out = eval_frame_default(tstate, frame, throw_flag);
@@ -394,7 +400,17 @@ static PyObject *_custom_eval_frame(PyThreadState *tstate,
   } else {
     /* should calculate guards here if we want */
 #if PY_3_11_PLUS
-    PyObject *args = Py_BuildValue("(O)", PyInterpreterFrameProxy_New(frame));
+    PyInterpreterFrameProxy *frame_proxy = PyInterpreterFrameProxy_New(frame);
+    if (frame_proxy == NULL) {
+#if PY_3_13_PLUS
+      Py_DECREF(f_locals);
+#endif
+      return NULL;
+    }
+#if PY_3_13_PLUS
+    frame_proxy->locals = f_locals;
+#endif
+    PyObject *args = Py_BuildValue("(O)", frame_proxy);
 #else
     PyObject *args = Py_BuildValue("(O)", frame);
 #endif
@@ -403,6 +419,7 @@ static PyObject *_custom_eval_frame(PyThreadState *tstate,
     if (result == NULL) {
 #if PY_3_12_PLUS
 #if PY_3_13_PLUS
+      Py_DECREF(f_locals);
       Internal_PyEval_FrameClearAndPop(tstate, frame);
 #else
       Internal_PyEvalFrameClearAndPop(tstate, frame);
@@ -414,6 +431,10 @@ static PyObject *_custom_eval_frame(PyThreadState *tstate,
     disable_eval_frame = PyObject_GetAttrString(result, "disable_eval_frame");
     Py_DECREF(result);
   }
+
+#if PY_3_13_PLUS
+  Py_DECREF(f_locals);
+#endif
 
   // code status
   if (is_code_without_graph(code == Py_None ? PyFrame_GET_CODE(frame)

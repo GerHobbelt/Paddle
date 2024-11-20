@@ -1430,6 +1430,14 @@ class TestDygraphInplaceLessThan(TestDygraphInplaceLogicAnd):
         return paddle.less_than(var, self.y)
 
 
+class TestDygraphInplaceLess(TestDygraphInplaceLogicAnd):
+    def inplace_api_processing(self, var):
+        return paddle.less_(var, self.y)
+
+    def non_inplace_api_processing(self, var):
+        return paddle.less(var, self.y)
+
+
 class TestDygraphInplaceLessEqual(TestDygraphInplaceLogicAnd):
     def inplace_api_processing(self, var):
         return paddle.less_equal_(var, self.y)

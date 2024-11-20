@@ -2858,9 +2858,9 @@ class OpTest(unittest.TestCase):
                 if isinstance(out, core.LoDTensor):
                     lod_level_runtime = len(out.lod())
                 else:
-                    if isinstance(out, core.LoDTensorArray):
+                    if isinstance(out, core.DenseTensorArray):
                         warnings.warn(
-                            "The check of LoDTensorArray's lod_level is not implemented now!"
+                            "The check of DenseTensorArray's lod_level is not implemented now!"
                         )
                     lod_level_runtime = 0
 

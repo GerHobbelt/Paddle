@@ -44,11 +44,13 @@ SUPPORT_PROMOTION_OPS = [
     "__mul__",
     "__rmul__",
     "__mod__",
+    "__rmod__",
     "__div__",
     "__rdiv__",
     "__truediv__",
     "__rtruediv__",
     "__floordiv__",
+    "__rfloordiv__",
     "__pow__",
     "__rpow__",
     "__eq__",
@@ -593,6 +595,30 @@ def monkey_patch_value():
             """
         raise TypeError(textwrap.dedent(error_msg))
 
+    def _complex_(self):
+        error_msg = """\
+            complex(Tensor) is not supported in static graph mode. Because it's value is not available during the static mode.
+            It's usually triggered by the logging implicitly, for example:
+                >>> logging.info("The value of x is: {complex(x)}")
+                                                              ^ `x` is Tensor, `complex(x)` triggers complex(Tensor)
+
+                There are two common workarounds available:
+                If you are logging Tensor values, then consider logging only at dynamic graphs, for example:
+
+                    Modify the following code
+                    >>> logging.info("The value of x is: {complex(x)}")
+                    to
+                    >>> if paddle.in_dynamic_mode():
+                    ...     logging.info("The value of x is: {complex(x)}")
+
+                If you need to convert the Tensor type, for example:
+                    Modify the following code
+                    >>> x = complex(x)
+                    to
+                    >>> x = x.astype("complex64")
+        """
+        raise TypeError(textwrap.dedent(error_msg))
+
     def clone(self):
         """
         Returns a new static Value, which is the clone of the original static
@@ -1092,8 +1118,18 @@ def monkey_patch_value():
             ),
         ),
         (
+            '__rfloordiv__',
+            _binary_creator_(
+                '__rfloordiv__', paddle.tensor.floor_divide, True, None
+            ),
+        ),
+        (
             '__mod__',
             _binary_creator_('__mod__', paddle.tensor.remainder, False, None),
+        ),
+        (
+            '__rmod__',
+            _binary_creator_('__rmod__', paddle.tensor.remainder, True, None),
         ),
         (
             '__matmul__',
@@ -1131,6 +1167,7 @@ def monkey_patch_value():
         ('__float__', _float_),
         ('__int__', _int_),
         ('__bool__', _bool_),
+        ('__complex__', _complex_),
     ]
 
     global _already_patch_value

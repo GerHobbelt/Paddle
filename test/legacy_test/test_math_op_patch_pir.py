@@ -84,6 +84,7 @@ class TestMathOpPatchesPir(unittest.TestCase):
         res_np_b = x_np % y_np
         res_np_c = paddle.mod(paddle.to_tensor(x_np), paddle.to_tensor(y_np))
         res_np_d = x_np.__mod__(y_np)
+        res_np_e = x_np.__rmod__(y_np)
         paddle.enable_static()
         with paddle.pir_utils.IrGuard():
             main_program, exe, program_guard = new_program()
@@ -97,14 +98,16 @@ class TestMathOpPatchesPir(unittest.TestCase):
                 b = x % y
                 c = x.mod(y)
                 d = x.__mod__(y)
-                (b_np, c_np, d_np) = exe.run(
+                e = x.__rmod__(y)
+                (b_np, c_np, d_np, e_np) = exe.run(
                     main_program,
                     feed={"x": x_np, "y": y_np},
-                    fetch_list=[b, c, d],
+                    fetch_list=[b, c, d, e],
                 )
                 np.testing.assert_allclose(res_np_b, b_np, atol=1e-05)
                 np.testing.assert_allclose(res_np_c, c_np, atol=1e-05)
                 np.testing.assert_allclose(res_np_d, d_np, atol=1e-05)
+                np.testing.assert_allclose(res_np_e, e_np, rtol=1e-05)
 
     def test_matmul(self):
         paddle.disable_static()
@@ -140,6 +143,7 @@ class TestMathOpPatchesPir(unittest.TestCase):
             paddle.to_tensor(x_np), paddle.to_tensor(y_np)
         )
         res_np_d = x_np.__floordiv__(y_np)
+        res_np_e = x_np.__rfloordiv__(y_np)
         paddle.enable_static()
         with paddle.pir_utils.IrGuard():
             main_program, exe, program_guard = new_program()
@@ -153,14 +157,16 @@ class TestMathOpPatchesPir(unittest.TestCase):
                 b = x // y
                 c = x.floor_divide(y)
                 d = x.__floordiv__(y)
-                (b_np, c_np, d_np) = exe.run(
+                e = x.__rfloordiv__(y)
+                (b_np, c_np, d_np, e_np) = exe.run(
                     main_program,
                     feed={"x": x_np, "y": y_np},
-                    fetch_list=[b, c, d],
+                    fetch_list=[b, c, d, e],
                 )
                 np.testing.assert_allclose(res_np_b, b_np, atol=1e-05)
                 np.testing.assert_allclose(res_np_c, c_np, atol=1e-05)
                 np.testing.assert_allclose(res_np_d, d_np, atol=1e-05)
+                np.testing.assert_allclose(res_np_e, e_np, rtol=1e-05)
 
     def test_bitwise_not(self):
         paddle.disable_static()
@@ -269,6 +275,31 @@ class TestMathOpPatchesPir(unittest.TestCase):
                 np.testing.assert_array_equal(res_np_c, c_np)
                 np.testing.assert_array_equal(res_np_d, d_np)
 
+    def test_positive(self):
+        paddle.disable_static()
+        x_np = np.random.random([10, 1024]).astype('float32')
+        res_np_b = +x_np
+        res_np_c = paddle.positive(paddle.to_tensor(x_np))
+        res_np_d = x_np.__pos__()
+        paddle.enable_static()
+        with paddle.pir_utils.IrGuard():
+            main_program, exe, program_guard = new_program()
+            with program_guard:
+                x = paddle.static.data(
+                    name='x', shape=[10, 1024], dtype='float32'
+                )
+                b = +x
+                c = paddle.positive(x)
+                d = x.__pos__()
+                (b_np, c_np, d_np) = exe.run(
+                    main_program,
+                    feed={"x": x_np},
+                    fetch_list=[b, c, d],
+                )
+                np.testing.assert_allclose(res_np_b, b_np, atol=1e-05)
+                np.testing.assert_allclose(res_np_c, c_np, atol=1e-05)
+                np.testing.assert_allclose(res_np_d, d_np, atol=1e-05)
+
     # for logical compare
     def test_equal_and_nequal(self):
         paddle.disable_static()
@@ -316,6 +347,7 @@ class TestMathOpPatchesPir(unittest.TestCase):
         res_np_c = paddle.less_than(
             paddle.to_tensor(x_np), paddle.to_tensor(y_np)
         )
+        res_np_c_ = paddle.less(paddle.to_tensor(x_np), paddle.to_tensor(y_np))
         res_np_d = x_np.__lt__(y_np)
         res_np_e = x_np <= y_np
         res_np_f = paddle.less_equal(
@@ -332,18 +364,20 @@ class TestMathOpPatchesPir(unittest.TestCase):
                 z = paddle.static.data(name="z", shape=[-1, 1], dtype='float32')
                 b = x < y
                 c = x.less_than(y)
+                c_ = x.less(y)
                 d = x.__lt__(y)
                 e = x <= y
                 f = x.less_equal(y)
                 g = x.__le__(y)
                 h = x <= z
-                (b_np, c_np, d_np, e_np, f_np, g_np, h_np) = exe.run(
+                (b_np, c_np, c_np_, d_np, e_np, f_np, g_np, h_np) = exe.run(
                     main_program,
                     feed={"x": x_np, "y": y_np, "z": z_np},
-                    fetch_list=[b, c, d, e, f, g, h],
+                    fetch_list=[b, c, c_, d, e, f, g, h],
                 )
                 np.testing.assert_array_equal(res_np_b, b_np)
                 np.testing.assert_array_equal(res_np_c, c_np)
+                np.testing.assert_array_equal(res_np_c_, c_np_)
                 np.testing.assert_array_equal(res_np_d, d_np)
                 np.testing.assert_array_equal(res_np_e, e_np)
                 np.testing.assert_array_equal(res_np_f, f_np)
@@ -700,6 +734,20 @@ class TestMathOpPatchesPir(unittest.TestCase):
                     float(x)
                 with self.assertRaises(TypeError):
                     bool(x)
+                with self.assertRaises(TypeError):
+                    complex(x)
+
+    def test_builtin_type_conversion_old_ir(self):
+        with paddle.pir_utils.DygraphOldIrGuard():
+            _, _, program_guard = new_program()
+            with program_guard:
+                x = paddle.static.data(name='x', shape=[], dtype="float32")
+                with self.assertRaises(TypeError):
+                    int(x)
+                with self.assertRaises(TypeError):
+                    float(x)
+                with self.assertRaises(TypeError):
+                    complex(x)
 
     def test_math_exists(self):
         with paddle.pir_utils.IrGuard():

@@ -252,7 +252,7 @@ def is_tensor_array_type(value):
     else:
         return (
             hasattr(value, "desc")
-            and value.desc.type() == core.VarDesc.VarType.LOD_TENSOR_ARRAY
+            and value.desc.type() == core.VarDesc.VarType.DENSE_TENSOR_ARRAY
         )
 
 

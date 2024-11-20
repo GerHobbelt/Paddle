@@ -250,7 +250,7 @@ int HeterClient::Send(const phi::DeviceContext& ctx,
     framework::Variable* var = p_scope->FindVar(send_var_name);
     butil::IOBuf temp_iobuf;
     if (var->IsType<phi::DenseTensor>()) {
-      SerializeLodTensor(var, ctx, send_var_msg, &temp_iobuf);
+      SerializeDenseTensor(var, ctx, send_var_msg, &temp_iobuf);
     } else if (var->IsType<phi::SelectedRows>()) {
       SerializeSelectedRows(var, ctx, send_var_msg, &temp_iobuf);
     }

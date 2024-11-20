@@ -2993,7 +2993,7 @@ proto::VarType::Type OperatorWithKernel::IndicateVarDataType(
       common::errors::InvalidArgument(
           "The Input Variable(%s) of (%s) Operator used to determine kernel "
           "data type is empty or not phi::DenseTensor or SelectedRows or "
-          "LoDTensorArray.",
+          "DenseTensorArray.",
           name,
           Type()));
   return data_type;

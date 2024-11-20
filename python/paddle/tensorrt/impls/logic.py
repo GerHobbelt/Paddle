@@ -20,18 +20,28 @@ from paddle.tensorrt.converter_utils import (
 )
 from paddle.tensorrt.register import converter_registry
 
+logic_type_map = {
+    "pd_op.greater_than": trt.ElementWiseOperation.GREATER,
+    "pd_op.less_than": trt.ElementWiseOperation.LESS,
+    "pd_op.equal": trt.ElementWiseOperation.EQUAL,
+}
+
 
 @converter_registry.register("pd_op.greater_than", trt_version="8.x")
 @converter_registry.register("pd_op.less_than", trt_version="8.x")
+@converter_registry.register("pd_op.equal", trt_version="8.x")
 def logic_converter(network, paddle_op, inputs):
-    if paddle_op.name() == "pd_op.greater_than":
-        layer_output = add_elementwise_layer(
-            network, paddle_op, inputs, trt.ElementWiseOperation.GREATER
-        )
-    elif paddle_op.name() == "pd_op.less_than":
-        layer_output = add_elementwise_layer(
-            network, paddle_op, inputs, trt.ElementWiseOperation.LESS
-        )
-    else:
-        raise ValueError(f"Unexpected paddle_op: {paddle_op.name()}")
+    layer_output = add_elementwise_layer(
+        network, paddle_op, inputs, logic_type_map[paddle_op.name()]
+    )
+    return trt_cast(network, layer_output, inputs[0].dtype)
+
+
+@converter_registry.register("pd_op.not_equal", trt_version="8.x")
+def not_equal_converter(network, paddle_op, inputs):
+    layer_output = add_elementwise_layer(
+        network, paddle_op, inputs, trt.ElementWiseOperation.EQUAL
+    )
+    not_layer = network.add_unary(layer_output, trt.UnaryOperation.NOT)
+    layer_output = not_layer.get_output(0)
     return trt_cast(network, layer_output, inputs[0].dtype)

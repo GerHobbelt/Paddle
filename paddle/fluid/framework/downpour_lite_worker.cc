@@ -514,7 +514,7 @@ void DownpourLiteWorker::TrainFiles() {
               continue;
             }
             s += param + ":" + std::to_string(len) + ":";
-            s += PrintLodTensor(tensor, 0, len);
+            s += PrintDenseTensor(tensor, 0, len);
             fprintf(stderr, "%s\n", s.c_str());
             fflush(stderr);
             s = "";

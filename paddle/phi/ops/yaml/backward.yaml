@@ -2216,6 +2216,7 @@
     spmd_rule : PNormGradInferSpmd
   kernel :
     func : p_norm_grad
+  composite: p_norm_grad(x, out, out_grad, porder, axis, epsilon, keepdim, asvector, x_grad)
 
 - backward_op : pad3d_double_grad
   forward : pad3d_grad(Tensor x, Tensor grad_out, IntArray paddings, str mode="constant", float pad_value=0.0, str data_format="NCDHW") -> Tensor(grad_x)
@@ -2585,6 +2586,7 @@
   kernel :
     func : reshape_double_grad
   no_need_buffer : grad_out
+  composite: reshape_double_grad(grad_out, grad_x_grad, grad_out_grad)
   inplace : (grad_x_grad -> grad_out_grad)
 
 - backward_op : reshape_grad
@@ -3356,16 +3358,6 @@
   kernel :
     func : temporal_shift_grad
     data_type : out_grad
-
-- backward_op : tensor_unfold_grad
-  forward : tensor_unfold (Tensor input, int64_t axis, int64_t size, int64_t step) -> Tensor(out)
-  args : (Tensor input, Tensor out_grad, int64_t axis, int64_t size, int64_t step)
-  output : Tensor(input_grad)
-  infer_meta :
-    func : StridedUnChangedInferMeta
-    param : [input]
-  kernel :
-    func : tensor_unfold_grad
 
 - backward_op : thresholded_relu_grad
   forward : thresholded_relu (Tensor x, float threshold, float value) -> Tensor(out)

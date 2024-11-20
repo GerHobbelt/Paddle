@@ -223,7 +223,7 @@ def copy_var_from_parent_block(parent_block_var, layer_helper):
     current_block = prog.current_block()
 
     if (
-        parent_block_var.type == core.VarDesc.VarType.LOD_TENSOR_ARRAY
+        parent_block_var.type == core.VarDesc.VarType.DENSE_TENSOR_ARRAY
         and current_block._find_var_recursive(parent_block_var.name)
     ):
         current_block_var = parent_block_var

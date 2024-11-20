@@ -150,7 +150,7 @@ class CompileTimeInferShapeContext : public InferShapeContext {
       auto *in_var = block_.FindVarRecursive(in_var_names[i]);
       auto *out_var = block_.FindVarRecursive(out_var_names[i]);
       if (in_var->GetType() != proto::VarType::LOD_TENSOR &&
-          in_var->GetType() != proto::VarType::LOD_TENSOR_ARRAY) {
+          in_var->GetType() != proto::VarType::DENSE_TENSOR_ARRAY) {
         VLOG(3) << "input " << in
                 << " is not phi::DenseTensor or phi::TensorArray.";
         return;
@@ -188,7 +188,7 @@ class CompileTimeInferShapeContext : public InferShapeContext {
     auto *in_var = block_.FindVarRecursive(Inputs(in)[i]);
     auto *out_var = block_.FindVarRecursive(Outputs(out)[j]);
     if (in_var->GetType() != proto::VarType::LOD_TENSOR &&
-        in_var->GetType() != proto::VarType::LOD_TENSOR_ARRAY) {
+        in_var->GetType() != proto::VarType::DENSE_TENSOR_ARRAY) {
       VLOG(3) << "input " << in
               << " is not phi::DenseTensor or phi::TensorArray.";
       return;

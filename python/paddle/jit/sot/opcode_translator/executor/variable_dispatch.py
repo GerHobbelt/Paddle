@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import inspect
 import math
 import operator
 from functools import partial, reduce
@@ -205,6 +206,15 @@ Dispatcher.register(
     ("DictVariable",),
     lambda var: var.copy(),
 )
+
+
+@Dispatcher.register_decorator(dict)
+def dispatch_dict_kwargs(**kwargs: VariableBase):
+    res_dict = {}
+    graph = Dispatcher.graph
+    for key, value in kwargs.items():
+        res_dict[key] = value
+    return DictVariable(res_dict, graph, DummyTracker(list(kwargs.values())))
 
 
 @Dispatcher.register_decorator(dict)
@@ -1231,11 +1241,44 @@ Dispatcher.register(
     lambda var: var.min(),
 )
 
+
+# math functions, e.g. math.log, math.sqrt, math.sin, etc.
+def get_math_unary_functions():
+    unary_fns = []
+    for name, fn in inspect.getmembers(math, inspect.isbuiltin):
+        try:
+            signature = inspect.signature(fn)
+        except ValueError:
+            continue
+        if len(signature.parameters.keys()) != 1:
+            continue
+        param = next(iter(signature.parameters.values()))
+        if param.kind in (
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.POSITIONAL_ONLY,
+        ):
+            unary_fns.append(fn)
+    return unary_fns
+
+
+for fn in get_math_unary_functions():
+    Dispatcher.register(
+        fn,
+        ("ConstantVariable",),
+        partial(
+            lambda fn, var: ConstantVariable(
+                fn(var.get_py_value()),
+                var.graph,
+                tracker=DummyTracker([var]),
+            ),
+            fn,
+        ),
+    )
 Dispatcher.register(
-    math.sqrt,
+    math.log,
     ("ConstantVariable",),
     lambda var: ConstantVariable(
-        math.sqrt(var.get_py_value()),
+        math.log(var.get_py_value()),
         var.graph,
         tracker=DummyTracker([var]),
     ),

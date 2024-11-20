@@ -85,6 +85,7 @@ UNARY_OPS_TO_MAGIC_NAMES: dict[UnaryOp, str] = {
     float: "__float__",
     len: "__len__",
     int: "__int__",
+    complex: "__complex__",
 }
 # TODO(SigureMo): support any, all, sum
 

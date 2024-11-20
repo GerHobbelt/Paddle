@@ -82,6 +82,9 @@ DEFINE_GENERAL_PATTERN(AssignValue_, paddle::dialect::AssignValue_Op)
 DEFINE_GENERAL_PATTERN(Tile, paddle::dialect::TileOp)
 DEFINE_GENERAL_PATTERN(Share_Data, paddle::dialect::ShareDataOp)
 DEFINE_GENERAL_PATTERN(AssignOut, paddle::dialect::AssignOut_Op)
+DEFINE_GENERAL_PATTERN(Swish, paddle::dialect::SwishOp)
+DEFINE_GENERAL_PATTERN(Log, paddle::dialect::LogOp)
+DEFINE_GENERAL_PATTERN(Floor, paddle::dialect::FloorOp)
 DEFINE_GENERAL_PATTERN(Roll, paddle::dialect::RollOp)
 
 #undef DEFINE_GENERAL_PATTERN
@@ -1500,6 +1503,87 @@ class WherePattern : public pir::OpRewritePattern<paddle::dialect::WhereOp> {
   }
 };
 
+class EqualOpPattern : public pir::OpRewritePattern<paddle::dialect::EqualOp> {
+ public:
+  using pir::OpRewritePattern<paddle::dialect::EqualOp>::OpRewritePattern;
+  bool MatchAndRewrite(paddle::dialect::EqualOp op,
+                       pir::PatternRewriter &rewriter) const override {
+    if (op->HasAttribute(kCanRunTrtAttr) &&
+        op.attribute<pir::BoolAttribute>(kCanRunTrtAttr).data()) {
+      return false;
+    }
+#if IS_TRT_VERSION_LT(8600)
+    pir::Value x = op.operand_source(0);
+    auto x_type = x.type().dyn_cast<paddle::dialect::DenseTensorType>();
+    auto x_shape = x_type.dims();
+    int dims = x_shape.size();
+    if (dims < 1) {
+      VLOG(3)
+          << "pd_op.equal op does not support 0 dim input when TensorRT < 8.6.";
+      return false;
+    }
+#endif
+
+    op->set_attribute(kCanRunTrtAttr, rewriter.bool_attr(true));
+    return true;
+  }
+};
+
+class NotEqualOpPattern
+    : public pir::OpRewritePattern<paddle::dialect::NotEqualOp> {
+ public:
+  using pir::OpRewritePattern<paddle::dialect::NotEqualOp>::OpRewritePattern;
+  bool MatchAndRewrite(paddle::dialect::NotEqualOp op,
+                       pir::PatternRewriter &rewriter) const override {
+    if (op->HasAttribute(kCanRunTrtAttr) &&
+        op.attribute<pir::BoolAttribute>(kCanRunTrtAttr).data()) {
+      return false;
+    }
+#if IS_TRT_VERSION_LT(8600)
+    pir::Value x = op.operand_source(0);
+    auto x_type = x.type().dyn_cast<paddle::dialect::DenseTensorType>();
+    auto x_shape = x_type.dims();
+    int dims = x_shape.size();
+    if (dims < 1) {
+      VLOG(3) << "pd_op.not_equal op does not support 0 dim input when "
+                 "TensorRT < 8.6.";
+      return false;
+    }
+#endif
+
+    op->set_attribute(kCanRunTrtAttr, rewriter.bool_attr(true));
+    return true;
+  }
+};
+
+class FullLikeOpPattern
+    : public pir::OpRewritePattern<paddle::dialect::FullLikeOp> {
+ public:
+  using pir::OpRewritePattern<paddle::dialect::FullLikeOp>::OpRewritePattern;
+  bool MatchAndRewrite(paddle::dialect::FullLikeOp op,
+                       pir::PatternRewriter &rewriter) const override {
+    if (op->HasAttribute(kCanRunTrtAttr) &&
+        op->attribute<pir::BoolAttribute>(kCanRunTrtAttr).data()) {
+      return false;
+    }
+    pir::Value x = op.operand_source(0);
+    auto x_dtype = pir::GetDataTypeFromValue(x);
+    bool hasAttr = op->HasAttribute("dtype");
+    auto dtype =
+        op->attribute<paddle::dialect::DataTypeAttribute>("dtype").data();
+
+    if (dtype == phi::DataType::BOOL ||
+        (!hasAttr && x_dtype.isa<pir::BoolType>())) {
+      op->set_attribute(kCanRunTrtAttr, rewriter.bool_attr(true));
+      VLOG(3) << "the pd_op.full_like supports input of BOOL by trt8.4 above";
+      return true;
+    }
+
+    op->set_attribute(kCanRunTrtAttr, rewriter.bool_attr(true));
+    return true;
+  }
+};
+
 class FullWithTensorPattern
     : public pir::OpRewritePattern<paddle::dialect::FullWithTensorOp> {
  public:
@@ -1642,6 +1726,9 @@ class TrtOpMarkerPass : public pir::PatternRewritePass {
     ADD_PATTERN(AssignValue_)
     ADD_PATTERN(Tile)
     ADD_PATTERN(Share_Data)
+    ADD_PATTERN(Swish)
+    ADD_PATTERN(Log)
+    ADD_PATTERN(Floor)
     ADD_PATTERN(Roll)
 #if IS_TRT_VERSION_GE(8600)
     ADD_PATTERN(Layer_norm)
@@ -1692,9 +1779,12 @@ class TrtOpMarkerPass : public pir::PatternRewritePass {
     ps.Add(std::make_unique<StackOpPattern>(context));
     ps.Add(std::make_unique<TanhOpPattern>(context));
     ps.Add(std::make_unique<WherePattern>(context));
+    ps.Add(std::make_unique<FullLikeOpPattern>(context));
     ps.Add(std::make_unique<FullWithTensorPattern>(context));
     ps.Add(std::make_unique<StridedSliceOpPattern>(context));
     ps.Add(std::make_unique<TopkOpPattern>(context));
+    ps.Add(std::make_unique<EqualOpPattern>(context));
+    ps.Add(std::make_unique<NotEqualOpPattern>(context));
     return ps;
   }
 };

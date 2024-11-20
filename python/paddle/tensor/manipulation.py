@@ -67,7 +67,7 @@ def tensor_array_to_tensor(
     name: str | None = None,
 ) -> tuple[Tensor, Tensor]:
     r"""
-    This function concatenates or stacks all tensors in the input LoDTensorArray
+    This function concatenates or stacks all tensors in the input DenseTensorArray
     along the axis mentioned and returns that as the output.
 
     For Example:
@@ -1493,13 +1493,13 @@ def concat(
             dtype=helper.input_dtype()
         )
 
-        if input[0].desc.type() == core.VarDesc.VarType.LOD_TENSOR_ARRAY:
+        if input[0].desc.type() == core.VarDesc.VarType.DENSE_TENSOR_ARRAY:
             # NOTE(liym27): Don't remove this if branch!
             # This feature is supported for Dynamic-to-Static, because after transformed, the type of inputs[0]
-            # is LOD_TENSOR_ARRAY in some scenarios. And this feature can be used in static graph mode.
+            # is DENSE_TENSOR_ARRAY in some scenarios. And this feature can be used in static graph mode.
 
             assert len(input) == 1, (
-                "If the elements of 'input' in concat are Variable(LoDTensorArray), "
+                "If the elements of 'input' in concat are Variable(DenseTensorArray), "
                 f"number of the elements must be 1, but received {len(input)}."
             )
             out_index = helper.create_variable_for_type_inference(dtype="int32")
@@ -2271,11 +2271,11 @@ def stack(
         return _C_ops.stack(x, axis)
 
     if not isinstance(x, list) and not isinstance(x, tuple):
-        # NOTE:(zhiqiu) Only support Variable as input if the Variable is a LOD_TENSOR_ARRAY create by create_array, array_write, array_read, etc.
+        # NOTE:(zhiqiu) Only support Variable as input if the Variable is a DENSE_TENSOR_ARRAY create by create_array, array_write, array_read, etc.
         # In that case, Variable is array of tensors indeed.
         if (
             isinstance(x, Variable)
-            and x.desc.type() == core.VarDesc.VarType.LOD_TENSOR_ARRAY
+            and x.desc.type() == core.VarDesc.VarType.DENSE_TENSOR_ARRAY
         ) or (
             isinstance(x, paddle.pir.Value) and x.is_dense_tensor_array_type()
         ):
@@ -2293,7 +2293,7 @@ def stack(
     if in_pir_mode():
         if x[0].is_dense_tensor_array_type():
             assert len(x) == 1, (
-                "If the elements of 'x' in stack are Variable(LoDTensorArray), "
+                "If the elements of 'x' in stack are Variable(DenseTensorArray), "
                 f"number of the elements must be 1, but received {len(x)}."
             )
             out, _ = _C_ops.array_to_tensor(x, axis, True)
@@ -2304,9 +2304,9 @@ def stack(
     helper = LayerHelper('stack', **locals())
 
     out = helper.create_variable_for_type_inference(x[0].dtype)
-    if x[0].desc.type() == core.VarDesc.VarType.LOD_TENSOR_ARRAY:
+    if x[0].desc.type() == core.VarDesc.VarType.DENSE_TENSOR_ARRAY:
         assert len(x) == 1, (
-            "If the elements of 'x' in stack are Variable(LoDTensorArray), "
+            "If the elements of 'x' in stack are Variable(DenseTensorArray), "
             f"number of the elements must be 1, but received {len(x)}."
         )
         out_index = helper.create_variable_for_type_inference(dtype="int32")
@@ -6272,6 +6272,12 @@ def masked_fill(
 ) -> Tensor:
     """
     Fills elements of self tensor with value where mask is True. The shape of mask must be broadcastable with the shape of the underlying tensor.
+
+    The following figure shows an example: consider a 3x3 matrix `x`,where all elements have a value of 1, and a matrix `mask` of the same size, and `value` is 3.
+
+    .. image:: https://githubraw.cdn.bcebos.com/PaddlePaddle/docs/develop/docs/images/api_legend/masked_fill.png
+       :width: 700
+       :align: center
 
     Args:
         x (Tensor) : The Destination Tensor. Supported data types are float,

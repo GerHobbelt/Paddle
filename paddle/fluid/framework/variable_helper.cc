@@ -39,7 +39,7 @@ void InitializeVariable(Variable *var, proto::VarType::Type var_type) {
     var->GetMutable<std::vector<framework::Scope *>>();
   } else if (var_type == proto::VarType::LOD_RANK_TABLE) {
     var->GetMutable<LoDRankTable>();
-  } else if (var_type == proto::VarType::LOD_TENSOR_ARRAY) {
+  } else if (var_type == proto::VarType::DENSE_TENSOR_ARRAY) {
     var->GetMutable<phi::TensorArray>();
   } else if (var_type == proto::VarType::STRINGS) {
     var->GetMutable<Strings>();

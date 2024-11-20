@@ -1463,6 +1463,38 @@ def bitwise_invert_(x: Tensor, name: str | None = None) -> Tensor:
     return bitwise_not_(x, name=name)
 
 
+def positive(x: Tensor) -> Tensor:
+    r"""
+    Returns the input Tensor as it is. This is used in `Tensor.__pos__`, applying the
+    unary `+` operator to the tensor.
+
+    .. math::
+        Out = +X
+
+    Args:
+        x (Tensor): The input tensor. The tensor cannot be of type bool.
+
+    Returns:
+        Tensor: A tensor with the same shape and data type as the input tensor. The returned tensor
+                is the same.
+
+    Examples:
+        .. code-block:: python
+
+            >>> import paddle
+            >>> x = paddle.to_tensor([-1, 0, 1])
+            >>> out = paddle.positive(x)
+            >>> print(out)
+            Tensor(shape=[3], dtype=int64, place=Place(cpu), stop_gradient=True,
+            [-1,  0,  1])
+    """
+
+    # Check if the input tensor is of bool type and raise an error
+    if x.dtype == paddle.bool:
+        raise TypeError("The `+` operator, on a bool tensor is not supported.")
+    return x
+
+
 def isclose(
     x: Tensor,
     y: Tensor,
