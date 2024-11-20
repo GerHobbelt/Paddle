@@ -1286,6 +1286,131 @@ static PyObject* tensor__matmul__method(TensorObject* self,
   EAGER_CATCH_AND_THROW_RETURN_NULL
 }
 
+static PyObject* tensor__rmatmul__method(TensorObject* self,
+                                         PyObject* args,
+                                         PyObject* kwargs) {
+  phi::RecordEvent pythonc_record_event(
+      "__rmatmul__ pybind_patch_func", phi::TracerEventType::UserDefined, 1);
+  EAGER_TRY
+
+  VLOG(6) << "Running Eager tensor__rmatmul__method";
+
+  // Set Device ID
+  auto place = egr::Controller::Instance().GetExpectedPlace();
+  SetDevice(place);
+
+  paddle::Tensor ret;
+  paddle::Tensor self_tensor = self->tensor;
+
+  PyObject* other_obj = PyTuple_GET_ITEM(args, 0);
+
+  // 1. scalar exists cases
+  // there is no scalar_matmul function for __rmatmul__ now
+  float other_double = 0.0f;
+  bool has_other_double = false;
+  if (PyFloat_Check(other_obj) || PyCheckInteger(other_obj) ||
+      IsNumpyType(other_obj)) {
+    if (PyFloat_Check(other_obj)) {
+      other_double = CastPyArg2Double(other_obj, "__rmatmul__", 0);  // NOLINT
+      has_other_double = true;
+      if (_supported_int_dtype_.find(self_tensor.dtype()) !=
+          _supported_int_dtype_.end()) {
+        eager_gil_scoped_release guard;
+        self_tensor = cast_ad_func(self_tensor, DataType::FLOAT32);
+      }
+    } else if (PyCheckInteger(other_obj) || IsNumpyType(other_obj)) {
+      other_double = CastPyArg2Double(other_obj, "__rmatmul__", 0);  // NOLINT
+      has_other_double = true;
+    }
+  }
+
+  // 2. create or get tensor for other_obj
+  paddle::Tensor other_tensor;
+  if (has_other_double) {
+    eager_gil_scoped_release guard;
+    other_tensor = full_ad_func({1},
+                                phi::Scalar(other_double),
+                                self_tensor.dtype(),
+                                self_tensor.place());
+    const phi::distributed::ProcessMesh* mesh = nullptr;
+    if (InputsContainDistTensor(&mesh, self_tensor, other_tensor)) {
+      ConvertAllInputsToDistTensor(mesh, self_tensor, other_tensor);
+    }
+  } else if (PyCheckTensor(other_obj)) {
+    auto& self_tensor_ref = self->tensor;
+    auto& other_tensor_ref = CastPyArg2Tensor(other_obj, 0);
+    const phi::distributed::ProcessMesh* mesh = nullptr;
+    if (InputsContainDistTensor(&mesh, self_tensor_ref, other_tensor_ref)) {
+      ConvertAllInputsToDistTensor(mesh, self_tensor_ref, other_tensor_ref);
+    }
+    self_tensor = self_tensor_ref;
+    other_tensor = other_tensor_ref;
+  } else {
+    if (IsNumpyArray(other_obj)) {
+      py::object numpy_value =
+          py::reinterpret_borrow<py::object>(py::handle(other_obj));
+      other_tensor = paddle::empty({}, phi::DataType::FLOAT32, place);
+      InitTensorWithNumpyValue(numpy_value, place, &other_tensor);
+    } else {
+      paddle::experimental::Scalar value =
+          CastPyArg2Scalar(other_obj, "__matmul__", 0);
+      if (PyComplex_Check(other_obj)) {
+        eager_gil_scoped_release guard;
+        other_tensor =
+            full_ad_func({1}, value, DataType::COMPLEX64, self_tensor.place());
+      } else {
+        eager_gil_scoped_release guard;
+        other_tensor =
+            full_ad_func({1}, value, self_tensor.dtype(), self_tensor.place());
+      }
+    }
+    const phi::distributed::ProcessMesh* mesh = nullptr;
+    if (InputsContainDistTensor(&mesh, self_tensor, other_tensor)) {
+      ConvertAllInputsToDistTensor(mesh, self_tensor, other_tensor);
+    }
+  }
+
+  // 3. promote types or unify right var type to left var
+  phi::DataType lhs_dtype = self_tensor.dtype();
+  phi::DataType rhs_dtype = other_tensor.dtype();
+  if (lhs_dtype != rhs_dtype) {
+    // note: only op_type in _supported_promote_complex_types_ should promote
+    // dtype
+    if (_complex_dtypes.find(lhs_dtype) != _complex_dtypes.end() ||
+        _complex_dtypes.find(rhs_dtype) != _complex_dtypes.end()) {
+      phi::DataType promote_dtype =
+          phi::TransToPhiDataType(framework::PromoteTypesIfComplexExists(
+              framework::TransToProtoVarType(lhs_dtype),
+              framework::TransToProtoVarType(rhs_dtype)));
+      if (lhs_dtype != promote_dtype) {
+        // cast
+        eager_gil_scoped_release guard;
+        self_tensor = cast_ad_func(self_tensor, promote_dtype);
+      }
+      if (rhs_dtype != promote_dtype) {
+        eager_gil_scoped_release guard;
+        other_tensor = cast_ad_func(other_tensor, promote_dtype);
+      }
+    } else {
+      VLOG(6) << "The dtype of left and right Tensor are not the same, left "
+                 "dtype is "
+              << lhs_dtype << ", but right dtype is " << rhs_dtype
+              << ", the right dtype will convert to " << lhs_dtype;
+      eager_gil_scoped_release guard;
+      other_tensor = cast_ad_func(other_tensor, lhs_dtype);
+    }
+  }
+
+  // 4. calculation
+  VLOG(6) << "Calling matmul_ad_func in tensor__rmatmul__method";
+  {
+    eager_gil_scoped_release guard;
+    ret = matmul_ad_func(other_tensor, self_tensor, false, false);
+  }
+  return ToPyObject(ret);
+  EAGER_CATCH_AND_THROW_RETURN_NULL
+}
+
 static PyObject* tensor__lt__method(TensorObject* self,
                                     PyObject* args,
                                     PyObject* kwargs) {
@@ -2085,6 +2210,10 @@ PyMethodDef math_op_patch_methods[] = {  // NOLINT
      nullptr},
     {"__matmul__",
      (PyCFunction)(void (*)())tensor__matmul__method,
+     METH_VARARGS | METH_KEYWORDS,
+     nullptr},
+    {"__rmatmul__",
+     (PyCFunction)(void (*)())tensor__rmatmul__method,
      METH_VARARGS | METH_KEYWORDS,
      nullptr},
     {"__gt__",

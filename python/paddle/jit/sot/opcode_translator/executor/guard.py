@@ -98,7 +98,7 @@ class FasterStringifiedExpression(StringifiedExpression):
         free_vars: dict[str, Any],
     ):
         self.faster_guard = faster_guard
-        if ENV_SOT_ENABLE_FASTER_GUARD:
+        if ENV_SOT_ENABLE_FASTER_GUARD.get():
             original_expr_template = expr_template
             guard_cls_name = faster_guard.__class__.__name__
             guard_name = f"{guard_cls_name}_{id(faster_guard)}"

@@ -5644,6 +5644,38 @@ def neg_(x: Tensor, name: str | None = None) -> Tensor:
     )
 
 
+def positive(x: Tensor) -> Tensor:
+    r"""
+    Returns the input Tensor as it is. This is used in `Tensor.__pos__`, applying the
+    unary `+` operator to the tensor.
+
+    .. math::
+        Out = +X
+
+    Args:
+        x (Tensor): The input tensor. The tensor cannot be of type bool.
+
+    Returns:
+        Tensor: A tensor with the same shape and data type as the input tensor. The returned tensor
+                is the same.
+
+    Examples:
+        .. code-block:: python
+
+            >>> import paddle
+            >>> x = paddle.to_tensor([-1, 0, 1])
+            >>> out = paddle.positive(x)
+            >>> print(out)
+            Tensor(shape=[3], dtype=int64, place=Place(cpu), stop_gradient=True,
+            [-1,  0,  1])
+    """
+
+    # Check if the input tensor is of bool type and raise an error
+    if x.dtype == paddle.bool:
+        raise TypeError("The `+` operator, on a bool tensor is not supported.")
+    return x
+
+
 def atan2(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
     r"""
     Element-wise arctangent of x/y with consideration of the quadrant.
@@ -7767,6 +7799,63 @@ def bitwise_right_shift_(
 
     if in_dynamic_or_pir_mode():
         return _C_ops.bitwise_right_shift_(x, y, is_arithmetic)
+
+
+def __lshift__(
+    x: Tensor,
+    y: Tensor | int,
+    is_arithmetic: bool = True,
+) -> Tensor:
+    if isinstance(y, int):
+        y = paddle.to_tensor(y, dtype=x.dtype)
+    elif isinstance(y, float):
+        raise TypeError(
+            "unsupported operand type(s) for <<: 'Tensor' and 'float'"
+        )
+    return bitwise_left_shift(x, y, is_arithmetic, None, None)
+
+
+def __rshift__(
+    x: Tensor,
+    y: Tensor | int,
+    is_arithmetic: bool = True,
+) -> Tensor:
+
+    if isinstance(y, int):
+        y = paddle.to_tensor(y, dtype=x.dtype)
+    elif isinstance(y, float):
+        raise TypeError(
+            "unsupported operand type(s) for <<: 'Tensor' and 'float'"
+        )
+    return bitwise_right_shift(x, y, is_arithmetic, None, None)
+
+
+def __rlshift__(
+    x: Tensor,
+    y: Tensor | int,
+    is_arithmetic: bool = True,
+):
+    if isinstance(y, int):
+        y = paddle.to_tensor(y, dtype=x.dtype)
+    elif isinstance(y, float):
+        raise TypeError(
+            "unsupported operand type(s) for <<: 'float' and 'Tensor'"
+        )
+    return bitwise_left_shift(y, x, is_arithmetic, None, None)
+
+
+def __rrshift__(
+    x: Tensor,
+    y: Tensor | int,
+    is_arithmetic: bool = True,
+):
+    if isinstance(y, int):
+        y = paddle.to_tensor(y, dtype=x.dtype)
+    elif isinstance(y, float):
+        raise TypeError(
+            "unsupported operand type(s) for <<: 'float' and 'Tensor'"
+        )
+    return bitwise_right_shift(y, x, is_arithmetic, None, None)
 
 
 def copysign(x: Tensor, y: Tensor | float, name: str | None = None) -> Tensor:

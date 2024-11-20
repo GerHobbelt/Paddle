@@ -709,7 +709,7 @@ class OpTest(unittest.TestCase):
         for var_name in input_vars:
             if isinstance(input_vars[var_name], list):
                 for name, np_value in self.inputs[var_name]:
-                    tensor = core.LoDTensor()
+                    tensor = core.DenseTensor()
                     if isinstance(np_value, tuple):
                         tensor.set(np_value[0], place)
                         dtype = np.array(np_value[1]).dtype
@@ -758,7 +758,7 @@ class OpTest(unittest.TestCase):
                             tensor.set(np_value, place)
                     feed_map[name] = tensor
             else:
-                tensor = core.LoDTensor()
+                tensor = core.DenseTensor()
                 if isinstance(self.inputs[var_name], tuple):
                     tensor.set(self.inputs[var_name][0], place)
                     if self.is_calc_ref:
@@ -2855,7 +2855,7 @@ class OpTest(unittest.TestCase):
                     # The output is dispensable or intermediate.
                     break
                 out = fetch_outs[i]
-                if isinstance(out, core.LoDTensor):
+                if isinstance(out, core.DenseTensor):
                     lod_level_runtime = len(out.lod())
                 else:
                     if isinstance(out, core.DenseTensorArray):
@@ -3679,7 +3679,7 @@ class OpTest(unittest.TestCase):
 
     @staticmethod
     def _numpy_to_lod_tensor(np_value, lod, place):
-        tensor = core.LoDTensor()
+        tensor = core.DenseTensor()
         tensor.set(np_value, place)
         if lod is not None:
             tensor.set_recursive_sequence_lengths(lod)

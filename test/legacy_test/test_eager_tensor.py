@@ -235,8 +235,8 @@ class TestEagerTensor(unittest.TestCase):
                 np.testing.assert_array_equal(x.numpy(), expected_result)
 
                 numpy_array = np.random.randn(3, 4)
-                # covert core.LoDTensor to paddle.Tensor
-                lod_tensor = paddle.base.core.LoDTensor()
+                # covert core.DenseTensor to paddle.Tensor
+                lod_tensor = paddle.base.core.DenseTensor()
                 place = paddle.base.framework._current_expected_place()
                 lod_tensor.set(numpy_array, place)
                 x = paddle.to_tensor(lod_tensor)
@@ -244,7 +244,7 @@ class TestEagerTensor(unittest.TestCase):
                 self.assertEqual(x.type, core.VarDesc.VarType.DENSE_TENSOR)
                 self.assertEqual(str(x.place), str(place))
 
-                # covert core.Tensor to paddle.Tensor
+                # covert core.DenseTensor to paddle.Tensor
                 x = paddle.to_tensor(numpy_array)
                 dlpack = x.value().get_tensor()._to_dlpack()
                 tensor_from_dlpack = paddle.base.core.from_dlpack(dlpack)
@@ -353,13 +353,13 @@ class TestEagerTensor(unittest.TestCase):
         if core.is_compiled_with_cuda():
             a_np = np.random.rand(1024, 1024)
             with paddle.base.dygraph.guard(core.CPUPlace()):
-                lod_tensor = core.LoDTensor()
+                lod_tensor = core.DenseTensor()
                 lod_tensor.set(a_np, core.CPUPlace())
                 a = paddle.to_tensor(lod_tensor)
                 np.testing.assert_array_equal(a_np, a.numpy())
 
             with paddle.base.dygraph.guard(core.CUDAPlace(0)):
-                lod_tensor = core.LoDTensor()
+                lod_tensor = core.DenseTensor()
                 lod_tensor.set(a_np, core.CUDAPlace(0))
                 a = paddle.to_tensor(lod_tensor, place=core.CPUPlace())
                 np.testing.assert_array_equal(a_np, a.numpy())

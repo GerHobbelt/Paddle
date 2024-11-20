@@ -183,7 +183,7 @@ def _rebuild_cuda_tensor(
         # you should manually maintain the lifecycle of ipc tensor
         shared_cache[(handle, offset_bytes)] = lodtensor
     else:
-        lodtensor = paddle.base.core.LoDTensor()
+        lodtensor = paddle.base.core.DenseTensor()
         lodtensor._share_buffer_with(
             cache_tensor, (size, type_idx, dims, lod, device_idx)
         )
@@ -241,4 +241,4 @@ def init_reductions() -> None:
     ForkingPickler.register(
         paddle.base.framework.EagerParamBase, _reduce_tensor
     )
-    ForkingPickler.register(paddle.base.core.LoDTensor, _reduce_lodtensor)
+    ForkingPickler.register(paddle.base.core.DenseTensor, _reduce_lodtensor)

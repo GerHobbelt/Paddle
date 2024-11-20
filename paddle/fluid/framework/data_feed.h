@@ -1629,7 +1629,7 @@ class MultiSlotType {
       offset_.reserve(max_batch_size + 1);
     }
     offset_.resize(1);
-    // LoDTensor' lod is counted from 0, the size of lod
+    // DenseTensor' lod is counted from 0, the size of lod
     // is one size larger than the size of data.
     offset_[0] = 0;
   }

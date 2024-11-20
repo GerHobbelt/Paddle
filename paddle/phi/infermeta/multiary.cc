@@ -2107,7 +2107,7 @@ void EditDistanceInferMeta(const MetaTensor& hyps,
         hyp_dims.size() == 2 && hyp_dims[1] == 1,
         true,
         errors::InvalidArgument(
-            "Input(Hyps) must be a 2-D LoDTensor with the 2nd dimension "
+            "Input(Hyps) must be a 2-D DenseTensor with the 2nd dimension "
             "equal to 1. But received: input rank %u, input shape [%s].",
             hyp_dims.size(),
             hyp_dims));
@@ -2115,7 +2115,7 @@ void EditDistanceInferMeta(const MetaTensor& hyps,
         ref_dims.size() == 2 && ref_dims[1] == 1,
         true,
         errors::InvalidArgument(
-            "Input(Refs) must be a 2-D LoDTensor with the 2nd dimension "
+            "Input(Refs) must be a 2-D DenseTensor with the 2nd dimension "
             "equal to 1. But received: input rank %u, input shape [%s].",
             ref_dims.size(),
             ref_dims));
@@ -4375,16 +4375,18 @@ void PsroiPoolInferMeta(const MetaTensor& x,
       input_dims.size(),
       4,
       errors::InvalidArgument("The format of input tensor is NCHW"));
-  PADDLE_ENFORCE_EQ(rois_dims.size(),
-                    2,
-                    errors::InvalidArgument(
-                        "ROIs should be a 2-D LoDTensor of shape (num_rois, 4) "
-                        "given as [(x1, y1, x2, y2), ...]"));
-  PADDLE_ENFORCE_EQ(rois_dims[1],
-                    4,
-                    errors::InvalidArgument(
-                        "ROIs should be a 2-D LoDTensor of shape (num_rois, 4) "
-                        "given as [(x1, y1, x2, y2), ...]"));
+  PADDLE_ENFORCE_EQ(
+      rois_dims.size(),
+      2,
+      errors::InvalidArgument(
+          "ROIs should be a 2-D DenseTensor of shape (num_rois, 4) "
+          "given as [(x1, y1, x2, y2), ...]"));
+  PADDLE_ENFORCE_EQ(
+      rois_dims[1],
+      4,
+      errors::InvalidArgument(
+          "ROIs should be a 2-D DenseTensor of shape (num_rois, 4) "
+          "given as [(x1, y1, x2, y2), ...]"));
   if (rois_num) {
     auto rois_num_dims = rois_num.dims();
     PADDLE_ENFORCE_EQ(

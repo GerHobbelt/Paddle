@@ -726,9 +726,9 @@ def _to_tensor_non_static(
             data = _handle_tensor_dtype(data, dtype)
             data.stop_gradient = stop_gradient
             return data
-        elif isinstance(data, core.Tensor):
+        elif isinstance(data, core.DenseTensor):
             # should't expose it to users, just for internal use.
-            # convert core.Tensor/core.LoDTensor to Tensor first
+            # convert core.DenseTensor to Tensor first
             # Currently, there is no copy when places are same
             data = paddle.Tensor(data, place=place)
             data = _handle_tensor_dtype(data, dtype)
@@ -1340,7 +1340,7 @@ def eye(
         name(str|None, optional): For details, please refer to :ref:`api_guide_Name`. Generally, no setting is required. Default: None.
 
     Returns:
-        Tensor: An identity Tensor or LoDTensor of shape [num_rows, num_columns].
+        Tensor: An identity Tensor or DenseTensor of shape [num_rows, num_columns].
 
     Examples:
         .. code-block:: python
@@ -2665,7 +2665,7 @@ def assign(x: TensorLike, output: paddle.Tensor | None = None) -> paddle.Tensor:
         input = np.array([input])
     elif isinstance(input, (list, tuple)):
         input = np.array(input)
-    # NOTE(Aurelius84): Why we judge core.Tensor?
+    # NOTE(Aurelius84): Why we judge core.DenseTensor?
     # In case of @to_static, a Tensor can be as input of `assign`,
     # but in_dynamic_mode()==False under @to_static, which means
     # isinstance(Tensor, Variable) == False. It will cause return None

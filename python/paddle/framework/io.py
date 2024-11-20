@@ -462,11 +462,11 @@ def _pickle_save(obj, f, protocol):
         # This is not a good method, because the pickle module has been modified.
         pickle.dispatch_table[core.eager.Tensor] = reduce_varbase
         pickle.dispatch_table[EagerParamBase] = reduce_varbase
-        pickle.dispatch_table[core.LoDTensor] = reduce_LoDTensor
+        pickle.dispatch_table[core.DenseTensor] = reduce_LoDTensor
         pickle.dispatch_table.update(dispatch_table_layer)
 
     def pop_dispatch_table():
-        pickle.dispatch_table.pop(core.LoDTensor)
+        pickle.dispatch_table.pop(core.DenseTensor)
         pickle.dispatch_table.pop(core.eager.Tensor)
         pickle.dispatch_table.pop(EagerParamBase)
         for k in dispatch_table_layer:
@@ -485,7 +485,7 @@ def _pickle_save(obj, f, protocol):
         pickler = pickle.Pickler(f, protocol)
         pickler.dispatch_table = copyreg.dispatch_table.copy()
 
-        pickler.dispatch_table[core.LoDTensor] = reduce_LoDTensor
+        pickler.dispatch_table[core.DenseTensor] = reduce_LoDTensor
         pickler.dispatch_table[core.eager.Tensor] = reduce_varbase
         pickler.dispatch_table[EagerParamBase] = reduce_varbase
         pickler.dispatch_table.update(dispatch_table_layer)
@@ -525,20 +525,20 @@ def _is_state_dict(obj):
                     paddle.nn.Layer,
                     Program,
                     core.eager.Tensor,
-                    core.LoDTensor,
+                    core.DenseTensor,
                     core.SelectedRows,
                 ),
             )
 
-        # If the value of a dict is a core.Tensor/LoDTensor or a dict
-        # that does not contain a paddle type(Layer, Program, Tensor, LoDTensor, SelectedRows),
+        # If the value of a dict is a core.Tensor/DenseTensor or a dict
+        # that does not contain a paddle type(Layer, Program, Tensor, DenseTensor, SelectedRows),
         # the dict is considered to be a state_ dict.
         for key, value in obj.items():
             if isinstance(value, dict):
                 for k, v in value.items():
                     if _contain_x(v, condition):
                         return False
-            elif not isinstance(value, (core.eager.Tensor, core.LoDTensor)):
+            elif not isinstance(value, (core.eager.Tensor, core.DenseTensor)):
                 return False
         return True
 
@@ -556,7 +556,7 @@ def _transformed_from_varbase(obj):
 
 
 def _transformed_from_lodtensor(obj):
-    # In paddle2.1 version, LoDTensor is saved as np.array(tensor).
+    # In paddle2.1 version, DenseTensor is saved as np.array(tensor).
     # When executing paddle.load, use this function to determine whether to restore to Tensor/LoDTensor.
     if isinstance(obj, np.ndarray):
         return True
@@ -568,7 +568,7 @@ def _to_LodTensor(ndarray):
         raise TypeError(
             f'Type of `ndarray` should be numpy.ndarray, but received {type(ndarray)}.'
         )
-    t = core.LoDTensor()
+    t = core.DenseTensor()
     place = _current_expected_place_()
     t.set(ndarray, place)
     return t
@@ -627,7 +627,7 @@ def _parse_every_object(obj, condition_func, convert_func):
     else:
         if isinstance(obj, Iterable) and not isinstance(
             obj,
-            (str, np.ndarray, core.eager.Tensor, core.LoDTensor),
+            (str, np.ndarray, core.eager.Tensor, core.DenseTensor),
         ):
             raise NotImplementedError(
                 f"The iterable objects supported are tuple, list, dict, OrderedDict, string. But received {type(obj)}."
@@ -696,7 +696,7 @@ def _save_lod_tensor(tensor, file_name):
 
 
 def _load_lod_tensor(file_name):
-    temp_t = paddle.base.core.LoDTensor()
+    temp_t = paddle.base.core.DenseTensor()
     if _is_file_path(file_name):
         # '_seek' is the end position of this tensor in the file.
         _seek = paddle.base.core.load_lod_tensor(temp_t, file_name)
@@ -757,7 +757,7 @@ def _load_selected_rows(file_name):
 
 
 def _save_binary_var(obj, path):
-    if isinstance(obj, core.LoDTensor):
+    if isinstance(obj, core.DenseTensor):
         _save_lod_tensor(obj, path)
     elif isinstance(obj, core.SelectedRows):
         _save_selected_rows(obj, path)

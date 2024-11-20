@@ -64,7 +64,7 @@ bool LoadDataFromDistModelTensor(const DistModelTensor &input_data,
   PADDLE_ENFORCE_NOT_NULL(
       input_tensor_ptr,
       common::errors::Fatal(
-          "LoDTensor creation failed. DistModel loaded data failed."));
+          "DenseTensor creation failed. DistModel loaded data failed."));
   PADDLE_ENFORCE_NOT_NULL(
       input_data.data.data(),
       common::errors::InvalidArgument("DistModelTensor contains no data."));

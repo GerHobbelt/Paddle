@@ -733,9 +733,9 @@ class DygraphGeneratorLoader(DataLoaderBase):
             for sample in self._batch_reader():
                 array = core.DenseTensorArray()
                 for item in sample:
-                    if not isinstance(item, core.LoDTensor):
+                    if not isinstance(item, core.DenseTensor):
                         item = self._check_input_array(item)
-                        tmp = core.LoDTensor()
+                        tmp = core.DenseTensor()
                         tmp.set(item, core.CPUPlace())
                         item = tmp
 
@@ -1020,9 +1020,9 @@ class GeneratorLoader(DataLoaderBase):
                 for tensors in self._tensor_reader():
                     array = core.DenseTensorArray()
                     for item in tensors:
-                        if not isinstance(item, core.LoDTensor):
+                        if not isinstance(item, core.DenseTensor):
                             item = self._check_input_array(item)
-                            tmp = core.LoDTensor()
+                            tmp = core.DenseTensor()
                             tmp.set(item, core.CPUPlace())
                             item = tmp
 

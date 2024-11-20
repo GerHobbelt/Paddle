@@ -72,9 +72,9 @@ class GuardGroup : public GuardBase {
 
 class TypeMatchGuard : public GuardBase {
  public:
+  explicit TypeMatchGuard(PyTypeObject* type_ptr) : expected_(type_ptr) {}
   explicit TypeMatchGuard(PyObject* type_ptr)
       : expected_(reinterpret_cast<PyTypeObject*>(type_ptr)) {}
-
   explicit TypeMatchGuard(const py::type& py_type)
       : expected_(reinterpret_cast<PyTypeObject*>(py_type.ptr())) {}
 
@@ -148,6 +148,19 @@ class ShapeMatchGuard : public GuardBase {
   std::vector<std::optional<int64_t>> expected_;
 };
 
+class AttributeMatchGuard : public GuardBase {
+ public:
+  AttributeMatchGuard(const py::object& obj, const std::string& attr_name)
+      : attr_ptr_(PyObject_GetAttrString(obj.ptr(), attr_name.c_str())),
+        attr_name_(attr_name) {}
+
+  bool check(PyObject* value);
+
+ private:
+  PyObject* attr_ptr_;
+  std::string attr_name_;
+};
+
 class LayerMatchGuard : public GuardBase {
  public:
   explicit LayerMatchGuard(PyObject* layer_ptr) : layer_ptr_(layer_ptr) {
@@ -162,6 +175,16 @@ class LayerMatchGuard : public GuardBase {
  private:
   PyObject* layer_ptr_;
   bool training_;
+};
+
+class RangeMatchGuard : public GuardGroup {
+ public:
+  explicit RangeMatchGuard(const py::object& range_obj)
+      : GuardGroup({std::make_shared<TypeMatchGuard>(Py_TYPE(range_obj.ptr())),
+                    std::make_shared<AttributeMatchGuard>(range_obj, "start"),
+                    std::make_shared<AttributeMatchGuard>(range_obj, "stop"),
+                    std::make_shared<AttributeMatchGuard>(range_obj, "step")}) {
+  }
 };
 
 #endif

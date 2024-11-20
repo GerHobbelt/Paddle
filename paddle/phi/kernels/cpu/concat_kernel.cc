@@ -56,8 +56,8 @@ void ConcatKernel(const Context& dev_ctx,
             x[i]->lod().size(),
             lod_size_0,
             common::errors::Unimplemented(
-                "The lod level of all input LoDTensors should be same. "
-                "Maybe different lod level of input LoDTensors can concat,"
+                "The lod level of all input DenseTensors should be same. "
+                "Maybe different lod level of input DenseTensors can concat,"
                 "it is not supported currently. The lod level of %dth input "
                 "is %d and first input is %d.",
                 i,

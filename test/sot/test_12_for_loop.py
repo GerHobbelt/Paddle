@@ -22,6 +22,7 @@ import unittest
 from test_case_base import (
     TestCaseBase,
     test_instruction_translator_cache_context,
+    test_with_faster_guard,
 )
 
 import paddle
@@ -224,6 +225,7 @@ class TestForLoop(TestCaseBase):
     def test_reconstruct_range_iter(self):
         self.assert_results(for_reconstruct_range_iter)
 
+    @test_with_faster_guard
     def test_layer_list(self):
         layers = paddle.nn.LayerList()
         for i in range(5):

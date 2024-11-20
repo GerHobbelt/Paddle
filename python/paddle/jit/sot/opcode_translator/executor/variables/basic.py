@@ -15,6 +15,7 @@
 from __future__ import annotations
 
 import operator
+import sys
 import types
 from functools import cached_property, reduce
 from typing import TYPE_CHECKING, Any
@@ -1205,6 +1206,9 @@ class NullVariable(VariableBase):
         return func(*args[1:], **kwargs)
 
     def reconstruct(self, codegen: PyCodeGen):
+        if sys.version_info >= (3, 13):
+            codegen.gen_push_null()
+            return
         codegen.gen_load_null_variable()
 
 

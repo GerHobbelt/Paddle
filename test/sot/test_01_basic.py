@@ -14,7 +14,7 @@
 
 import unittest
 
-from test_case_base import TestCaseBase
+from test_case_base import TestCaseBase, test_with_faster_guard
 
 import paddle
 
@@ -24,6 +24,7 @@ def foo(x: int, y: paddle.Tensor):
 
 
 class TestBasic(TestCaseBase):
+    @test_with_faster_guard
     def test_simple(self):
         self.assert_results(foo, 1, paddle.to_tensor(2))
 

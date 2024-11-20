@@ -28,16 +28,22 @@ set(XPU_XBLAS_LIB_NAME "libxpu_blas.so")
 set(XPU_XFA_LIB_NAME "libxpu_flash_attention.so")
 set(XPU_XPUDNN_LIB_NAME "libxpu_dnn.so")
 
-if(NOT DEFINED XPU_XRE_BASE_VERSION)
-  set(XPU_XRE_BASE_VERSION "4.32.0.1")
-endif()
 if(NOT DEFINED XPU_XHPC_BASE_DATE)
-  set(XPU_XHPC_BASE_DATE "dev/20241113")
+  set(XPU_XHPC_BASE_DATE "dev/20241115")
 endif()
-set(XPU_XCCL_BASE_VERSION "1.2.11e")
+set(XPU_XCCL_BASE_VERSION "3.0.0.5") # For XRE5
 if(NOT DEFINED XPU_XFT_BASE_VERSION)
   set(XPU_XFT_BASE_VERSION "20230602")
 endif()
+
+if(NOT DEFINED XPU_XRE_BASE_VERSION)
+  if(WITH_XPU_XRE5)
+    set(XPU_XRE_BASE_VERSION "5.0.21.8")
+  else()
+    set(XPU_XRE_BASE_VERSION "4.32.0.1")
+  endif()
+endif()
+
 set(XPU_XPTI_BASE_VERSION "0.0.1")
 
 set(XPU_XRE_BASE_URL
@@ -45,7 +51,7 @@ set(XPU_XRE_BASE_URL
 )
 
 set(XPU_XCCL_BASE_URL
-    "https://klx-sdk-release-public.su.bcebos.com/xccl/release/${XPU_XCCL_BASE_VERSION}.1"
+    "https://klx-sdk-release-public.su.bcebos.com/xccl/release/2.0.0.1" # 2.0.0.1 is the final version for R200
 )
 
 if(NOT XPU_XFT_BASE_URL)
@@ -62,12 +68,11 @@ if(WITH_XPTI)
 endif()
 
 if(WITH_XPU_XRE5)
-  set(XPU_XRE_BASE_VERSION "5.0.15.1")
   set(XPU_XRE_BASE_URL
       "https://klx-sdk-release-public.su.bcebos.com/xre/kl3-release/${XPU_XRE_BASE_VERSION}"
   )
   set(XPU_XCCL_BASE_URL
-      "https://klx-sdk-release-public.su.bcebos.com/xccl/release/${XPU_XCCL_BASE_VERSION}.2"
+      "https://klx-sdk-release-public.su.bcebos.com/xccl/release/${XPU_XCCL_BASE_VERSION}"
   )
 endif()
 

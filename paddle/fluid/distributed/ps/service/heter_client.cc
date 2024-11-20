@@ -31,7 +31,7 @@ int GetMicroId(const phi::DeviceContext& ctx, const framework::Scope* scope) {
   PADDLE_ENFORCE_EQ(var->IsType<phi::DenseTensor>(),
                     true,
                     common::errors::InvalidArgument(
-                        "the type of micro id should be LoDTensor."));
+                        "the type of micro id should be DenseTensor."));
   auto micro_id = -1;
   auto* tensor = var->GetMutable<phi::DenseTensor>();
   if (phi::is_cpu_place(tensor->place())) {

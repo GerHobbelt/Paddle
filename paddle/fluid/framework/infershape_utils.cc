@@ -315,7 +315,7 @@ void CompatMetaTensor::set_dims(const DDim& dims) {
       PADDLE_ENFORCE_EQ(dims.size(),
                         1UL,
                         common::errors::InvalidArgument(
-                            "LoDTensorArray can only have one dimension."));
+                            "DenseTensorArray can only have one dimension."));
       // only set the array size for phi::TensorArray input
       tensor_array->resize(dims[0]);
     } else {
@@ -412,7 +412,7 @@ void CompatMetaTensor::share_lod(const MetaTensor& meta_tensor) {
                  var->GetType() != proto::VarType::DENSE_TENSOR_ARRAY)) ||
         (!meta_tensor.is_dense() && !meta_tensor.is_tensor_array())) {
       VLOG(3) << "this tensor or input metatensor is not phi::DenseTensor or "
-                 "LoDTensorArray.";
+                 "DenseTensorArray.";
       return;
     }
     if (var) {

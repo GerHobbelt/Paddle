@@ -172,7 +172,7 @@ def get_tensor_from_selected_rows(x, name=None):
             For more information, please refer to :ref:`api_guide_Name` .
 
     Returns:
-        Variable: LoDTensor transformed from SelectedRows. The data type is same with input.
+        Variable: DenseTensor transformed from SelectedRows. The data type is same with input.
 
     Examples:
         .. code-block:: python

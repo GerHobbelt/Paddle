@@ -2965,7 +2965,7 @@ static PyObject* tensor_method__share_memory(TensorObject* self,
                     true,
                     common::errors::InvalidArgument(
                         "Sharing memory only support CPU Tensor currently"));
-  // 1. get LoDTensor
+  // 1. get DenseTensor
   auto* t =
       std::dynamic_pointer_cast<phi::DenseTensor>(self->tensor.impl()).get();
   // 2. allocate shared memory

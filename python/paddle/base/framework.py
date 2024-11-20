@@ -1352,7 +1352,9 @@ def grad_var_name(var_name):
     return var_name + GRAD_VAR_SUFFIX
 
 
-def convert_np_dtype_to_proto_type(np_dtype: np.dtype | str):
+def convert_np_dtype_to_proto_type(
+    np_dtype: np.dtype | str,
+) -> core.VarDesc.VarType:
     """
     Convert the data type in numpy to the data type in Paddle.
 
@@ -1409,7 +1411,9 @@ def convert_np_dtype_to_proto_type(np_dtype: np.dtype | str):
         raise ValueError(f"Not supported numpy dtype {dtype}")
 
 
-def convert_np_dtype_to_dtype_(np_dtype):
+def convert_np_dtype_to_dtype_(
+    np_dtype: np.dtype | str,
+) -> core.VarDesc.VarType | core.DataType:
     """
     Convert the data type in numpy to the data type in Paddle.
 

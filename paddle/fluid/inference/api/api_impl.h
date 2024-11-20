@@ -75,7 +75,7 @@ class NativePaddlePredictor : public PaddlePredictor {
   std::vector<framework::OpDesc *> feeds_;
   std::map<std::string, size_t> feed_names_;
   std::vector<framework::OpDesc *> fetchs_;
-  // Memory buffer for feed inputs. The temporary LoDTensor will cause serious
+  // Memory buffer for feed inputs. The temporary DenseTensor will cause serious
   // concurrency problems, wrong results and memory leak, so cache them.
   std::vector<phi::DenseTensor> feed_tensors_;
   // Do not use unique_ptr, use parent scope to delete

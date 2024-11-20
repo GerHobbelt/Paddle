@@ -1719,15 +1719,15 @@ void RoiPoolInferMeta(const MetaTensor& x,
       boxes_dims.size(),
       2,
       common::errors::InvalidArgument(
-          "boxes should be a 2-D LoDTensor with shape (num_boxes, 4)"
+          "boxes should be a 2-D DenseTensor with shape (num_boxes, 4)"
           "given as [[x1, y1, x2, y2], ...], but received boxes is "
-          "%d-dimensional LoDTensor",
+          "%d-dimensional DenseTensor",
           boxes_dims.size()));
   PADDLE_ENFORCE_EQ(
       boxes_dims[1],
       4,
       common::errors::InvalidArgument(
-          "boxes should be a 2-D LoDTensor with shape (num_boxes, 4)"
+          "boxes should be a 2-D DenseTensor with shape (num_boxes, 4)"
           "given as [[x1, y1, x2, y2], ...]. But the second dimension of  "
           "the received data is %d",
           boxes_dims[1]));

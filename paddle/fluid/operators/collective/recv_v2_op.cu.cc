@@ -222,7 +222,7 @@ class RecvOpV2CUDAKernel : public framework::OpKernel<T> {
           dynamic_shape,
           false,
           common::errors::InvalidArgument("Dynamic shape for send/recv not "
-                                          "support LoDTensorArray for now."));
+                                          "support DenseTensorArray for now."));
       auto out_array = out_var->GetMutable<phi::TensorArray>();
       for (size_t idx = 0; idx < out_array->size(); ++idx) {
         VLOG(3) << "DenseTensorArray: idx(" << idx << ")";

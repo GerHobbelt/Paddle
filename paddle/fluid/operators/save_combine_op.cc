@@ -51,7 +51,7 @@ class SaveCombineOpProtoMaker : public framework::OpProtoAndCheckerMaker {
   void Make() override {
     AddInput(
         "X",
-        "(vector) Input LoDTensors that need to be saved together in a file.")
+        "(vector) Input DenseTensors that need to be saved together in a file.")
         .AsDuplicable();
     AddComment(R"DOC(
 SaveCombine operator

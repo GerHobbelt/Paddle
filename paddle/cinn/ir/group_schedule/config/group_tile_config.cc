@@ -201,7 +201,8 @@ TileConfigMap BuildPureStaticShapeConfig(
   if (last_dim == "R") {
     rd_thread_num = 32;
     int64_t remain_reduce_numel = CeilDiv(reduce_numel, 32);
-    if (remain_reduce_numel <= 8 && spatial_numel > 1) {
+    if ((remain_reduce_numel <= 8 && spatial_numel > 1) ||
+        (spatial_numel > remain_reduce_numel * 128)) {
       sp_thread_num = Trim(spatial_numel, 1, 8);
       reduce_method = WarpReduceMethod();
     } else {
@@ -247,7 +248,7 @@ TileConfigMap BuildPureStaticShapeConfig(
       return 1;
     }
     int64_t expected = spatial_numel / (sm_count * 4);
-    return CeilPow2(Trim(expected, 1, 32));
+    return CeilPow2(Trim(expected, 1, 4));
   }();
 
   int64_t sp_upper_bound = base_info->spatial_numel > 1 ? kMaxNumel : 1;

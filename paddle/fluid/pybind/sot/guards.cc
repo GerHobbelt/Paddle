@@ -26,6 +26,22 @@ static inline PyObject* PyObject_CallOneArg(PyObject* func, PyObject* arg) {
 }
 #endif
 
+static inline bool PyObject_Equal(PyObject* a, PyObject* b) {
+  if (a == b) {
+    return true;
+  }
+  if (Py_TYPE(a) != Py_TYPE(b)) {
+    return false;
+  }
+  int result = PyObject_RichCompareBool(a, b, Py_EQ);
+  // Check for exception
+  if (result == -1) {
+    PyErr_Clear();
+    return false;
+  }
+  return result;
+}
+
 std::optional<paddle::Tensor> GetTensorFromPyObject(PyObject* obj) {
   if (!paddle::pybind::PyCheckTensor(obj)) {
     // TODO(zrr1999): PyCheckTensor only check if the object is a p_tensor_type.
@@ -59,19 +75,7 @@ bool TypeMatchGuard::check(PyObject* value) {
 }
 
 bool ValueMatchGuard::check(PyObject* value) {
-  if (value == expected_value_) {
-    return true;
-  }
-  if (Py_TYPE(value) != expected_type_) {
-    return false;
-  }
-  int result = PyObject_RichCompareBool(value, expected_value_, Py_EQ);
-  // Check for exception
-  if (result == -1) {
-    PyErr_Clear();
-    return false;
-  }
-  return result;
+  return PyObject_Equal(value, expected_value_);
 }
 
 bool LengthMatchGuard::check(PyObject* value) {
@@ -102,6 +106,11 @@ bool ShapeMatchGuard::check(PyObject* value) {
     }
   }
   return true;
+}
+
+bool AttributeMatchGuard::check(PyObject* value) {
+  PyObject* attr = PyObject_GetAttrString(value, attr_name_.c_str());
+  return PyObject_Equal(attr, attr_ptr_);
 }
 
 bool LayerMatchGuard::check(PyObject* value) {

@@ -596,9 +596,14 @@ class TestMathOpPatchesVarBase(unittest.TestCase):
             res1 = a.astype(np.float16)
             res2 = a.astype('float16')
             res3 = a.astype(paddle.float16)
+            res4 = a.astype(a.dtype)
 
             self.assertEqual(res1.dtype, res2.dtype)
             self.assertEqual(res1.dtype, res3.dtype)
+            self.assertEqual(res4.dtype, a.dtype)
+            self.assertEqual(
+                a.data_ptr(), res4.data_ptr()
+            )  # zero-copy if same dtype
 
             np.testing.assert_array_equal(res1.numpy(), res2.numpy())
             np.testing.assert_array_equal(res1.numpy(), res3.numpy())

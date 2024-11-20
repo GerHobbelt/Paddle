@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from __future__ import annotations
 
 import numpy as np
 
@@ -99,7 +100,7 @@ _PADDLE_PIR_DTYPE_2_NUMPY_DTYPE = {
 }
 
 
-def convert_np_dtype_to_dtype_(np_dtype):
+def convert_np_dtype_to_dtype_(np_dtype) -> DataType:
     """
     Convert the data type in numpy to the data type in Paddle.
 
@@ -108,7 +109,7 @@ def convert_np_dtype_to_dtype_(np_dtype):
             string.
 
     Returns:
-        core.DataType : The data type in Paddle.
+        DataType : The data type in Paddle.
 
     """
     # Convert the data type string to numpy data type.
@@ -123,7 +124,7 @@ def convert_np_dtype_to_dtype_(np_dtype):
     else:
         dtype = np.dtype(np_dtype)
 
-    if dtype in np_type_to_paddle_type.keys():
+    if dtype in np_type_to_paddle_type:
         return np_type_to_paddle_type[dtype]
     else:
         raise ValueError(f"Not supported numpy dtype {dtype}")
@@ -574,7 +575,7 @@ def set_state_dict(program, state_dict, scope=None):
         clear_state_dict = state_dict
 
     for name, value in clear_state_dict.items():
-        if isinstance(value, paddle.base.libpaddle.Tensor):
+        if isinstance(value, paddle.base.libpaddle.DenseTensor):
             continue
         elif isinstance(value, np.ndarray):
             clear_state_dict[name] = paddle.to_tensor(value)

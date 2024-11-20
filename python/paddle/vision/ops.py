@@ -641,7 +641,7 @@ def box_coder(
             data type is float32 or float64. The second is list or tuple consist
             of 4 elements shared by all boxes and data type is float32 or float64.
             Other is None and not involved in calculation.
-        target_box (Tensor): This input can be a 2-D LoDTensor with shape
+        target_box (Tensor): This input can be a 2-D DenseTensor with shape
             [N, 4] when code_type is 'encode_center_size'. This input also can
             be a 3-D Tensor with shape [N, M, 4] when code_type is
             'decode_center_size'. Each box is represented as

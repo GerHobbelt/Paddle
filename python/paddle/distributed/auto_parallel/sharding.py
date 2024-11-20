@@ -120,10 +120,7 @@ class ShardingOptimizerStage1(Optimizer):
         self._place = paddle.base.libpaddle.Place()
         self._place.set_place(place)
 
-        sharding_config = fleet.fleet._user_defined_strategy.hybrid_configs[
-            'sharding_configs'
-        ]
-        comm_buffer_size_MB = sharding_config.comm_buffer_size_MB
+        comm_buffer_size_MB = self._strategy.sharding.comm_buffer_size_MB
         parameters_dict = {}
         grads_dict = {}
         has_dist_param = False
@@ -227,7 +224,7 @@ class ShardingOptimizerStage1(Optimizer):
                     // align[dtype]
                 )
                 align_size = align_size * self._sharding_degree
-                if not sharding_config.release_gradients:
+                if not self._strategy.sharding.release_gradients:
                     _, fused_grad = paddle._C_ops.coalesce_tensor_(
                         group_grad_list,
                         dtype,

@@ -229,5 +229,13 @@ class TestArangeImperative(unittest.TestCase):
         paddle.enable_static()
 
 
+class TestArangeStatic(unittest.TestCase):
+    def test_infermeta(self):
+        paddle.enable_static()
+        x = paddle.arange(0, 1 + 0.005, 0.005)
+        self.assertEqual(x.shape, [201])
+        paddle.disable_static()
+
+
 if __name__ == "__main__":
     unittest.main()

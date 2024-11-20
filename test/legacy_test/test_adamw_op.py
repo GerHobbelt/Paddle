@@ -463,11 +463,15 @@ class TestAdamWOpMultiPrecisionWithMainGrad(unittest.TestCase):
         beta2_pow_acc = paddle.ones([1]).astype(paddle.float32)
         beta2_pow_acc[0] = _beta2**10
 
-        ref_param = param.astype(paddle.float32)
-        ref_beta1_pow_acc = beta1_pow_acc.astype(paddle.float32)
-        ref_beta2_pow_acc = beta2_pow_acc.astype(paddle.float32)
-        ref_moment_1 = moment1.astype(paddle.float32)
-        ref_moment_2 = moment2.astype(paddle.float32)
+        ref_param = param.astype(paddle.float32).clone().detach()
+        ref_beta1_pow_acc = (
+            beta1_pow_acc.astype(paddle.float32).clone().detach()
+        )
+        ref_beta2_pow_acc = (
+            beta2_pow_acc.astype(paddle.float32).clone().detach()
+        )
+        ref_moment_1 = moment1.astype(paddle.float32).clone().detach()
+        ref_moment_2 = moment2.astype(paddle.float32).clone().detach()
 
         # reference code
         _, _, _, _, _, _ = paddle._C_ops.adamw_(

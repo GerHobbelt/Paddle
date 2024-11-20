@@ -19,7 +19,7 @@ import unittest
 import paddle
 
 
-class TestFasterGuard(unittest.TestCase):
+class TestBasicFasterGuard(unittest.TestCase):
     def test_lambda_guard(self):
         guard_lambda = paddle.framework.core.LambdaGuard(lambda x: x == 1)
         self.assertTrue(guard_lambda.check(1))
@@ -69,6 +69,12 @@ class TestFasterGuard(unittest.TestCase):
         guard_shape = paddle.framework.core.ShapeMatchGuard([2, 3, 1])
         self.assertFalse(guard_shape.check(tensor))
 
+    def test_attribute_match_guard(self):
+        a = range(1, 10, 2)
+        guard_attribute = paddle.framework.core.AttributeMatchGuard(a, "start")
+        self.assertTrue(guard_attribute.check(a))
+        self.assertFalse(guard_attribute.check(range(10)))
+
     def test_layer_match_guard(self):
         layer = paddle.nn.Linear(10, 10)
         guard_layer = paddle.framework.core.LayerMatchGuard(layer)
@@ -90,7 +96,7 @@ class TestFasterGuardGroup(unittest.TestCase):
         self.assertTrue(guard_group.check(1))
         self.assertFalse(guard_group.check(2))
 
-    def test_negated_guard_group(self):
+    def test_nested_guard_group(self):
         guard_lambda = paddle.framework.core.LambdaGuard(lambda x: x == 1)
         guard_type_match = paddle.framework.core.TypeMatchGuard(int)
         guard_group = paddle.framework.core.GuardGroup(
@@ -102,6 +108,11 @@ class TestFasterGuardGroup(unittest.TestCase):
             )
         self.assertTrue(guard_group.check(1))
         self.assertFalse(guard_group.check(2))
+
+    def test_range_match_guard(self):
+        guard_range = paddle.framework.core.RangeMatchGuard(range(1, 10, 2))
+        self.assertTrue(guard_range.check(range(1, 10, 2)))
+        self.assertFalse(guard_range.check(range(11)))
 
 
 if __name__ == "__main__":

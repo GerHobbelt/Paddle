@@ -1848,7 +1848,7 @@ class Layer:
                             assign(value, getattr(self, name))
                     elif value is not None:
                         raise TypeError(
-                            f"assignment to buffers '{name}' should be of type core.Tensor or None, but got '{type(value).__name__}'"
+                            f"assignment to buffers '{name}' should be of type core.DenseTensor or None, but got '{type(value).__name__}'"
                         )
                     else:
                         # Assigning None will remove the buffer, but if re-assign a new varBase to it,

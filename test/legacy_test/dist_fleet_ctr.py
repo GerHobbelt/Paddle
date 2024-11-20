@@ -57,7 +57,7 @@ class TestDistCTR2x2(FleetDistRunnerBase):
             batch_size(int): the size of mini-batch for training
             lr(float): learning rate of training
         Returns:
-            avg_cost: LoDTensor of cost.
+            avg_cost: DenseTensor of cost.
         """
         dnn_input_dim, lr_input_dim = int(1e5), int(1e5)
 

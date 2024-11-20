@@ -65,7 +65,13 @@ class ParamsSyncAmongDevicesPass : public pir::Pass {
     auto& block = module_op.block();
     int64_t num_rewrites_{0};
     for (auto& inner_op : block) {
-      if (inner_op.isa<pir::ParameterOp>()) {
+      if (inner_op.isa<pir::ParameterOp>() && inner_op.num_results() > 0) {
+        auto var = inner_op.result(0);
+        auto bool_attr =
+            var.attribute<::pir::BoolAttribute>(kAttrIsPersistable);
+        if (!bool_attr || !bool_attr.data()) {
+          continue;
+        }
         std::string param_name = inner_op.attributes()
                                      .at("parameter_name")
                                      .dyn_cast<pir::StrAttribute>()

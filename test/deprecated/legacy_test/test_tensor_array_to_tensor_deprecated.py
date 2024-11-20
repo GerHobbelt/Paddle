@@ -47,7 +47,7 @@ class TestDenseTensorArrayConcat(unittest.TestCase):
 
         cpu = core.CPUPlace()
         for i in range(10):
-            t = core.LoDTensor()
+            t = core.DenseTensor()
             if i == 0:
                 t.set(np.array([[i], [i]], dtype='float32'), cpu)
             else:

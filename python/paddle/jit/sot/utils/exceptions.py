@@ -61,7 +61,7 @@ def inner_error_default_handler(func, message_fn):
                 traceback.format_exception(type(e), e, e.__traceback__)
             )
             raise InnerError(
-                f"{message}.\nOrigin Exception is: \n {origin_exception_message}"
+                f"{message}\nOrigin Exception is: \n {origin_exception_message}"
             ) from e
 
     return impl

@@ -328,7 +328,7 @@ class OpConverter {
           var->GetType(),
           FluidDT::VarType_Type_DENSE_TENSOR,
           common::errors::InvalidArgument("TensorRT engine only takes "
-                                          "LoDTensor as input"));
+                                          "DenseTensor as input"));
       nvinfer1::DataType in_dtype = FluidDataType2TRT(var->GetDataType());
       if (engine->precision() == phi::DataType::FLOAT16 &&
           in_dtype == nvinfer1::DataType::kFLOAT &&
@@ -391,7 +391,7 @@ class OpConverter {
           var->GetType(),
           FluidDT::VarType_Type_DENSE_TENSOR,
           common::errors::InvalidArgument(
-              "The output tensor in TensorRT subgraph should be LoDTensor"));
+              "The output tensor in TensorRT subgraph should be DenseTensor"));
       nvinfer1::DataType out_dtype = FluidDataType2TRT(var->GetDataType());
       if (engine->precision() == phi::DataType::FLOAT16 &&
           out_dtype == nvinfer1::DataType::kFLOAT &&

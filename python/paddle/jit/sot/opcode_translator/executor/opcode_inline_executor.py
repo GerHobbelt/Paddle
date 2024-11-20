@@ -319,7 +319,8 @@ class OpcodeInlineExecutor(OpcodeExecutorBase):
                 self._lasti = self.indexof(instr.jump_to)
                 if sys.version_info >= (3, 12):
                     assert self._instructions[self._lasti].opname == "END_FOR"
-                    self._lasti += 1
+                    skip_n_instrs = 2 if sys.version_info >= (3, 13) else 1
+                    self._lasti += skip_n_instrs
 
         else:
             self._graph.remove_global_guarded_variable(iterator)

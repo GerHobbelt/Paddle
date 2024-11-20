@@ -79,7 +79,8 @@ class ConstantFoldingPattern : public pir::RewritePattern {
     if (op->HasTrait<pir::SideEffectTrait>() ||
         op->isa<pir::ConstantTensorOp>() || op->isa<pir::ParameterOp>() ||
         op->isa<paddle::dialect::FeedOp>() ||
-        op->isa<paddle::dialect::DataOp>()) {
+        op->isa<paddle::dialect::DataOp>() ||
+        op->isa<paddle::dialect::AssignValueOp>()) {
       return false;
     }
 
@@ -289,8 +290,14 @@ class ConstantFoldingPattern : public pir::RewritePattern {
     for (const auto& output_var_name : output_var_names) {
       exe_config_->skip_gc_vars.insert(output_var_name);
     }
+    if (VLOG_IS_ON(3)) {
+      std::cout << "IR before lowering = " << new_program << std::endl;
+    }
     auto kernel_program =
         paddle::dialect::PdOpLowerToKernelPass(&new_program, place_);
+    if (VLOG_IS_ON(3)) {
+      std::cout << "IR after lowering = " << *kernel_program << std::endl;
+    }
     paddle::framework::InterpreterCore core(
         place_, {}, kernel_program->block(), scope_, *exe_config_);
 

@@ -20,7 +20,7 @@ limitations under the License. */
 #include "paddle/fluid/framework/variable.h"
 #include "paddle/phi/common/place.h"
 
-TEST(AssignOp, AssignLoDTensor) {
+TEST(AssignOp, AssignDenseTensor) {
   phi::CPUPlace cpu_place;
   phi::CPUContext ctx(cpu_place);
 

@@ -1077,7 +1077,7 @@ class PartialProgramLayer:
         # will be SelectedRows, not LoDTensor. But tracer will just
         # set param grad Tensor by forward Tensor(LoDTensor)
         # If we don't change grad_var type here, RunProgramOp need
-        # transform SelectedRows to LoDTensor forcibly, it may not
+        # transform SelectedRows to DenseTensor forcibly, it may not
         # be user wanted result.
         for param in params:
             grad_name = param.name + core.grad_var_suffix()

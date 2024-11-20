@@ -23,10 +23,19 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 import paddle
 
 from ....profiler import event_register
-from ....utils import NameGenerator, get_unbound_method, log
+from ....utils import (
+    NameGenerator,
+    get_unbound_method,
+    log,
+)
 from ....utils.exceptions import FallbackError, HasNoAttributeError
 from ..dispatcher import Dispatcher
-from ..guard import StringifiedExpression, check_guard, union_free_vars
+from ..guard import (
+    FasterStringifiedExpression,
+    StringifiedExpression,
+    check_guard,
+    union_free_vars,
+)
 from ..mutable_data import MutableDictLikeData
 from ..tracker import (
     DummyTracker,
@@ -364,18 +373,13 @@ class VariableBase:
 
         # Get a ValueTracer object from the Tracker object associated with the variable
         frame_value_tracer = self.tracker.trace_value_from_frame()
-
         return [
-            StringifiedExpression(
-                f"id(type({{}})) == {id(self.get_py_type())}",
+            FasterStringifiedExpression(
+                f"id(type({{0}})) == {id(self.get_py_type())} and {{0}} == {self.get_py_value()!r}",
+                paddle.framework.core.ValueMatchGuard(self.get_py_value()),
                 [frame_value_tracer],
                 union_free_vars(frame_value_tracer.free_vars),
-            ),
-            StringifiedExpression(
-                f"{{}} == {self.get_py_value()!r}",
-                [frame_value_tracer],
-                union_free_vars(frame_value_tracer.free_vars),
-            ),
+            )
         ]
 
     def get_py_value(self, allow_tensor=False) -> Any:

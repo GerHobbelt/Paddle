@@ -26,9 +26,10 @@ class ShardedDataParallel(ParallelModel):
         model (paddle.nn.Layer): A single card model to be distributed.
         optimizer (paddle.optimizer.Optimizer): an optimizer to be distributed.
         level (str): Zero stage, can be the following values:
-            os: Zero Stage1
-            os_g: Zero Stage2
-            p_g_os: Zero Stage3
+            0: no sharding (pure dp)
+            1: Zero Stage1
+            2: Zero Stage2
+            3: Zero Stage3
             Default: None, which means optimizer is replicated among all process.
         offload (bool): whether enable cpu offload strategy, not implemented currently.
         exclude_layer (list): Specify which layers do not use the zero stage strategy, not implemented currently.
@@ -60,9 +61,10 @@ def sharded_data_parallel(
         model (paddle.nn.Layer): A single card model to be distributed
         optimizer (paddle.optimizer.Optimizer): an optimizer to be distributed
         level (str): Zero stage, can be the following values:
-            os: Zero Stage1
-            os_g: Zero Stage2
-            p_g_os: Zero Stage3
+            0: no sharding (pure dp)
+            1: Zero Stage1
+            2: Zero Stage2
+            3: Zero Stage3
             Default: None, which means optimizer is replicated among all process.
         offload (bool): whether enable cpu offload strategy, not implemented currently.
         exclude_layer (list): Specify which layers do not use the zero stage strategy, not implemented currently.

@@ -571,6 +571,15 @@ def _enable_dist_prim_all():
 
 def _enable_auto_recompute():
     flag = os.getenv("FLAGS_enable_auto_recompute")
+
+    # NOTE(chenxi67): open recompute when cinn is enabled
+    from paddle.base.framework import in_cinn_mode
+
+    if in_cinn_mode():
+        if flag and flag.lower() in ("0", "false"):
+            return False
+        else:
+            return True
     if flag and flag.lower() in ("1", "true"):
         return True
     else:

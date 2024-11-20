@@ -1666,7 +1666,7 @@ def flip(
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
-        Tensor, Tensor or LoDTensor calculated by flip layer. The data type is same with input x.
+        Tensor, Tensor or DenseTensor calculated by flip layer. The data type is same with input x.
 
     Examples:
         .. code-block:: python
@@ -1742,7 +1742,7 @@ def rot90(
             For more information, please refer to :ref:`api_guide_Name` .
 
     Returns:
-        Tensor, Tensor or LoDTensor calculated by rot90 layer. The data type is same with input x.
+        Tensor, Tensor or DenseTensor calculated by rot90 layer. The data type is same with input x.
 
     Examples:
         .. code-block:: python

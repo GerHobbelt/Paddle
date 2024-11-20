@@ -291,7 +291,7 @@ class RandomSampler(Sampler[int]):
 
 
 def _weighted_sample(weights, num_samples, replacement=True):
-    if isinstance(weights, core.LoDTensor):
+    if isinstance(weights, core.DenseTensor):
         weights = weights.numpy()
     if isinstance(weights, (list, tuple)):
         weights = np.array(weights)

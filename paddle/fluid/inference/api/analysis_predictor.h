@@ -586,7 +586,7 @@ class AnalysisPredictor : public PaddlePredictor {
 
   phi::DataType model_precision_{phi::DataType::FLOAT32};
 
-  // Memory buffer for feed inputs. The temporary LoDTensor will cause serious
+  // Memory buffer for feed inputs. The temporary DenseTensor will cause serious
   // concurrency problems, wrong results and memory leak, so cache them.
   std::vector<phi::DenseTensor> feed_tensors_;
   details::TensorArrayBatchCleaner tensor_array_batch_cleaner_;

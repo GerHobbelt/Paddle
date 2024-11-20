@@ -14,7 +14,6 @@
 import logging
 import os
 import random
-from collections import OrderedDict
 from functools import reduce
 
 import numpy as np
@@ -23,23 +22,16 @@ from single_llama_model import LlamaForCausalLM, LlamaPretrainingCriterion
 import paddle
 import paddle.distributed as dist
 from paddle import LazyGuard
-from paddle.distributed.auto_parallel.intermediate.parallel_base import (
-    parallelize_model_and_optimizer,
-)
-from paddle.distributed.auto_parallel.intermediate.pipeline_parallel import (
-    SplitPoint,
-    pipeline_parallel,
-)
-from paddle.distributed.auto_parallel.intermediate.sharded_data_parallel import (
-    sharded_data_parallel,
+from paddle.distributed.auto_parallel.intermediate.parallelize import (
+    parallelize,
 )
 from paddle.distributed.auto_parallel.intermediate.tensor_parallel import (
     ColWiseParallel,
     RowWiseParallel,
-    SequenceParallel,
     SequenceParallelBegin,
+    SequenceParallelDisable,
+    SequenceParallelEnable,
     SequenceParallelEnd,
-    tensor_parallel,
 )
 from paddle.io import BatchSampler, DataLoader, Dataset
 
@@ -141,16 +133,17 @@ class TestParallelAPI:
             self.amp_level = os.getenv("amp_level")
         if os.getenv("amp_master_grad") == "true":
             self.amp_master_grad = True
-        self.sharding_stage_to_level = [None, "os", "os_g", "p_g_os"]
-        self.level = self.sharding_stage_to_level[
-            int(os.getenv("sharding_stage", 0))
-        ]
+        self.level = os.getenv("sharding_stage", "0")
         self.sequence_parallel = False
         if os.getenv("sequence_parallel") == "true":
             self.sequence_parallel = True
         self.prepare_input_output = False
         if os.getenv("prepare_input_output") == "true":
             self.sequence_parallel = True
+
+        num_hidden_layers = os.getenv("num_hidden_layers")
+        if num_hidden_layers:
+            self.config.num_hidden_layers = int(num_hidden_layers)
 
         seed = int(os.getenv("seed", 2024))
         np.random.seed(seed)
@@ -207,22 +200,18 @@ class TestParallelAPI:
                     ]
 
     def parallel_model(self, layer, optimizer=None):
+        dp_config = None
+        mp_config = None
+        pp_config = None
         if self.pp > 1:
-            decoders_per_rank = self.config.num_hidden_layers // self.pp
-            split_spec = OrderedDict(
-                [
-                    (
-                        f"llama.layers.{i * decoders_per_rank - 1}",
-                        SplitPoint.END,
-                    )
-                    for i in range(1, self.pp)
-                ]
-            )
-            layer, optimizer = pipeline_parallel(layer, optimizer, split_spec)
+            # decoders_per_rank = self.config.num_hidden_layers // self.pp
+            # split_spec = {
+            #     f"llama.layers.{i * decoders_per_rank - 1}": SplitPoint.END
+            #     for i in range(1, self.pp)
+            # }
+            pp_config = {'split_spec': "llama.layers"}
         if self.dp > 1:
-            layer, optimizer = sharded_data_parallel(
-                layer, optimizer, self.level
-            )
+            dp_config = {'sharding_level': self.level}
         if self.mp > 1:
             if not self.sequence_parallel:
                 plan = {
@@ -248,9 +237,9 @@ class TestParallelAPI:
                         "llama.layers.*.mlp.up_proj": ColWiseParallel(),
                         "llama.layers.*.mlp.down_proj": RowWiseParallel(),
                         "lm_head.weight": ColWiseParallel(),
-                        "llama.layers.*.input_layernorm": SequenceParallel(),
-                        "llama.layers.*.post_attention_layernorm": SequenceParallel(),
-                        "llama.norm": SequenceParallel(),
+                        "llama.layers.*.input_layernorm": SequenceParallelEnable(),
+                        "llama.layers.*.post_attention_layernorm": SequenceParallelEnable(),
+                        "llama.norm": SequenceParallelEnable(),
                     }
                 else:
                     plan = {
@@ -262,22 +251,24 @@ class TestParallelAPI:
                         "llama.layers.*.self_attn.k_proj": ColWiseParallel(),
                         "llama.layers.*.self_attn.v_proj": ColWiseParallel(),
                         "llama.layers.*.self_attn.o_proj": RowWiseParallel(),
-                        "llama.layers.*.self_attn": [
-                            SequenceParallelEnd(),
-                            SequenceParallelBegin(),
-                        ],
+                        "llama.layers.*.self_attn": SequenceParallelDisable(),
                         "llama.layers.*.mlp.gate_proj": ColWiseParallel(),
                         "llama.layers.*.mlp.up_proj": ColWiseParallel(),
                         "llama.layers.*.mlp.down_proj": RowWiseParallel(),
-                        "llama.layers.*.mlp": [
-                            SequenceParallelEnd(need_transpose=False),
-                            SequenceParallelBegin(need_transpose=False),
-                        ],
+                        "llama.layers.*.mlp": SequenceParallelDisable(
+                            need_transpose=False
+                        ),
                         "lm_head.weight": ColWiseParallel(),
                         "lm_head": SequenceParallelEnd(),
                     }
-            layer, optimizer = tensor_parallel(layer, plan, optimizer)
-        layer, optimizer = parallelize_model_and_optimizer(layer, optimizer)
+            mp_config = {'parallelize_plan': plan}
+        layer, optimizer = parallelize(
+            layer,
+            optimizer,
+            dp_config=dp_config,
+            mp_config=mp_config,
+            pp_config=pp_config,
+        )
         self.check_mp(layer)
         if optimizer is None:
             return layer

@@ -165,14 +165,14 @@ def infer(word_dict, use_cuda, save_dirname=None):
 
         word_dict_len = len(word_dict)
 
-        # Setup input by creating LoDTensor to represent sequence of words.
-        # Here each word is the basic element of the LoDTensor and the shape of
+        # Setup input by creating DenseTensor to represent sequence of words.
+        # Here each word is the basic element of the DenseTensor and the shape of
         # each word (base_shape) should be [1] since it is simply an index to
         # look up for the corresponding word vector.
         # Suppose the recursive_sequence_lengths info is set to [[3, 4, 2]],
-        # which has only one level of detail. Then the created LoDTensor will have only
+        # which has only one level of detail. Then the created DenseTensor will have only
         # one higher level structure (sequence of words, or sentence) than the basic
-        # element (word). Hence the LoDTensor will hold data for three sentences of
+        # element (word). Hence the DenseTensor will hold data for three sentences of
         # length 3, 4 and 2, respectively.
         # Note that recursive_sequence_lengths should be a list of lists.
         recursive_seq_lens = [[3, 4, 2]]
@@ -191,7 +191,6 @@ def infer(word_dict, use_cuda, save_dirname=None):
             fetch_list=fetch_targets,
             return_numpy=False,
         )
-        print(results[0].recursive_sequence_lengths())
         np_data = np.array(results[0])
         print("Inference Shape: ", np_data.shape)
         print("Inference results: ", np_data)

@@ -83,6 +83,7 @@ EXPRESSION_MAP = {
     "__mod__": "A % B",
     "__rmod__": "A %= B",
     "__matmul__": "A @ B",
+    "__rmatmul__": "A @= B",
     "__eq__": "A == B",
     "__ne__": "A != B",
     "__lt__": "A < B",
@@ -320,7 +321,8 @@ def monkey_patch_variable():
         **Notes**:
             **The variable must be a** :ref:`api_paddle_Tensor`
 
-        Cast a variable to a specified data type.
+        Cast a variable to a specified data type if it differs from the current dtype;
+        otherwise, return the original variable.
 
         Args:
 
@@ -366,6 +368,9 @@ def monkey_patch_variable():
                 original var's dtype is: paddle.float32, numpy dtype is float32
                 new var's dtype is: paddle.int64, numpy dtype is int64
         """
+        if self.dtype == dtype:
+            return self
+
         block = current_block(self)
         out = create_new_tmp_var(block, dtype)
         block.append_op(
@@ -886,6 +891,10 @@ def monkey_patch_variable():
         (
             '__matmul__',
             _binary_creator_('__matmul__', "matmul_v2", False, None),
+        ),
+        (
+            '__rmatmul__',
+            _binary_creator_('__rmatmul', "matmul_v2", True, None),
         ),
         #  for logical compare
         ('__eq__', _binary_creator_('__eq__', 'equal', False, None)),

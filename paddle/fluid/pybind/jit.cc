@@ -87,12 +87,22 @@ void BindGuard(pybind11::module *m) {
       .def(py::init<const paddle::framework::proto::VarType &>(),
            py::arg("dtype"))
       .def(py::init<const phi::DataType &>(), py::arg("dtype"));
-  py::class_<LayerMatchGuard, GuardBase, std::shared_ptr<LayerMatchGuard>>(
-      *m, "LayerMatchGuard", R"DOC(LayerMatchGuard Class.)DOC")
-      .def(py::init<const py::object &>(), py::arg("layer_obj"));
+  py::class_<AttributeMatchGuard,
+             GuardBase,
+             std::shared_ptr<AttributeMatchGuard>>(
+      *m, "AttributeMatchGuard", R"DOC(AttributeMatchGuard Class.)DOC")
+      .def(py::init<const py::object &, const std::string &>(),
+           py::arg("obj"),
+           py::arg("attr_name"));
   py::class_<ShapeMatchGuard, GuardBase, std::shared_ptr<ShapeMatchGuard>>(
       *m, "ShapeMatchGuard", R"DOC(ShapeMatchGuard Class.)DOC")
       .def(py::init<const std::vector<py::object> &>(), py::arg("shape"));
+  py::class_<LayerMatchGuard, GuardBase, std::shared_ptr<LayerMatchGuard>>(
+      *m, "LayerMatchGuard", R"DOC(LayerMatchGuard Class.)DOC")
+      .def(py::init<const py::object &>(), py::arg("layer_obj"));
+  py::class_<RangeMatchGuard, GuardBase, std::shared_ptr<RangeMatchGuard>>(
+      *m, "RangeMatchGuard", R"DOC(RangeMatchGuard Class.)DOC")
+      .def(py::init<const py::object &>(), py::arg("range_obj"));
 
   m->def(
       "merge_guard",

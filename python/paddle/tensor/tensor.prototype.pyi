@@ -175,6 +175,7 @@ class AbstractTensor:
     def __radd__(self, y: _typing.TensorLike) -> Tensor: ...  # type: ignore
     def __rsub__(self, y: _typing.TensorLike) -> Tensor: ...  # type: ignore
     def __rmul__(self, y: _typing.TensorLike) -> Tensor: ...  # type: ignore
+    def __rmatmul__(self, y: _typing.TensorLike) -> Tensor: ...  # type: ignore
     def __rtruediv__(self, y: _typing.TensorLike) -> Tensor: ...  # type: ignore
     def __rmod__(self, y: _typing.TensorLike) -> Tensor: ...  # type: ignore
     def __rpow__(self, y: _typing.TensorLike) -> Tensor: ...  # type: ignore

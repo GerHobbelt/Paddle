@@ -72,7 +72,7 @@ def tensor_share_external_data(self, data: Tensor) -> None:
     '''
     Support input type check based on tensor.share_external_data.
     '''
-    if isinstance(data, core.LoDTensor):
+    if isinstance(data, core.DenseTensor):
         self._share_external_data_bind(data)
     elif isinstance(data, paddle.Tensor):
         self._share_external_data_paddle_tensor_bind(data)

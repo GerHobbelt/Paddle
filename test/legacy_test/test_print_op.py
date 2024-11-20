@@ -32,10 +32,9 @@ class TestPrintOpCPU(unittest.TestCase):
     def setUp(self):
         self.dtype = 'float32'
         self.place = paddle.CPUPlace()
-        self.x_tensor = base.core.LoDTensor()
+        self.x_tensor = base.core.DenseTensor()
         tensor_np = np.random.random(size=(2, 3)).astype(self.dtype)
         self.x_tensor.set(tensor_np, self.place)
-        self.x_tensor.set_recursive_sequence_lengths([[1, 1]])
 
     def build_network(self, only_forward, **kargs):
         x = paddle.static.data(
@@ -137,10 +136,9 @@ class TestPrintOpGPU(TestPrintOpCPU):
     def setUp(self):
         self.dtype = 'float32'
         self.place = paddle.CUDAPlace(0)
-        self.x_tensor = base.core.LoDTensor()
+        self.x_tensor = base.core.DenseTensor()
         tensor_np = np.random.random(size=(2, 3)).astype(self.dtype)
         self.x_tensor.set(tensor_np, self.place)
-        self.x_tensor.set_recursive_sequence_lengths([[1, 1]])
 
 
 @unittest.skipIf(
@@ -150,10 +148,9 @@ class TestPrintOpGPUFP16(TestPrintOpCPU):
     def setUp(self):
         self.dtype = 'float16'
         self.place = paddle.CUDAPlace(0)
-        self.x_tensor = base.core.LoDTensor()
+        self.x_tensor = base.core.DenseTensor()
         tensor_np = np.random.random(size=(2, 3)).astype(self.dtype)
         self.x_tensor.set(tensor_np, self.place)
-        self.x_tensor.set_recursive_sequence_lengths([[1, 1]])
 
 
 @unittest.skipIf(
@@ -163,10 +160,9 @@ class TestPrintOpGPUBFP16(TestPrintOpCPU):
     def setUp(self):
         self.dtype = 'bfloat16'
         self.place = paddle.CUDAPlace(0)
-        self.x_tensor = base.core.LoDTensor()
+        self.x_tensor = base.core.DenseTensor()
         tensor_np = convert_float_to_uint16(np.random.random(size=(2, 3)))
         self.x_tensor.set(tensor_np, self.place)
-        self.x_tensor.set_recursive_sequence_lengths([[1, 1]])
 
 
 class TestPrintOpBackward(unittest.TestCase):

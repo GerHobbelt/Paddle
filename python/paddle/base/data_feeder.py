@@ -317,7 +317,7 @@ class DataToLoDTensorConverter:
                     raise ValueError(
                         f"Reshape error. What is defined in data layer is {self.shape}, but receive {arr.shape}"
                     )
-        t = core.LoDTensor()
+        t = core.DenseTensor()
         t.set(arr, self.place)
         if self.lod_level > 0:
             t.set_recursive_sequence_lengths(self.lod)

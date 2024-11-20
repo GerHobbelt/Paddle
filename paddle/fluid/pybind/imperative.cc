@@ -526,7 +526,7 @@ void BindImperative(py::module *m_ptr) {
                   "lists with different lengths.\n  * Check the reader "
                   "function passed to 'set_(sample/sample_list/batch)"
                   "_generator' to locate the data causes this issue."));
-          // 2. construct LoDTensor
+          // 2. construct DenseTensor
           phi::DenseTensor t;
           SetTensorFromPyArray<phi::CPUPlace>(&t, array, phi::CPUPlace(), true);
           // 3. allocate shared memory
@@ -565,7 +565,7 @@ void BindImperative(py::module *m_ptr) {
                 "lists with different lengths.\n  * Check the reader "
                 "function passed to 'set_(sample/sample_list/batch)"
                 "_generator' to locate the data causes this issue."));
-        // 2. construct LoDTensor
+        // 2. construct DenseTensor
         phi::DenseTensor t;
         SetTensorFromPyArray<phi::CPUPlace>(&t, array, phi::CPUPlace(), true);
         // 3. allocate shared memory
@@ -596,7 +596,7 @@ void BindImperative(py::module *m_ptr) {
               t.Holder().get());
       PADDLE_ENFORCE_NOT_NULL(
           mmap_writer_allocation,
-          common::errors::NotFound("The shared memory of LoDTensor in "
+          common::errors::NotFound("The shared memory of DenseTensor in "
                                    "DataLoader's child process has been "
                                    "released."));
       memory::allocation::MemoryMapFdSet::Instance().Remove(

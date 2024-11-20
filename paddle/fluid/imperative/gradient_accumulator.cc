@@ -73,7 +73,7 @@ static void MoveOrCopyVar(framework::Variable* dst,
     dst_selected_rows->set_height(src_selected_rows.height());
   } else {
     PADDLE_THROW(common::errors::PermissionDenied(
-        "Only support LoDTensor and SelectedRows for sum gradient"));
+        "Only support DenseTensor and SelectedRows for sum gradient"));
   }
 }
 
@@ -521,7 +521,7 @@ static phi::Place GetPlaceOfVar(const std::shared_ptr<VariableWrapper>& var) {
     place = var->Var().Get<phi::SelectedRows>().place();
   } else {
     PADDLE_THROW(common::errors::InvalidArgument(
-        "only support LoDTensor and SelectedRows in dygraph"));
+        "only support DenseTensor and SelectedRows in dygraph"));
   }
   return place;
 }
@@ -565,7 +565,7 @@ void GradientAccumulator::AccumulateGrad() {
       }
     } else {
       PADDLE_THROW(common::errors::PermissionDenied(
-          "Only support LoDTensor and SelectedRows for gradient var"));
+          "Only support DenseTensor and SelectedRows for gradient var"));
     }
   } else {
     VLOG(6)
@@ -758,7 +758,7 @@ void SortedGradientAccumulator::SumGrad(std::shared_ptr<VariableWrapper> var,
           PADDLE_ENFORCE_EQ(var_info.var->Var().IsType<phi::DenseTensor>(),
                             true,
                             common::errors::PermissionDenied(
-                                "Gradient var must be LoDTensor"));
+                                "Gradient var must be DenseTensor"));
           if (CurCnt() == 0) {
             MoveOrCopyVar(dst_var->MutableVar(),
                           var_info.var->MutableVar(),
@@ -782,7 +782,7 @@ void SortedGradientAccumulator::SumGrad(std::shared_ptr<VariableWrapper> var,
                   var_info.var->Var().IsType<phi::SelectedRows>(),
               true,
               common::errors::PermissionDenied("The type of Gradient "
-                                               "var must be LoDTensor "
+                                               "var must be DenseTensor "
                                                "or SelectedRows"));
           if (CurCnt() == 0) {
             MoveOrCopyVar(dst_var->MutableVar(),

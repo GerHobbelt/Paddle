@@ -278,7 +278,7 @@ class Cache:
 
     def __call__(self, *args, **kwargs):
         cache_key = self.key_fn(*args, **kwargs)
-        if cache_key is None:
+        if not hashable(cache_key):
             return self.value_fn(*args, **kwargs)
         if cache_key in self.cache:
             log(5, "cache hit: ", cache_key, "\n")

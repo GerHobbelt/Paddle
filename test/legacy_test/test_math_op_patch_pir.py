@@ -116,6 +116,7 @@ class TestMathOpPatchesPir(unittest.TestCase):
         res_np_b = x_np @ y_np  # __matmul__
         res_np_c = paddle.matmul(paddle.to_tensor(x_np), paddle.to_tensor(y_np))
         res_np_d = x_np.__matmul__(y_np)
+        res_np_e = y_np.__rmatmul__(x_np)
         paddle.enable_static()
         with paddle.pir_utils.IrGuard():
             main_program, exe, program_guard = new_program()
@@ -125,14 +126,16 @@ class TestMathOpPatchesPir(unittest.TestCase):
                 b = x @ y
                 c = x.matmul(y)
                 d = x.__matmul__(y)
-                (b_np, c_np, d_np) = exe.run(
+                e = y.__rmatmul__(x)
+                (b_np, c_np, d_np, e_np) = exe.run(
                     main_program,
                     feed={"x": x_np, "y": y_np},
-                    fetch_list=[b, c, d],
+                    fetch_list=[b, c, d, e],
                 )
                 np.testing.assert_allclose(res_np_b, b_np, atol=1e-05)
                 np.testing.assert_allclose(res_np_c, c_np, atol=1e-05)
                 np.testing.assert_allclose(res_np_d, d_np, atol=1e-05)
+                np.testing.assert_allclose(res_np_e, e_np, atol=1e-05)
 
     def test_floordiv(self):
         paddle.disable_static()
@@ -500,6 +503,12 @@ class TestMathOpPatchesPir(unittest.TestCase):
                     self.assertEqual(x_T.shape, out_shape)
                     (output_x,) = exe.run(main_program, fetch_list=[x_T])
                     self.assertEqual(output_x.shape, tuple(out_shape))
+
+    def test_astype_zero_copy_if_same_dtype(self):
+        with paddle.pir_utils.IrGuard():
+            x = paddle.static.data(name='x', shape=[3, 2, 1])
+            y = x.astype(x.dtype)
+            self.assertTrue(x.is_same(y))
 
     def test_mT(self):
         with paddle.pir_utils.IrGuard():

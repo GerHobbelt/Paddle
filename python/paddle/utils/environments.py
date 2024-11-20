@@ -86,6 +86,12 @@ class BooleanEnvironmentVariable(EnvironmentVariable[bool]):
         assert isinstance(value, bool), "value must be a boolean"
         os.environ[self.name] = str(value).lower()
 
+    def __bool__(self) -> bool:
+        raise ValueError(
+            "BooleanEnvironmentVariable does not support bool(), "
+            "please use get() instead."
+        )
+
 
 class IntegerEnvironmentVariable(EnvironmentVariable[int]):
     def __init__(self, name: str, default: int):

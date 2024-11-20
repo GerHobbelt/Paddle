@@ -74,7 +74,8 @@ def monkey_patch_math_tensor():
     def astype(self: Tensor, dtype: DTypeLike) -> Tensor:
         """
 
-        Cast a Tensor to a specified data type.
+        Cast a Tensor to a specified data type if it differs from the current dtype;
+        otherwise, return the original Tensor.
 
         Args:
             dtype: The target data type.
@@ -97,6 +98,10 @@ def monkey_patch_math_tensor():
         """
         if not isinstance(dtype, (core.VarDesc.VarType, core.DataType)):
             dtype = convert_np_dtype_to_dtype_(dtype)
+
+        if self.dtype == dtype:
+            return self
+
         return _C_ops.cast(self, dtype)
 
     def _scalar_elementwise_op_(
@@ -244,6 +249,7 @@ def monkey_patch_math_tensor():
         '__mod__',
         '__rmod__',
         '__matmul__',
+        '__rmatmul__',
         '__gt__',
         '__ge__',
         '__lt__',

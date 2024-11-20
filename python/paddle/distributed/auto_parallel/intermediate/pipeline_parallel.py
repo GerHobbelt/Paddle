@@ -13,13 +13,17 @@
 # limitations under the License.
 
 import itertools
+import re
 from collections import OrderedDict
 from enum import Enum
 
 import paddle.distributed as dist
 from paddle.distributed import fleet
+from paddle.distributed.utils.log_utils import get_logger
 
 from .parallel_base import ParallelModel, ParallelOptimizer, is_tensor
+
+logger = get_logger("INFO", __name__)
 
 
 class SplitPoint(Enum):
@@ -137,7 +141,11 @@ def pipeline_parallel(model, optimizer, split_spec, mesh=None, dimension=None):
     Args:
         model (paddle.nn.Layer): A single card model to be distributed
         optimizer (paddle.optimizer.Optimizer): An optimizer to be distributed
-        split_spec (OrderedDict): Pipeline parallel split point, the order of the keys is the order of the pipeline stage
+        split_spec (OrderedDict|dict|str): The pipeline parallel split point.
+            if split_spec is a string, such as "llama.layer", Then the layer with same prefix a will be divided equally according to the size of pipeline degree.
+            if split_spec is a OrderedDict|dict, key is the layer name, and the value is the split position that can be SplitPoint.BEGINNING or SplitPoint.END, the order of the keys is the order of the pipeline stage.
+            NOTE: dict is also ordered after python3.7, so use dict at this time.
+        the order of the keys is the order of the pipeline stage
         mesh (ProcessMesh): A ProcessMesh Object.
         dimension (int|str): The mesh dimension to pipeline the model.
 
@@ -158,7 +166,40 @@ def pipeline_parallel(model, optimizer, split_spec, mesh=None, dimension=None):
             "Specifying a custom mesh is not supported currently"
         )
 
-    model = PipelineParallel(model, split_spec)
+    if isinstance(split_spec, str):
+        # match layer_name with split_spec following by a dot and numbers and no other characters
+        # such as split_spec = "llama.layer", then llama.layer.0 is matched, llama.layer.0.mlp is not matched
+        pattern = rf"{split_spec}\.\d+$"
+        matched_layer_name = [
+            name
+            for name, _ in model.named_sublayers()
+            if re.match(pattern, name)
+        ]
+
+        pp_size = mesh.get_dim_size("pp")
+        layer_num = len(matched_layer_name)
+        assert (
+            layer_num > 0
+        ), "No layer match the split_spec, please check its correctness"
+        assert (
+            layer_num % pp_size == 0
+        ), f"The number of layers must be divisible by the pp size, but got {layer_num} and {pp_size}"
+        layers_per_rank = layer_num // pp_size
+        split_spec_dict = OrderedDict(
+            [
+                (
+                    f"{split_spec}.{i * layers_per_rank - 1}",
+                    SplitPoint.END,
+                )
+                for i in range(1, pp_size)
+            ]
+        )
+    else:
+        split_spec_dict = split_spec
+
+    logger.info(f"split_spec_dict: {split_spec_dict}")
+
+    model = PipelineParallel(model, split_spec_dict)
     if optimizer is not None:
         optimizer = ParallelOptimizer(optimizer)
 

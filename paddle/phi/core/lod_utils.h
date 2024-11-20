@@ -30,7 +30,7 @@ TEST_API void AppendLoD(LoD* lod, const LoD& lod_length);
 
 /*
  * Convert between length-based LoD and offset-based LoD.
- * The implementation of LoDTensor class use offset-based LoD.
+ * The implementation of DenseTensor class use offset-based LoD.
  * However, we want to expose the more user-friendly length-based
  * LoD to the Python side instead.
  *

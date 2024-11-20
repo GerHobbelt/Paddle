@@ -258,7 +258,7 @@ class SequenceParallelEnd(PlanBase):
         )
 
 
-class SequenceParallel(PlanBase):
+class SequenceParallelEnable(PlanBase):
     """
     Do sequence parallel on the layer. Note the input should be in [b, s, h] format.
     """
@@ -290,6 +290,43 @@ class SequenceParallel(PlanBase):
         )
         layer.register_forward_post_hook(
             self.sequence_parallel_end(process_mesh)
+        )
+
+
+class SequenceParallelDisable(PlanBase):
+    """
+    Disable sequence parallel on the layer.
+    If the need_transpose is true:
+        - change the input from  [s/mp, b, h] to [b, s, h]
+        - change the output from [b, s, h] to [s/mp, b, h]
+    If the need_transpose is False:
+        - change the input from  [s/mp, b, h] to [s, b, h]
+        - change the output from [s, b, h] to [s/mp, b, h]
+    """
+
+    def __init__(self, need_transpose=True):
+        super().__init__()
+        self.need_transpose = need_transpose
+
+    def sequence_parallel_begin(self, process_mesh):
+        def begin(layer, input, output=None):
+            return sp_split(output, process_mesh, self.need_transpose)
+
+        return begin
+
+    def sequence_parallel_end(self, process_mesh):
+        def end(layer, input, output=None):
+            return sp_reduce_scatter(input, process_mesh, self.need_transpose)
+
+        return end
+
+    def apply(self, layer, process_mesh, shard_weight=None, shard_bias=None):
+        layer.register_forward_pre_hook(
+            self.sequence_parallel_end(process_mesh)
+        )
+
+        layer.register_forward_post_hook(
+            self.sequence_parallel_begin(process_mesh)
         )
 
 
@@ -358,7 +395,7 @@ class TensorParallel(ParallelModel):
         return model
 
 
-def tensor_parallel(model, parallelize_plan=None, optimizer=None):
+def tensor_parallel(model, optimizer=None, parallelize_plan=None):
     """
     Tensor parallel.
     :param model: paddle.nn.Layer, the model to be shard into tensor parallel.

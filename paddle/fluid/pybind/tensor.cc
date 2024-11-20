@@ -868,7 +868,7 @@ void BindTensor(pybind11::module &m) {  // NOLINT
 
                     >>> tensor = paddle.ones([3,3])
                     >>> metainfo = tensor.value().get_tensor()._share_cuda()
-                    >>> tensor_from_shared = paddle.to_tensor(paddle.base.core.LoDTensor._new_shared_cuda(metainfo))
+                    >>> tensor_from_shared = paddle.to_tensor(paddle.base.core.DenseTensor._new_shared_cuda(metainfo))
         )DOC")
 #endif
       .def("_share_filename",
@@ -1003,7 +1003,7 @@ void BindTensor(pybind11::module &m) {  // NOLINT
 
                     >>> tensor = paddle.ones([3,3])
                     >>> metainfo = tensor.value().get_tensor()._share_filename()
-                    >>> tensor_from_shared = paddle.to_tensor(paddle.base.core.LoDTensor._new_shared_filename(metainfo))
+                    >>> tensor_from_shared = paddle.to_tensor(paddle.base.core.DenseTensor._new_shared_filename(metainfo))
         )DOC")
       .def("_shared_incref",
            [](phi::DenseTensor &self) {

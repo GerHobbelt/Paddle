@@ -20,11 +20,11 @@ from tensorrt_test_base import TensorRTBaseTest
 import paddle
 
 
-class TestArgmaxTRTPattern(TensorRTBaseTest):
+class TestArgmaxCase1TRTPattern(TensorRTBaseTest):
     def setUp(self):
         self.python_api = paddle.argmax
         self.api_args = {
-            "x": np.random.randn(2, 3).astype(np.float32),
+            "x": np.random.randn(2, 3).astype("float32"),
             "axis": -1,
         }
         self.program_config = {"feed_list": ["x"]}
@@ -33,6 +33,111 @@ class TestArgmaxTRTPattern(TensorRTBaseTest):
 
     def test_trt_result(self):
         self.check_trt_result()
+
+
+class TestArgmaxCase2TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argmax
+        self.api_args = {
+            "x": np.random.randn(2, 3).astype("int64"),
+            "axis": -1,
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.target_marker_op = "pd_op.argmax"
+
+    def test_trt_result(self):
+        # test input's dtype
+        self.check_marker(expected_result=False)
+
+
+class TestArgmaxCase3TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argmax
+        self.api_args = {
+            "x": np.random.randn(2, 3).astype("float32"),
+            "axis": 0,
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.target_marker_op = "pd_op.argmax"
+
+    def test_trt_result(self):
+        # test axis
+        self.check_marker(expected_result=False)
+
+
+class TestArgmaxCase4TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argmin
+        self.api_args = {
+            "x": np.random.randn(2, 3).astype("float32"),
+            "axis": np.random.randn(1).astype("int64"),
+        }
+        self.program_config = {"feed_list": ["x", "axis"]}
+        self.target_marker_op = "pd_op.argmax"
+
+    def test_trt_result(self):
+        # test axis Value
+        self.check_marker(expected_result=False)
+
+
+class TestArgminCase1TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argmin
+        self.api_args = {
+            "x": np.random.randn(2, 3).astype("float32"),
+            "axis": -1,
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [1, 3]}
+        self.max_shape = {"x": [5, 3]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
+class TestArgminCase2TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argmin
+        self.api_args = {
+            "x": np.random.randn(2, 3).astype("int64"),
+            "axis": -1,
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.target_marker_op = "pd_op.argmin"
+
+    def test_trt_result(self):
+        # test input's dtype
+        self.check_marker(expected_result=False)
+
+
+class TestArgminCase3TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argmin
+        self.api_args = {
+            "x": np.random.randn(2, 3).astype("float32"),
+            "axis": 0,
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.target_marker_op = "pd_op.argmin"
+
+    def test_trt_result(self):
+        # test axis
+        self.check_marker(expected_result=False)
+
+
+class TestArgminCase4TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argmin
+        self.api_args = {
+            "x": np.random.randn(2, 3).astype("float32"),
+            "axis": np.random.randn(1).astype("int64"),
+        }
+        self.program_config = {"feed_list": ["x", "axis"]}
+        self.target_marker_op = "pd_op.argmin"
+
+    def test_trt_result(self):
+        # test axis Value
+        self.check_marker(expected_result=False)
 
 
 class TestWhereTRTPatternCase1(TensorRTBaseTest):
@@ -49,6 +154,66 @@ class TestWhereTRTPatternCase1(TensorRTBaseTest):
 
     def test_trt_result(self):
         self.check_trt_result()
+
+
+class TestArgsortCase1TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argsort
+        self.api_args = {
+            "x": np.random.randn(2, 3).astype("float32"),
+            "axis": -1,
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [1, 3]}
+        self.max_shape = {"x": [5, 3]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
+class TestArgsortCase2TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argsort
+        self.api_args = {
+            "x": np.random.randn(2).astype("float32"),
+            "axis": -1,
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [1]}
+        self.max_shape = {"x": [5]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
+class TestArgsortCase3TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argsort
+        self.api_args = {
+            "x": np.random.randn(2, 3).astype("int64"),
+            "axis": -1,
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.min_shape = {"x": [1, 3]}
+        self.max_shape = {"x": [5, 3]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
+class TestArgsortCase4TRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = paddle.argsort
+        self.api_args = {
+            "x": np.random.randn(2, 4000).astype("float32"),
+            "axis": 1,
+        }
+        self.program_config = {"feed_list": ["x"]}
+        self.target_marker_op = "pd_op.argsort"
+
+    def test_trt_result(self):
+        # test axis attr
+        self.check_marker(expected_result=False)
 
 
 class TestWhereTRTPatternCase2(TensorRTBaseTest):

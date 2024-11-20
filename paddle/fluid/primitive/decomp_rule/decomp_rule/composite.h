@@ -275,6 +275,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> batch_norm_decomp(
 
   std::vector<int64_t> x_dim = x_cast.shape();
   std::vector<int64_t> stats_shape;
+  Tensor eps = full_scalar<T>(epsilon, x_cast.dtype());
 
   Tensor x_hat;
   Tensor batch_mean;
@@ -283,7 +284,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> batch_norm_decomp(
     batch_mean = mean_decomp<T>(x_cast, reduce_axes, true);
     auto temp = mean_decomp<T>(x_cast * x_cast, reduce_axes, true);
     auto batch_var = temp - batch_mean * batch_mean;
-    inv_std = rsqrt<T>(batch_var + epsilon);
+    inv_std = rsqrt<T>(batch_var + eps);
 
     x_hat = (x_cast - batch_mean) * inv_std;
 
@@ -298,7 +299,7 @@ std::tuple<Tensor, Tensor, Tensor, Tensor, Tensor, Tensor> batch_norm_decomp(
     assign_out_<T>(run_var_, run_var);
   } else {
     x_hat = (x_cast - reshape<T>(run_mean, scale_bias_new_shape)) *
-            rsqrt<T>(reshape<T>(run_var, scale_bias_new_shape) + epsilon);
+            rsqrt<T>(reshape<T>(run_var, scale_bias_new_shape) + eps);
 
     run_mean_ = run_mean;
     run_var_ = run_var;

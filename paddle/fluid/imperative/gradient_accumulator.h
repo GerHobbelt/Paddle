@@ -37,7 +37,7 @@ class GradientAccumulator {
         var->SetType(framework::proto::VarType::SELECTED_ROWS);
       } else {
         PADDLE_THROW(common::errors::PermissionDenied(
-            "Only support LoDTensor and SelectedRows for gradient var"));
+            "Only support DenseTensor and SelectedRows for gradient var"));
       }
     }
 

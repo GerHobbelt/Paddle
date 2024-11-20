@@ -68,7 +68,7 @@ TEST(bfloat16, lod_tensor_on_gpu) {
       bfloat16(1.0f), bfloat16(0.5f), bfloat16(0.33333f), bfloat16(0.0f)};
   memcpy(src_ptr, arr, 4 * sizeof(bfloat16));
 
-  // CPU LoDTensor to GPU LoDTensor
+  // CPU DenseTensor to GPU DenseTensor
   phi::GPUPlace gpu_place(0);
   phi::GPUContext gpu_ctx(gpu_place);
   gpu_ctx.SetAllocator(paddle::memory::allocation::AllocatorFacade::Instance()
@@ -77,7 +77,7 @@ TEST(bfloat16, lod_tensor_on_gpu) {
   gpu_ctx.PartialInitWithAllocator();
   framework::TensorCopy(src_tensor, gpu_place, gpu_ctx, &gpu_tensor);
 
-  // GPU LoDTensor to CPU LoDTensor
+  // GPU DenseTensor to CPU DenseTensor
   framework::TensorCopy(gpu_tensor, CPUPlace(), gpu_ctx, &dst_tensor);
 
   // Sync before comparing LoDTensors

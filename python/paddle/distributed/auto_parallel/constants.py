@@ -157,6 +157,8 @@ set_field_default_config(SHARDING, "enable_hierarchical_comm", False)
 set_field_default_config(SHARDING, "partition_algor", "greedy_even")
 set_field_default_config(SHARDING, "enable_tuning", False)
 set_field_default_config(SHARDING, "tuning_range", [])
+set_field_default_config(SHARDING, "release_gradients", False)
+set_field_default_config(SHARDING, "comm_buffer_size_MB", -1)
 
 if TYPE_CHECKING:
 

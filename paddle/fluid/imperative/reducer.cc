@@ -363,7 +363,7 @@ void Reducer::InitializeDenseGroups(
     PADDLE_ENFORCE_EQ(is_sparse_gradient_[variable_index],
                       false,
                       common::errors::PreconditionNotMet(
-                          "Tensor %s's GRAD must be LoDTensor, but received "
+                          "Tensor %s's GRAD must be DenseTensor, but received "
                           "GRAD is SelectedRows",
                           var_name));
 
@@ -999,7 +999,7 @@ bool Reducer::HasGrad(size_t var_index) {
     }
   } else {
     PADDLE_THROW(common::errors::PermissionDenied(
-        "Only support LoDTensor and SelectedRows for gradient var"));
+        "Only support DenseTensor and SelectedRows for gradient var"));
   }
   return false;
 }

@@ -57,6 +57,13 @@ class Instruction:
         return id(self) == id(instr)
 
 
+def get_instruction_size(instr: Instruction) -> int:
+    cache_size = 0
+    if sys.version_info >= (3, 11):
+        cache_size = PYOPCODE_CACHE_SIZE.get(instr.opname, 0)
+    return 2 * (cache_size + 1)
+
+
 def gen_instr(name, arg=None, argval=None, gened=True, jump_to=None):
     return Instruction(
         opcode=dis.opmap[name],
@@ -207,8 +214,10 @@ def modify_instrs(instructions: list[Instruction]) -> None:
     modify_completed = False
     while not modify_completed:
         reset_offset(instructions)
-        relocate_jump_target(instructions)
-        modify_completed = modify_extended_args(instructions)
+        has_inverted_jump = relocate_jump_target(instructions)
+        modify_completed = (
+            modify_extended_args(instructions) and not has_inverted_jump
+        )
 
 
 def reset_offset(instructions: list[Instruction]) -> None:
@@ -233,7 +242,9 @@ def reset_offset(instructions: list[Instruction]) -> None:
         instr.offset = idx * 2
 
 
-def correct_jump_direction(instr: Instruction, arg: int) -> Instruction:
+def correct_jump_direction(
+    instr: Instruction, arg: int
+) -> tuple[Instruction, bool]:
     """
     Corrects the jump direction of the given instruction.
     NOTE(zrr1999): In Python 3.11, JUMP_ABSOLUTE is removed, so python generates JUMP_FORWARD or JUMP_BACKWARD instead,
@@ -241,10 +252,11 @@ def correct_jump_direction(instr: Instruction, arg: int) -> Instruction:
 
     Args:
         instr (Instruction): The instruction to be corrected.
+        invert_jump (bool): Whether to invert the jump direction.
     """
     if instr.opname in ABS_JUMP:
         instr.arg = arg
-        return instr
+        return instr, False
     elif instr.opname in REL_JUMP:
         if arg < 0:
             if instr.opname in REL_BWD_JUMP:
@@ -260,14 +272,16 @@ def correct_jump_direction(instr: Instruction, arg: int) -> Instruction:
                 instr.opname = backward_op_name
                 instr.opcode = dis.opmap[backward_op_name]
             instr.arg = -arg
+            invert_jump = True
         else:
             instr.arg = arg
-        return instr
+            invert_jump = False
+        return instr, invert_jump
     else:
         raise ValueError(f"unknown jump type: {instr.opname}")
 
 
-def relocate_jump_target(instructions: list[Instruction]) -> None:
+def relocate_jump_target(instructions: list[Instruction]) -> bool:
     """
     If a jump instruction is found, this function will adjust the jump targets based on the presence of EXTENDED_ARG instructions.
     If an EXTENDED_ARG instruction exists for the jump target, use its offset as the new target.
@@ -276,8 +290,9 @@ def relocate_jump_target(instructions: list[Instruction]) -> None:
         instructions (list): The list of Instruction objects representing bytecode instructions.
 
     Returns:
-        None
+        bool: True if the jump direction is inverted, False otherwise.
     """
+    has_inverted_jump = False
     extended_arg = []
     for instr in instructions:
         if instr.opname == "EXTENDED_ARG":
@@ -305,7 +320,8 @@ def relocate_jump_target(instructions: list[Instruction]) -> None:
 
             if sys.version_info >= (3, 10):
                 new_arg //= 2
-            correct_jump_direction(instr, new_arg)
+            _, invert_jump = correct_jump_direction(instr, new_arg)
+            has_inverted_jump = has_inverted_jump or invert_jump
             assert instr.arg is not None
             if extended_arg:
                 instr.arg &= 0xFF
@@ -319,6 +335,7 @@ def relocate_jump_target(instructions: list[Instruction]) -> None:
                 if new_arg > 0:
                     extended_arg[0].arg += new_arg << 8
         extended_arg.clear()
+    return has_inverted_jump
 
 
 def modify_extended_args(instructions: list[Instruction]) -> bool:

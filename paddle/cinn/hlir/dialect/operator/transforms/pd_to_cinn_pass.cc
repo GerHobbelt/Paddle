@@ -254,30 +254,59 @@ class ReshapeOpPattern
 
   bool Match(paddle::dialect::ReshapeOp op) const override {
     const bool is_denied = CompatibleInfo::IsDeniedForCinn(*op.operation());
-    return !is_denied && IsDefinedBy<FullIntArrayOp>(op, 1);
+    return !is_denied && IsDefinedBy<FullIntArrayOp>(op, 1) &&
+           CanUseStaticOutputShape(op);
   }
 
   void Rewrite(paddle::dialect::ReshapeOp op,
                pir::PatternRewriter &rewriter) const override {
+    std::vector<int64_t> vec_out_shape = GetOutputShape(op);
+    std::vector<int32_t> vec_int32_shape(vec_out_shape.begin(),
+                                         vec_out_shape.end());
+
+    ReplaceWithCinnReshapeOp(op, rewriter, vec_int32_shape);
+    rewriter.EraseOp(op);
+  }
+
+ private:
+  std::vector<int64_t> GetOutputShape(paddle::dialect::ReshapeOp op) const {
     const FullIntArrayOp scale_full_op = CastDefinedTo<FullIntArrayOp>(op, 1);
 
     auto out_shape_attr = scale_full_op.attribute("value")
                               .dyn_cast<pir::ArrayAttribute>()
                               .AsVector();
+    std::vector<int64_t> attr_out_shape =
+        cinn::dialect::ir::GetVectorAttr(scale_full_op, "value");
 
-    std::vector<int> vec_out_shape;
-    if (out_shape_attr.size() > 0) {
-      PADDLE_ENFORCE_EQ(out_shape_attr[0].isa<::pir::Int64Attribute>(),
-                        true,
-                        ::common::errors::Unimplemented(
-                            "the 0th elementwise MUST be ir::Int64Attribute"));
-      for (size_t i = 0; i < out_shape_attr.size(); ++i) {
-        vec_out_shape.push_back(
-            out_shape_attr[i].dyn_cast<::pir::Int64Attribute>().data());
+    std::vector<int64_t> in_shape =
+        phi::vectorize(op.operand_source(0)
+                           .type()
+                           .dyn_cast<paddle::dialect::DenseTensorType>()
+                           .dims());
+
+    std::vector<int64_t> output_shape;
+    for (size_t i = 0; i < attr_out_shape.size(); ++i) {
+      if (attr_out_shape[i] == 0) {
+        output_shape.push_back(in_shape[i]);
+      } else {
+        output_shape.push_back(attr_out_shape[i]);
       }
     }
-    ReplaceWithCinnReshapeOp(op, rewriter, vec_out_shape);
-    rewriter.EraseOp(op);
+
+    return output_shape;
+  }
+
+  bool CanUseStaticOutputShape(paddle::dialect::ReshapeOp op) const {
+    std::vector<int64_t> output_shape = GetOutputShape(op);
+
+    int negtive_count = 0;
+    for (auto &d : output_shape) {
+      if (d < 0) {
+        negtive_count++;
+      }
+    }
+
+    return negtive_count <= 1;
   }
 };
 

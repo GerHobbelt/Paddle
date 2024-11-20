@@ -242,7 +242,7 @@ bool NativePaddlePredictor::SetFeed(const std::vector<PaddleTensor> &inputs,
             "The data contained in the input PaddleTensor had wrong length."));
 
     if (phi::is_cpu_place(place_)) {
-      // TODO(panyx0718): Init LoDTensor from existing memcpy to save a copy.
+      // TODO(panyx0718): Init DenseTensor from existing memcpy to save a copy.
       std::memcpy(static_cast<void *>(input_ptr),
                   inputs[i].data.data(),
                   inputs[i].data.length());

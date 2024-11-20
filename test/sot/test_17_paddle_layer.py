@@ -14,7 +14,7 @@
 
 import unittest
 
-from test_case_base import TestCaseBase
+from test_case_base import TestCaseBase, test_with_faster_guard
 
 import paddle
 
@@ -66,6 +66,7 @@ class SimpleNetWithSequenital(paddle.nn.Layer):
 
 
 class TestLayer(TestCaseBase):
+    @test_with_faster_guard
     def test_layer(self):
         x = paddle.rand((10,))
         y = paddle.rand((10, 10))
@@ -74,6 +75,7 @@ class TestLayer(TestCaseBase):
         self.assert_results(net_call, y, net)
         self.assert_results(net_call_passed_by_user, x, net.forward)
 
+    @test_with_faster_guard
     def test_layer_with_sequential(self):
         x = paddle.rand((10,))
         y = paddle.rand((10, 10))
@@ -82,6 +84,7 @@ class TestLayer(TestCaseBase):
         self.assert_results(net_call, y, net)
         self.assert_results(net_call_passed_by_user, x, net.forward)
 
+    @test_with_faster_guard
     def test_bound(self):
         x = paddle.rand((10,))
         y = paddle.rand((10, 10))

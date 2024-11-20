@@ -165,7 +165,7 @@ class _PirProgramHolder:
 #   The variable/parameter of the dynamic graph is not in the scope, so before the op
 #   executes the program internally, create persistent variables with the
 #   same name as feed, parameters, and fetch in the scope, and share the
-#   LoDTensor of the op input.
+#   DenseTensor of the op input.
 #
 # 2. Forward and Backward Separation:
 #   Because the dynamic graph op performs the forward and backward separately,

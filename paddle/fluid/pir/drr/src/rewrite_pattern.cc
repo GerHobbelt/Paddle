@@ -16,7 +16,6 @@
 #include <queue>
 #include <utility>
 
-#include "glog/vlog_is_on.h"
 #include "paddle/fluid/pir/drr/include/drr_pattern_base.h"
 #include "paddle/fluid/pir/drr/include/drr_rewrite_pattern.h"
 #include "paddle/fluid/pir/drr/src/ir_operation_factory.h"

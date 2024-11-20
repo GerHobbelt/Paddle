@@ -48,6 +48,7 @@ from ....utils.exceptions import (
 )
 from ..dispatcher import Dispatcher
 from ..guard import (
+    FasterStringifiedExpression,
     StringifiedExpression,
     check_guard,
     object_equal_stringified_guard,
@@ -445,13 +446,9 @@ class LayerVariable(CallableVariable):
     def make_stringified_guard(self) -> list[StringifiedExpression]:
         frame_value_tracer = self.tracker.trace_value_from_frame()
         return [
-            StringifiedExpression(
-                f"id({{}}) == {id(self.get_py_value())}",
-                [frame_value_tracer],
-                union_free_vars(frame_value_tracer.free_vars),
-            ),
-            StringifiedExpression(
-                f"{{}}.training == {self.get_py_value().training}",
+            FasterStringifiedExpression(
+                f"id({{0}}) == {id(self.get_py_value())} and {{0}}.training == {self.get_py_value().training}",
+                paddle.framework.core.ValueMatchGuard(self.get_py_value()),
                 [frame_value_tracer],
                 union_free_vars(frame_value_tracer.free_vars),
             ),
@@ -503,13 +500,14 @@ class ContainerLayerVariable(LayerVariable):
         if isinstance(self.value, PD_SEQ_CONTAINERS):
             frame_value_tracer = self.tracker.trace_value_from_frame()
 
-            len_guard = StringifiedExpression(
+            len_guard = FasterStringifiedExpression(
                 f"len({{}}) == {len(self.value)}",
+                paddle.framework.core.LengthMatchGuard(len(self.value)),
                 [frame_value_tracer],
                 frame_value_tracer.free_vars,
             )
 
-            guards = [len_guard]
+            guards: list[StringifiedExpression] = [len_guard]
             for idx, layer in enumerate(self.value):
                 layer_variable = VariableFactory.from_value(
                     layer, self.graph, GetItemTracker(self, idx)

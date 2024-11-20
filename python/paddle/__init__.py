@@ -279,7 +279,6 @@ from .tensor.logic import (
     logical_xor_,  # noqa: F401
     not_equal,
     not_equal_,  # noqa: F401
-    positive,
 )
 from .tensor.manipulation import (
     as_complex,
@@ -500,6 +499,7 @@ from .tensor.math import (  # noqa: F401
     outer,
     polygamma,
     polygamma_,
+    positive,
     pow,
     pow_,
     prod,
@@ -587,6 +587,10 @@ from .tensor.stat import (
     var,
 )
 from .tensor.to_string import set_printoptions
+from .utils.dlpack import (
+    from_dlpack,
+    to_dlpack,
+)
 
 # CINN has to set a flag to include a lib
 if is_compiled_with_cinn():
@@ -1188,4 +1192,6 @@ __all__ = [
     'combinations',
     'signbit',
     'positive',
+    'from_dlpack',
+    'to_dlpack',
 ]

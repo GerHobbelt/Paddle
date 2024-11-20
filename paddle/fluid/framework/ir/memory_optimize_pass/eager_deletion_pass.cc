@@ -129,7 +129,7 @@ static OpToVarNameSetMap ShrinkGCVars(const OpToVarNameSetMap &m,
 
   /**
    * Step 1: Split all variables into phi::DenseTensor and Non-phi::DenseTensor.
-   * We can only calculate memory size of LoDTensors
+   * We can only calculate memory size of DenseTensors
    */
   OpToVarNameSetMap lod_tensors, other_vars;
   SplitIntoLoDTensorAndNonLoDTensorVars(m, vars, &lod_tensors, &other_vars);

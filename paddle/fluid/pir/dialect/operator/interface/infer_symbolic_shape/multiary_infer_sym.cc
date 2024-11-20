@@ -2930,13 +2930,14 @@ bool RoiPoolOpInferSymbolicShape(
           "The input data should be a four-dimensional tensor with [N,C,H,W], "
           "but received input data with %d dimension",
           x_shape.size()));
-  PADDLE_ENFORCE_EQ(rois_shape.size(),
-                    2,
-                    common::errors::InvalidArgument(
-                        "rois should be a 2-D LoDTensor with shape (num_rois, "
-                        "4) given as [[x1, y1, x2, y2], ...], but received "
-                        "rois is %d-dimensional LoDTensor",
-                        rois_shape.size()));
+  PADDLE_ENFORCE_EQ(
+      rois_shape.size(),
+      2,
+      common::errors::InvalidArgument(
+          "rois should be a 2-D DenseTensor with shape (num_rois, "
+          "4) given as [[x1, y1, x2, y2], ...], but received "
+          "rois is %d-dimensional DenseTensor",
+          rois_shape.size()));
   const auto &four = symbol::DimExpr(4);
   infer_context->AddEqualCstr(rois_shape[1], four);
 
@@ -3380,11 +3381,12 @@ bool PsroiPoolOpInferSymbolicShape(
       input_dims.size(),
       4,
       common::errors::InvalidArgument("The format of input tensor is NCHW"));
-  PADDLE_ENFORCE_EQ(rois_dims.size(),
-                    2,
-                    common::errors::InvalidArgument(
-                        "ROIs should be a 2-D LoDTensor of shape (num_rois, 4) "
-                        "given as [(x1, y1, x2, y2), ...]"));
+  PADDLE_ENFORCE_EQ(
+      rois_dims.size(),
+      2,
+      common::errors::InvalidArgument(
+          "ROIs should be a 2-D DenseTensor of shape (num_rois, 4) "
+          "given as [(x1, y1, x2, y2), ...]"));
   infer_context->AddEqualCstr(rois_dims[1], symbol::DimExpr(4));
   if (op->operand_source(2)) {
     auto &rois_num_shape_or_data =

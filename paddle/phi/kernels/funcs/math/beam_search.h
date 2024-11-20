@@ -74,7 +74,7 @@ static inline bool CheckLoD(const LoD& in, int tensor_height = -1) {
  * will have some candidates, input the candidate ids and their corresponding
  * scores (probabilities), it will sort and select the top beam_size candidates
  * for each source sentence, and store the selected candidates's score and their
- * corresponding ids to LoDTensors.
+ * corresponding ids to DenseTensors.
  *
  * A detailed example:
  *

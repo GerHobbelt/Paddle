@@ -391,7 +391,7 @@ class TestSaveLoadAny(unittest.TestCase):
         paddle.enable_static()
         lod_static = paddle.load(path)
         np_static = paddle.load(path, return_numpy=True)
-        self.assertTrue(isinstance(lod_static, paddle.base.core.LoDTensor))
+        self.assertTrue(isinstance(lod_static, paddle.base.core.DenseTensor))
         np.testing.assert_array_equal(tensor.numpy(), np_static)
         np.testing.assert_array_equal(tensor.numpy(), np.array(lod_static))
 
@@ -600,7 +600,9 @@ class TestSaveLoadAny(unittest.TestCase):
             )
         self.assertTrue(load_tensor2['epoch'] == 123)
 
-        self.assertTrue(isinstance(load_tensor3[0], paddle.base.core.LoDTensor))
+        self.assertTrue(
+            isinstance(load_tensor3[0], paddle.base.core.DenseTensor)
+        )
         np.testing.assert_array_equal(
             np.array(load_tensor3[0]), obj3[0].numpy()
         )
@@ -610,7 +612,7 @@ class TestSaveLoadAny(unittest.TestCase):
             self.assertTrue(
                 isinstance(
                     load_tensor3[2]["state_dict"][k],
-                    paddle.base.core.LoDTensor,
+                    paddle.base.core.DenseTensor,
                 )
             )
             np.testing.assert_array_equal(
@@ -620,14 +622,14 @@ class TestSaveLoadAny(unittest.TestCase):
         for k, v in state_dict.items():
             self.assertTrue(
                 isinstance(
-                    load_tensor3[2]["opt"][k], paddle.base.core.LoDTensor
+                    load_tensor3[2]["opt"][k], paddle.base.core.DenseTensor
                 )
             )
             np.testing.assert_array_equal(
                 np.array(load_tensor3[2]['opt'][k]), v.numpy()
             )
 
-        self.assertTrue(load_tensor4[0], paddle.base.core.LoDTensor)
+        self.assertTrue(load_tensor4[0], paddle.base.core.DenseTensor)
         np.testing.assert_array_equal(np.array(load_tensor4[0]), obj4[0])
 
         load_array1 = paddle.load(path1, return_numpy=True)
@@ -733,15 +735,15 @@ class TestSaveLoadAny(unittest.TestCase):
                 )
             self.assertTrue(load_tensor2['epoch'] == 123)
 
-            self.assertTrue(isinstance(load_tensor3[0], base.core.LoDTensor))
+            self.assertTrue(isinstance(load_tensor3[0], base.core.DenseTensor))
             np.testing.assert_array_equal(np.array(load_tensor3[0]), obj3[0])
-            self.assertTrue(isinstance(load_tensor3[1], base.core.LoDTensor))
+            self.assertTrue(isinstance(load_tensor3[1], base.core.DenseTensor))
             np.testing.assert_array_equal(np.array(load_tensor3[1]), obj3[1])
 
             for k, v in state_dict.items():
                 self.assertTrue(
                     isinstance(
-                        load_tensor3[2]["state_dict"][k], base.core.LoDTensor
+                        load_tensor3[2]["state_dict"][k], base.core.DenseTensor
                     )
                 )
                 np.testing.assert_array_equal(
@@ -750,13 +752,13 @@ class TestSaveLoadAny(unittest.TestCase):
 
             for k, v in state_dict.items():
                 self.assertTrue(
-                    isinstance(load_tensor3[2]["opt"][k], base.core.LoDTensor)
+                    isinstance(load_tensor3[2]["opt"][k], base.core.DenseTensor)
                 )
                 np.testing.assert_array_equal(
                     np.array(load_tensor3[2]['opt'][k]), np.array(v)
                 )
 
-            self.assertTrue(isinstance(load_tensor4[0], base.core.LoDTensor))
+            self.assertTrue(isinstance(load_tensor4[0], base.core.DenseTensor))
             np.testing.assert_array_equal(np.array(load_tensor4[0]), obj4[0])
 
             load_array1 = paddle.load(path1, return_numpy=True)

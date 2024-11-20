@@ -926,9 +926,10 @@ class PartialProgramLayer:
         inputs = train_runnable_program.x_values
         params = train_runnable_program.param_values
         combined_inputs = list(itertools.chain(inputs, params))
-        forward_end_idx = len(program.global_block().ops)
+        forward_prog_len = len(program.global_block().ops)
+        forward_end_idx = forward_prog_len - 1
         forward_end_op = None
-        if forward_end_idx > 0:
+        if forward_prog_len > 0:
             forward_end_op = program.global_block().ops[-1]
         grad_info_map = [None] * len(combined_inputs)
         with backend_guard(self._backend):
@@ -958,7 +959,7 @@ class PartialProgramLayer:
                     "grad_input_",
                 )
                 op_between_forward_and_backward = (
-                    len(program.global_block().ops) - forward_end_idx
+                    len(program.global_block().ops) - forward_prog_len
                 )
 
                 # call grad to get backward ops.
@@ -985,7 +986,7 @@ class PartialProgramLayer:
                     if forward_end_op is not None:
                         for idx, op in enumerate(program.global_block().ops):
                             if op == forward_end_op:
-                                forward_end_idx = idx + 1
+                                forward_end_idx = idx
                                 break
 
             for hooker in self._hookers:
@@ -1019,11 +1020,12 @@ class PartialProgramLayer:
         output_grads_to_append = list(
             filter(lambda x: not is_fake_value(x), x_grad_value + p_grad_value)
         )
-        backward_end_op_index = len(program.global_block().ops)
+        backward_prog_len = len(program.global_block().ops)
+        backward_end_op_index = backward_prog_len - 1
         paddle.base.libpaddle.pir.append_shadow_outputs(
             program,
             output_grads_to_append,
-            backward_end_op_index,
+            backward_prog_len,
             "grad_output_",
         )
 
@@ -1036,7 +1038,11 @@ class PartialProgramLayer:
             [inputs, params, targets, x_grad_value, p_grad_value, o_grad_value]
         )
         forward_index_pass = IndicesPreservePass(
-            [forward_end_idx, backward_start_op_index, backward_end_op_index],
+            [
+                forward_end_idx + 1,
+                backward_start_op_index + 1,
+                backward_end_op_index + 1,
+            ],
             fused_bn_add_act_pass,
         )
         program = forward_index_pass(program)
@@ -1049,17 +1055,17 @@ class PartialProgramLayer:
             o_grad_value,
         ) = fused_bn_add_act_pass.values
         (
-            forward_end_idx,
-            backward_start_op_index,
-            backward_end_op_index,
+            forward_end_range,
+            backward_start_range,
+            backward_end_op_range,
         ) = forward_index_pass.new_indices
 
         return RunnableProgram(
             program,
             (inputs, params, targets),
             (x_grad_value, p_grad_value, o_grad_value),
-            (0, forward_end_idx),
-            (backward_start_op_index, backward_end_op_index),
+            (0, forward_end_range),
+            (backward_start_range, backward_end_op_range),
         )
 
     def _prepare_attributes(self, in_sot_mode=False):
@@ -1208,7 +1214,7 @@ class PartialProgramLayer:
         # will be SelectedRows, not LoDTensor. But tracer will just
         # set param grad Tensor by forward Tensor(LoDTensor)
         # If we don't change grad_var type here, RunProgramOp need
-        # transform SelectedRows to LoDTensor forcibly, it may not
+        # transform SelectedRows to DenseTensor forcibly, it may not
         # be user wanted result.
         forward_params_grads = train_program.param_grad_values
         train_program = train_program.program

@@ -48,7 +48,7 @@ static const phi::Place &GetVarPlace(const framework::Variable &src) {
     PADDLE_THROW(common::errors::InvalidArgument(
         "Cannot get unsupported variable type %s for imperative allreduce, "
         "only "
-        "LoDTensor and SelectedRows are supported.",
+        "DenseTensor and SelectedRows are supported.",
         common::demangle(framework::ToTypeName(src.Type()))));
   }
 }
@@ -260,7 +260,7 @@ void AllReduce(const framework::Variable &src,
   } else {
     PADDLE_THROW(common::errors::InvalidArgument(
         "Unsupported variable type %s for imperative allreduce, only "
-        "LoDTensor and SelectedRows are supported.",
+        "DenseTensor and SelectedRows are supported.",
         common::demangle(framework::ToTypeName(src.Type()))));
   }
 }

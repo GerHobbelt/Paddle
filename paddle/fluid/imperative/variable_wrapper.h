@@ -110,7 +110,7 @@ class VariableWrapper {
         tensor = &(var_.Get<phi::SelectedRows>().value());
       } else {
         PADDLE_THROW(common::errors::PermissionDenied(
-            "Only support LoDTensor and SelectedRows for gradient var"));
+            "Only support DenseTensor and SelectedRows for gradient var"));
       }
       if (tensor && tensor->IsInitialized()) {
         is_empty = false;

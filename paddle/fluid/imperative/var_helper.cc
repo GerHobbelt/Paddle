@@ -89,7 +89,7 @@ const phi::Place &GetPlace(const std::shared_ptr<VarType> &var) {
     return variable.Get<phi::SelectedRows>().place();
   } else {
     PADDLE_THROW(common::errors::InvalidArgument(
-        "Variable type is %s, expect LoDTensor or SelectedRows.",
+        "Variable type is %s, expect DenseTensor or SelectedRows.",
         paddle::framework::ToTypeName(var->Var().Type())));
   }
 }

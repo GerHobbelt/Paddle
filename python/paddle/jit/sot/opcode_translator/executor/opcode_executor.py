@@ -116,6 +116,9 @@ SUPPORT_COMPARE_OP = {
     "BAD": operator_BAD,
 }
 
+# In Python 3.13, the method layout is changed, and a NULL will be pushed after the value.
+CALL_METHOD_LAYOUT_NULL_AFTER_VALUE = sys.version_info >= (3, 13)
+
 
 @dataclass
 class Stop:
@@ -370,7 +373,7 @@ class OpcodeExecutorBase:
         self.guard_fn = None
         self._name = "Executor"
         self._call_shape: tuple[str, ...] | None = (
-            None  # store kwnames for Python 3.11+
+            None  # store kwnames for Python 3.11 and 3.12
         )
         self._prepare_virtual_env()
         self.stop_state = None
@@ -837,7 +840,7 @@ class OpcodeExecutorBase:
         if sys.version_info >= (3, 11):
             push_null = namei & 1
             namei >>= 1
-        if push_null:
+        if push_null and not CALL_METHOD_LAYOUT_NULL_AFTER_VALUE:
             self.stack.push(NullVariable())
         name = self._code.co_names[namei]
         if name in self._globals.keys():
@@ -847,6 +850,8 @@ class OpcodeExecutorBase:
         else:
             raise InnerError(f"{name} not in globals and builtins")
         self.stack.push(value)
+        if push_null and CALL_METHOD_LAYOUT_NULL_AFTER_VALUE:
+            self.stack.push(NullVariable())
 
     def load_method(self, method_name):
         method_name_var = ConstantVariable.wrap_literal(
@@ -867,8 +872,11 @@ class OpcodeExecutorBase:
             self.stack.push(obj)
         else:
             # unbound method, push the dummy and the function
-            self.stack.push(NullVariable())
+            if not CALL_METHOD_LAYOUT_NULL_AFTER_VALUE:
+                self.stack.push(NullVariable())
             self.stack.push(method)
+            if CALL_METHOD_LAYOUT_NULL_AFTER_VALUE:
+                self.stack.push(NullVariable())
 
     def LOAD_METHOD(self, instr: Instruction):
         method_name = self._code.co_names[instr.arg]
@@ -1158,12 +1166,15 @@ class OpcodeExecutorBase:
         assert isinstance(instr.arg, int)
         self._call_shape = self._co_consts[instr.arg].get_py_value()
 
-    def call(self, instr: Instruction):
+    def call_impl_py312_minus(
+        self,
+        instr: Instruction,
+    ):
         assert isinstance(instr.arg, int)
         assert instr.arg + 2 <= len(self.stack)
         is_method = not isinstance(self.stack.peek[instr.arg + 2], NullVariable)
         total_args = instr.arg + int(is_method)
-        kwnames = self._call_shape if self._call_shape is not None else []
+        kwnames = self._call_shape if self._call_shape is not None else ()
         n_kwargs = len(kwnames)
         n_positional_args = total_args - n_kwargs
         kwargs_list = self.stack.pop_n(n_kwargs)
@@ -1176,11 +1187,63 @@ class OpcodeExecutorBase:
         self.stack.push(fn(*args, **kwargs))
         self._call_shape = None
 
-    CALL = (
-        call_break_graph_decorator(push_n=1)(call)
-        if sys.version_info >= (3, 12)
-        else call
-    )
+    def call_impl_py313_plus(
+        self,
+        num_args: int,
+        kwnames_getter: Callable[[OpcodeExecutorBase], tuple[str, ...]],
+    ):
+        kwnames = kwnames_getter(self)
+        assert num_args + 2 <= len(self.stack)
+        args = self.stack.pop_n(num_args)
+        self_or_null = self.stack.pop()
+        callable = self.stack.pop()
+
+        if not isinstance(self_or_null, NullVariable):
+            args = [self_or_null, *args]
+        if isinstance(self_or_null, NullVariable) and isinstance(
+            callable, MethodVariable
+        ):
+            unbound_method = callable.fn
+            self_var = callable.bound_instance
+            args = [self_var, *args]
+            callable = unbound_method
+
+        n_positional_args = len(args) - len(kwnames)
+        kwargs_list = args[n_positional_args:]
+        args = args[:n_positional_args]
+        kwargs = dict(zip(kwnames, kwargs_list))
+        self.stack.push(callable(*args, **kwargs))
+
+    if sys.version_info >= (3, 13):
+
+        @call_break_graph_decorator(push_n=1)
+        def CALL(self, instr: Instruction):
+            assert isinstance(instr.arg, int)
+
+            self.call_impl_py313_plus(instr.arg, lambda exe: ())
+
+    elif sys.version_info >= (3, 12):
+
+        @call_break_graph_decorator(push_n=1)
+        def CALL(self, instr: Instruction):
+            self.call_impl_py312_minus(instr)
+
+    else:
+
+        def CALL(self, instr: Instruction):
+            self.call_impl_py312_minus(instr)
+
+    @call_break_graph_decorator(push_n=1)
+    def CALL_KW(self, instr: Instruction):
+        assert isinstance(instr.arg, int)
+
+        def get_kwnames(exe: OpcodeExecutorBase):
+            kwnames_var = exe.stack.pop()
+            assert isinstance(kwnames_var, TupleVariable)
+            kwnames = kwnames_var.get_py_value()
+            return kwnames
+
+        self.call_impl_py313_plus(instr.arg, get_kwnames)
 
     @call_break_graph_decorator(push_n=1)
     def CALL_FUNCTION(self, instr: Instruction):
@@ -1230,8 +1293,14 @@ class OpcodeExecutorBase:
         assert isinstance(args_variable, (TupleVariable, ListVariable))
         args = args_variable.get_wrapped_items()
 
+        if sys.version_info >= (3, 11) and CALL_METHOD_LAYOUT_NULL_AFTER_VALUE:
+            null = self.stack.pop()
+            assert isinstance(null, NullVariable)
         fn = self.stack.pop()
-        if sys.version_info >= (3, 11):
+        if (
+            sys.version_info >= (3, 11)
+            and not CALL_METHOD_LAYOUT_NULL_AFTER_VALUE
+        ):
             null = self.stack.pop()
             assert isinstance(null, NullVariable)
         ret = fn(*args, **kwargs)
@@ -1740,7 +1809,12 @@ class OpcodeExecutor(OpcodeExecutorBase):
             self._lasti = self.indexof(instr.jump_to)
             if sys.version_info >= (3, 12):
                 assert self._instructions[self._lasti].opname == "END_FOR"
-                self._lasti += 1
+                # NOTE(SigureMo): From Python 3.12, END_FOR indicates the end of the for loop.
+                # But it's never executed, so we need to skip it.
+                # In Python 3.12, it equivalent to POP_TOP + POP_TOP (in one instruction)
+                # In Python 3.13, it equivalent to POP_TOP, and it common with other POP_TOP
+                skip_n_instrs = 2 if sys.version_info >= (3, 13) else 1
+                self._lasti += skip_n_instrs
         except BreakGraphError as e:
             log(3, f"[BreakGraph] FOR_ITER sim for loop failed for: {e}\n")
             if backup_iter_idx:
@@ -2018,7 +2092,7 @@ class OpcodeExecutor(OpcodeExecutorBase):
             var_loader.load(stack_arg)
 
         # 5. run the break CALL with origin python
-        # NOTE(SigureMo): In Python 3.11，we need generate KW_NAMES if the call shape is not None.
+        # NOTE(SigureMo): In Python 3.11 and 3.12，we need generate KW_NAMES if the call shape is not None.
         self._graph.pycode_gen.gen_kw_names(self._call_shape)
         self._graph.pycode_gen.extend_instrs(
             self._instructions[cur_index:next_index]
@@ -2172,7 +2246,8 @@ class OpcodeExecutor(OpcodeExecutorBase):
             # skip resume END_FOR in python3.12
             if sys.version_info >= (3, 12):
                 assert origin_instrs[loop_body_end_idx].opname == "END_FOR"
-                resume_fn_end_idx += 1
+                skip_n_instrs = 2 if sys.version_info >= (3, 13) else 1
+                resume_fn_end_idx += skip_n_instrs
 
             resume_fn_creator.set_inputs(
                 after_loop_fn_inputs, stack_size=len(self.stack) - 1
@@ -2253,6 +2328,8 @@ class OpcodeExecutor(OpcodeExecutorBase):
 
         if sys.version_info >= (3, 12):
             end_for = self._graph.pycode_gen.add_instr("END_FOR")
+            if sys.version_info >= (3, 13):
+                self._graph.pycode_gen.gen_pop_top()
 
         nop = self._graph.pycode_gen.add_instr("NOP")
 
@@ -2342,6 +2419,8 @@ class OpcodeExecutor(OpcodeExecutorBase):
 
             if sys.version_info >= (3, 12):
                 end_for = pycode_gen.add_instr("END_FOR")
+                if sys.version_info >= (3, 13):
+                    self._graph.pycode_gen.gen_pop_top()
             nop_for_break = pycode_gen.add_instr("NOP")
 
             # 2.4. relocate jumps

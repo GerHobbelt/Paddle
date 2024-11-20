@@ -59,7 +59,7 @@ def fused_seqpool_cvm(
 
     This OP is the fusion of sequence_pool and continuous_value_model op.
 
-    **Note:** The Op only receives List of LoDTensor as input, only support SUM pooling now.
+    **Note:** The Op only receives List of DenseTensor as input, only support SUM pooling now.
 
     Args:
         input(Tensor): Input is List of LoDTensor.
@@ -181,7 +181,7 @@ def search_pyramid_hash(
         dtype (str, optional): The data type of output Tensor, float32. Default: float32.
 
     Returns:
-        Tensor: LoDTensor of pyramid hash embedding.
+        Tensor: DenseTensor of pyramid hash embedding.
     """
     helper = LayerHelper('search_pyramid_hash', **locals())
 
@@ -275,7 +275,7 @@ def shuffle_batch(x: Tensor, seed: int | Tensor | None = None) -> Tensor:
     """
     This layer shuffle input tensor :attr:`x` . Normally, :attr:`x` is 2-D LoDTensor.
 
-    :attr:`x` is a LoDTensor to be shuffled with shape :math:`[N_1, N_2, ..., N_k, D]` . Note that the last dim of input will not be shuffled.
+    :attr:`x` is a DenseTensor to be shuffled with shape :math:`[N_1, N_2, ..., N_k, D]` . Note that the last dim of input will not be shuffled.
     :math:`N_1 * N_2 * ... * N_k` numbers of elements with length :math:`D` will be shuffled randomly.
 
     Examples:
@@ -294,12 +294,12 @@ def shuffle_batch(x: Tensor, seed: int | Tensor | None = None) -> Tensor:
               Out.dims = [4, 2]
 
     Args:
-        x (Tensor): The input Tensor. The input Tensor is a N-D LoDTensor with type int, float32 or float64.
+        x (Tensor): The input Tensor. The input Tensor is a N-D DenseTensor with type int, float32 or float64.
         seed (None|int|Tensor, optional): The start up seed. If set, seed will be set as the start up seed of shuffle engine.
             If not set(Default), start up seed of shuffle engine will be generated randomly. Default: None.
 
     Returns:
-        Tensor: The shuffled LoDTensor with the same shape and lod as input.
+        Tensor: The shuffled DenseTensor with the same shape and lod as input.
 
     Examples:
 

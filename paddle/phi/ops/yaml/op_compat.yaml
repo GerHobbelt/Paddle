@@ -239,6 +239,16 @@
     {start : Start, end : End, step : Step}
   outputs :
     out : Out
+  scalar:
+    start:
+      data_type : double
+      support_tensor : true
+    end:
+      data_type : double
+      support_tensor : true
+    step:
+      data_type : double
+      support_tensor : true
 
 - op : argmax(arg_max)
   inputs :

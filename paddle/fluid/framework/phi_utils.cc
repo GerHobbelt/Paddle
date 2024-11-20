@@ -341,8 +341,8 @@ phi::IntArray MakePhiIntArrayFromVarList(
         }
       } else {
         PADDLE_THROW(common::errors::InvalidArgument(
-            "Data type error. When cast a LoDTensor to VectorTensor, "
-            "the data type of LoDTensor must be int32 or int64, "
+            "Data type error. When cast a DenseTensor to VectorTensor, "
+            "the data type of DenseTensor must be int32 or int64, "
             "but now data type is %s.",
             data_type));
       }
