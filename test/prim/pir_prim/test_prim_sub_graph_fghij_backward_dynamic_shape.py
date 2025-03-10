@@ -54,6 +54,10 @@ def gelu_net2(x):
     return paddle.nn.functional.gelu(x, approximate=False)
 
 
+def hardsigmoid_net(x):
+    return paddle.nn.functional.hardsigmoid(x)
+
+
 def hardswish_net(x):
     return paddle.nn.functional.hardswish(x)
 
@@ -227,7 +231,7 @@ class TestPrimGatherWithGrad1(TestPrimTwoWithGrad):
 
     def base_net(self, flag=None):
         if flag == "prim":
-            core._set_prim_all_enabled(True)
+            core._set_prim_backward_enabled(True)
         x = paddle.to_tensor(self.x, stop_gradient=False)
         y = paddle.to_tensor(self.y)
         if flag == "prim":
@@ -246,7 +250,7 @@ class TestPrimGatherWithGrad1(TestPrimTwoWithGrad):
         res.backward()
         x_grad = x.gradient()
         if flag == "prim":
-            core._set_prim_all_enabled(False)
+            core._set_prim_backward_enabled(False)
         return res, [x_grad]
 
 
@@ -368,6 +372,19 @@ class TestPrimGeluWithGrad4(TestPrimBaseWithGrad):
 
         for dr, d in zip(grad_ref, grad):
             np.testing.assert_allclose(dr, d, rtol=self.rtol, atol=self.atol)
+
+
+class TestPrimHardsigmoidWithGrad(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.hardsigmoid_grad"
+        self.dtype = "float32"
+        self.x_shape = [30, 200, 40]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = hardsigmoid_net
+        self.enable_cinn = False
+        self.tol = 1e-6
 
 
 class TestPrimHardswishWithGrad(TestPrimBaseWithGrad):

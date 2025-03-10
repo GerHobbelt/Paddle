@@ -1457,9 +1457,8 @@ bool FullWithTensorOpInferSymbolicShape(
   const symbol::ShapeOrDataDimExprs &operand_shape_or_data =
       infer_context->GetShapeOrDataForValue(operand_source);
 
-  const auto &out_shape = operand_shape_or_data.data().has_value()
-                              ? operand_shape_or_data.data().value()
-                              : operand_shape_or_data.shape();
+  const auto &out_shape =
+      details::GetOrCreateExprVecFromData(operand_shape_or_data, infer_context);
 
   infer_context->SetShapeOrDataForValue(
       op->result(0), symbol::TensorShapeOrDataDimExprs(out_shape));

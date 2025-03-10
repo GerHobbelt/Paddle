@@ -109,6 +109,13 @@ if(WITH_ROCM)
   add_definitions(-DCINN_WITH_HIP)
 endif()
 
+if(CINN_WITH_SYCL)
+  message(STATUS "CINN Compile with SYCL support")
+  set(DPCPP_DIR ${PROJECT_SOURCE_DIR}/cmake/cinn)
+  find_package(DPCPP REQUIRED CONFIG)
+  add_definitions(-DCINN_WITH_SYCL)
+endif()
+
 set(cinnapi_src CACHE INTERNAL "" FORCE)
 set(core_src CACHE INTERNAL "" FORCE)
 set(core_includes CACHE INTERNAL "" FORCE)

@@ -892,6 +892,10 @@ void BindAnalysisConfig(py::module *m) {
       .def("enable_low_precision_io",
            &AnalysisConfig::EnableLowPrecisionIO,
            py::arg("x") = true)
+      .def("enable_openvino_engine",
+           &AnalysisConfig::EnableOpenVINOEngine,
+           py::arg("inference_precision") = AnalysisConfig::Precision::kFloat32)
+      .def("openvino_engine_enabled", &AnalysisConfig::openvino_engine_enabled)
       .def("enable_tensorrt_engine",
            &AnalysisConfig::EnableTensorRtEngine,
            py::arg("workspace_size") = 1 << 30,

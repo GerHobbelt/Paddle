@@ -146,16 +146,11 @@ def run(model, data_loader, optimizer, mode):
 
             end_time = time.time()
             print(
-                "[%s]epoch %d | batch step %d, loss %0.8f, acc1 %0.3f, acc5 %0.3f, time %f"
-                % (
-                    mode,
-                    epoch,
-                    batch_id,
-                    avg_loss,
-                    total_acc1.numpy() / total_sample,
-                    total_acc5.numpy() / total_sample,
-                    end_time - start_time,
-                )
+                f"[{mode}]epoch {epoch} | batch step {batch_id}, "
+                f"loss {avg_loss:0.8f}, "
+                f"acc1 {total_acc1.numpy() / total_sample:0.3f}, "
+                f"acc5 {total_acc5.numpy() / total_sample:0.3f}, "
+                f"time {end_time - start_time:f}"
             )
             if batch_id >= end_step:
                 break

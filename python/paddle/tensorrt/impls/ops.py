@@ -22,8 +22,8 @@ ops_type_map = {
 }
 
 
-@converter_registry.register("pd_op.sqrt", trt_version="8.x")
-@converter_registry.register("pd_op.sqrt_", trt_version="8.x")
+@converter_registry.register("pd_op.sqrt", trt_version="trt_version_ge=8.0")
+@converter_registry.register("pd_op.sqrt_", trt_version="trt_version_ge=8.0")
 @converter_registry.register("pd_op.floor", trt_version="8.x")
 def sqrt_converter(network, paddle_op, inputs):
     input_tensor = inputs[0]

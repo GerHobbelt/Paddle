@@ -407,7 +407,7 @@ class PipelineLayer(nn.Layer):
             if num_stages:
                 assert (
                     self._num_stages == num_stages
-                ), "num_stages should be equal to be %d" % (self._num_stages)
+                ), f"num_stages should be equal to be {self._num_stages}"
         else:
             # construct default topology
             if world_size % num_stages != 0:

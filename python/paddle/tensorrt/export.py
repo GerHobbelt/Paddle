@@ -15,11 +15,13 @@
 from __future__ import annotations
 
 import os
+from enum import Enum
 
 import numpy as np
 
 import paddle
 from paddle.base import core, dygraph
+from paddle.base.executor import scope_guard
 from paddle.base.framework import (
     Variable,
 )
@@ -35,7 +37,7 @@ from paddle.nn import Layer
 from paddle.tensorrt.converter import PaddleToTensorRTConverter
 from paddle.tensorrt.util import (
     forbid_op_lower_trt,
-    mark_buitlin_op,
+    mark_builtin_op,
     run_pir_pass,
     warmup_shape_infer,
 )
@@ -143,6 +145,23 @@ class Input:
         return self.input_min_data, self.input_optim_data, self.input_max_data
 
 
+class PrecisionMode(Enum):
+    FP32 = "FP32"
+    FP16 = "FP16"
+    BF16 = "BF16"
+    INT8 = "INT8"
+
+    """
+    This class defines different precision modes that can be used to configure
+    TensorRT optimization. The modes include FP32, FP16, BF16, and INT8.
+    Specifies the precision mode for TensorRT optimization. The options are:
+    - PrecisionMode.FP32: 32-bit floating point precision (default).
+    - PrecisionMode.FP16: 16-bit floating point precision.
+    - PrecisionMode.INT8: 8-bit integer precision.
+    - PrecisionMode.BFP16: 16-bit Brain Floating Point precision. Only supported in TensorRT versions greater than 9.0.
+    """
+
+
 class TensorRTConfig:
     def __init__(
         self,
@@ -150,6 +169,9 @@ class TensorRTConfig:
         min_subgraph_size: int | None = 3,
         save_model_dir: str | None = None,
         disable_ops: str | list | None = None,
+        precision_mode: PrecisionMode = PrecisionMode.FP32,
+        ops_run_float: str | list | None = None,
+        optimization_level: int | None = 3,
     ) -> None:
         """
         A class for configuring TensorRT optimizations.
@@ -160,9 +182,20 @@ class TensorRTConfig:
             min_subgraph_size (int, optional):
                 The minimum number of operations in a subgraph for TensorRT to optimize (default is 3).
             save_model_dir (str, optional):
-                 The directory where the optimized model will be saved (default is None).
+                The directory where the optimized model will be saved (default is not to save).
             disable_ops : (str|list, optional):
                 A string representing the names of operations that should not be entering by TensorRT (default is None).
+            precision_mode (PrecisionMode, optional):
+                Specifies the precision mode for TensorRT optimization. The options are:
+                - PrecisionMode.FP32: 32-bit floating point precision (default).
+                - PrecisionMode.FP16: 16-bit floating point precision.
+                - PrecisionMode.INT8: 8-bit integer precision.
+                - PrecisionMode.BFP16: 16-bit Brain Floating Point precision. Only supported in TensorRT versions greater than 9.0.
+            ops_run_float (str|list, optional):
+                A set of operation names that should be executed using FP32 precision regardless of the `tensorrt_precision_mode` setting.
+                The directory where the optimized model will be saved (default is None).
+            optimization_level (int, optional):
+                Set TensorRT optimization level (default is 3). Only supported in TensorRT versions greater than 8.6.
         Returns:
             None
 
@@ -172,6 +205,7 @@ class TensorRTConfig:
             >>> from paddle.tensorrt.export import (
             ...    Input,
             ...    TensorRTConfig,
+            ...    PrecisionMode,
             ... )
             >>> input = Input(
             ...    min_input_shape=(1,100),
@@ -183,11 +217,16 @@ class TensorRTConfig:
 
             >>> trt_config = TensorRTConfig(inputs=[input])
             >>> trt_config.disable_ops = "pd_op.dropout"
+            >>> trt_config.precision_mode = PrecisionMode.FP16
+            >>> trt_config.ops_run_float = "pd_op.conv2d"
         """
         self.inputs = inputs
         self.min_subgraph_size = min_subgraph_size
         self.save_model_dir = save_model_dir
+        self.precision_mode = precision_mode
+        self.ops_run_float = ops_run_float
         self.disable_ops = disable_ops
+        self.optimization_level = optimization_level
         paddle.framework.set_flags(
             {'FLAGS_trt_min_group_size': min_subgraph_size}
         )
@@ -232,13 +271,15 @@ def convert_to_trt(program, trt_config, scope):
             forbid_op_lower_trt(program, trt_config.disable_ops)
 
         # Adding marker labels to builtin ops facilitates convert processing, but they ultimately do not enter the TensorRT subgraph.
-        mark_buitlin_op(program)
+        mark_builtin_op(program)
 
         # run pir pass (including trt_sub_graph_extract_pass)
         program_with_pir = run_pir_pass(program, partition_mode=True)
 
         # Step4: run TRTConverter (would lower group_op into tensorrt_engine_op)
-        converter = PaddleToTensorRTConverter(program_with_pir, scope)
+        converter = PaddleToTensorRTConverter(
+            program_with_pir, scope, trt_config=trt_config
+        )
         converter.convert_program_to_trt()
         trt_output_var = []
 
@@ -260,18 +301,19 @@ def convert_to_trt(program, trt_config, scope):
             place = paddle.CUDAPlace(0)
             exe = paddle.static.Executor(place)
 
-            paddle.static.save_inference_model(
-                trt_config.save_model_dir,
-                input_values,
-                trt_output_var,
-                exe,
-                program=program_with_pir,
-            )
+            with scope_guard(scope):
+                paddle.static.save_inference_model(
+                    trt_config.save_model_dir,
+                    input_values,
+                    trt_output_var,
+                    exe,
+                    program=program_with_pir,
+                )
         return program_with_pir
 
 
 # Obtain a program with tensorrt_op for dynamic-to-static scenarios.
-def convert(function=None, input_spec=None, config=None, **kwargs):
+def _convert_(function=None, input_spec=None, config=None, **kwargs):
     """
     Convert a dynamic graph API to a static graph and apply TensorRT optimizations if relevant parameters are configured.
 
@@ -286,61 +328,6 @@ def convert(function=None, input_spec=None, config=None, **kwargs):
 
     Returns:
         tuple: A tuple containing two elements. The first element is the TensorRT optimized program., optionally optimized with TensorRT if configured. The second element is the scope containing the parameters.
-
-    Examples:
-        .. code-block:: python
-        >>> # example
-        >>> from paddle import nn
-        >>> from paddle.static import InputSpec
-        >>> import paddle
-        >>> from paddle.tensorrt.export import (
-        ...    Input,
-        ...    TensorRTConfig,
-        ...    convert,
-        ... )
-        >>> import paddle.nn.functional as F
-
-        >>> class CumsumModel(nn.Layer):
-        ...    def __init__(self, input_dim):
-        ...        super().__init__()
-        ...        self.linear = nn.Linear(input_dim, input_dim)
-
-        >>>    def forward(self, x):
-        ...        linear_out = self.linear(x)
-        ...        relu_out = F.relu(linear_out)
-        ...        axis = paddle.full([1], 2, dtype='int64')
-        ...        out = paddle.cumsum(relu_out, axis=axis)
-        ...        return out
-
-        >>> def test_run():
-        ...     with paddle.pir_utils.IrGuard():
-        ...         input_config = Input(
-        ...             min_input_shape=(9, 10, 11),
-        ...             optim_input_shape=(9, 10, 11),
-        ...             max_input_shape=(9, 10, 11),
-        ...         )
-        ...         trt_config = TensorRTConfig(inputs=[input_config])
-        ...         for i, input_instrance in enumerate(trt_config.inputs):
-        ...             min_data, _, max_data = input_instrance.generate_input_data()
-        ...             paddle.disable_static()
-        ...             x = paddle.to_tensor(min_data)
-        ...             net = CumsumModel(input_dim=min_data.shape[-1])
-        ...             out=net(x)
-        ...            input_spec = [InputSpec(shape=min_data.shape, dtype='float32')]
-        ...             program_with_trt ,scope= convert(
-        ...                 net,
-        ...                 input_spec=input_spec,
-        ...                 config=trt_config,
-        ...                 full_graph=True,
-        ...             )
-        ...             output_var = program_with_trt.list_vars()[-1]
-        ...             with paddle.pir_utils.IrGuard():
-        ...                with paddle.static.scope_guard(scope):
-        ...                  place=paddle.CUDAPlace(0)
-        ...                  executor=paddle.static.Executor(place)
-        ...                  output=executor.run(program_with_trt, feed={"x": min_data}, fetch_list=[output_var],scope=scope)
-
-        >>> test_run()
 
     """
     # Converts dynamic graph APIs into static graph
@@ -508,17 +495,23 @@ def convert(function=None, input_spec=None, config=None, **kwargs):
                 param_or_buffer_tensor._share_data_with(src_tensor)
     with paddle.pir_utils.IrGuard():
         main_program = concrete_program.main_program
+        output_vars = concrete_program.outputs
+        paddle.base.executor._add_pir_fetch_ops(
+            program=main_program, fetch_list=output_vars, fetch_var_name="fetch"
+        )
         program_with_trt = convert_to_trt(main_program, config, scope)
         return program_with_trt, scope
 
 
 # Obtain a program with tensorrt_op by directly loading the model.
-def convert_loaded_model(model_dir, config):
+def convert(model_path, config):
     """
     Loading a PaddlePaddle Model and Exporting the TensorRT-Optimized Program.
 
     Args:
-       model_dir(str):The directory path where the PaddlePaddle model is located.
+       model_path(str):The directory path where the PaddlePaddle model is located.
+       The model path can either include the model directory and prefix (e.g., 'model_dir/inference'),
+       or it can be the full path to the model (e.g., 'model_dir/inference.json').
        config(TensorRTConfig):The configuration of TensorRTConfig.
 
     Returns:
@@ -534,7 +527,6 @@ def convert_loaded_model(model_dir, config):
             ...      Input,
             ...      TensorRTConfig,
             ...      export,
-            ...      convert_loaded_model,
             ... )
             >>> import os
             >>> from paddle import nn
@@ -598,7 +590,7 @@ def convert_loaded_model(model_dir, config):
             ...    trt_save_path = os.path.join(temp_dir.name, 'trt')
             ...    trt_config.save_model_dir = trt_save_path
 
-            ...    program_with_trt = convert_loaded_model(save_path, trt_config)
+            ...    program_with_trt = paddle.tensorrt.convert(save_path, trt_config)
 
             ...    # Create a config for inference.
             ...    config = paddle_infer.Config(
@@ -620,9 +612,9 @@ def convert_loaded_model(model_dir, config):
             ...        output_converted = predictor.run([model_inputs])
 
     """
-    if os.path.abspath(config.save_model_dir) == os.path.abspath(model_dir):
+    if os.path.abspath(config.save_model_dir) == os.path.abspath(model_path):
         raise ValueError(
-            "The `config.save_model_dir` and `model_dir` cannot be the same. Please specify a different directory for saving the model."
+            "The `config.save_model_dir` and `model_path` cannot be the same. Please specify a different directory for saving the model."
         )
 
     scope = paddle.static.global_scope()
@@ -630,31 +622,46 @@ def convert_loaded_model(model_dir, config):
     exe = paddle.static.Executor(place)
 
     is_json = True
-    if os.path.exists(model_dir + '.json'):
-        is_json = True
-    elif os.path.exists(model_dir + '.pdmodel'):
-        is_json = False
+
+    if os.path.isfile(model_path):
+        model_path = model_path
+        model_dir, model_file = os.path.split(model_path)
+        model_prefix, ext = os.path.splitext(model_file)
+        if ext == '.json':
+            is_json = True
+        elif ext == '.pdmodel':
+            is_json = False
+        else:
+            raise ValueError(
+                f"Unsupported extension {ext}. Only support json/pdmodel"
+            )
     else:
-        raise ValueError(
-            f"No valid model file found in the directory '{model_dir}'. Expected either 'json' or 'pdmodel'. Please ensure that the directory contains one of these files."
-        )
+        model_prefix = model_path
+        if os.path.exists(model_prefix + '.json'):
+            is_json = True
+        elif os.path.exists(model_prefix + '.pdmodel'):
+            is_json = False
+        else:
+            raise ValueError(
+                f"No valid model file found in the directory '{model_path}'. Expected either 'json' or 'pdmodel'. Please ensure that the directory contains one of these files."
+            )
 
     if is_json:
         with paddle.pir_utils.IrGuard():
             [program, feed_target_names, fetch_targets] = (
                 paddle.static.io.load_inference_model(
-                    model_dir,
+                    model_path,
                     executor=exe,
                 )
             )
     else:
-        paddle.framework.set_flags({"FLAGS_enable_pir_in_executor": True})
-        [program, feed_target_names, fetch_targets] = (
-            paddle.static.io.load_inference_model(
-                model_dir,
-                executor=exe,
+        with paddle.pir_utils.OldIrGuard():
+            os.environ['FLAGS_enable_pir_in_executor'] = '1'
+            [program, feed_target_names, fetch_targets] = (
+                paddle.static.io.load_inference_model(
+                    model_path,
+                    executor=exe,
+                )
             )
-        )
-        paddle.framework.set_flags({"FLAGS_enable_pir_in_executor": False})
-
+            os.environ['FLAGS_enable_pir_in_executor'] = '0'
     return convert_to_trt(program, config, scope)

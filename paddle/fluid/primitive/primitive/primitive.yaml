@@ -50,6 +50,7 @@
 - bitwise_xor
 - isinf
 - isnan
+- isfinite
 - remainder
 - scale
 - matmul

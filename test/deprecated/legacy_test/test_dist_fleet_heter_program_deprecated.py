@@ -70,9 +70,7 @@ class TestDistFleetHeterProgram(unittest.TestCase):
         )
 
         sparse_input_ids = [
-            paddle.static.data(
-                name="C" + str(i), shape=[-1, 1], lod_level=1, dtype="int64"
-            )
+            paddle.static.data(name="C" + str(i), shape=[-1, 1], dtype="int64")
             for i in range(1, 27)
         ]
 

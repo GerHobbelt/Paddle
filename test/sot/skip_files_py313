@@ -1,4 +1,0 @@
-./test_model_switch_training.py
-./test_sot_cost_model.py
-./test_sot_dynamic_shape.py
-./test_sot_export.py

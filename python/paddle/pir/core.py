@@ -494,7 +494,10 @@ def _convert_into_value(tensor):
             paddle.pir.core.default_main_program(), tensor
         )
         NON_PERSISTABLE_VAR_NAME_SUFFIX = "__non_persistable"
-        if tensor.name.endswith(NON_PERSISTABLE_VAR_NAME_SUFFIX):
+        # NOTE(SigureMo): Why do not use `tensor.name.endswith(NON_PERSISTABLE_VAR_NAME_SUFFIX)`?
+        # Because the tensor maybe copied, the name of the tensor will be appended with a new suffix.
+        # Such as `lstm_0.dropout_state__non_persistable_deepcopy_204`
+        if NON_PERSISTABLE_VAR_NAME_SUFFIX in tensor.name:
             value.persistable = False
         return value
 

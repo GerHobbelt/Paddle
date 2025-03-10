@@ -1163,7 +1163,33 @@ void CustomOpDialect::RegisterCustomOp(const paddle::OpMetaInfo& op_meta) {
                                verify_func,
                                verify_func);
 }
+
+// customEngineDialect
+
+CustomEngineDialect::CustomEngineDialect(pir::IrContext* context)
+    : pir::Dialect(name(), context, pir::TypeId::get<CustomEngineDialect>()) {}
+
+void CustomEngineDialect::PrintType(pir::Type type, std::ostream& os) const {
+  PrintTypeImpl(type, os);
+}
+
+void CustomEngineDialect::PrintAttribute(pir::Attribute attr,
+                                         std::ostream& os) const {
+  PrintAttributeImpl(attr, os);
+}
+
+pir::OpPrintFn CustomEngineDialect::PrintOperation(
+    const pir::Operation& op) const {
+  return nullptr;
+}
+
+// template <typename ConcreteOp>
+// void CustomEngineDialect::RegisterCustomEngineOp() {
+
+// }
+
 }  // namespace paddle::dialect
 
 IR_DEFINE_EXPLICIT_TYPE_ID(paddle::dialect::OperatorDialect)
 IR_DEFINE_EXPLICIT_TYPE_ID(paddle::dialect::CustomOpDialect)
+IR_DEFINE_EXPLICIT_TYPE_ID(paddle::dialect::CustomEngineDialect)

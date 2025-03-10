@@ -76,16 +76,3 @@ namespace ops = paddle::operators;
 REGISTER_OP_WITHOUT_GRADIENT(c_allgather,
                              ops::CAllGatherOp,
                              ops::CAllGatherOpMaker);
-
-PD_REGISTER_STRUCT_KERNEL(c_allgather,
-                          CPU,
-                          ALL_LAYOUT,
-                          ops::CAllGatherOpCPUKernel,
-                          float,
-                          double,
-                          int,
-                          int8_t,
-                          int64_t,
-                          uint8_t,
-                          bool,
-                          phi::dtype::float16) {}

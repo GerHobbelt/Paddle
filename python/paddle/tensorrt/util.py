@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+import os
 
 import paddle
 
@@ -20,6 +22,11 @@ try:
 except Exception as e:
     pass
 from paddle import pir
+from paddle.base.log_helper import get_logger
+
+_logger = get_logger(
+    __name__, logging.INFO, fmt='%(asctime)s-%(levelname)s: %(message)s'
+)
 
 
 def map_dtype(pd_dtype):
@@ -122,7 +129,7 @@ def get_trt_version_list():
 
 
 # Adding marker labels to builtin ops facilitates convert processing, but they ultimately do not enter the TensorRT subgraph.
-def mark_buitlin_op(program):
+def mark_builtin_op(program):
     for op in program.global_block().ops:
         if op.name() == "builtin.split":
             defining_op = op.operands()[0].source().get_defining_op()
@@ -140,6 +147,39 @@ def mark_buitlin_op(program):
                     and defining_op.attrs()["__l_trt__"]
                 ):
                     op.set_bool_attr("__l_trt__", True)
+
+
+class TensorRTConfigManager:
+    _instance = None
+
+    def __new__(cls, trt_config=None):
+        if not cls._instance:
+            cls._instance = super().__new__(cls)
+            cls._instance.trt_config = trt_config
+        return cls._instance
+
+    def _init(self, trt_config=None):
+        self.trt_config = trt_config
+
+    def get_precision_mode(self):
+        if self.trt_config and self.trt_config.precision_mode:
+            return self.trt_config.precision_mode
+        return None
+
+    def get_force_fp32_ops(self):
+        if self.trt_config and self.trt_config.ops_run_float:
+            return self.trt_config.ops_run_float
+        return []
+
+
+# In TensorRT FP16 inference, this function sets the precision of specific
+# operators to FP32, ensuring numerical accuracy for these operations.
+def support_fp32_mix_precision(op_type, layer, trt_config=None):
+    trt_manager = TensorRTConfigManager()
+    force_fp32_ops = trt_manager.get_force_fp32_ops()
+    if op_type in force_fp32_ops:
+        layer.reset_precision()
+        layer.precision = trt.DataType.FLOAT
 
 
 def weight_to_tensor(network, paddle_value, trt_tensor, use_op_name):
@@ -171,3 +211,44 @@ def zero_dims_to_one_dims(network, trt_tensor):
     shuffle_layer = network.add_shuffle(trt_tensor)
     shuffle_layer.reshape_dims = (1,)
     return shuffle_layer.get_output(0)
+
+
+# We use a special rule to judge whether a paddle value is a shape tensor.
+# The rule is consistent with the rule in C++ source code(collect_shape_manager.cc).
+# We use the rule for getting min/max/opt value shape from collect_shape_manager.
+# We don't use trt_tensor.is_shape_tensor, because sometimes, the trt_tensor that corresponding to paddle value is not a shape tensor
+# when it is a output in this trt graph, but it is a shape tensor when it is a input in next trt graph.
+def is_shape_tensor(value):
+    dims = value.shape
+    total_elements = 1
+    if (
+        dims.count(-1) > 1
+    ):  # we can only deal with the situation that is has one dynamic dims
+        return False
+    for dim in dims:
+        total_elements *= abs(dim)  # add abs for dynamic shape -1
+    is_int_dtype = value.dtype == paddle.int32 or value.dtype == paddle.int64
+    return total_elements <= 8 and total_elements >= 1 and is_int_dtype
+
+
+def get_cache_path():
+    home_path = os.path.expanduser("~")
+    cache_path = os.path.join(home_path, ".pp_trt_cache")
+
+    if not os.path.exists(cache_path):
+        os.makedirs(cache_path)
+    return cache_path
+
+
+def remove_duplicate_value(value_list):
+    ret_list = []
+    ret_list_id = []
+    for value in value_list:
+        if value.id not in ret_list_id:
+            ret_list.append(value)
+            ret_list_id.append(value.id)
+    return ret_list
+
+
+def get_trt_version():
+    return trt.__version__

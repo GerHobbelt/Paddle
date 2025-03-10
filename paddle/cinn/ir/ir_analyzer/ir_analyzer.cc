@@ -103,9 +103,6 @@ std::vector<Expr> GetAllBlocks(const std::vector<Expr>& exprs) {
     auto find_blocks = visitor(&it_expr);
     result.insert(result.end(), find_blocks.begin(), find_blocks.end());
   }
-  for (auto& it_expr : exprs) {
-    VLOG(3) << "it_expr is : " << it_expr;
-  }
   PADDLE_ENFORCE_EQ(
       result.empty(),
       false,
@@ -146,6 +143,22 @@ Expr GetBlock(const std::vector<Expr>& exprs, const std::string& block_name) {
   PADDLE_THROW(::common::errors::InvalidArgument(ss.str()));
 }
 
+Expr GetRootSBlock(const Expr& expr) {
+  PADDLE_ENFORCE_NOT_NULL(expr.As<ir::Block>(),
+                          ::common::errors::InvalidArgument(
+                              "The root of ModuleExpr must be a Block."));
+  PADDLE_ENFORCE_EQ(expr.As<ir::Block>()->stmts.size(),
+                    1U,
+                    ::common::errors::InvalidArgument(
+                        "The root block must have exactly one stmt."));
+  auto& root = expr.As<ir::Block>()->stmts[0];
+  PADDLE_ENFORCE_NOT_NULL(
+      root.As<ir::ScheduleBlockRealize>(),
+      ::common::errors::InvalidArgument(
+          "The first stmt in the block must be ScheduleBlockRealize."));
+  return root;
+}
+
 Expr GetRootBlock(const std::vector<Expr>& exprs, const Expr& expr) {
   for (auto& it_expr : exprs) {
     auto find_expr = ir::ir_utils::CollectIRNodesWithoutTensor(
@@ -155,20 +168,7 @@ Expr GetRootBlock(const std::vector<Expr>& exprs, const Expr& expr) {
         },
         true);
     if (!find_expr.empty()) {
-      PADDLE_ENFORCE_NOT_NULL(
-          it_expr.As<ir::Block>(),
-          ::common::errors::InvalidArgument(
-              "The expression cannot be cast to ir::Block."));
-      PADDLE_ENFORCE_EQ(it_expr.As<ir::Block>()->stmts.size(),
-                        1U,
-                        ::common::errors::InvalidArgument(
-                            "The root block should only have one stmt!"));
-      PADDLE_ENFORCE_NOT_NULL(
-          it_expr.As<ir::Block>()->stmts[0].As<ir::ScheduleBlockRealize>(),
-          ::common::errors::InvalidArgument(
-              "The first statement in the block must be convertible to "
-              "ir::ScheduleBlockRealize."));
-      return it_expr.As<ir::Block>()->stmts[0];
+      return GetRootSBlock(it_expr);
     }
   }
   std::stringstream ss;

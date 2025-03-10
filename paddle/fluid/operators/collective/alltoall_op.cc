@@ -69,13 +69,3 @@ namespace ops = paddle::operators;
 REGISTER_OP_WITHOUT_GRADIENT(alltoall,
                              ops::AllToAllBaseOp,
                              ops::AllToAllBaseOpMaker)
-
-PD_REGISTER_STRUCT_KERNEL(alltoall,
-                          CPU,
-                          ALL_LAYOUT,
-                          ops::AllToAllOpCPUKernel,
-                          float,
-                          double,
-                          int,
-                          int64_t,
-                          phi::dtype::float16) {}

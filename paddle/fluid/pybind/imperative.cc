@@ -432,7 +432,6 @@ static void VarBaseCopy(std::shared_ptr<imperative::VarBase> &src,  // NOLINT
       if (src->Var().IsType<phi::DenseTensor>()) {
         auto &src_tensor = src->Var().Get<phi::DenseTensor>();
         auto *dst_tensor = dst.MutableVar()->GetMutable<phi::DenseTensor>();
-        dst_tensor->set_lod(src_tensor.lod());
         framework::TensorCopy(src_tensor, dst_device, dst_tensor);
         if (blocking) {
           phi::DeviceContextPool::Instance().Get(dst_device)->Wait();

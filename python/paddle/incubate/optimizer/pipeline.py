@@ -55,8 +55,8 @@ class PipelineOptimizer:
 
             >>> paddle.enable_static()
             >>> with base.device_guard("gpu:0"):
-            ...     x = paddle.static.data(name='x', shape=[-1, 1], dtype='int64', lod_level=0)
-            ...     y = paddle.static.data(name='y', shape=[-1, 1], dtype='int64', lod_level=0)
+            ...     x = paddle.static.data(name='x', shape=[-1, 1], dtype='int64')
+            ...     y = paddle.static.data(name='y', shape=[-1, 1], dtype='int64')
             ...     data_loader = base.io.DataLoader.from_generator(
             ...         feed_list=[x, y],
             ...         capacity=64,

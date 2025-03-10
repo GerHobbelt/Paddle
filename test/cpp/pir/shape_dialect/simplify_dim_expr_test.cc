@@ -182,4 +182,36 @@ TEST(Simplify, FoldBroadcast) {
   ASSERT_TRUE(simplify_broadcast3 == add);
 }
 
+TEST(Simplify, Case1) {
+  // Mul(Broadcast(S11, S8), Broadcast(S10, S13, S4, S7), Broadcast(S12, S3, S6,
+  // S9), 1 / (S0), 16, 1 / (49))
+  DimExpr S11{"S11"};
+  DimExpr S8{"S8"};
+  DimExpr mul_op1 = Broadcast<DimExpr>{{S11, S8}};
+
+  DimExpr S10{"S10"};
+  DimExpr S13{"S13"};
+  DimExpr S4{"S4"};
+  DimExpr S7{"S7"};
+  DimExpr mul_op2 = Broadcast<DimExpr>{{S10, S13, S4, S7}};
+
+  DimExpr S12{"S12"};
+  DimExpr S3{"S3"};
+  DimExpr S6{"S6"};
+  DimExpr S9{"S9"};
+  DimExpr mul_op3 = Broadcast<DimExpr>{{S12, S3, S6, S9}};
+
+  DimExpr S0{"S0"};
+  DimExpr mul_op4 = Reciprocal<DimExpr>(S0);
+
+  DimExpr mul_op5 = DimExpr(16);
+
+  DimExpr mul_op6 = Reciprocal<DimExpr>(DimExpr(49));
+
+  List<DimExpr> mul_list{mul_op1, mul_op2, mul_op3, mul_op4, mul_op5, mul_op6};
+  DimExpr dim_expr{Mul<DimExpr>{mul_list}};
+
+  ASSERT_TRUE((SimplifyDimExpr(dim_expr)) == dim_expr);
+}
+
 }  // namespace symbol::test

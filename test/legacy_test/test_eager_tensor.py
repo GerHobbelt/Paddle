@@ -15,6 +15,7 @@
 import copy
 import itertools
 import unittest
+import warnings
 
 import numpy as np
 from utils import dygraph_guard
@@ -1293,6 +1294,23 @@ class TestEagerTensor(unittest.TestCase):
                     self.assertIn("version", interface)
                     self.assertEqual(interface["version"], 2)
 
+    def test_to_tensor_from___cuda_array_interface__(self):
+        # only test warning message here for cuda tensor of other framework is not supported in Paddle test, more tests code can be referenced: https://github.com/PaddlePaddle/Paddle/pull/69913
+        with dygraph_guard():
+            with warnings.catch_warnings(record=True) as w:
+                x = paddle.to_tensor([1, 2, 3])
+                paddle.to_tensor(x)
+                flag = False
+                for warn in w:
+                    if (
+                        issubclass(warn.category, UserWarning)
+                    ) and "To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach(), rather than paddle.to_tensor(sourceTensor)." in str(
+                        warn.message
+                    ):
+                        flag = True
+                        break
+                self.assertTrue(flag)
+
     def test_dlpack_device(self):
         """test Tensor.__dlpack_device__"""
         with dygraph_guard():
@@ -1847,6 +1865,25 @@ class TestDenseTensorToTensor(unittest.TestCase):
             y = paddle.to_tensor(x_dense, place=place)
 
             self.assertEqual(x.data_ptr(), y.data_ptr())
+
+
+class TestSetDynamicAttributeToEagerTensorInstance(unittest.TestCase):
+    def test_set_dynamic_attribute_to_eager_tensor_instance_create_via_constructor(
+        self,
+    ):
+        tensor_instance = paddle.to_tensor(1.0)
+        tensor_instance._custom_id = 0
+        self.assertEqual(tensor_instance._custom_id, 0)
+        self.assertEqual(tensor_instance.__dict__["_custom_id"], 0)
+
+    def test_set_dynamic_attribute_to_eager_tensor_instance_create_via_to_pyobject(
+        self,
+    ):
+        original_tensor = paddle.to_tensor(-1.0)
+        tensor_instance = paddle.abs(original_tensor)
+        tensor_instance._custom_flag = True
+        self.assertEqual(tensor_instance._custom_flag, True)
+        self.assertEqual(tensor_instance.__dict__["_custom_flag"], True)
 
 
 if __name__ == "__main__":

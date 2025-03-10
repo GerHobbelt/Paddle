@@ -120,9 +120,9 @@ class OpTestUtils:
             return isinstance(a, Empty)
 
         def get_default(idx, defaults):
-            assert not isinstance(defaults[idx], Empty), (
-                "%d-th params of python api don't have default value." % idx
-            )
+            assert not isinstance(
+                defaults[idx], Empty
+            ), f"{idx}-th params of python api don't have default value."
             return defaults[idx]
 
         def to_defaults_list(params, defaults):
@@ -703,15 +703,10 @@ class PrimForwardChecker:
                 atol=self.fw_comp_atol,
                 err_msg=(
                     'Check static comp forward api out failed. Mismatch between static comp '
-                    'and eager on %s, when enable_fw_comp is %s,the forward api out tensor\'s index is : %d \n'
-                    'static comp forward api out tensor:\n%s\n eager forward api out tensor:\n%s\n'
-                    % (
-                        str(self.place),
-                        self.enable_fw_comp,
-                        i,
-                        ret[i],
-                        self.eager_desire[i],
-                    )
+                    f'and eager on {self.place!s}, when enable_fw_comp is {self.enable_fw_comp},'
+                    f'the forward api out tensor\'s index is : {i} \n'
+                    f'static comp forward api out tensor:\n{ret[i]}\n '
+                    f'eager forward api out tensor:\n{self.eager_desire[i]}\n'
                 ),
             )
         with dygraph_guard():
@@ -788,15 +783,10 @@ class PrimForwardChecker:
                     atol=atol,
                     err_msg=(
                         'Check jit comp forward api out failed. Mismatch between jit comp '
-                        'and eager on %s, when enable_fw_comp is %s,the forward api out tensor\'s index is : %d \n'
-                        'jit comp forward api out tensor:\n%s\n eager forward api out tensor:\n%s\n'
-                        % (
-                            str(self.place),
-                            self.enable_fw_comp,
-                            i,
-                            ret[i],
-                            self.eager_desire[i],
-                        )
+                        f'and eager on {self.place!s}, when enable_fw_comp is {self.enable_fw_comp},'
+                        f'the forward api out tensor\'s index is : {i} \n'
+                        f'jit comp forward api out tensor:\n{ret[i]}\n '
+                        f'eager forward api out tensor:\n{self.eager_desire[i]}\n'
                     ),
                 )
             core._set_prim_forward_enabled(False)
@@ -882,17 +872,12 @@ class PrimForwardChecker:
                     rtol=rtol,
                     atol=atol,
                     err_msg=(
-                        'Check jit comp with cinn forward api out failed. Mismatch between jit comp and eager on %s, '
-                        'when enable_fw_comp is %s, enable_cinn is %s, the forward api out tensor\'s index is : %d \n'
-                        'jit comp forward api out tensor:\n%s\n eager forward api out tensor:\n%s\n'
-                        % (
-                            str(self.place),
-                            self.enable_fw_comp,
-                            core.is_compiled_with_cinn() and self.enable_cinn,
-                            i,
-                            ret[i],
-                            self.eager_desire[i],
-                        )
+                        f'Check jit comp with cinn forward api out failed. Mismatch between jit comp and eager on {self.place!s}, '
+                        f'when enable_fw_comp is {self.enable_fw_comp}, '
+                        f'enable_cinn is {core.is_compiled_with_cinn() and self.enable_cinn}, '
+                        f'the forward api out tensor\'s index is : {i} \n'
+                        f'jit comp forward api out tensor:\n{ret[i]}\n '
+                        f'eager forward api out tensor:\n{self.eager_desire[i]}\n'
                     ),
                 )
             core._set_prim_forward_enabled(False)
@@ -1084,15 +1069,9 @@ class PrimGradChecker(PrimForwardChecker):
                     atol=rtol,
                     err_msg=(
                         'Check eager comp grad out failed. Mismatch between eager comp '
-                        'and eager on %s, when enable_rev_comp is %s,the eager comp grad out tensor\'s index is : %d \n'
-                        'eager comp grad out tensor:\n%s\n eager grad out tensor:\n%s\n'
-                        % (
-                            str(self.place),
-                            self.enable_rev_comp,
-                            i,
-                            actual_ret[i],
-                            self.eager_desire[i],
-                        )
+                        f'and eager on {self.place!s}, when enable_rev_comp is {self.enable_rev_comp},'
+                        f'the eager comp grad out tensor\'s index is : {i} \n'
+                        f'eager comp grad out tensor:\n{actual_ret[i]}\n eager grad out tensor:\n{self.eager_desire[i]}\n'
                     ),
                 )
             core.set_prim_eager_enabled(False)
@@ -1204,16 +1183,9 @@ class PrimGradChecker(PrimForwardChecker):
                 atol=atol,
                 err_msg=(
                     'Check static comp grad out failed. Mismatch between static comp '
-                    'and eager on %s, when enable_fw_comp is %s,enable_rev_comp is %s,the forward api out tensor\'s index is : %d \n'
-                    'static comp grad out tensor:\n%s\n eager grad out tensor:\n%s\n'
-                    % (
-                        str(self.place),
-                        self.enable_fw_comp,
-                        self.enable_rev_comp,
-                        i,
-                        actual_ret[i],
-                        self.eager_desire[i],
-                    )
+                    f'and eager on {self.place}, when enable_fw_comp is {self.enable_fw_comp},enable_rev_comp is { self.enable_rev_comp},'
+                    f'the forward api out tensor\'s index is : {i} \n'
+                    f'static comp grad out tensor:\n{actual_ret[i]}\n eager grad out tensor:\n{self.eager_desire[i]}\n'
                 ),
             )
         core._set_prim_forward_enabled(False)
@@ -1320,16 +1292,9 @@ class PrimGradChecker(PrimForwardChecker):
                     atol=atol,
                     err_msg=(
                         'Check jit comp grad out failed. Mismatch between jit comp '
-                        'and eager on %s, when enable_fw_comp is %s, enable_rev_comp is %s,the grad out tensor\'s index is : %d \n'
-                        'jit comp grad out tensor:\n%s\n eager grad out out tensor:\n%s\n'
-                        % (
-                            str(self.place),
-                            self.enable_fw_comp,
-                            self.enable_rev_comp,
-                            i,
-                            ret[i],
-                            self.eager_desire[i],
-                        )
+                        f'and eager on {self.place!s}, when enable_fw_comp is {self.enable_fw_comp}, '
+                        f'enable_rev_comp is {self.enable_rev_comp},the grad out tensor\'s index is : {i} \n'
+                        f'jit comp grad out tensor:\n{ret[i]}\n eager grad out out tensor:\n{self.eager_desire[i]}\n'
                     ),
                 )
             core._set_prim_forward_enabled(False)
@@ -1449,17 +1414,9 @@ class PrimGradChecker(PrimForwardChecker):
                     atol=atol,
                     err_msg=(
                         'Check jit comp with cinn grad out failed. Mismatch between jit comp with cinn '
-                        'and eager on %s, when enable_fw_comp is %s, enable_rev_comp is %s, enable_cinn is %s,'
-                        'the grad out tensor\'s index is : %d ,jit comp with cinn grad out tensor:\n%s\n eager grad out out tensor:\n%s\n'
-                        % (
-                            str(self.place),
-                            self.enable_fw_comp,
-                            self.enable_rev_comp,
-                            self.enable_cinn and core.is_compiled_with_cinn(),
-                            i,
-                            ret[i],
-                            self.eager_desire[i],
-                        )
+                        f'and eager on {self.place!s}, when enable_fw_comp is {self.enable_fw_comp}, '
+                        f'enable_rev_comp is {self.enable_rev_comp}, enable_cinn is {self.enable_cinn and core.is_compiled_with_cinn()},'
+                        f'the grad out tensor\'s index is : {i} ,jit comp with cinn grad out tensor:\n{ret[i]}\n eager grad out out tensor:\n{self.eager_desire[i]}\n'
                     ),
                 )
 

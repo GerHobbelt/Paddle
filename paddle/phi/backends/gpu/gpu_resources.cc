@@ -216,7 +216,7 @@ void InitStream(gpuStream_t* stream) {
 #endif
 }
 
-void DestoryStream(gpuStream_t stream) {
+void DestroyStream(gpuStream_t stream) {
   if (stream != nullptr) {
 #ifdef PADDLE_WITH_HIP
     PADDLE_ENFORCE_GPU_SUCCESS(hipStreamDestroy(stream));

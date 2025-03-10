@@ -19,6 +19,7 @@ from paddle.tensorrt.converter_utils import (
     get_shape_tensor_element,
     squeeze_trt,
     trt_cast,
+    trt_gather,
     trt_reshape,
     trt_shape,
     trt_unsqueeze,
@@ -35,7 +36,7 @@ def non_zero_converter(network, paddle_op, inputs):
     return non_zero_layer.get_output(0)
 
 
-@converter_registry.register("pd_op.argmax", trt_version="8.x")
+@converter_registry.register("pd_op.argmax", trt_version="trt_version_ge=8.0")
 def argmax_converter(network, paddle_op, inputs):
     x = inputs[0]
     input_dims = x.shape
@@ -59,14 +60,23 @@ def argmax_converter(network, paddle_op, inputs):
     if keepdims:
         return topk_layer.get_output(1)
     else:
-        squeeze_layer = network.add_shuffle(topk_layer.get_output(1))
-        output_dims = []
-        for i in range(len(input_dims)):
-            if i == axis:
-                continue
-            output_dims.append(input_dims[i])
-        squeeze_layer.reshape_dims = tuple(output_dims)
-        return squeeze_layer.get_output(0)
+        topk_out = topk_layer.get_output(1)
+        topk_out_shape_size = len(topk_out.shape)
+        # Mark which dimensions to squeeze
+        should_squeeze = [False] * topk_out_shape_size
+        should_squeeze[axis] = True
+
+        # Get dimensions to keep
+        gather_indices = [
+            i for i, squeeze in enumerate(should_squeeze) if not squeeze
+        ]
+
+        # Add Shuffle layer
+        layer = network.add_shuffle(topk_out)
+        shape_tensor = trt_shape(network, topk_out)
+        real_shape_tensor = trt_gather(network, shape_tensor, gather_indices)
+        layer.set_input(1, real_shape_tensor)
+        return layer.get_output(0)
 
 
 @converter_registry.register("pd_op.argmin", trt_version="8.x")

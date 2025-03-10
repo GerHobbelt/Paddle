@@ -951,10 +951,10 @@ void BuildOpFuncList(const phi::Place& place,
           // operator.cc
           for (auto& p : m) {
             auto* transformed_tensor =
-                GetMutableLoDTensorOrSelectedRowsValueFromVar(
+                GetMutableDenseTensorOrSelectedRowsValueFromVar(
                     local_scope->FindVar(var_scope->GetNameById(p.first)));
             auto* original_tensor =
-                GetMutableLoDTensorOrSelectedRowsValueFromVar(
+                GetMutableDenseTensorOrSelectedRowsValueFromVar(
                     local_scope->FindVar(var_scope->GetNameById(p.second)));
 
             // avoid overwriting valid data

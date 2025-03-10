@@ -77,10 +77,10 @@ void MainWord2Vec(const ::paddle::PaddlePlace& place) {
   phi::LegacyLoD lod{{0, 1}};
   int64_t dict_size = 2073;  // The size of dictionary
 
-  SetupLoDTensor(&first_word, lod, static_cast<int64_t>(0), dict_size - 1);
-  SetupLoDTensor(&second_word, lod, static_cast<int64_t>(0), dict_size - 1);
-  SetupLoDTensor(&third_word, lod, static_cast<int64_t>(0), dict_size - 1);
-  SetupLoDTensor(&fourth_word, lod, static_cast<int64_t>(0), dict_size - 1);
+  SetupDenseTensor(&first_word, lod, static_cast<int64_t>(0), dict_size - 1);
+  SetupDenseTensor(&second_word, lod, static_cast<int64_t>(0), dict_size - 1);
+  SetupDenseTensor(&third_word, lod, static_cast<int64_t>(0), dict_size - 1);
+  SetupDenseTensor(&fourth_word, lod, static_cast<int64_t>(0), dict_size - 1);
 
   std::vector<PaddleTensor> paddle_tensor_feeds;
   paddle_tensor_feeds.push_back(LodTensorToPaddleTensor(&first_word));
@@ -180,7 +180,8 @@ void MainThreadsWord2Vec(const ::paddle::PaddlePlace& place) {
     for (size_t j = 0; j < 4; ++j) {
       phi::LegacyLoD lod{{0, 1}};
       int64_t dict_size = 2073;  // The size of dictionary
-      SetupLoDTensor(&jobs[i][j], lod, static_cast<int64_t>(0), dict_size - 1);
+      SetupDenseTensor(
+          &jobs[i][j], lod, static_cast<int64_t>(0), dict_size - 1);
       paddle_tensor_feeds[i].push_back(LodTensorToPaddleTensor(&jobs[i][j]));
     }
 

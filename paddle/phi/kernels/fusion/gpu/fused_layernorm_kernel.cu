@@ -1048,8 +1048,8 @@ void FusedLayerNormKernel(const Context& dev_ctx,
   const U* norm_weight_data =
       norm_weight ? norm_weight.get().data<U>() : nullptr;
   const U* norm_bias_data = norm_bias ? norm_bias.get().data<U>() : nullptr;
-  int32_t rows = 1;
-  int32_t cols = 1;
+  int64_t rows = 1;
+  int64_t cols = 1;
   for (int i = 0; i < begin_norm_axis; i++) {
     rows *= x.dims()[i];
   }

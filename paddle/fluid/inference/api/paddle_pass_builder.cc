@@ -86,7 +86,9 @@ void PaddlePassBuilder::AppendAnalysisPass(const std::string &pass) {
 }
 
 void PaddlePassBuilder::ClearPasses() { passes_.clear(); }
-
+#ifdef PADDLE_WITH_OPENVINO
+const std::vector<std::string> kOVSubgraphPasses({"openvino_subgraph_pass"});
+#endif
 const std::vector<std::string> kTRTSubgraphPasses({
   "set_subgraph_edge_pass",                                       //
       "trt_remove_amp_strategy_op_pass",                          //
@@ -619,6 +621,7 @@ const std::vector<std::string> kPirXpuPasses{
     "add_activation_xpu_fuse_pass",
     "add_layernorm_xpu_fuse_pass",
     "rms_norm_xpu_fuse_pass",
+    "elementwise_mul_add_xpu_fuse_pass",
     "conv2d_bn_xpu_fuse_pass",
     "conv2d_add_xpu_fuse_pass",
     "group_norm_silu_fuse_pass",

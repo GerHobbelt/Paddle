@@ -39,6 +39,12 @@ std::vector<Expr> GetChildBlocks(const Expr& expr);
 
 Expr GetBlock(const std::vector<Expr>& exprs, const std::string& block_name);
 
+/**
+ * Get the root schedule block (i.e. ScheduleBlock(root)) from `expr`.
+ * The `expr` must be the root block of ModuleExpr.
+ */
+Expr GetRootSBlock(const Expr& expr);
+
 Expr GetRootBlock(const std::vector<Expr>& exprs, const Expr& expr);
 
 DeviceAPI GetDeviceAPI(const std::vector<Expr>& exprs);

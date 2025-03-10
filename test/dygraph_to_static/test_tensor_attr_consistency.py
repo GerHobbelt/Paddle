@@ -26,6 +26,7 @@ DYGRAPH_ONLY_TENSOR_ATTRS_ALLOW_LIST = OrderedSet(
         '__len__',
         '__long__',
         '__nonzero__',
+        '__dict__',
         'apply_',
         'backward',
         'clear_grad',
@@ -120,6 +121,7 @@ STATIC_ONLY_TENSOR_ATTRS_ALLOW_LIST = OrderedSet(
         'trainable',
         'is_sparse_coo_tensor_type',
         'is_sparse_csr_tensor_type',
+        'is_no_need_buffer',
     ]
 )
 

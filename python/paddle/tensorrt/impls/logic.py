@@ -16,6 +16,7 @@ import tensorrt as trt
 
 from paddle.tensorrt.converter_utils import (
     add_elementwise_layer,
+    unary_op_converter,
 )
 from paddle.tensorrt.register import converter_registry
 
@@ -23,12 +24,20 @@ logic_type_map = {
     "pd_op.greater_than": trt.ElementWiseOperation.GREATER,
     "pd_op.less_than": trt.ElementWiseOperation.LESS,
     "pd_op.equal": trt.ElementWiseOperation.EQUAL,
+    "pd_op.logical_xor": trt.ElementWiseOperation.XOR,
+    "pd_op.logical_or": trt.ElementWiseOperation.OR,
+    "pd_op.logical_or_": trt.ElementWiseOperation.OR,
+    "pd_op.logical_and": trt.ElementWiseOperation.AND,
 }
 
 
 @converter_registry.register("pd_op.greater_than", trt_version="8.x")
 @converter_registry.register("pd_op.less_than", trt_version="8.x")
 @converter_registry.register("pd_op.equal", trt_version="8.x")
+@converter_registry.register("pd_op.logical_xor", trt_version="8.x")
+@converter_registry.register("pd_op.logical_or", trt_version="8.x")
+@converter_registry.register("pd_op.logical_or_", trt_version="8.x")
+@converter_registry.register("pd_op.logical_and", trt_version="8.x")
 def logic_converter(network, paddle_op, inputs):
     layer_output = add_elementwise_layer(
         network, paddle_op, inputs, logic_type_map[paddle_op.name()]
@@ -43,4 +52,11 @@ def not_equal_converter(network, paddle_op, inputs):
     )
     not_layer = network.add_unary(layer_output, trt.UnaryOperation.NOT)
     layer_output = not_layer.get_output(0)
+    return layer_output
+
+
+@converter_registry.register("pd_op.logical_not", trt_version="8.x")
+@converter_registry.register("pd_op.logical_not_", trt_version="8.x")
+def logic_not_converter(network, paddle_op, inputs):
+    layer_output = unary_op_converter(network, paddle_op, inputs)
     return layer_output

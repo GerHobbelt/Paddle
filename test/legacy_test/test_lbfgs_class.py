@@ -89,7 +89,7 @@ class TestLbfgs(unittest.TestCase):
             np.testing.assert_allclose(net.w, weight, rtol=1e-05)
 
     def test_inf_minima_incubate(self):
-        # not converage
+        # not converge
         input = np.random.rand(1).astype(np.float32)
 
         def outputs1(x):
@@ -169,7 +169,7 @@ class TestLbfgs(unittest.TestCase):
         self.assertRaises(TypeError, error_func1)
 
     def test_error2_incubate(self):
-        # not converage
+        # not converge
         input = np.random.rand(1).astype(np.float32)
 
         def outputs2(x):
@@ -339,7 +339,7 @@ class TestLbfgs(unittest.TestCase):
             np.testing.assert_allclose(net.w, weight, rtol=1e-05)
 
     def test_inf_minima(self):
-        # not converage
+        # not converge
         input = np.random.rand(1).astype(np.float32)
 
         def outputs1(x):
@@ -419,7 +419,7 @@ class TestLbfgs(unittest.TestCase):
         self.assertRaises(TypeError, error_func1)
 
     def test_error2(self):
-        # not converage
+        # not converge
         input = np.random.rand(1).astype(np.float32)
 
         def outputs2(x):

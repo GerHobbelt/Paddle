@@ -39,13 +39,3 @@ namespace ops = paddle::operators;
 REGISTER_OP_WITHOUT_GRADIENT(c_reduce_max,
                              ops::CReduceOp,
                              ops::CReduceMaxOpMaker);
-
-PD_REGISTER_STRUCT_KERNEL(c_reduce_max,
-                          CPU,
-                          ALL_LAYOUT,
-                          ops::CReduceMaxCPUKernel,
-                          float,
-                          double,
-                          int,
-                          int64_t,
-                          phi::dtype::float16) {}

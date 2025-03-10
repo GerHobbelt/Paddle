@@ -149,6 +149,7 @@ void CudaTransBufferWithDynamicShape(ir::Expr* e) {
             ::common::errors::InvalidArgument(
                 "The shared memory size used by current kernel is greater "
                 "than the max shared memory per block"));
-      });
+      },
+      [&](common::HygonDCUArchSYCL) { CINN_NOT_IMPLEMENTED });
 }
 }  // namespace cinn::optim

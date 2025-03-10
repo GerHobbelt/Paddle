@@ -26,7 +26,6 @@
 #include "paddle/cinn/optim/replace_var_with_expr.h"
 #include "paddle/cinn/utils/string.h"
 
-PD_DECLARE_bool(group_schedule_tiling_first);
 namespace cinn {
 namespace optim {
 
@@ -301,8 +300,7 @@ class ResizeBufferFromAnalyzedRange : public ir::IRMutator<> {
       (*tensor_ptr)->shape = analyzed_shape;
       buffer->shape = analyzed_shape;
     }
-    if (FLAGS_group_schedule_tiling_first &&
-        buffer_name_to_size_.count(buffer_name) > 0) {
+    if (buffer_name_to_size_.count(buffer_name) > 0) {
       const ir::Expr& analyzed_size = buffer_name_to_size_.at(buffer_name);
       VLOG(6) << "Replacing shape of buffer " << buffer->name << " with shape "
               << analyzed_size;

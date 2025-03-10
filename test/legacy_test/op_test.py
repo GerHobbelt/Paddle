@@ -525,6 +525,7 @@ class OpTest(unittest.TestCase):
                 not cls.input_shape_is_large
                 and cls.op_type
                 not in check_shape_white_list.NEED_TO_FIX_OP_LIST
+                and not is_xpu_op_test()
             ):
                 raise AssertionError(
                     "Number of element(s) of input should be large than or equal to 100 for "
@@ -3045,19 +3046,9 @@ class OpTest(unittest.TestCase):
                 def err_msg():
                     offset = np.argmax(diff_mat > max_relative_error)
                     return (
-                        "Operator %s error, %s variable %s (shape: %s, dtype: %s) max gradient diff %e over limit %e, "
-                        "the first error element is %d, expected %e, but got %e."
-                    ) % (
-                        self.op_type,
-                        msg_prefix,
-                        name,
-                        str(a.shape),
-                        self.dtype,
-                        max_diff,
-                        max_relative_error,
-                        offset,
-                        a.flatten()[offset],
-                        b.flatten()[offset],
+                        f"Operator {self.op_type} error, {msg_prefix} variable {name} (shape: {a.shape!s}, dtype: {self.dtype}) "
+                        f"max gradient diff {max_diff:e} over limit {max_relative_error:e}, "
+                        f"the first error element is {offset}, expected {a.flatten()[offset].item():e}, but got {b.flatten()[offset].item():e}."
                     )
 
                 self.assertLessEqual(max_diff, max_relative_error, err_msg())

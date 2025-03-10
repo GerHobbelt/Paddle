@@ -64,7 +64,6 @@ class TestFleet1(unittest.TestCase):
                 name="show",
                 shape=[-1, 1],
                 dtype="int64",
-                lod_level=1,
             )
             emb = paddle.static.nn.embedding(
                 input=show,
@@ -84,7 +83,6 @@ class TestFleet1(unittest.TestCase):
                 name="click",
                 shape=[-1, 1],
                 dtype="int64",
-                lod_level=1,
             )
             label_cast = paddle.cast(label, dtype='float32')
             cost = paddle.nn.functional.log_loss(fc, label_cast)

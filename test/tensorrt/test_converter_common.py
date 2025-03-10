@@ -188,6 +188,38 @@ class TestBilinearOutSizeTRTPattern(TensorRTBaseTest):
         self.check_trt_result()
 
 
+class TestBilinearSizeTensorTRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = bilinear_python_api
+        self.api_args = {
+            "x": np.random.random([2, 3, 6, 10]).astype("float32"),
+            "OutSize": None,
+            "SizeTensor": [
+                np.array([2], dtype="int64"),
+                np.array([2], dtype="int64"),
+            ],
+            "Scale": None,
+            "attrs": {
+                "data_layout": "NCHW",
+                "scale": [],
+                "out_h": -1,
+                "out_w": -1,
+                "out_d": -1,
+                "interp_method": "bilinear",
+                "align_corners": False,
+                "align_mode": 0,
+            },
+        }
+        self.program_config = {
+            "feed_list": ["x", "OutSize", "SizeTensor", "Scale"]
+        }
+        self.min_shape = {"x": [2, 3, 6, 10]}
+        self.max_shape = {"x": [12, 3, 6, 10]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
 class TestNearestNHWCTRTPattern(TensorRTBaseTest):
     def setUp(self):
         self.python_api = nearest_python_api
@@ -225,8 +257,8 @@ class TestNearestSizeTensorTRTPattern(TensorRTBaseTest):
             "x": x_nchw,
             "OutSize": None,
             "SizeTensor": [
-                np.array([12], dtype="int32"),
-                np.array([12], dtype="int32"),
+                np.array([12], dtype="int64"),
+                np.array([12], dtype="int64"),
             ],
             "Scale": None,
             "attrs": {

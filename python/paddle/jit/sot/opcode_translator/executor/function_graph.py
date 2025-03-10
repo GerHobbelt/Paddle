@@ -52,6 +52,7 @@ from ...utils import (
     map_if,
     switch_symbol_registry,
 )
+from ...utils.exceptions import BreakGraphError
 from ..instruction_utils import get_instructions
 from .guard import Guard, StringifiedExpression, make_guard
 from .mutable_data import MutationDel, MutationNew, MutationSet
@@ -661,7 +662,9 @@ class FunctionGraph:
                         for arg in flatten_vars
                     ):
                         # TODO(zrr1999): maybe we can continue to fallback to all args are constant.
-                        raise e
+                        raise BreakGraphError(
+                            f"InferMeta encount {type(e)}, but all args are not symbolic."
+                        )
 
                     args, kwargs = map_if(
                         (args, kwargs),
@@ -686,7 +689,9 @@ class FunctionGraph:
                         isinstance(arg, SymbolicVariable)
                         for arg in flatten_vars
                     ):
-                        raise e
+                        raise BreakGraphError(
+                            f"InferMeta encount {type(e)}, but all args are not symbolic."
+                        )
 
                     args, kwargs = map_structure(
                         replace_symbolic_var_with_constant_var, (args, kwargs)

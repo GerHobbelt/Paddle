@@ -883,7 +883,7 @@ bool DiagOpInferSymbolicShape(pir::Operation *op,
     if (x_shape[0].isa<int64_t>() && x_shape[1].isa<int64_t>()) {
       int64_t size_ = 0;
       if (offset_data >= 0) {
-        if (x_shape[0].dyn_cast<int64_t>() >
+        if (x_shape[0].dyn_cast<int64_t>() <
             x_shape[1].dyn_cast<int64_t>() - offset_data) {
           size_ = x_shape[0].dyn_cast<int64_t>();
         } else {
@@ -3515,42 +3515,12 @@ bool SplitWithNumOpInferSymbolicShape(
   return true;
 }
 
-bool StridedSliceOpInferSymbolicShape(
-    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
-  pir::Value operand_source = op->operand_source(0);
-  pir::Value operand_starts = op->operand_source(1);
-  pir::Value operand_ends = op->operand_source(2);
-  pir::Value operand_strides = op->operand_source(3);
-  pir::Value res = op->result(0);
-
-  const symbol::ShapeOrDataDimExprs &starts_shape_data =
-      infer_context->GetShapeOrDataForValue(operand_starts);
-  const symbol::ShapeOrDataDimExprs &ends_shape_data =
-      infer_context->GetShapeOrDataForValue(operand_ends);
-  const symbol::ShapeOrDataDimExprs &strides_shape_data =
-      infer_context->GetShapeOrDataForValue(operand_strides);
-
-  ExprVec starts = slice_utils::GetExprVecFromData(starts_shape_data);
-  ExprVec ends = slice_utils::GetExprVecFromData(ends_shape_data);
-  ExprVec strides = slice_utils::GetExprVecFromData(strides_shape_data);
-
-  std::vector<int32_t> axes_vec = details::GetVectorAttr<int32_t>(op, "axes");
-  std::vector<int64_t> axes_vec_64(axes_vec.begin(), axes_vec.end());
-
-  infer_context->SetShapeOrDataForValue(
-      res,
-      slice_utils::StridedSliceRawInferSymbolicShape(operand_source,
-                                                     res,
-                                                     starts,
-                                                     ends,
-                                                     strides,
-                                                     axes_vec_64,
-                                                     std::vector<int64_t>{},
-                                                     std::vector<int64_t>{},
-                                                     infer_context));
-
-  return true;
-}
+// bool StridedSliceOpInferSymbolicShape(pir::Operation *op,
+//                                       pir::InferSymbolicShapeContext
+//                                       *infer_context) {
+//   // pass
+//   return true;
+// }
 
 bool SumOpInferSymbolicShape(pir::Operation *op,
                              pir::InferSymbolicShapeContext *infer_context) {
@@ -3791,14 +3761,14 @@ bool TopkOpInferSymbolicShape(pir::Operation *op,
 
   int x_rank = in_dims_sym.size();
 
-  int k = k_shape_or_data.data().value().at(0).Get<int64_t>();
+  symbol::DimExpr k = k_shape_or_data.data().value().at(0);
 
   if (axis < 0) axis += x_rank;
   const auto &out_sym_shape = [&] {
     std::vector<symbol::DimExpr> out_sym_shape;
     for (int i = 0; i < x_rank; ++i) {
       if (i == axis) {
-        out_sym_shape.push_back(symbol::DimExpr(k));
+        out_sym_shape.push_back(k);
       } else {
         out_sym_shape.push_back(in_dims_sym.at(i));
       }

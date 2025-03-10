@@ -1914,7 +1914,7 @@ paddle::Tensor CreateTensorFromVarDesc(
   autograd_meta->SetStopGradient(var_desc.StopGradient());
 
   if (var_type == paddle::framework::proto::VarType::DENSE_TENSOR) {
-    // TODO(jiabin): Maybe support LOD later
+    // TODO(jiabin): Maybe support LegacyLoD later
     std::shared_ptr<phi::DenseTensor> dense_tensor = nullptr;
     if (dims.size() == 1 && dims[0] == 0) {
       std::shared_ptr<phi::Allocation> allocation_ptr = nullptr;
@@ -1998,7 +1998,7 @@ paddle::Tensor CreateTensorFromValue(const pir::Value& value) {
   autograd_meta->SetStopGradient(GetValueBoolAttr(value, kAttrStopGradients));
 
   if (value.type().isa<paddle::dialect::DenseTensorType>()) {
-    // TODO(jiabin): Maybe support LOD later
+    // TODO(jiabin): Maybe support LegacyLoD later
     std::shared_ptr<phi::DenseTensor> dense_tensor = nullptr;
     auto dtype = paddle::dialect::TransToPhiDataType(
         value.type().dyn_cast<paddle::dialect::DenseTensorType>().dtype());

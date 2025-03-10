@@ -131,7 +131,7 @@ std::shared_ptr<OpStrategy> StrategyForMatMul(
         [&](common::NVGPUArch) {
           out = pe::Matmul(new_A, new_B, trans_a, trans_b, alpha, tensor_name);
         },
-        [&](common::HygonDCUArchHIP) {
+        [&](std::variant<common::HygonDCUArchHIP, common::HygonDCUArchSYCL>) {
           out = pe::Matmul(new_A, new_B, trans_a, trans_b, alpha, tensor_name);
         });
 
@@ -484,7 +484,7 @@ std::shared_ptr<OpStrategy> StrategyForMul(
         [&](common::NVGPUArch) {
           out = pe::Matmul(new_A, new_B, false, is_infer, 1.0f, tensor_name);
         },
-        [&](common::HygonDCUArchHIP) {
+        [&](std::variant<common::HygonDCUArchHIP, common::HygonDCUArchSYCL>) {
           out = pe::Matmul(new_A, new_B, false, is_infer, 1.0f, tensor_name);
         });
 

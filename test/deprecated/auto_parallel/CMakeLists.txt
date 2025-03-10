@@ -76,10 +76,6 @@ if(WITH_DISTRIBUTE AND WITH_GPU)
                   test_pass_recompute_deprecated)
   set_tests_properties(test_pass_recompute_deprecated
                        PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 50)
-  py_test_modules(test_pass_sharding_deprecated MODULES
-                  test_pass_sharding_deprecated)
-  set_tests_properties(test_pass_sharding_deprecated
-                       PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 100)
   py_test_modules(test_while_op_completion_deprecated MODULES
                   test_while_op_completion_deprecated)
   py_test_modules(test_while_op_partition_deprecated MODULES

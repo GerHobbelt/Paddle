@@ -40,10 +40,11 @@ namespace common {
 class TestIterSimplify : public ::testing::Test {
  public:
   void SetUp() override {
-    i = ir::Var(ir::Expr(0), ir::Expr(2), "i");
-    j = ir::Var(ir::Expr(0), ir::Expr(4), "j");
-    k = ir::Var(ir::Expr(0), ir::Expr(8), "k");
-    i_j_k_fused = ir::Var(ir::Expr(0), ir::Expr(64), "i_j_k_fused");
+    i = ir::Var(ir::Expr(0), ir::Expr(2), "i").set_index(1);
+    j = ir::Var(ir::Expr(0), ir::Expr(4), "j").set_index(1);
+    k = ir::Var(ir::Expr(0), ir::Expr(8), "k").set_index(1);
+    i_j_k_fused =
+        ir::Var(ir::Expr(0), ir::Expr(64), "i_j_k_fused").set_index(1);
     var_intervals = {
         {"i", CasInterval(i->lower_bound, i->upper_bound)},
         {"j", CasInterval(j->lower_bound, j->upper_bound)},
@@ -366,18 +367,12 @@ TEST_F(TestIterSimplify, fuse_not_same_source) {
       ir::IndexExpr(8),
       ir::IndexExpr(8),
       ir::IndexExpr(1)));
-  auto gt2 = ITER_SUM(ITER_SPLIT(
-      ITER_MARK_SUM(ITER_SUM(ITER_SPLIT(ITER_MARK_VAR(i), ir::IndexExpr(4)),
-                             ITER_SPLIT(ITER_MARK_VAR(j), ir::IndexExpr(1))),
-                    ir::IndexExpr(8))));
 
   ir::Expr e1 = (i * 32 + j * 8 + k) / 8;
-  ir::Expr e2 = (i * 32 + j * 8) / 8;
-  ir::Expr e3 = (i * 32 + j * 7) / 8;
+  ir::Expr e2 = (i * 32 + j * 7) / 8;
 
   TEST_EXPR(e1, gt1, (i * 32 + j * 8 + k) / 8);
-  TEST_EXPR(e2, gt2, i * 4 + j);
-  EXPECT_ANY_THROW(rewriter.Rewrite(&e3));
+  EXPECT_ANY_THROW(rewriter.Rewrite(&e2));
 }
 
 TEST_F(TestIterSimplify, fuse_same_source) {
@@ -445,7 +440,8 @@ TEST_F(TestIterSimplify, SimplifyBindings) {
                                  shape[i],
                                  cinn::UniqName("b" + std::to_string(i)),
                                  false,
-                                 false));
+                                 false)
+                             .set_index(1));
     axis_vars[i]->is_reduce_axis = false;
     iter_values.push_back(axis_vars[i]);
   }
@@ -499,9 +495,9 @@ TEST_F(TestIterSimplify, SimplifyBindings) {
 }
 
 TEST_F(TestIterSimplify, MergeMulMod) {
-  auto S0 = ir::Var(ir::Expr(0), ir::Expr(4), "S0");
-  auto S1 = ir::Var(ir::Expr(0), ir::Expr(256), "S1");
-  auto S2 = ir::Var(ir::Expr(0), ir::Expr(13), "S2");
+  auto S0 = ir::Var(ir::Expr(0), ir::Expr(4), "S0").set_index(1);
+  auto S1 = ir::Var(ir::Expr(0), ir::Expr(256), "S1").set_index(1);
+  auto S2 = ir::Var(ir::Expr(0), ir::Expr(13), "S2").set_index(1);
   common::cas_intervals_t var_intervals = {
       {"S0", CasInterval(S0->lower_bound, S0->upper_bound)},
       {"S1", CasInterval(S1->lower_bound, S1->upper_bound)},

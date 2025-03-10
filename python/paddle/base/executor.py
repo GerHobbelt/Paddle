@@ -270,9 +270,8 @@ def check_feed_shape_type(var, feed, num_places=1):
         diff_shape = core.diff_tensor_shape(feed, var.desc, num_places)
         if diff_shape is not None:
             raise ValueError(
-                'The fed Variable %r should have dimensions = %d, shape = '
-                '%r, but received fed shape %r on each device'
-                % (var.name, len(var.shape), var.shape, diff_shape)
+                f'The fed Variable {var.name!r} should have dimensions = {len(var.shape)}, shape = '
+                f'{var.shape!r}, but received fed shape {diff_shape!r} on each device'
             )
         if not dtype_is_compatible_with(feed._dtype(), var.dtype):
             var_dtype_format = (
@@ -318,9 +317,8 @@ def pir_check_feed_shape_type(feed, name, target_shape, dtype, num_places=1):
     diff_shape = core.diff_tensor_shape(feed, target_shape, num_places)
     if diff_shape is not None:
         warnings.warn(
-            'The fed Variable %r should have dimensions = %d, shape = '
-            '%r, but received fed shape %r on each device'
-            % (name, len(target_shape), target_shape, diff_shape)
+            f'The fed Variable {name!r} should have dimensions = {len(target_shape)}, shape = '
+            f'{target_shape!r}, but received fed shape {diff_shape!r} on each device'
         )
     if not dtype_is_compatible_with(feed._dtype(), dtype):
         var_dtype_format = (
@@ -353,7 +351,7 @@ def has_feed_operators(block, feed_targets, feed_holder_name):
         feed_targets: a dictionary of {feed_target_name: feed_target_data}
         feed_holder_name: the name of the variable that holds the data of
             all feed targets. The type of this feed_holder variable is
-            FEED_MINIBATCH, which is essentially vector<LoDTensor>.
+            FEED_MINIBATCH, which is essentially vector<DenseTensor>.
 
     Returns:
         A boolean value that indicates whether a block has feed operators
@@ -2277,13 +2275,11 @@ class Executor:
         if filelist_length < pipeline_num:
             pipeline_num = filelist_length
             print(
-                "Pipeline training: setting the pipeline num to %d is enough because there are only %d files"
-                % (filelist_length, filelist_length)
+                f"Pipeline training: setting the pipeline num to {filelist_length} is enough because there are only {filelist_length} files"
             )
         if filelist_length < pipeline_num * pipeline_opt["concurrency_list"][0]:
             print(
-                "Pipeline training: setting the 1st element in concurrency_list to %d is enough because there are only %d files"
-                % (filelist_length // pipeline_num, filelist_length)
+                f"Pipeline training: setting the 1st element in concurrency_list to {filelist_length // pipeline_num} is enough because there are only {filelist_length} files"
             )
             pipeline_opt["concurrency_list"][0] = (
                 filelist_length // pipeline_num

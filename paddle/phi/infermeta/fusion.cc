@@ -842,6 +842,9 @@ void FcXPUInferMeta(const MetaTensor& x,
     out_shape[i] = static_cast<int>(x.dims()[i]);
   }
   out_shape[in_num_col_dims] = static_cast<int>(w.dims()[0]);
+  if (act_type == 23 /*phi::backends::xpu::Activation_t::SWISH_GLU*/) {
+    out_shape[in_num_col_dims] = out_shape[in_num_col_dims] / 2;
+  }
   out->set_dims(DDim(out_shape.data(), static_cast<int>(out_shape.size())));
   out->set_dtype(out_dtype);
   out->set_layout(x.layout());
@@ -1972,7 +1975,6 @@ void FusedGemmEpilogueGradInferMeta(const MetaTensor& x,
           x_dims.size()));
 
   auto dout_mat_dims = common::flatten_to_2d(dout_dims, dout_dims.size() - 1);
-  auto x_mat_dims = common::flatten_to_2d(x_dims, x_dims.size() - 1);
 
   PADDLE_ENFORCE_EQ(
       dout_mat_dims[1],
@@ -1983,14 +1985,33 @@ void FusedGemmEpilogueGradInferMeta(const MetaTensor& x,
           dout_mat_dims[1],
           y_dims[1]));
 
+  for (int32_t i = 0; i + 2 < x_dims.size(); ++i) {
+    if (dout_dims[i] > 0 && x_dims[i] > 0) {
+      PADDLE_ENFORCE_EQ(
+          dout_dims[i],
+          x_dims[i],
+          common::errors::InvalidArgument(
+              "The i dimension of DOut should be equal with i dimension of X."
+              "But received DOut[%d] = [%d], Y[%d] = [%d].",
+              i,
+              dout_dims[i],
+              i,
+              x_dims[i]));
+    }
+  }
+
+  auto k_from_dout = dout_dims[x_dims.size() - 2];
+  auto k_from_x =
+      trans_x ? x_dims[x_dims.size() - 1] : x_dims[x_dims.size() - 2];
+
+  bool check_k = (k_from_dout < 0 || k_from_x < 0) || (k_from_dout == k_from_x);
   PADDLE_ENFORCE_EQ(
-      dout_mat_dims[0],
-      trans_x ? x_mat_dims[1] : x_mat_dims[0],
+      check_k,
+      true,
       common::errors::InvalidArgument(
-          "The first dimension of DOut should be equal with X's first"
-          "dimension. But received DOut[0] = [%d], Y[0] = [%d].",
-          dout_mat_dims[0],
-          x_mat_dims[0]));
+          "K from dout and x is not same, k_from_dout is [%d], k_from_x is[%d]",
+          k_from_dout,
+          k_from_x));
 
   if (activation_grad != "none" && !reserve_space) {
     PADDLE_THROW(common::errors::InvalidArgument(

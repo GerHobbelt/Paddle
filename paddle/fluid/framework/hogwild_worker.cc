@@ -905,7 +905,7 @@ void HogwildWorker::CreateThreadOperators(const ProgramDesc &program) {
       // add offload
       auto itx = offload_vars_.find(op.get());
       if (itx != offload_vars_.end()) {
-        str_os << ", offload copys: [";
+        str_os << ", offload copies: [";
         for (auto &name : itx->second.copy_vars) {
           str_os << name << ",";
         }

@@ -23,7 +23,22 @@
 
 namespace cinn {
 namespace common {
-TEST(IndexExpr, IndexExpr_0) {
+class TestIndexExpr : public ::testing::Test {
+ public:
+  void SetUp() override {
+    S4 = ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S4")
+             .set_index(true);
+    S5 = ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S5")
+             .set_index(true);
+    S6 = ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S6")
+             .set_index(true);
+    S7 = ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S7")
+             .set_index(true);
+  };
+
+  ir::Var S4, S5, S6, S7;
+};
+TEST_F(TestIndexExpr, IndexExpr_0) {
   ir::IndexExpr a(14);
   ir::IndexExpr b(7);
   Expr d(6);
@@ -45,16 +60,8 @@ TEST(IndexExpr, IndexExpr_0) {
   EXPECT_EQ(c6, Expr(2));
 }
 
-TEST(IndexExpr, IndexExpr_1) {
-  auto S4 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S4");
-  auto S5 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S5");
-  auto S6 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S6");
-  auto S7 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S7");
-
+TEST_F(TestIndexExpr, IndexExpr_1) {
+  auto test = S6 * S7;
   ir::IndexExpr e1 = (S5 * ((S4 * (S5 * (S6 * S7))) / S5));
   ir::IndexExpr e2 = (S4 * (S5 * (S6 * S7))) / S5;
   ir::IndexExpr e3 = (S4 * S5) / S5;
@@ -65,27 +72,16 @@ TEST(IndexExpr, IndexExpr_1) {
   ir::IndexExpr e6 = (S4 * (S5 * (S6 * S7)) + S5 / S6) / S5;
   ir::IndexExpr e7 = (S4 * (S5 * (S6 * S7)) + 2 * S5 / S6) / S5;
 
-  EXPECT_EQ(e1.as_index().Normalize(), ir::IndexExpr((S6 * S7) * S4 * S5));
-  EXPECT_EQ(e2.as_index().Normalize(), ir::IndexExpr((S6 * S7) * S4));
-  EXPECT_EQ(e3.as_index().Normalize(), ir::IndexExpr(S4));
-  EXPECT_EQ(e4.as_index().Normalize(), ir::IndexExpr(((S6 * S7) * S4) + 1));
-  EXPECT_EQ(e5.as_index().Normalize(), ir::IndexExpr(((S6 * S7) * S4) + 2));
-  EXPECT_EQ(e6.as_index().Normalize(),
-            ir::IndexExpr(((S6 * S7) * S4) + (1 / S6)));
-  EXPECT_EQ(e7.as_index().Normalize(),
-            ir::IndexExpr(((S6 * S7) * S4) + (2 / S6)));
+  EXPECT_EQ(e1.Normalize(), ir::IndexExpr((S6 * S7) * S4 * S5));
+  EXPECT_EQ(e2.Normalize(), ir::IndexExpr((S6 * S7) * S4));
+  EXPECT_EQ(e3.Normalize(), ir::IndexExpr(S4));
+  EXPECT_EQ(e4.Normalize(), ir::IndexExpr(((S6 * S7) * S4) + 1));
+  EXPECT_EQ(e5.Normalize(), ir::IndexExpr(((S6 * S7) * S4) + 2));
+  EXPECT_EQ(e6.Normalize(), ir::IndexExpr(((S6 * S7) * S4) + (1 / S6)));
+  EXPECT_EQ(e7.Normalize(), ir::IndexExpr(((S6 * S7) * S4) + (2 / S6)));
 }
 
-TEST(IndexExpr, IndexExpr_2) {
-  auto S4 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S4");
-  auto S5 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S5");
-  auto S6 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S6");
-  auto S7 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S7");
-
+TEST_F(TestIndexExpr, IndexExpr_2) {
   ir::Expr q1 = S4;
   ir::Expr q2 = S4;
 
@@ -128,16 +124,7 @@ TEST(IndexExpr, IndexExpr_2) {
   EXPECT_NE(q19.as_index().Normalize(), q20.as_index().Normalize());
 }
 
-TEST(IndexExpr, IndexExpr_3) {
-  auto S4 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S4");
-  auto S5 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S5");
-  auto S6 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S6");
-  auto S7 =
-      ir::Var(ir::Expr(static_cast<int64_t>(1)), ir::Expr(INT32_MAX), "S7");
-
+TEST_F(TestIndexExpr, IndexExpr_3) {
   // `Add` corner cases
   ir::Expr q1 = S4 / S5 * S5 + S4 % S5;
   ir::Expr q2 = (S4 + S5) / S6 * S6 + (S4 + S5) % S6;

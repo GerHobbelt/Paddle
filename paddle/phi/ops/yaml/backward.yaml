@@ -810,6 +810,7 @@
   infer_meta :
     func : UnchangedInferMeta
     param : [out_grad]
+    spmd_rule: DropoutBwdInferSpmd
   kernel :
     func : dropout_grad
   composite : dropout_grad(mask, out_grad, p, is_test, mode, x_grad)
@@ -867,6 +868,18 @@
     func : elu_grad
   backward : elu_double_grad
   inplace : (out_grad -> x_grad)
+
+- backward_op : embedding_with_scaled_gradient_grad
+  forward : embedding_with_scaled_gradient (Tensor x, Tensor weight, int64_t padding_idx=-1) -> Tensor(out)
+  args : (Tensor x, Tensor weight, Tensor out_grad, int64_t padding_idx=-1)
+  output : Tensor(weight_grad)
+  infer_meta :
+    func : EmbeddingGradInferMeta
+    param : [x, weight]
+  kernel :
+    func : embedding_with_scaled_gradient_grad
+    data_type : out_grad
+  no_need_buffer : weight
 
 - backward_op : erf_grad
   forward : erf (Tensor x) -> Tensor(out)

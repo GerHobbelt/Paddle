@@ -453,16 +453,17 @@ void LaunchLayerNormKernel(const Context &dev_ctx,
 #endif  // PADDLE_WITH_CUDA
 
 template <typename T, typename U>
-void LayerNormDirectCUDAFunctor<T, U>::operator()(gpuStream_t stream,
-                                                  const T *input,
-                                                  std::vector<int> input_shape,
-                                                  const U *bias,
-                                                  const U *scale,
-                                                  T *output,
-                                                  U *mean,
-                                                  U *variance,
-                                                  int begin_norm_axis,
-                                                  float eps) {
+void LayerNormDirectCUDAFunctor<T, U>::operator()(
+    gpuStream_t stream,
+    const T *input,
+    std::vector<int64_t> input_shape,
+    const U *bias,
+    const U *scale,
+    T *output,
+    U *mean,
+    U *variance,
+    int begin_norm_axis,
+    float eps) {
   const auto x_dims = common::make_ddim(input_shape);
   auto matrix_dim = common::flatten_to_2d(x_dims, begin_norm_axis);
   int64_t batch_size = static_cast<int64_t>(matrix_dim[0]);

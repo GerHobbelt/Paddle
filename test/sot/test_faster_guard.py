@@ -36,6 +36,26 @@ class TestBasicFasterGuard(unittest.TestCase):
         self.assertTrue(guard_list.check([1]))
         self.assertFalse(guard_list.check(1))
 
+    def test_isinstance_match_guard(self):
+        guard_int = paddle.framework.core.InstanceCheckGuard(int)
+        guard_str = paddle.framework.core.InstanceCheckGuard(str)
+        guard_list = paddle.framework.core.InstanceCheckGuard(list)
+        guard_int_bool = paddle.framework.core.InstanceCheckGuard((int, bool))
+        guard_int_str = paddle.framework.core.InstanceCheckGuard((int, str))
+        self.assertTrue(guard_int.check(1))
+        self.assertFalse(guard_int.check("1"))
+        self.assertTrue(guard_str.check("1"))
+        self.assertFalse(guard_str.check(1))
+        self.assertTrue(guard_list.check([1]))
+        self.assertFalse(guard_list.check(1))
+        self.assertTrue(guard_int_bool.check(1))
+        self.assertTrue(guard_int_bool.check(True))
+        self.assertFalse(guard_int_bool.check("1"))
+        self.assertTrue(guard_int_str.check(1))
+        self.assertTrue(guard_int_str.check("1"))
+        self.assertTrue(guard_int_str.check(True))
+        self.assertFalse(guard_int_str.check([1]))
+
     def test_value_match_guard(self):
         guard_value = paddle.framework.core.ValueMatchGuard(1)
         guard_container_value = paddle.framework.core.ValueMatchGuard([1])

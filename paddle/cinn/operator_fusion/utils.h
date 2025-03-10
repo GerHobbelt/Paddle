@@ -139,6 +139,27 @@ std::vector<T> FilterVector(const std::vector<T>& first, const F& func) {
   return result;
 }
 
+template <typename T, typename F = std::function<bool(T, T)>>
+bool VectorEqual(const std::vector<T>& first,
+                 const std::vector<T>& second,
+                 const F& func = nullptr) {
+  if (first.size() != second.size()) {
+    return false;
+  }
+  for (size_t i = 0; i < first.size(); ++i) {
+    if (func) {
+      if (!func(first[i], second[i])) {
+        return false;
+      }
+    } else {
+      if (first[i] != second[i]) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 template <class A, class B>
 std::vector<B> MapVector(const std::vector<A>& as,
                          const std::function<B(A)>& func) {
@@ -641,6 +662,10 @@ std::vector<Int> ArangeVector(Int start, Int end, Int step = 1) {
   }
   return res;
 }
+
+symbol::DimExpr GetShapeProduct(const std::vector<symbol::DimExpr>& shape,
+                                int start,
+                                int end);
 
 bool ShapeProductEqual(const std::vector<symbol::DimExpr>& in_shape,
                        const std::vector<symbol::DimExpr>& out_shape,

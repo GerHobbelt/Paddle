@@ -13,14 +13,14 @@
 // limitations under the License.
 
 #include "paddle/cinn/hlir/dialect/operator/transforms/lowering_pass/collect_sym_expr.h"
-#include "paddle/cinn/hlir/dialect/operator/transforms/lowering_pass/utils.h"
+#include "paddle/cinn/hlir/framework/pir/utils.h"
 #include "paddle/fluid/pir/dialect/operator/interface/infer_symbolic_shape/infer_symbolic_shape.h"
 #include "paddle/pir/include/dialect/shape/utils/dim_expr_util.h"
 
 namespace {
-using cinn::dialect::ir::details::GetBlockOutsideInput;
 using cinn::dialect::ir::details::OpLoweringGroup;
 using cinn::dialect::ir::details::OpLoweringGroupPtr;
+using cinn::hlir::framework::pir::GetBlockOutsideInput;
 
 bool IsComplicatedDimExpr(const symbol::DimExpr& dim_expr) {
   auto lambdas = common::Overloaded{
@@ -93,14 +93,16 @@ CollectSubstituteDimExprMap(
     pir::ShapeConstraintIRAnalysis& shape_analysis) {  // NOLINT
   std::unordered_map<symbol::DimExpr, symbol::DimExpr> dim_expr_map;
   std::unordered_set<std::string> base_dim_expr_set;
+  std::unordered_set<std::string> new_symbol_set;
 
   VisitEachInputValue(group, [&](::pir::Value value) {
     auto& shape_or_data = shape_analysis.GetShapeOrDataForValue(value);
     VisitEachDimExpr(shape_or_data, [&](const symbol::DimExpr& dim_expr) {
       if (IsComplicatedDimExpr(dim_expr) &&
           dim_expr_map.find(dim_expr) == dim_expr_map.end()) {
-        dim_expr_map[dim_expr] =
-            symbol::DimExpr(shape_analysis.GetNextSymName());
+        const auto& new_symbol = shape_analysis.GetNextSymName();
+        dim_expr_map[dim_expr] = symbol::DimExpr(new_symbol);
+        new_symbol_set.insert(new_symbol);
       }
       if (dim_expr.isa<std::string>()) {
         base_dim_expr_set.insert(dim_expr.Get<std::string>());
@@ -129,6 +131,35 @@ CollectSubstituteDimExprMap(
     dim_expr_map.erase(dim_expr);
   }
 
+  const auto& dim_exprs_can_represent_by_subset = [&]() {
+    const auto& CanBeRepresentedBySubset =
+        [&](const symbol::DimExpr& dim_expr) {
+          if (dim_expr.isa<std::string>()) return false;
+          for (const auto& symbol : symbol::CollectDimExprSymbols(dim_expr)) {
+            if (new_symbol_set.count(symbol) == 0 &&
+                base_dim_expr_set.count(symbol) == 0) {
+              return false;
+            }
+          }
+          return true;
+        };
+    std::unordered_set<symbol::DimExpr> result;
+    for (const auto& kv : dim_expr_map) {
+      std::unordered_map<symbol::DimExpr, symbol::DimExpr>
+          substitute_dim_expr_map = dim_expr_map;
+      substitute_dim_expr_map.erase(kv.first);
+      const auto& substituted =
+          symbol::SubstituteDimExpr(kv.first, substitute_dim_expr_map);
+      if (CanBeRepresentedBySubset(substituted)) {
+        result.insert(kv.first);
+      }
+    }
+    return result;
+  }();
+  for (const auto& dim_expr : dim_exprs_can_represent_by_subset) {
+    dim_expr_map.erase(dim_expr);
+  }
+
   return dim_expr_map;
 }
 
@@ -147,9 +178,6 @@ bool IsShapeOrDataNeedSubstitute(
 symbol::ShapeOrDataDimExprs TrySubstitute(
     const symbol::ShapeOrDataDimExprs& shape_or_data,
     const std::unordered_map<symbol::DimExpr, symbol::DimExpr>& dim_expr_map) {
-  if (!IsShapeOrDataNeedSubstitute(shape_or_data, dim_expr_map)) {
-    return shape_or_data;
-  }
   return symbol::SubstituteShapeOrData(shape_or_data, dim_expr_map);
 }
 
@@ -205,6 +233,11 @@ CreateGroupShapeOrDataExprs(
   pir::ShapeConstraintIRAnalysis local_shape_analysis({});
   local_shape_analysis.InitInferContext();
 
+  local_shape_analysis.RegisterSymbolConstraintFromShapeAnalysis(
+      global_shape_analysis);
+  for (const auto& item : dim_expr_map) {
+    local_shape_analysis.AddEqualCstr(item.first, item.second);
+  }
   // process input values.
   VisitEachInputValue(group, [&](::pir::Value value) {
     auto new_shape_expr = TrySubstitute(

@@ -71,7 +71,7 @@ EXTRA_IMPORTS = {
 # ref:
 # - https://pybind11.readthedocs.io/en/latest/advanced/misc.html#avoiding-cpp-types-in-docstrings
 # - https://pybind11.readthedocs.io/en/latest/advanced/functions.html#default-arguments-revisited
-# we can add some mappings for convertion, e.g. {'paddle::Tensor': 'paddle.Tensor'}
+# we can add some mappings for conversion, e.g. {'paddle::Tensor': 'paddle.Tensor'}
 PYBIND11_ATTR_MAPPING = {}
 
 # some bad full expression pybind11-stubgen can not catch as invalid exp

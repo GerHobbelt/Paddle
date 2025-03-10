@@ -35,7 +35,9 @@ _logger = get_logger(
 )
 
 
-@converter_registry.register("pd_op.multiclass_nms3", trt_version="8.x")
+@converter_registry.register(
+    "pd_op.multiclass_nms3", trt_version="trt_version_ge=8.0"
+)
 def multiclass_nms3_converter(network, paddle_op, inputs):
     bboxes = inputs[0]
     scores = inputs[1]

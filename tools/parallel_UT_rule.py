@@ -662,6 +662,7 @@ THIRD_HIGH_PARALLEL_JOB_NEW = [
     'test_analyzer_seq_pool1_profile',
     'test_analyzer_mobilenet_transpose',
     'test_analyzer_resnet50',
+    'test_analyzer_openvino_resnet50',
     'test_analyzer_int8_resnet50',
     'test_analyzer_int8_mobilenetv2',
     'test_analyzer_bfloat16_resnet50',

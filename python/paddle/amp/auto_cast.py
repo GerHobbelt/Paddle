@@ -632,25 +632,14 @@ def amp_guard(
                 if (dtype == 'float16') and not _is_gpu_float16_supported():
                     prop = paddle.device.cuda.get_device_capability()
                     warnings.warn(
-                        "For float16, amp only support NVIDIA GPU with Compute Capability 7.0 or higher, current GPU is: %s, with Compute Capability: %d.%d."
-                        % (
-                            paddle.device.cuda.get_device_name(),
-                            prop[0],
-                            prop[1],
-                        )
+                        f"For float16, amp only support NVIDIA GPU with Compute Capability 7.0 or higher, current GPU is: {paddle.device.cuda.get_device_name()}, with Compute Capability: {prop[0]}.{prop[1]}."
                     )
                     enable = False
                 elif (dtype == 'bfloat16') and not _is_gpu_bfloat16_supported():
                     prop = paddle.device.cuda.get_device_capability()
                     cuda_version = paddle.version.cuda()
                     warnings.warn(
-                        "For bfloat16, amp only support NVIDIA GPU with Compute Capability 8.0 or higher and CUDA Version 11.0 or higher, current GPU is: %s, with Compute Capability: %d.%d, current CUDA Version is: %s."
-                        % (
-                            paddle.device.cuda.get_device_name(),
-                            prop[0],
-                            prop[1],
-                            cuda_version,
-                        )
+                        f"For bfloat16, amp only support NVIDIA GPU with Compute Capability 8.0 or higher and CUDA Version 11.0 or higher, current GPU is: {paddle.device.cuda.get_device_name()}, with Compute Capability: {prop[0]}.{prop[1]}, current CUDA Version is: {cuda_version}."
                     )
                     enable = False
 

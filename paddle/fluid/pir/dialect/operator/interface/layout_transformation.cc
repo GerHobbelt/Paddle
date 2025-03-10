@@ -21,6 +21,9 @@
 #include "paddle/pir/include/core/builtin_attribute.h"
 #include "paddle/pir/include/core/ir_context.h"
 #include "paddle/pir/include/pass/utils.h"
+#ifdef PADDLE_WITH_CINN
+#include "paddle/pir/include/dialect/shape/utils/shape_analysis.h"
+#endif
 
 namespace paddle::dialect {
 
@@ -32,8 +35,28 @@ void RewriteByInfermeta(pir::Operation* op, common::DataLayout new_layout) {
     op->result(i).set_type(new_outputs[i]);
   }
 
+  pir::TransLayoutCallbackFn callback = nullptr;
+#ifdef PADDLE_WITH_CINN
+  auto& shape_analysis =
+      pir::ShapeAnalysisManager::Instance().Get(op->GetParentProgram());
+  const pir::TransLayoutType trans_layout_type = [&] {
+    if (new_layout == common::DataLayout::NHWC) {
+      return pir::TransLayoutType::NCHW2NHWC;
+    }
+    if (new_layout == common::DataLayout::NHWC) {
+      return pir::TransLayoutType::NHWC2NCHW;
+    }
+    return pir::TransLayoutType::INVALID;
+  }();
+
+  if (trans_layout_type != pir::TransLayoutType::INVALID) {
+    callback = [&](pir::Value value, common::DataLayout new_layout) -> void {
+      shape_analysis.UpdateShapeOrDataByTransLayout(value, trans_layout_type);
+    };
+  }
+#endif
   for (auto value : RelevantOutputsImpl<ConcreteOp>(op)) {
-    pir::SetNewLayoutForValue(value, new_layout);
+    pir::SetNewLayoutForValue(value, new_layout, callback);
   }
 }
 

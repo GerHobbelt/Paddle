@@ -1044,6 +1044,7 @@ DimExpr Simplify(const DimExpr& expr) {
   DimExpr ret = expr;
   for (bool keep_rewrite = true; keep_rewrite;) {
     keep_rewrite = false;
+    const DimExpr expr_before_run_pipeline = ret;
     DoPass<SimplifyOneOperand<Negative>>(&keep_rewrite, &ret);
     DoPass<SimplifyOneOperand<Reciprocal>>(&keep_rewrite, &ret);
     DoPass<SimplifyUnitOneOperand<Negative>>(&keep_rewrite, &ret);
@@ -1071,6 +1072,7 @@ DimExpr Simplify(const DimExpr& expr) {
     DoPass<FoldRedundantBroadcast>(&keep_rewrite, &ret);
     DoPass<FoldRedundantSymbolicBroadcast>(&keep_rewrite, &ret);
     DoPass<SimplifyBroadcast>(&keep_rewrite, &ret);
+    if (expr_before_run_pipeline == ret) break;
   }
   return ret;
 }

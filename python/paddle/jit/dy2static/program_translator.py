@@ -361,6 +361,7 @@ class CacheKey:
                 with_hook,
                 is_train,
                 self._pir_flags,
+                use_pir_api(),
             )
         )
 
@@ -700,7 +701,7 @@ class StaticFunction(Generic[_InputT, _RetT]):
     def __deepcopy__(self, memo):
         """
         Customized behavior for copy.deepcopy, return original decorated function instead
-        of a new StaticFunction Object. StaticFunction itself is not copyable becuase it's
+        of a new StaticFunction Object. StaticFunction itself is not copyable because it's
         associated with class_instance.
 
         We add __deepcopy__ here only for the following usage:
@@ -1034,7 +1035,7 @@ class ASTStaticFunction(StaticFunction[_InputT, _RetT]):
         # if specific the `input_spec`, the length of program_cache will always 1,
         # else, return the last one.
         cached_program_len = len(self._program_cache)
-        # If specific `input_spec`, apply convertion from dygraph layers into static Program.
+        # If specific `input_spec`, apply conversion from dygraph layers into static Program.
         # NOTE(jiabin): is_prim_infer indicates this method called by paddle.jit.save and it is worked in prim mode
 
         desired_input_spec = input_spec

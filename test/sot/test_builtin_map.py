@@ -17,7 +17,7 @@ from __future__ import annotations
 import unittest
 from typing import TYPE_CHECKING
 
-from test_case_base import TestCaseBase
+from test_case_base import TestCaseBase, test_with_faster_guard
 
 from paddle.jit import sot
 from paddle.jit.sot.psdb import check_no_breakgraph
@@ -99,12 +99,14 @@ def test_map_for_loop(x: list):
 
 
 class TestMap(TestCaseBase):
+    @test_with_faster_guard
     def test_map(self):
         self.assert_results(test_map_list, [1, 2, 3, 4])
         self.assert_results(test_map_tuple, (1, 2, 3, 4))
         self.assert_results(test_map_range, range(5))
         self.assert_results(test_map_dict, {"a": 1, "b": 2, "c": 3})
 
+    @test_with_faster_guard
     def test_map_comprehension(self):
         self.assert_results(test_map_list_comprehension, [1, 2, 3, 4])
         self.assert_results(test_map_tuple_comprehension, (1, 2, 3, 4))
@@ -117,9 +119,11 @@ class TestMap(TestCaseBase):
         with strict_mode_guard(False):
             self.assert_results(test_map_list_with_breakgraph, [1, 2, 3, 4])
 
+    @test_with_faster_guard
     def test_map_unpack(self):
         self.assert_results(test_map_unpack, [1, 2, 3, 4])
 
+    @test_with_faster_guard
     def test_map_for_loop(self):
         self.assert_results(test_map_for_loop, [7, 8, 9, 10])
 

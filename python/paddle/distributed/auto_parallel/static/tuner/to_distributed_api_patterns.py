@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
 import math
 from abc import abstractmethod
 
@@ -22,6 +23,8 @@ import paddle.nn.functional as F
 _ALL_PATTERNS = {}
 _USED_PATTERNS = []
 
+logger = logging.getLogger(__name__)
+
 
 def register_pattern(cls):
     """Register a pattern"""
@@ -30,6 +33,9 @@ def register_pattern(cls):
         global _ALL_PATTERNS
         pattern = cls()
         _ALL_PATTERNS[pattern.name] = pattern
+        logger.debug(
+            f'register pattern : {pattern.name}, pattern program: {pattern.program}'
+        )
 
     register()
 
@@ -661,7 +667,7 @@ class AttentionPattern(BasePattern):
             (9,): qkv_linear_dist_infos,
             (10,): qkv_linear_dist_infos,
             (11,): qkv_linear_dist_infos,
-            (77,): out_linear_dist_infos,
+            (76,): out_linear_dist_infos,
         }
         self.ops_dist_infos = ops_dist_infos
 
@@ -858,13 +864,13 @@ class DecoderLayerPattern(BasePattern):
         down_linear_dist_infos = MpDistInfos("row")
         # # # build ops dist infos # # #
         ops_dist_infos = {
+            (21,): qkv_linear_dist_infos,
             (22,): qkv_linear_dist_infos,
             (23,): qkv_linear_dist_infos,
-            (24,): qkv_linear_dist_infos,
-            (90,): out_linear_dist_infos,
-            (100,): up_linear_dist_infos,
-            (101,): up_linear_dist_infos,
-            (103,): down_linear_dist_infos,
+            (88,): out_linear_dist_infos,
+            (97,): up_linear_dist_infos,
+            (98,): up_linear_dist_infos,
+            (100,): down_linear_dist_infos,
         }
         self.ops_dist_infos = ops_dist_infos
 
@@ -1272,6 +1278,9 @@ def match_pattern(pattern, program):
             return
 
         if is_op:
+            logger.debug(
+                f'comparing src op {src.name()} with tgt op {tgt.name()}'
+            )
             # skip comparing data_op
             if src.name() == "pd_op.data" or src.name() == "builtin.parameter":
                 return
@@ -1306,7 +1315,7 @@ def match_pattern(pattern, program):
                 _match_core(src_result, tgt_result, is_op=False)
 
         else:
-
+            logger.debug('comparing operands')
             # as input for op node
             src_as_input_ops = src.all_used_ops()
             tgt_as_input_ops = tgt.all_used_ops()
@@ -1352,14 +1361,26 @@ def match_pattern(pattern, program):
             break
     # src_start_op = src_ops[0] # to be done, need to check pattern start op
     assert src_start_op is not None, "src_start_op is none"
+    logger.debug(
+        f'in match_pattern func, Matching Pattern {pattern.name}, start op is {src_start_op.name()}'
+    )
 
     tgt_ops = program.global_block().ops
     for idx, tgt_op in enumerate(tgt_ops):
         if tgt_op.name() == src_start_op.name():
+            tgt_op_id = tgt_op.get_parent_block().ops.index(tgt_op)
+            if tgt_op_id in matched_op_node_ids:
+                continue
+            logger.debug(
+                f'in match_pattern func, Matching Pattern {pattern.name}, tgt_op is {tgt_op.name()}'
+            )
             not_matched = False
             result = {}
             _match_core(src_start_op, tgt_op, is_op=True)
             if not not_matched:
+                logger.debug(
+                    f'in match_pattern func, Matched Pattern {pattern.name}, pattern.program is {pattern.program} result is {result}'
+                )
                 need_to_append = True
                 for value in result.values():
                     if value in matched_op_node_ids:
@@ -1384,6 +1405,9 @@ def match_all_patterns(program):
     matched_ids = set()
     for pattern_name in _ALL_PATTERNS:
         if pattern_name in _USED_PATTERNS:
+            logger.debug(
+                f'in match_all_patterns func, Matching Pattern {pattern_name}'
+            )
             pattern = _ALL_PATTERNS[pattern_name]
             results, matched = match_pattern(pattern, program)
             for result in results:

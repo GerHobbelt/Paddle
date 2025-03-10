@@ -497,9 +497,9 @@ def start_local_trainers(
     procs = []
     for idx, t in enumerate(pod.trainers):
         proc_env = {
-            "PADDLE_TRAINER_ID": "%d" % t.rank,
-            "PADDLE_CURRENT_ENDPOINT": f"{t.endpoint}",
-            "PADDLE_TRAINERS_NUM": "%d" % cluster.trainers_nranks(),
+            "PADDLE_TRAINER_ID": str(t.rank),
+            "PADDLE_CURRENT_ENDPOINT": str(t.endpoint),
+            "PADDLE_TRAINERS_NUM": str(cluster.trainers_nranks()),
             "PADDLE_TRAINER_ENDPOINTS": ",".join(cluster.trainers_endpoints()),
             "PADDLE_RANK_IN_NODE": str(idx),
             "PADDLE_LOCAL_DEVICE_IDS": ",".join(
@@ -582,9 +582,9 @@ def start_local_trainers(
                 and current_env.get("PADDLE_NEED_RANK_MAPPING").lower()
                 == "true"
             ):
-                fn = open("%s/prelaunchlog.%d" % (log_dir, idx), "a")
+                fn = open(f"{log_dir}/prelaunchlog.{idx}", "a")
             else:
-                fn = open("%s/workerlog.%d" % (log_dir, idx), "a")
+                fn = open(f"{log_dir}/workerlog.{idx}", "a")
             proc = subprocess.Popen(
                 cmd, env=current_env, stdout=fn, stderr=fn, preexec_fn=pre_fn
             )
@@ -949,7 +949,7 @@ def get_mapped_cluster_from_args_without_rank_mapping(args, device_mode):
             )
         else:
             free_ports = find_free_ports(len(node_ranks[node_rank]))
-        trainer_endpoints.append(["%s:%d" % (ip, port) for port in free_ports])
+        trainer_endpoints.append([f"{ip}:{port}" for port in free_ports])
 
     return get_mapped_cluster_without_rank_mapping(
         node_ips, node_ip, trainer_endpoints, device_mode, node_ranks
@@ -1082,7 +1082,7 @@ def get_mapped_cluster_from_args_with_rank_mapping(args, device_mode):
             )
         else:
             free_ports = find_free_ports(len(node_ranks[node_rank]))
-        trainer_endpoints.append(["%s:%d" % (ip, port) for port in free_ports])
+        trainer_endpoints.append([f"{ip}:{port}" for port in free_ports])
 
     return get_mapped_cluster_with_rank_mapping(
         node_ips,
@@ -1640,7 +1640,7 @@ class ParameterServerLauncher:
 
             if args.log_dir is not None:
                 os.makedirs(args.log_dir, exist_ok=True)
-                fn = open("%s/serverlog.%d" % (args.log_dir, idx), "w")
+                fn = open(f"{args.log_dir}/serverlog.{idx}", "w")
                 self.log_fns["server"].append(fn)
                 proc = subprocess.Popen(
                     cmd, env=current_env, stdout=fn, stderr=fn
@@ -1749,7 +1749,7 @@ class ParameterServerLauncher:
 
             if args.log_dir is not None:
                 os.makedirs(args.log_dir, exist_ok=True)
-                fn = open("%s/workerlog.%d" % (args.log_dir, idx), "w")
+                fn = open(f"{args.log_dir}/workerlog.{idx}", "w")
                 self.log_fns["worker"].append(fn)
                 proc = subprocess.Popen(
                     cmd, env=current_env, stdout=fn, stderr=fn
@@ -1818,7 +1818,7 @@ class ParameterServerLauncher:
 
             if args.log_dir is not None:
                 os.makedirs(args.log_dir, exist_ok=True)
-                fn = open("%s/coordinator.%d" % (args.log_dir, idx), "w")
+                fn = open(f"{args.log_dir}/coordinator.{idx}", "w")
                 self.log_fns["coordinator"].append(fn)
                 proc = subprocess.Popen(
                     cmd, env=current_env, stdout=fn, stderr=fn
@@ -1910,7 +1910,7 @@ class ParameterServerLauncher:
 
             if args.log_dir is not None:
                 os.makedirs(args.log_dir, exist_ok=True)
-                fn = open("%s/heterlog.%d" % (args.log_dir, idx), "w")
+                fn = open(f"{args.log_dir}/heterlog.{idx}", "w")
                 self.log_fns["heter_worker"].append(fn)
                 proc = subprocess.Popen(
                     cmd, env=current_env, stdout=fn, stderr=fn

@@ -864,6 +864,32 @@ void DeleterBridge(phi::Allocation* alloc) {
   }
 }
 
+phi::DataType ConvertToPDDataType(const std::string& typestr) {
+  static const std::unordered_map<std::string, phi::DataType> type_map = {
+      {"<c8", phi::DataType::COMPLEX64},
+      {"<c16", phi::DataType::COMPLEX128},
+      {"<f2", phi::DataType::BFLOAT16},
+      {"<f4", phi::DataType::FLOAT32},
+      {"<f8", phi::DataType::FLOAT64},
+      {"|u1", phi::DataType::UINT8},
+      {"|i1", phi::DataType::INT8},
+      {"<i2", phi::DataType::INT16},
+      {"<i4", phi::DataType::INT32},
+      {"<i8", phi::DataType::INT64},
+      {"|b1", phi::DataType::BOOL},
+      // NOTE: Paddle not support uint32, uint64, uint16 yet.
+      // {"<u2", phi::DataType::UINT16},
+      // {"<u4", phi::DataType::UINT32},
+      // {"<u8", phi::DataType::UINT64},
+  };
+  auto it = type_map.find(typestr);
+  PADDLE_ENFORCE_NE(
+      it,
+      type_map.end(),
+      common::errors::InvalidArgument("Unsupported typestr: " + typestr));
+  return it->second;
+}
+
 phi::DenseTensor from_blob(void* data,
                            DLManagedTensor* src,
                            const phi::DDim& shape,

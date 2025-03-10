@@ -123,4 +123,8 @@ bool LayerMatchGuard::check(PyObject* value) {
   return (training == Py_True) == training_;
 }
 
+bool InstanceCheckGuard::check(PyObject* value) {
+  return PyObject_IsInstance(value, expected_);
+}
+
 #endif

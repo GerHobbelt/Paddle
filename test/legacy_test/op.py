@@ -90,8 +90,7 @@ class OpDescCreationMethod:
 
             if not input_parameter.duplicable and len(input_arguments) > 1:
                 raise ValueError(
-                    "Input %s expects only one input, but %d are given."
-                    % (input_parameter.name, len(input_arguments))
+                    f"Input {input_parameter.name} expects only one input, but {len(input_arguments)} are given."
                 )
 
             ipt = op_desc.inputs.add()
@@ -105,8 +104,7 @@ class OpDescCreationMethod:
 
             if not output_parameter.duplicable and len(output_arguments) > 1:
                 raise ValueError(
-                    "Output %s expects only one output, but %d are given."
-                    % (output_parameter.name, len(output_arguments))
+                    f"Output {output_parameter.name} expects only one output, but {len(output_arguments)} are given."
                 )
 
             out = op_desc.outputs.add()

@@ -32,8 +32,6 @@
 
 PD_DECLARE_bool(cinn_enable_map_expr);
 
-PD_DECLARE_bool(cinn_bucket_compile);
-
 namespace cinn {
 namespace hlir {
 namespace op {
@@ -169,11 +167,14 @@ std::shared_ptr<OpStrategy> StrategyForReduce(
       std::vector<CINNValue> cinn_values{CINNValue(out)};
       *ret = CINNValuePack{cinn_values};
     };
-    target.arch.Match([&](common::NVGPUArch) { NaiveCompute(); },
-                      [&](std::variant<common::UnknownArch,
-                                       common::X86Arch,
-                                       common::ARMArch>) { NaiveCompute(); },
-                      [&](common::HygonDCUArchHIP) { NaiveCompute(); });
+    target.arch.Match(
+        [&](common::NVGPUArch) { NaiveCompute(); },
+        [&](std::variant<common::UnknownArch,
+                         common::X86Arch,
+                         common::ARMArch>) { NaiveCompute(); },
+        [&](std::variant<common::HygonDCUArchHIP, common::HygonDCUArchSYCL>) {
+          NaiveCompute();
+        });
   });
 
   framework::CINNSchedule reduction_schedule([=](lang::Args args,
@@ -219,27 +220,28 @@ std::shared_ptr<OpStrategy> StrategyForReduce(
     ir::ModuleExpr mod_expr(vec_ast);
     ir::IRSchedule ir_sch(mod_expr);
     ir_sch.MergeExprs();
-    target.arch.Match([&](common::UnknownArch) { CINN_NOT_IMPLEMENTED; },
-                      [&](common::X86Arch) {
-                        std::vector<CINNValue> res{
-                            CINNValue(ir_sch.GetModule().GetExprs().at(0))};
-                        *ret = CINNValuePack{res};
-                      },
-                      [&](common::ARMArch) {
-                        std::vector<CINNValue> res{
-                            CINNValue(ir_sch.GetModule().GetExprs().at(0))};
-                        *ret = CINNValuePack{res};
-                      },
-                      [&](common::NVGPUArch) {
-                        std::vector<CINNValue> res{
-                            CINNValue(ir_sch.GetModule().GetExprs().at(0))};
-                        *ret = CINNValuePack{res};
-                      },
-                      [&](common::HygonDCUArchHIP) {
-                        std::vector<CINNValue> res{
-                            CINNValue(ir_sch.GetModule().GetExprs().at(0))};
-                        *ret = CINNValuePack{res};
-                      });
+    target.arch.Match(
+        [&](common::UnknownArch) { CINN_NOT_IMPLEMENTED; },
+        [&](common::X86Arch) {
+          std::vector<CINNValue> res{
+              CINNValue(ir_sch.GetModule().GetExprs().at(0))};
+          *ret = CINNValuePack{res};
+        },
+        [&](common::ARMArch) {
+          std::vector<CINNValue> res{
+              CINNValue(ir_sch.GetModule().GetExprs().at(0))};
+          *ret = CINNValuePack{res};
+        },
+        [&](common::NVGPUArch) {
+          std::vector<CINNValue> res{
+              CINNValue(ir_sch.GetModule().GetExprs().at(0))};
+          *ret = CINNValuePack{res};
+        },
+        [&](std::variant<common::HygonDCUArchHIP, common::HygonDCUArchSYCL>) {
+          std::vector<CINNValue> res{
+              CINNValue(ir_sch.GetModule().GetExprs().at(0))};
+          *ret = CINNValuePack{res};
+        });
   });
 
   auto strategy = std::make_shared<framework::OpStrategy>();

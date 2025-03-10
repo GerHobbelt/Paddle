@@ -102,7 +102,8 @@ void TuplePushInstruction::Run() {
 
       auto var_name = value_2_var_name.at(inlet_element_value);
       auto num_str = std::to_string(stack_element_var_array_->size());
-      std::string new_name = var_name + "_copied_" + num_str;
+      std::string new_name = var_name + "_copied_" + num_str + "_in_tuple_" +
+                             std::to_string(op_->id());
       auto* copy_var = value_exe_info_->GetScope()->Var(new_name);
       bool is_optional = (inlet_element_value.impl() == nullptr ||
                           !inlet_element_value.type());

@@ -137,7 +137,7 @@ class Builder {
                           const std::vector<Type> &output_types,
                           pir::OpInfo op_info);
 
-  Operation *Insert(Operation *op);
+  IR_API Operation *Insert(Operation *op);
 
   /// Create an operation of specific op type at the current insertion point.
   template <typename OpTy, typename... Args>

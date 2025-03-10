@@ -45,6 +45,8 @@ from .auto_parallel.api import (
     to_static,
     unshard_dtensor,
 )
+from .auto_parallel.high_level_api import to_distributed
+from .auto_parallel.interface import get_mesh, set_mesh
 from .auto_parallel.intermediate.parallelize import parallelize
 from .auto_parallel.intermediate.pipeline_parallel import SplitPoint
 from .auto_parallel.intermediate.tensor_parallel import (
@@ -199,4 +201,7 @@ __all__ = [
     "PrepareLayerOutput",
     "PrepareLayerInput",
     "SplitPoint",
+    "set_mesh",
+    "get_mesh",
+    "to_distributed",
 ]

@@ -52,13 +52,11 @@ class TestHeterPipelinePsCTR2x2(FleetDistHeterRunnerBase):
                 name="dnn_data",
                 shape=[-1, 1],
                 dtype="int64",
-                lod_level=1,
             )
             lr_data = paddle.static.data(
                 name="lr_data",
                 shape=[-1, 1],
                 dtype="int64",
-                lod_level=1,
             )
             label = paddle.static.data(
                 name="click",
@@ -109,7 +107,7 @@ class TestHeterPipelinePsCTR2x2(FleetDistHeterRunnerBase):
                     weight_attr=base.ParamAttr(
                         initializer=paddle.nn.initializer.Constant(value=0.01)
                     ),
-                    name='dnn-fc-%d' % i,
+                    name=f'dnn-fc-{i}',
                 )
                 dnn_out = fc
 

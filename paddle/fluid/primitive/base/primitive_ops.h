@@ -60,6 +60,7 @@ const std::set<std::string>& GetPrimitiveOpNames() {
       "pd_op.minimum",
       "pd_op.argmax",
       "pd_op.argmin",
+      "pd_op.pow",
       "pd_op.prod",
       "pd_op.roll",
       "pd_op.scatter",

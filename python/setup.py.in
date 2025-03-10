@@ -1011,6 +1011,16 @@ if '${WITH_ONNXRUNTIME}' == 'ON':
     else:
         package_data['paddle.libs']+=['${PADDLE2ONNX_LIB_NAME}', '${ONNXRUNTIME_LIB_NAME}']
 
+if '${WITH_OPENVINO}' == 'ON':
+    shutil.copy('${OPENVINO_LIB}', libs_path)
+    shutil.copy('${TBB_LIB}', libs_path)
+    shutil.copy('${OPENVINO_PADDLE_LIB}', libs_path)
+    shutil.copy('${OPENVINO_CPU_PLUGIN_LIB}', libs_path)
+    if os.name != 'nt':
+        package_data['paddle.libs'] += ['libopenvino.so.2500', 'libtbb.so.12', 'libopenvino_paddle_frontend.so.2500', 'libopenvino_intel_cpu_plugin.so']
+    else:
+        package_data['paddle.libs'] += ['openvino.dll', 'tbb.dll', 'openvino_paddle_frontend.dll', 'openvino_intel_cpu_plugin.dll']
+
 if '${WITH_XPU}' == 'ON':
     shutil.copy('${XPU_API_LIB}', libs_path)
     package_data['paddle.libs']+=['${XPU_API_LIB_NAME}']
@@ -1162,6 +1172,14 @@ for f in jit_layer_headers:
 
 if '${WITH_ONEDNN}' == 'ON':
     headers += list(find_files('*', '${ONEDNN_INSTALL_DIR}/include')) # mkldnn
+
+if '${WITH_OPENVINO}' == 'ON':
+    headers += list(
+        find_files('*', '${OPENVINO_INC_DIR}')
+    )  # openvino
+    headers += list(
+        find_files('*', '${TBB_INC_DIR}')
+    )  # tbb
 
 if '${WITH_GPU}' == 'ON' or '${WITH_ROCM}' == 'ON':
     # externalErrorMsg.pb for External Error message

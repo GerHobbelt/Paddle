@@ -160,7 +160,7 @@ class TestParallelAPI:
         global_mesh = dist.ProcessMesh(mesh_arr, dim_names)
         dist.auto_parallel.set_mesh(global_mesh)
 
-    def check_mp(self, layer):
+    def check_mp(self, layer, share_embedding):
         if self.mp == 1:
             return
         for name, sub_layer in layer.named_sublayers():
@@ -174,12 +174,14 @@ class TestParallelAPI:
                         dist.Replicate(),
                         dist.Shard(0),
                     ]
+                if 'gate_proj' in name or 'up_proj' in name:
+                    assert sub_layer.weight.placements == [
+                        dist.Replicate(),
+                        dist.Shard(1),
+                    ]
                 if (
-                    'gate_proj' in name
-                    or 'up_proj' in name
-                    or 'embed_tokens' in name
-                    or 'lm_head' in name
-                ):
+                    'embed_tokens' in name or 'lm_head' in name
+                ) and not share_embedding:
                     assert sub_layer.weight.placements == [
                         dist.Replicate(),
                         dist.Shard(1),
@@ -196,7 +198,7 @@ class TestParallelAPI:
                         dist.Shard(0),
                     ]
 
-    def parallel_model(self, layer):
+    def parallel_model(self, layer, share_embedding=False):
         dp_config = None
         mp_config = None
         pp_config = None
@@ -306,7 +308,7 @@ class TestParallelAPI:
                 optimizer,
                 config=config,
             )
-        self.check_mp(layer)
+        self.check_mp(layer, share_embedding)
         return layer, optimizer, lr_scheduler
 
     def run_llama(
@@ -322,7 +324,9 @@ class TestParallelAPI:
                 self.config, share_embedding, position_embedding
             )
 
-        model, optimizer, lr_scheduler = self.parallel_model(model)
+        model, optimizer, lr_scheduler = self.parallel_model(
+            model, share_embedding
+        )
 
         criterion = LlamaPretrainingCriterion(self.config)
 

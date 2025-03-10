@@ -494,6 +494,10 @@ if(TENSORRT_FOUND)
   set(NAIVE_EXECUTOR_DEPS ${NAIVE_EXECUTOR_DEPS} tensorrt_engine_op)
 endif()
 
+if(WITH_OPENVINO)
+  set(NAIVE_EXECUTOR_DEPS ${NAIVE_EXECUTOR_DEPS} openvino_engine_op)
+endif()
+
 cc_library(
   naive_executor
   SRCS naive_executor.cc

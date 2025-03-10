@@ -19,6 +19,7 @@
 #include "paddle/cinn/operator_fusion/fusion_tracker/interpreter.h"
 #include "paddle/cinn/operator_fusion/utils.h"
 
+COMMON_DECLARE_bool(enable_fusion_result_check);
 namespace cinn::fusion {
 
 std::vector<ir::Expr> OperationFusion(
@@ -38,6 +39,11 @@ std::vector<ir::Expr> OperationFusion(
   auto interpreter =
       FusionInterpreter(fusion_tracker_ptr, ops, initialized_lowered_op);
   auto output = interpreter.Run();
+
+  if (FLAGS_enable_fusion_result_check) {
+    cinn::hlir::framework::pir::trivial_fusion_detail::CheckLoopAlignment(
+        output);
+  }
 
   VLOG(4) << "Fusion Result: output size is " << output.size();
   for (const auto& expr : output) {

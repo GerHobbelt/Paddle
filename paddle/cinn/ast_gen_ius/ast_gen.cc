@@ -21,9 +21,6 @@
 #include "paddle/cinn/lang/compute.h"
 #include "paddle/cinn/optim/replace_var_with_expr.h"
 
-PD_DECLARE_bool(group_schedule_tiling_first);
-PD_DECLARE_bool(cinn_bucket_compile);
-
 namespace cinn {
 namespace ast_gen_ius {
 
@@ -108,27 +105,17 @@ ir::Expr AstGen::Build(const ir::Tensor& tensor, TensorGroup* tensor_group) {
     std::vector<ir::Expr> iter_values;
     // reduce body and reduce init schedule block should have different objects
     // for same axis so we re-create objects
-    VLOG(4) << "FLAGS_group_schedule_tiling_first = "
-            << FLAGS_group_schedule_tiling_first;
     std::vector<Var> axis_vars = cinn::common::GenDefaultAxis(axis_len);
     const std::vector<ir::Var>& reduce_axis = tensor->reduce_axis;
     VLOG(4) << "ast gen: tensor init_body is " << init_body;
     for (int i = 0; i < shape.size(); ++i) {
-      if (!FLAGS_group_schedule_tiling_first && shape[i] == Expr(1)) {
-        optim::ReplaceVarWithExpr(&init_body, axis[i], Expr(0));
-        continue;
-      }
       block_vars.push_back(Var(Expr(0),
                                shape[i],
                                cinn::UniqName("i" + std::to_string(i)),
                                /*is_reduce = */ false));
       optim::ReplaceVarWithExpr(&init_body, axis[i], block_vars.back());
       axis_vars[i]->is_reduce_axis = false;
-      if (!FLAGS_group_schedule_tiling_first && shape[i] == Expr(1)) {
-        iter_values.push_back(Expr(0));
-      } else {
-        iter_values.push_back(axis_vars[i]);
-      }
+      iter_values.push_back(axis_vars[i]);
       ir::TryElevateInt32ToInt64({ir::Expr(axis_vars[i]), shape[i]});
     }
     VLOG(4) << "iter_value.size() and block_vars.size() is "
@@ -151,20 +138,12 @@ ir::Expr AstGen::Build(const ir::Tensor& tensor, TensorGroup* tensor_group) {
     // for same axis so we re-create objects
     std::vector<Var> reduce_axis_vars = cinn::common::GenDefaultAxis(axis_len);
     for (int i = 0; i < shape.size(); ++i) {
-      if (!FLAGS_group_schedule_tiling_first && shape[i] == Expr(1)) {
-        optim::ReplaceVarWithExpr(&reduce_body, axis[i], Expr(0));
-        continue;
-      }
       reduce_block_vars.push_back(Var(Expr(0),
                                       shape[i],
                                       cinn::UniqName("i" + std::to_string(i)),
                                       /*is_reduce = */ false));
       reduce_axis_vars[i]->is_reduce_axis = false;
-      if (!FLAGS_group_schedule_tiling_first && shape[i] == Expr(1)) {
-        reduce_iter_values.push_back(Expr(0));
-      } else {
-        reduce_iter_values.push_back(axis_vars[i]);
-      }
+      reduce_iter_values.push_back(axis_vars[i]);
       ir::TryElevateInt32ToInt64({ir::Expr(axis_vars[i]), shape[i]});
     }
     VLOG(4) << "ast gen: reduce body is after replace 0" << reduce_body;
@@ -181,28 +160,17 @@ ir::Expr AstGen::Build(const ir::Tensor& tensor, TensorGroup* tensor_group) {
     }
 
     int non_zero_axis_size = 0;
-    if (FLAGS_group_schedule_tiling_first) {
-      std::vector<ir::Var> non_reduce_axis_vars = [&]() {
-        std::vector<ir::Var> res;
-        for (int i = 0; i < shape.size(); ++i) {
-          res.push_back(axis[i]);
-        }
-        return res;
-      }();
-      for (int i = 0; i < non_reduce_axis_vars.size(); ++i) {
-        optim::ReplaceVarWithExpr(
-            &reduce_body, non_reduce_axis_vars[i], reduce_block_vars[i]);
-        ++non_zero_axis_size;
+    std::vector<ir::Var> non_reduce_axis_vars = [&]() {
+      std::vector<ir::Var> res;
+      for (int i = 0; i < shape.size(); ++i) {
+        res.push_back(axis[i]);
       }
-    } else {
-      for (int i = 0; i < axis.size(); ++i) {
-        if (!FLAGS_group_schedule_tiling_first && shape[i] == Expr(1)) {
-          continue;
-        }
-        optim::ReplaceVarWithExpr(
-            &reduce_body, axis[i], reduce_block_vars[non_zero_axis_size]);
-        ++non_zero_axis_size;
-      }
+      return res;
+    }();
+    for (int i = 0; i < non_reduce_axis_vars.size(); ++i) {
+      optim::ReplaceVarWithExpr(
+          &reduce_body, non_reduce_axis_vars[i], reduce_block_vars[i]);
+      ++non_zero_axis_size;
     }
 
     VLOG(4) << "to replace : " << non_zero_axis_size << " "
@@ -239,10 +207,6 @@ ir::Expr AstGen::Build(const ir::Tensor& tensor, TensorGroup* tensor_group) {
     // Put the two parts together
     ir::Expr body = ir::Block::Make({init_body, reduce_body});
     for (int i = static_cast<int>(axis_len) - 1; i >= 0; --i) {
-      if ((!FLAGS_group_schedule_tiling_first || !FLAGS_cinn_bucket_compile) &&
-          shape[i] == Expr(1)) {
-        continue;
-      }
       ir::Var loop_var = axis[i];
       ir::Expr loop_extent = shape[i];
       body = ir::For::Make(
@@ -265,11 +229,7 @@ ir::Expr AstGen::Build(const ir::Tensor& tensor, TensorGroup* tensor_group) {
           Expr(0), shape[i], cinn::UniqName("i" + std::to_string(i)), false));
       optim::ReplaceVarWithExpr(&body, axis[i], block_vars[i]);
       axis_vars[i]->is_reduce_axis = false;
-      if (!FLAGS_group_schedule_tiling_first && shape[i] == Expr(1)) {
-        iter_values.push_back(Expr(0));
-      } else {
-        iter_values.push_back(axis_vars[i]);
-      }
+      iter_values.push_back(axis_vars[i]);
     }
     body = ir::ScheduleBlockRealize::Make(
         iter_values,

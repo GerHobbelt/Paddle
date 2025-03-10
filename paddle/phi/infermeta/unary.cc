@@ -441,6 +441,8 @@ void AsComplexInferMeta(const MetaTensor& input, MetaTensor* output) {
   output->set_dtype(dtype::ToComplex(input.dtype()));
 }
 
+void BarrierInferMeta(const MetaTensor& x, MetaTensor* out) {}
+
 void BatchSizeLikeInferMeta(const MetaTensor& x,
                             const std::vector<int>& shape,
                             int x_batch_size_dim,
@@ -2427,10 +2429,11 @@ void MatrixPowerInferMeta(const MetaTensor& x, int n, MetaTensor* out) {
                         "received a %d dimension tensor.",
                         n_dim));
   for (int i = 0; i < n_dim; ++i)
-    PADDLE_ENFORCE_NE(dims[i],
-                      0,
-                      common::errors::InvalidArgument(
-                          "The size of Input(X) should not be 0."));
+    PADDLE_ENFORCE_GE(
+        dims[i],
+        0,
+        common::errors::InvalidArgument(
+            "The size of Input(X) should greater than or equal to 0."));
   PADDLE_ENFORCE_EQ(dims[n_dim - 2],
                     dims[n_dim - 1],
                     common::errors::InvalidArgument(
@@ -5950,7 +5953,7 @@ void WeightQuantizeInferMeta(const MetaTensor& x,
                              const int32_t group_size,
                              MetaTensor* out,
                              MetaTensor* scale) {
-#ifndef PADDLE_WITH_HIP
+#ifdef PADDLE_WITH_CUDA
   PADDLE_ENFORCE_EQ(
       ((arch == 70) || (arch == 75) || (arch == 80) || (arch == 86) ||
        (arch == 89) || (arch == 90)),

@@ -44,7 +44,7 @@ void Transpose(const Context& dev_ctx,
 
   // do not call TransposeStridedKernel, because some other kernels call
   // Transpose directly
-  if (x.initialized()) {
+  if (x.has_allocation()) {
     TransposeKernel<T, Context>(dev_ctx, x, axis, dense_out);
   }
 }

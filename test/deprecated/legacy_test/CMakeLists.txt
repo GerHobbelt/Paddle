@@ -75,9 +75,6 @@ if(NOT WITH_GPU)
 endif()
 
 list(REMOVE_ITEM TEST_OPS test_audio_logmel_feature test_audio_mel_feature)
-list(REMOVE_ITEM TEST_OPS test_fused_dot_product_attention_op)
-list(REMOVE_ITEM TEST_OPS test_fused_dot_product_attention_op_static)
-list(REMOVE_ITEM TEST_OPS test_fuse_dot_product_attention_pass)
 list(REMOVE_ITEM TEST_OPS test_fuse_gemm_epilogue_pass_deprecated)
 
 if(((NOT WITH_ROCM) AND (NOT WITH_GPU)) OR WIN32)
@@ -471,11 +468,6 @@ endif()
 foreach(TEST_OP ${TEST_OPS})
   py_test_modules(${TEST_OP} MODULES ${TEST_OP})
 endforeach()
-
-if((WITH_GPU) AND (WITH_CUDNN_FRONTEND))
-  py_test_modules(test_fused_dot_product_attention_op MODULES
-                  test_fused_dot_product_attention_op)
-endif()
 
 set_tests_properties(test_conv2d_api_deprecated PROPERTIES LABELS
                                                            "RUN_TYPE=EXCLUSIVE")

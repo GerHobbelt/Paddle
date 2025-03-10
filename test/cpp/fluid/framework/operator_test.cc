@@ -173,7 +173,7 @@ class OpKernelTestMultiInputsProtoAndCheckerMaker
   }
 };
 
-class CPUKernalMultiInputsTest : public OpKernel<float> {
+class CPUKernelMultiInputsTest : public OpKernel<float> {
  public:
   void Compute(const ExecutionContext& ctx) const {
     auto xs = ctx.InputNames("xs");
@@ -258,7 +258,7 @@ REGISTER_OP_WITHOUT_GRADIENT(
     paddle::framework::OpWithKernelTest,
     paddle::framework::OpKernelTestMultiInputsProtoAndCheckerMaker);
 REGISTER_OP_CPU_KERNEL(op_multi_inputs_with_kernel,
-                       paddle::framework::CPUKernalMultiInputsTest);
+                       paddle::framework::CPUKernelMultiInputsTest);
 
 // test with multi inputs
 TEST(OpKernel, multi_inputs) {
@@ -318,7 +318,7 @@ TEST(VarNameTest, all) {
 namespace paddle {
 namespace framework {
 
-class IndicateLoDTensorDataTypeTest : public OperatorWithKernel {
+class IndicateDenseTensorDataTypeTest : public OperatorWithKernel {
  public:
   using OperatorWithKernel::OperatorWithKernel;
 
@@ -332,7 +332,8 @@ class IndicateLoDTensorDataTypeTest : public OperatorWithKernel {
   }
 };
 
-class IndicateLoDTensorDataTypeTestProtoMaker : public OpProtoAndCheckerMaker {
+class IndicateDenseTensorDataTypeTestProtoMaker
+    : public OpProtoAndCheckerMaker {
  public:
   void Make() override {
     AddInput("phi::DenseTensor", "Input of phi::DenseTensor type Variable.");
@@ -393,8 +394,8 @@ class EmptyTestKernel : public OpKernel<T> {
 
 REGISTER_OP_WITHOUT_GRADIENT(
     indicate_lod_tensor_data_type_test,
-    paddle::framework::IndicateLoDTensorDataTypeTest,
-    paddle::framework::IndicateLoDTensorDataTypeTestProtoMaker);
+    paddle::framework::IndicateDenseTensorDataTypeTest,
+    paddle::framework::IndicateDenseTensorDataTypeTestProtoMaker);
 REGISTER_OP_WITHOUT_GRADIENT(
     indicate_selected_rows_data_type_test,
     paddle::framework::IndicateSelectedRowsDataTypeTest,

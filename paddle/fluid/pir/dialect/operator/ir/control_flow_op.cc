@@ -188,11 +188,9 @@ void IfOp::Print(pir::IrPrinter &printer) {
   auto &os = printer.os;
   auto op = operation();
   printer.PrintOpResult(*op);
-  os << " = \"" << name() << "\"";
-
-  if (VLOG_IS_ON(1)) {
-    os << " [id:" << op->id() << "]";
-  }
+  os << " = ";
+  printer.PrintOpName(*op);
+  printer.PrintOpId(*op);
 
   printer.PrintOpOperands(*op);
   printer.PrintAttributeMap(*op);

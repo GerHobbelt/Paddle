@@ -76,8 +76,7 @@ class TensorHookRemoveHelper:
                 return True
             else:
                 warnings.warn(
-                    "The backward hook (ID: %d) of Tensor `%s` you want to remove does not exist or has been removed."
-                    % (self._hook_id, tensor.name),
+                    f"The backward hook (ID: {self._hook_id}) of Tensor `{tensor.name}` you want to remove does not exist or has been removed.",
                     RuntimeWarning,
                 )
         return False
@@ -584,6 +583,36 @@ def monkey_patch_tensor():
         if device is None and dtype is None and blocking is None:
             return self
 
+        def is_cuda_place(place: PlaceLike):
+            return isinstance(place, core.CUDAPlace) or (
+                isinstance(place, Place) and place.is_gpu_place()
+            )
+
+        def get_device_id(place: PlaceLike):
+            if isinstance(
+                place,
+                (
+                    core.CUDAPlace,
+                    core.XPUPlace,
+                    core.IPUPlace,
+                    core.CustomPlace,
+                ),
+            ):
+                return place.get_device_id()
+            elif isinstance(place, Place):
+                if place.is_gpu_place():
+                    return place.gpu_device_id()
+                elif place.is_xpu_place():
+                    return place.xpu_device_id()
+                elif place.is_ipu_place():
+                    return place.ipu_device_id()
+                elif place.is_custom_place():
+                    return place.custom_device_id()
+            else:
+                raise ValueError(
+                    f"Invalid place: {place}, only support getting device id from CUDAPlace/XPUPlace/IPUPlace/CustomPlace"
+                )
+
         if device is not None:
             if isinstance(device, str):
                 device = paddle.device._convert_to_place(device)
@@ -618,7 +647,13 @@ def monkey_patch_tensor():
             if dtype is None:
                 dtype = t.dtype
             # 1. gpu place need to determine whether the memory is sufficient for allocation.
-            if t.place.is_gpu_place():
+            if t.place.is_gpu_place() and (
+                # NOTE: Only copy memory when place or device id is different,
+                # otherwise, it may frequently call GpuMemGetInfo in
+                # core.gpu_memory_available, leading to abnormal overhead.
+                not is_cuda_place(device)
+                or t.place.gpu_device_id() != get_device_id(device)
+            ):
                 proto_dtype = framework.convert_to_proto_type(dtype)
                 size_dtype = core.size_of_dtype(proto_dtype)
                 # Note(weilong wu): Paddle GPU minimum memory allocation unit is 256 bytes,

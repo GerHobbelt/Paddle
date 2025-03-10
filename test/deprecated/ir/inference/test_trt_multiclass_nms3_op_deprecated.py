@@ -118,9 +118,9 @@ def multiclass_nms(
             import paddle
             from ppdet.modeling import ops
             boxes = paddle.static.data(name='bboxes', shape=[81, 4],
-                                      dtype='float32', lod_level=1)
+                                      dtype='float32')
             scores = paddle.static.data(name='scores', shape=[81],
-                                      dtype='float32', lod_level=1)
+                                      dtype='float32')
             out, index = ops.multiclass_nms(bboxes=boxes,
                                             scores=scores,
                                             background_label=0,

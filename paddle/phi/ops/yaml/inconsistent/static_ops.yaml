@@ -15,6 +15,7 @@
   inplace : (x -> out)
   backward : add_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface, paddle::dialect::LayoutTransformationInterface
+  traits : pir::BinaryElementWiseTrait
 
 # this add_n is only for ops_api_gen.py and onednn
 - op : add_n
@@ -64,12 +65,6 @@
     data_type : dtype
   interfaces : paddle::dialect::InferSymbolicShapeInterface
   traits : paddle::dialect::ForwardOnlyTrait
-
-- op : barrier
-  args : (Tensor x, int ring_id=0)
-  output : Tensor(out)
-  kernel :
-    func : barrier
 
 - op : batch_norm
   args : (Tensor x, Tensor mean, Tensor variance, Tensor scale, Tensor bias, bool is_test, float momentum, float epsilon, str data_format, bool use_global_stats, bool trainable_statistics)
@@ -244,6 +239,7 @@
     support_trans_dtype : x, y
   backward : divide_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+  traits : pir::BinaryElementWiseTrait
 
 - op : einsum
   args : (Tensor[] x, str equation)
@@ -268,6 +264,7 @@
     support_trans_dtype : x, y
   backward : elementwise_pow_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+  traits : pir::BinaryElementWiseTrait
 
 - op : embedding
   args : (Tensor x, Tensor weight, int64_t padding_idx=-1, bool sparse=false)
@@ -314,7 +311,7 @@
   data_transform :
     support_trans_dtype : x, y
   inplace: (x -> out)
-  traits : paddle::dialect::ForwardOnlyTrait
+  traits : paddle::dialect::ForwardOnlyTrait, pir::BinaryElementWiseTrait
   interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : fused_adam_
@@ -569,7 +566,7 @@
     func : matmul_with_flatten
     data_type : x
   backward : matmul_with_flatten_grad
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : maximum
   args : (Tensor x, Tensor y)
@@ -583,6 +580,7 @@
     support_trans_dtype : x, y
   backward : maximum_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+  traits : pir::BinaryElementWiseTrait
 
 - op : memcpy
   args : (Tensor x, int dst_place_type)
@@ -631,6 +629,7 @@
     support_trans_dtype : x, y
   backward : multiply_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface, paddle::dialect::LayoutTransformationInterface
+  traits : pir::BinaryElementWiseTrait
 
 - op : nop
   args : (Tensor x)
@@ -641,7 +640,7 @@
     func : nop
   inplace: (x -> out)
   interfaces : paddle::dialect::ParseKernelKeyInterface
-  traits : pir::SideEffectTrait, paddle::dialect::ForwardOnlyTrait
+  traits : pir::SideEffectTrait, paddle::dialect::ForwardOnlyTrait, pir::BinaryElementWiseTrait
 
 - op : not_equal
   args : (Tensor x, Tensor y)
@@ -783,6 +782,7 @@
   inplace : (x -> out)
   interfaces : paddle::dialect::InferSymbolicShapeInterface
   backward: remainder_grad
+  traits : pir::BinaryElementWiseTrait
 
 - op : row_conv
   args : (Tensor x, Tensor filter)
@@ -957,6 +957,7 @@
     support_trans_dtype : x, y
   backward : subtract_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+  traits : pir::BinaryElementWiseTrait
 
 - op : sync_comm_stream
   args : (Tensor[] x, int ring_id = 0)
@@ -1003,9 +1004,11 @@
   infer_meta:
     func : CSoftmaxWithCrossEntropyInferMeta
     spmd_rule : CSoftmaxWithCrossEntropyInferSpmd
+    param: [logits, label, ignore_index, rank, nranks]
   kernel:
     func: c_softmax_with_cross_entropy
     data_type : logits
+    param: [logits, label, ignore_index, rank, nranks]
   backward: c_softmax_with_cross_entropy_grad
 
 - op: faster_tokenizer

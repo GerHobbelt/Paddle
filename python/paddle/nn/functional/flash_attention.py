@@ -104,20 +104,14 @@ def can_use_flash_attn(query, key, attn_mask, dropout, is_causal) -> bool:
     # sdpa flash check
     # step1 check tensor place on cuda
     # step2 check tensor shape, flash attn only support shape == 4
-    # step3 check attn_mask, some diff with torch version
-    # step4 check head_dim <= 256
-    # step5 check arch_info > sm80
+    # step3 check head_dim <= 256
+    # step4 check arch_info > sm80
     # step5 check specify sm head dim constraint
     # step6 check causal qk
     # step7 check sm dtype support
     if "gpu" not in paddle.get_device():
         return False
     if query.ndim != 4:
-        return False
-    if attn_mask is not None and attn_mask.dtype not in [
-        paddle.bool,
-        paddle.float32,
-    ]:
         return False
     if query.shape[-1] >= 256:
         return False
@@ -1204,16 +1198,15 @@ def scaled_dot_product_attention(
             >>> # doctest: -SKIP
     """
 
-    head_dim = query.shape[3]
-    sdp_func_name = _select_sdp_for_sdpa(
-        query, key, attn_mask, dropout_p, is_causal
-    )
-
     if attn_mask is None:
         # downgraded to ordinary flash attention implementation
         out, _ = flash_attention(query, key, value, dropout_p, is_causal)
         return out
     else:
+        head_dim = query.shape[3]
+        sdp_func_name = _select_sdp_for_sdpa(
+            query, key, attn_mask, dropout_p, is_causal
+        )
         if sdp_func_name == "flash_attn":
             if in_dynamic_or_pir_mode():
                 fixed_seed_offset = None

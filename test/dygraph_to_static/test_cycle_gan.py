@@ -207,7 +207,7 @@ class build_generator_resnet_9blocks(paddle.nn.Layer):
         dim = 128
         for i in range(9):
             Build_Resnet_Block = self.add_sublayer(
-                "generator_%d" % (i + 1), build_resnet_block(dim)
+                f"generator_{i + 1}", build_resnet_block(dim)
             )
             self.build_resnet_block_list.append(Build_Resnet_Block)
         self.deconv0 = DeConv2D(

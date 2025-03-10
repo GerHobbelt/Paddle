@@ -24,3 +24,7 @@ add_subdirectory(cpu)
 if(WITH_ROCM)
   add_subdirectory(hip)
 endif()
+
+if(CINN_WITH_SYCL)
+  add_subdirectory(sycl)
+endif()

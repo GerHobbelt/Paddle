@@ -39,13 +39,3 @@ namespace ops = paddle::operators;
 REGISTER_OP_WITHOUT_GRADIENT(c_reduce_sum,
                              ops::CReduceOp,
                              ops::CReduceSumOpMaker);
-
-PD_REGISTER_STRUCT_KERNEL(c_reduce_sum,
-                          CPU,
-                          ALL_LAYOUT,
-                          ops::CReduceSumCPUKernel,
-                          float,
-                          double,
-                          int,
-                          int64_t,
-                          phi::dtype::float16) {}

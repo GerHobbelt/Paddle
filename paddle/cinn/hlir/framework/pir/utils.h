@@ -114,6 +114,9 @@ struct CompatibleInfo {
 std::vector<int64_t> GetBroadcastAxis(const ::common::DDim& in_shape,
                                       const std::vector<int64_t>& out_shape);
 
+std::vector<::pir::Value> GetBlockOutsideInput(
+    const std::vector<::pir::Operation*>& op_list);
+
 class PrettyNamer {
  public:
   const std::string& GetOrNew(::pir::Value hash_key,

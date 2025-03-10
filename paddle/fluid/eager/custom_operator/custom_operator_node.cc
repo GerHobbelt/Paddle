@@ -268,10 +268,11 @@ RunCustomOpNode::operator()(paddle::small_vector<std::vector<paddle::Tensor>,
                 grad_outputs_names.at(i)) ||
                 out_tensor->is_dist_tensor(),
             common::errors::InvalidArgument(
-                "Custom grad operator's %d-th output is not initialized. "
+                "Custom grad operator[%s]'s %d-th output is not initialized. "
                 "Please check your implementation again. If you are "
                 "using inplace optional outputs, then you must use "
                 "`paddle::Optional` to decorate this output",
+                op_type_,
                 i));
         // We can also consider using `autograd_meta` to tolerant nullptr.
         out_tensor->set_autograd_meta(std::make_shared<egr::AutogradMeta>());

@@ -535,7 +535,7 @@ __global__ void GridSampler3DCudaBackwardKernel(const int nthreads,
       auto iy_nearest = static_cast<int>(std::round(iy));
       auto iz_nearest = static_cast<int>(std::round(iz));
 
-      // assign nearest neighor pixel value to output pixel
+      // assign nearest neighbor pixel value to output pixel
       int gOut_offset = n * gOut_sN + d * gOut_sD + h * gOut_sH + w * gOut_sW;
       T* gInp_ptr_NC = grad_input + n * inp_sN;
       for (int c = 0; c < out_c;

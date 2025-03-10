@@ -41,6 +41,12 @@ COMMON_DECLARE_uint64(initial_gpu_memory_in_mb);
 COMMON_DECLARE_bool(use_cinn);
 #endif
 
+#ifdef PADDLE_WITH_OPENVINO
+#include "oneapi/tbb.h"
+#include "openvino/frontend/manager.hpp"
+#include "openvino/openvino.hpp"
+#endif
+
 COMMON_DECLARE_bool(enable_pir_api);
 namespace paddle {
 
@@ -495,6 +501,11 @@ AnalysisConfig::AnalysisConfig(const AnalysisConfig &other) {
   CP_MEMBER(enable_low_precision_io_);
 
   CP_MEMBER(enable_memory_optim_);
+#ifdef PADDLE_WITH_OPENVINO
+  // Openvino related.
+  CP_MEMBER(use_openvino_);
+  CP_MEMBER(openvino_inference_precision_);
+#endif
   // TensorRT related.
   CP_MEMBER(use_tensorrt_);
   CP_MEMBER(tensorrt_workspace_size_);
@@ -723,6 +734,25 @@ void AnalysisConfig::EnableMkldnnInt8(
 #endif
 
   Update();
+}
+
+void AnalysisConfig::EnableOpenVINOEngine(Precision inference_precision) {
+#ifdef PADDLE_WITH_OPENVINO
+  use_openvino_ = true;
+  openvino_inference_precision_ = inference_precision;
+  Update();
+#else
+  PADDLE_THROW(common::errors::PreconditionNotMet(
+      "To use Paddle-OpenVINO, please compile with OpenVINO first."));
+#endif
+}
+
+bool AnalysisConfig::openvino_engine_enabled() const {
+#ifdef PADDLE_WITH_OPENVINO
+  return use_openvino_;
+#else
+  return false;
+#endif
 }
 
 void AnalysisConfig::EnableTensorRtEngine(int64_t workspace_size,
@@ -955,7 +985,14 @@ void AnalysisConfig::Update() {
     pass_builder()->DisableMKLDNN();
   }
 #endif
-
+#ifdef PADDLE_WITH_OPENVINO
+  if (use_openvino_) {
+    pass_builder()->ClearPasses();
+    for (const auto &pass : kOVSubgraphPasses) {
+      pass_builder()->AppendPass(pass);
+    }
+  }
+#endif
   if (use_tensorrt_) {
     pass_builder()->ClearPasses();
     for (const auto &pass : kTRTSubgraphPasses) {
@@ -1271,13 +1308,17 @@ std::string AnalysisConfig::Summary() {
     os.InsertRow({"model_from_memory", params_file_});
   }
   os.InsetDivider();
-
   // cpu info
   os.InsertRow(
       {"cpu_math_thread", std::to_string(cpu_math_library_num_threads_)});
   os.InsertRow({"enable_mkldnn", use_mkldnn_ ? "true" : "false"});
   os.InsertRow(
       {"mkldnn_cache_capacity", std::to_string(mkldnn_cache_capacity_)});
+#ifdef PADDLE_WITH_OPENVINO
+  os.InsertRow({"use_openvino", use_openvino_ ? "true" : "false"});
+  os.InsertRow({"openvino_inference_precision",
+                inference::Precision2String(openvino_inference_precision_)});
+#endif
   os.InsetDivider();
 
   // gpu info

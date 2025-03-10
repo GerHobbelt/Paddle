@@ -233,10 +233,14 @@ static phi::DataType TRT2PaddleDataType(nvinfer1::DataType type) {
       return phi::DataType::FLOAT16;
     case nvinfer1::DataType::kINT8:
       return phi::DataType::INT8;
-#if IS_TRT_VERSION_GE(7000)
+#if IS_TRT_VERSION_GE(9000)
+    case nvinfer1::DataType::kINT64:
+      VLOG(4) << "get nvinfer1::DataType::kINT64 from TRT op, and will output "
+                 "to paddle. Does the downstream paddle op here support int64?";
+      return phi::DataType::INT64;
+#endif
     case nvinfer1::DataType::kBOOL:
       return phi::DataType::BOOL;
-#endif
     default:
       PADDLE_THROW(common::errors::InvalidArgument(
           "unknown fluid datatype in Fluid op converter"));
@@ -482,12 +486,11 @@ void TensorRTEngineInstruction::BindInputTensor(
                         "index=%d >= total inputs and outputs=%d",
                         bind_index,
                         num_bindings));
-
-#if IS_TRT_VERSION_GE(6000)
 #if IS_TRT_VERSION_GE(8500)
   if (trt_engine_->engine()->isShapeInferenceIO(input_name.c_str()) &&
       trt_engine_->engine()->getTensorIOMode(input_name.c_str()) ==
           nvinfer1::TensorIOMode::kINPUT) {
+    shape_v.resize(input_tensor.numel());
     if (input_tensor.dtype() == phi::DataType::INT32) {
       phi::memory_utils::Copy(phi::CPUPlace(),
                               shape_v.data(),
@@ -519,41 +522,12 @@ void TensorRTEngineInstruction::BindInputTensor(
         paddle::platform::Vec2TRT_Dims(input_shape, input_name, true));
   }
 #else
-  trt_context->setBindingDimensions(
-      bind_index,
-      paddle::platform::Vec2TRT_Dims(input_shape, input_name, true));
-  // If this x is a shape tensor, we need call setInputShapeBinding
-  if (trt_engine_->engine()->isShapeBinding(bind_index) &&
-      trt_engine_->engine()->bindingIsInput(bind_index)) {
-    if (input_tensor.dtype() == phi::DataType::INT32) {
-      phi::memory_utils::Copy(phi::CPUPlace(),
-                              shape_v.data(),
-                              input_tensor.place(),
-                              input_tensor.data<int32_t>(),
-                              input_tensor.numel() * sizeof(int),
-                              nullptr);
-    } else if (input_tensor.dtype() == phi::DataType::INT64) {
-      std::string x_t = input_name + "_cast_to_INT32";
-      if (scope.FindVar(x_t) == nullptr) {
-        const_cast<framework::Scope *>(&scope)->Var(x_t);
-      }
-      auto int32_tensor = scope.FindVar(x_t)->GetMutable<phi::DenseTensor>();
-      *int32_tensor = phi::Cast<int64_t>(
-          reinterpret_cast<const phi::GPUContext &>(*dev_ctx_),
-          input_tensor,
-          phi::DataType::INT32);
-      phi::memory_utils::Copy(phi::CPUPlace(),
-                              shape_v.data(),
-                              int32_tensor->place(),
-                              int32_tensor->data<int32_t>(),
-                              int32_tensor->numel() * sizeof(int),
-                              nullptr);
-    }
-    trt_context->setInputShapeBinding(bind_index, shape_v.data());
-  }
+  PADDLE_THROW(
+      common::errors::Unimplemented("PIR-TRT only support TensorRT "
+                                    "version that is >= 8.5,"
+                                    "Please check your TensorRT "
+                                    "in your env."));
 #endif
-#endif
-
   *runtime_batch = input_shape[0];
   VLOG(1) << "trt input [" << input_name << "] dtype is "
           << input_tensor.dtype();
@@ -604,11 +578,10 @@ void TensorRTEngineInstruction::BindInputTensor(
   } else if (input_tensor.dtype() == phi::DataType::FLOAT16) {
     buffers[bind_index] = static_cast<void *>(
         const_cast<float16 *>(input_tensor.data<float16>()));
-#if IS_TRT_VERSION_GE(8400)
   } else if (input_tensor.dtype() == phi::DataType::BOOL) {
     buffers[bind_index] =
         static_cast<void *>(const_cast<bool *>(input_tensor.data<bool>()));
-#endif
+
   } else {
     PADDLE_THROW(common::errors::Fatal(
         "The TRT Engine OP only support "
@@ -662,18 +635,12 @@ void TensorRTEngineInstruction::BindOutputTensor(
     ddim.push_back(dims.d[i]);
   }
 #else
-  auto dims = trt_context->getBindingDimensions(bind_index);
-  int nb_dims = dims.nbDims;
-  for (; nb_dims > 0; nb_dims--) {
-    // some 'x 1' of shape is normal, no need to remove it
-    if (dims.d[nb_dims - 1] != 1 || nb_dims == outputs_rank_[output_index])
-      break;
-  }
-  for (int i = 0; i < nb_dims; i++) {
-    ddim.push_back(dims.d[i]);
-  }
+  PADDLE_THROW(
+      common::errors::Unimplemented("PIR-TRT only support TensorRT "
+                                    "version that is >= 8.5,"
+                                    "Please check your TensorRT "
+                                    "in your env."));
 #endif
-
   auto *fluid_t = output_tensor;
   fluid_t->Resize(common::make_ddim(ddim));
   PADDLE_ENFORCE_LT(bind_index,
@@ -715,14 +682,13 @@ void TensorRTEngineInstruction::RunTrt() {
                               "can not find var[%s] in scope", in_var_name));
   auto in_var = scope.FindVar(in_var_name);
   auto &in_variable_array = in_var->Get<VariableRefArray>();
+  // we will use shape_input when input is a shape tensor
   std::vector<std::vector<int>> shape_inputs(in_variable_array.size());
 
   for (const auto &index_name_pair : input_names_) {
     size_t i = index_name_pair.first;
     if (in_variable_array[i]->IsType<phi::DenseTensor>()) {
       auto input_tensor = in_variable_array[i]->Get<phi::DenseTensor>();
-      // we will use shape_input when input is a shape tensor
-      shape_inputs[i].resize(input_tensor.numel());
       // Bind input tensor to TRT.
       BindInputTensor(index_name_pair.second,
                       input_tensor,
@@ -812,6 +778,13 @@ void TensorRTEngineInstruction::RunTrt() {
 }
 
 void TensorRTEngineInstruction::Run() {
+#if IS_TRT_VERSION_LT(8500)
+  PADDLE_THROW(
+      common::errors::Unimplemented("PIR-TRT only support TensorRT "
+                                    "version that is >= 8.5,"
+                                    "Please check your TensorRT "
+                                    "in your env."));
+#endif
   PrepareDynamicShape();
   RunTrt();
 }

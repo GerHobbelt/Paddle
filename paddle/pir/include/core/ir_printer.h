@@ -64,6 +64,10 @@ class IR_API IrPrinter : public BasicIrPrinter {
 
   void PrintAttributeMap(const Operation& op);
 
+  void PrintOpName(const Operation& op);
+
+  void PrintOpId(const Operation& op);
+
   void PrintOpOperands(const Operation& op);
 
   void PrintOperandsType(const Operation& op);

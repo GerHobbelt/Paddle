@@ -110,7 +110,7 @@ WhileInstruction::WhileInstruction(
       outputs.emplace(value, outputs_id);
     }
   }
-  InsertTuplePushContinerToOuts(body_block_, *parent_exe_info, &outputs);
+  InsertTuplePushContainerToOuts(body_block_, *parent_exe_info, &outputs);
   InsertInplacedExternalInputsToOuts(
       body_block_, body_outside_inputs, *parent_exe_info, &outputs);
   SetOutputs(outputs);

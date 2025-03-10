@@ -420,7 +420,7 @@ Json AttrTypeWriter::WriteBuiltInAttr(const pir::Attribute& attr) {
   } else {
     PADDLE_ENFORCE(false,
                    common::errors::InvalidArgument(
-                       "Unknown Attr %s when write Buitin dialect attr"));
+                       "Unknown Attr %s when write Builtin dialect attr"));
   }
   return attr_json;
 }

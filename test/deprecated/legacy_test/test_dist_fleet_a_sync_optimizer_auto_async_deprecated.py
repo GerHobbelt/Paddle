@@ -50,7 +50,6 @@ class TestFleetGradientMergeMetaOptimizer(unittest.TestCase):
             name="x",
             shape=[-1, 1],
             dtype="int64",
-            lod_level=1,
         )
         x_embedding = paddle.static.nn.embedding(
             is_distributed=False,

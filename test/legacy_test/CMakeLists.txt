@@ -5,6 +5,7 @@ file(
 string(REPLACE ".py" "" TEST_OPS "${TEST_OPS}")
 set(GC_ENVS FLAGS_eager_delete_tensor_gb=0.0 FLAGS_fast_eager_deletion_mode=1
             FLAGS_memory_fraction_of_eager_deletion=1.0)
+set(deterministic_ENVS FLAGS_cudnn_deterministic=1)
 set(dist_ENVS http_proxy="" https_proxy="")
 
 file(
@@ -592,8 +593,9 @@ if(WITH_ROCM)
 endif()
 
 if((WITH_GPU) AND (WITH_CUDNN_FRONTEND))
-  py_test_modules(test_fused_dot_product_attention_op MODULES
-                  test_fused_dot_product_attention_op)
+  py_test_modules(
+    test_fused_dot_product_attention_op MODULES
+    test_fused_dot_product_attention_op ENVS ${deterministic_ENVS})
 endif()
 
 set_tests_properties(test_norm_nn_grad PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE")
@@ -1174,3 +1176,4 @@ set_tests_properties(test_inplace_softmax_with_cross_entropy PROPERTIES TIMEOUT
 set_tests_properties(test_imperative_selected_rows_to_lod_tensor
                      PROPERTIES TIMEOUT 200)
 set_tests_properties(test_slice_op PROPERTIES TIMEOUT 120)
+set_tests_properties(test_load_state_dict_from_url PROPERTIES TIMEOUT 40)

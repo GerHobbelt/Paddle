@@ -74,6 +74,7 @@ class TestDtypeReconstruct(TestCaseBase):
 
 
 class TestDtypeGuard(TestCaseBase):
+    @test_with_faster_guard
     def test_dtype_guard(self):
         dtype_map = {paddle.float32: paddle.float64}
         x = paddle.ones([2, 3], dtype="float32")

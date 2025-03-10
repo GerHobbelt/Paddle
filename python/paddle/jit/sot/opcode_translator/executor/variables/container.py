@@ -19,10 +19,16 @@ from collections import OrderedDict
 from functools import reduce
 from typing import TYPE_CHECKING, Any
 
+import paddle
+
 from ....utils import ConstTypes
 from ....utils.exceptions import FallbackError, InnerError
 from ..dispatcher import Dispatcher
-from ..guard import StringifiedExpression, check_guard
+from ..guard import (
+    FasterStringifiedExpression,
+    StringifiedExpression,
+    check_guard,
+)
 from ..mutable_data import MutableDictLikeData, MutableListLikeData
 from ..tracker import (
     ConstTracker,
@@ -74,13 +80,23 @@ class ContainerVariable(VariableBase):
     def make_stringified_guard(self) -> list[StringifiedExpression]:
         frame_value_tracer = self.tracker.trace_value_from_frame()
 
-        type_guard = StringifiedExpression(
-            f"isinstance({{}}, {self.get_py_type().__name__})",
-            [frame_value_tracer],
-            frame_value_tracer.free_vars,
-        )
-        len_guard = StringifiedExpression(
+        if self.get_py_type() is dict:
+            type_guard = FasterStringifiedExpression(
+                f"isinstance({{}}, {self.get_py_type().__name__})",
+                paddle.framework.core.InstanceCheckGuard(self.get_py_type()),
+                [frame_value_tracer],
+                frame_value_tracer.free_vars,
+            )
+        else:
+            type_guard = FasterStringifiedExpression(
+                f"id(type({{}})) == {id(self.get_py_type())}",
+                paddle.framework.core.TypeMatchGuard(self.get_py_type()),
+                [frame_value_tracer],
+                frame_value_tracer.free_vars,
+            )
+        len_guard = FasterStringifiedExpression(
             f"len({{}}) == {len(self.init_value)}",
+            paddle.framework.core.LengthMatchGuard(len(self.init_value)),
             [frame_value_tracer],
             frame_value_tracer.free_vars,
         )

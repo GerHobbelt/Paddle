@@ -281,7 +281,7 @@ class FileReader:
         return self.getFileName("dcgm", groupId, gpuId, tmpPath)
 
     def getFileName(self, name, groupId, gpuId, tmpPath="./tmp"):
-        return os.path.join(tmpPath, "%s_%d_%d.json" % (name, groupId, gpuId))
+        return os.path.join(tmpPath, f"{name}_{groupId}_{gpuId}.json")
 
     def getOpInfoDict(self, groupId, gpuId, tmpPath="./tmp"):
         return self.getDict("opinfo", groupId, gpuId, tmpPath)
@@ -292,7 +292,7 @@ class FileReader:
     def getDict(self, name, groupId, gpuId, tmpPath="./tmp"):
         fileName = self.getFileName(name, groupId, gpuId, tmpPath)
         if not os.path.isfile(fileName):
-            raise OSError(f"[{fileName}] is not existed!")
+            raise OSError(f"[{fileName}] does not existed!")
 
         data = {}
         with open(fileName, "r") as rf:

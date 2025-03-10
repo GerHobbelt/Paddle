@@ -504,6 +504,35 @@ def dispatch_list_ne(lhs: ListVariable, rhs: ListVariable):
     return Dispatcher.call(operator.eq, lhs, rhs).bool_not()
 
 
+BUILTIN_EQ_DISPATCH_TYPES = [
+    "ListVariable",
+    "TupleVariable",
+    "DictVariable",
+    "ConstantVariable",
+]
+
+for i in range(len(BUILTIN_EQ_DISPATCH_TYPES)):
+    current_type = BUILTIN_EQ_DISPATCH_TYPES[i]
+    other_types = (
+        BUILTIN_EQ_DISPATCH_TYPES[:i] + BUILTIN_EQ_DISPATCH_TYPES[i + 1 :]
+    )
+    Dispatcher.register(
+        operator.eq,
+        (current_type, " | ".join(other_types)),
+        lambda var, other: ConstantVariable(
+            False, var.graph, DummyTracker([var, other])
+        ),
+    )
+
+    Dispatcher.register(
+        operator.ne,
+        (current_type, " | ".join(other_types)),
+        lambda var, other: ConstantVariable(
+            True, var.graph, DummyTracker([var, other])
+        ),
+    )
+
+
 # getattr
 Dispatcher.register(
     getattr,

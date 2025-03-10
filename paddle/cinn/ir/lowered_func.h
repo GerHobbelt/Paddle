@@ -19,6 +19,7 @@
 
 #include "paddle/cinn/ir/buffer.h"
 #include "paddle/cinn/ir/ir_base.h"
+#include "paddle/cinn/ir/stmt.h"
 
 namespace cinn {
 namespace ir {
@@ -159,8 +160,10 @@ struct _LoweredFunc_ : public IrNode {
   //! This number doesn't include temp_spaces.
   int num_output_tensors;
 
+  // TODO(Hongqing-work): remove expr body after update all the backend passes.
   //! Body of this function.
   Expr body;
+  stmt::BlockRef body_block;
 
   DeviceAPI device_api{DeviceAPI::UNK};
 

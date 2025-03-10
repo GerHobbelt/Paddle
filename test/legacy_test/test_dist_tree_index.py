@@ -28,19 +28,13 @@ paddle.enable_static()
 
 def create_feeds():
     user_input = paddle.static.data(
-        name="item_id", shape=[-1, 1], dtype="int64", lod_level=1
+        name="item_id", shape=[-1, 1], dtype="int64"
     )
 
-    item = paddle.static.data(
-        name="unit_id", shape=[-1, 1], dtype="int64", lod_level=1
-    )
+    item = paddle.static.data(name="unit_id", shape=[-1, 1], dtype="int64")
 
-    label = paddle.static.data(
-        name="label", shape=[-1, 1], dtype="int64", lod_level=1
-    )
-    labels = paddle.static.data(
-        name="labels", shape=[-1, 1], dtype="int64", lod_level=1
-    )
+    label = paddle.static.data(name="label", shape=[-1, 1], dtype="int64")
+    labels = paddle.static.data(name="labels", shape=[-1, 1], dtype="int64")
 
     feed_list = [user_input, item, label, labels]
     return feed_list

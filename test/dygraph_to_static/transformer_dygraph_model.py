@@ -51,7 +51,7 @@ class PrePostProcessLayer(Layer):
             elif cmd == "n":  # add layer normalization
                 self.functors.append(
                     self.add_sublayer(
-                        "layer_norm_%d" % len(list(self.children())),
+                        f"layer_norm_{len(list(self.children()))}",
                         paddle.nn.LayerNorm(
                             normalized_shape=d_model,
                             weight_attr=base.ParamAttr(
@@ -252,7 +252,7 @@ class Encoder(Layer):
         for i in range(n_layer):
             self.encoder_layers.append(
                 self.add_sublayer(
-                    "layer_%d" % i,
+                    f"layer_{i}",
                     EncoderLayer(
                         n_head,
                         d_key,
@@ -446,7 +446,7 @@ class Decoder(Layer):
         for i in range(n_layer):
             self.decoder_layers.append(
                 self.add_sublayer(
-                    "layer_%d" % i,
+                    f"layer_{i}",
                     DecoderLayer(
                         n_head,
                         d_key,

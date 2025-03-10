@@ -297,8 +297,7 @@ def parse_index(x, indices):
                 # the unpack size would cause error.
                 # We raises IndexError here to support grammar like `a, b = var`
                 raise IndexError(
-                    "slice_item %d at dim %d should be >= 0 and < x.shape[%d]: %d"
-                    % (slice_item, dim, dim, x.shape[dim])
+                    f"slice_item {slice_item} at dim {dim} should be >= 0 and < x.shape[{dim}]: {x.shape[dim]}"
                 )
             # not calculate result to reduce call times for slice OP.
             decrease_axes.append(dim)
@@ -765,16 +764,7 @@ def get_tensor_with_basic_indexing(
                 stride = attrs['strides']
             if use_strided_slice:
                 # TODO(zoooo0820): support strided_slice_array until PIR API is ready
-                if in_pir_mode():
-                    if isinstance(st, (list, tuple)):
-                        if paddle.utils._contain_var(st):
-                            st = paddle.utils.get_int_tensor_list(st)
-                    if isinstance(end, (list, tuple)):
-                        if paddle.utils._contain_var(end):
-                            end = paddle.utils.get_int_tensor_list(end)
-                    if isinstance(stride, (list, tuple)):
-                        if paddle.utils._contain_var(stride):
-                            stride = paddle.utils.get_int_tensor_list(stride)
+
                 out = paddle._C_ops.strided_slice(x, axes, st, end, stride)
                 if len(decrease_axes) > 0:
                     out = paddle._C_ops.squeeze(out, decrease_axes)

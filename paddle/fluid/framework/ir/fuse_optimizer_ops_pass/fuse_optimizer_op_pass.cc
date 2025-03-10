@@ -44,7 +44,7 @@ void FuseOptimizerOpPass::ApplyImpl(ir::Graph *graph) const {
               "The %s operator has multiple gradient input. Expected "
               "it to only have one gradient input.",
               fuse_op_type));
-      if (IsLoDTensorType(GetTypeOfVar(vars_info, grad_name[0]))) {
+      if (IsDenseTensorType(GetTypeOfVar(vars_info, grad_name[0]))) {
         opt_nodes.emplace_back(node);
       }
       ++opt_ops_num;
@@ -398,7 +398,7 @@ void FuseOptimizerOpPass::FuseGradientsToContinuousSpace(
         iter->second.front()->Var(),
         common::errors::InvalidArgument("The gradient var(%s) node is null.",
                                         grad_var_name));
-    PADDLE_ENFORCE_EQ(IsLoDTensorType(iter->second.front()->Var()->GetType()),
+    PADDLE_ENFORCE_EQ(IsDenseTensorType(iter->second.front()->Var()->GetType()),
                       true,
                       common::errors::InvalidArgument(
                           "Currently the gradient(%s) type only should be "
@@ -432,7 +432,7 @@ FuseOptimizerOpPass::GetVarInfo(const Graph &result) const {
   return vars;
 }
 
-bool FuseOptimizerOpPass::IsLoDTensorType(
+bool FuseOptimizerOpPass::IsDenseTensorType(
     const proto::VarType::Type &type) const {
   // Current only support DENSE_TENSOR.
   return type == proto::VarType::DENSE_TENSOR;

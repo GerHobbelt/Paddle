@@ -732,10 +732,11 @@ PyObject* eager_api_run_custom_op(PyObject* self,
               paddle::framework::detail::IsOptionalVar(outputs.at(i)) ||
                   out_tensor->is_dist_tensor(),
               common::errors::InvalidArgument(
-                  "Custom operator's %d-th output is not initialized. "
+                  "Custom operator[%s]'s %d-th output is not initialized. "
                   "Please check your implementation again. If you are "
                   "using inplace optional output, then you must use "
                   "`paddle::Optional` to decorate this output",
+                  op_type,
                   i));
           // We can also consider using `autograd_meta` to tolerant nullptr.
           out_tensor->set_autograd_meta(std::make_shared<egr::AutogradMeta>());

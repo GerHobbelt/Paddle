@@ -36,6 +36,7 @@ from ....utils import (
     is_break_graph_api,
     is_break_graph_tensor_methods,
     is_builtin_fn,
+    is_directly_run_api,
     is_not_supported_paddle_layer,
     is_paddle_api,
     magic_method_builtin_dispatch,
@@ -698,6 +699,22 @@ class BuiltinVariable(FunctionVariable):
                     false_fn=lambda x: x,
                 )
                 return handler(*args, **kwargs)
+
+        # If API can be directly called in simulation mode (e.g. user defined native code
+        # without graph affect), we can directly call it.
+        if is_directly_run_api(self.value):
+            from ..function_graph import convert_to_py_value
+
+            res = self.value(
+                *convert_to_py_value(args),
+                **convert_to_py_value(kwargs),
+            )
+
+            return VariableFactory.from_value(
+                res,
+                self.graph,
+                DummyTracker([self, *list(args), *list(kwargs.values())]),
+            )
 
         # Try to inline call the magic function
         magic_methods = magic_method_builtin_dispatch(self.value)

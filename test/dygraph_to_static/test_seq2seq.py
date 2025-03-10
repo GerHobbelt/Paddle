@@ -105,15 +105,11 @@ def train(args, attn_model=False):
             batch_times.append(batch_time)
             if batch_id % PRINT_STEP == 0:
                 print(
-                    "Batch:[%d]; Time: %.5f s; loss: %.5f; total_loss: %.5f; word num: %.5f; ppl: %.5f"
-                    % (
-                        batch_id,
-                        batch_time,
-                        loss.numpy(),
-                        total_loss.numpy(),
-                        word_count,
-                        np.exp(total_loss.numpy() / word_count),
-                    )
+                    f"Batch:[{batch_id}]; Time: {batch_time:.5f}s; "
+                    f"loss: {loss.numpy():.5f}; "
+                    f"total_loss: {total_loss.numpy():.5f}; "
+                    f"word num: {word_count:.5f}; "
+                    f"ppl: {np.exp(total_loss.numpy() / word_count):.5f}"
                 )
 
             if attn_model:

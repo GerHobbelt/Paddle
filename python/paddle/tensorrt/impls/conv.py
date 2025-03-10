@@ -18,7 +18,7 @@ from paddle.tensorrt.register import converter_registry
 
 
 @converter_registry.register("pd_op.depthwise_conv2d", trt_version="8.x")
-@converter_registry.register("pd_op.conv2d", trt_version="8.x")
+@converter_registry.register("pd_op.conv2d", trt_version="trt_version_ge=8.0")
 @converter_registry.register("pd_op.conv2d_transpose", trt_version="8.x")
 @converter_registry.register(
     "pd_op.depthwise_conv2d_transpose", trt_version="8.x"

@@ -466,7 +466,7 @@ def summary_string(model, input_size=None, dtypes=None, input=None):
             except:
                 layer_idx = len(summary)
 
-            m_key = "%s-%i" % (class_name, layer_idx + 1)
+            m_key = f"{class_name}-{layer_idx + 1}"
             summary[m_key] = OrderedDict()
 
             try:

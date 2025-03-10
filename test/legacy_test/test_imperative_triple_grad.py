@@ -227,7 +227,7 @@ class TestDygraphTripleGrad(TestCase):
         self.func_example_with_gradient_and_create_graph()
 
 
-class TestDygraphTripleGradBradcastCase(TestCase):
+class TestDygraphTripleGradBroadcastCase(TestCase):
     def setUp(self):
         self.sort_sum_gradient = False
         self.x_shape = [3, 2, 2]

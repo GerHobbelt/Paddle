@@ -431,7 +431,7 @@ def _pickle_save(obj, f, protocol):
 
         return (tuple, ((name, data),))
 
-    def reduce_LoDTensor(self):
+    def reduce_DenseTensor(self):
         p = core.Place()
         p.set_place(paddle.CPUPlace())
         if self._place().is_custom_place():
@@ -462,7 +462,7 @@ def _pickle_save(obj, f, protocol):
         # This is not a good method, because the pickle module has been modified.
         pickle.dispatch_table[core.eager.Tensor] = reduce_varbase
         pickle.dispatch_table[EagerParamBase] = reduce_varbase
-        pickle.dispatch_table[core.DenseTensor] = reduce_LoDTensor
+        pickle.dispatch_table[core.DenseTensor] = reduce_DenseTensor
         pickle.dispatch_table.update(dispatch_table_layer)
 
     def pop_dispatch_table():
@@ -485,7 +485,7 @@ def _pickle_save(obj, f, protocol):
         pickler = pickle.Pickler(f, protocol)
         pickler.dispatch_table = copyreg.dispatch_table.copy()
 
-        pickler.dispatch_table[core.DenseTensor] = reduce_LoDTensor
+        pickler.dispatch_table[core.DenseTensor] = reduce_DenseTensor
         pickler.dispatch_table[core.eager.Tensor] = reduce_varbase
         pickler.dispatch_table[EagerParamBase] = reduce_varbase
         pickler.dispatch_table.update(dispatch_table_layer)

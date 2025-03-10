@@ -203,7 +203,7 @@ class _DataLoaderIterSingleProcess(_DataLoaderIterBase):
             ]
             self._dtypes = [v.dtype for v in self._feed_list]
         # if only 1 place, do not need to keep order
-        self._blocking_queue = core.init_lod_tensor_blocking_queue(
+        self._blocking_queue = core.init_dense_tensor_blocking_queue(
             core.Variable(),
             self._blocking_queue_capacity,
             len(self._places) > 1,
@@ -507,7 +507,7 @@ class _DataLoaderIterMultiProcess(_DataLoaderIterBase):
             ]
             self._dtypes = [v.dtype for v in self._feed_list]
         # if only 1 place, do not need to keep order
-        self._blocking_queue = core.init_lod_tensor_blocking_queue(
+        self._blocking_queue = core.init_dense_tensor_blocking_queue(
             core.Variable(), self._outstanding_capacity, len(self._places) > 1
         )
         core._set_max_memory_map_allocation_pool_size(

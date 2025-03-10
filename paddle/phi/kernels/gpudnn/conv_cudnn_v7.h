@@ -163,7 +163,7 @@ struct SearchAlgorithmBase<ConvKind::kForward> {
           perf_results, workspace_size_limit, &result);
 #else
       VLOG(3) << "Fallback to non-v7 method to find conv algorithm "
-                 "becasue the workspace size request("
+                 "because the workspace size request("
               << result.workspace_size << ") exceeds the limit("
               << workspace_size_limit << ")";
       PADDLE_ENFORCE_GPU_SUCCESS(
@@ -346,7 +346,7 @@ struct SearchAlgorithmBase<ConvKind::kBackwardData> {
       ChooseAlgoByWorkspace<PerfT, AlgoT>(
           perf_results, workspace_size_limit, &result);
 #else
-      VLOG(1) << "Fallback to non-v7 method to find conv algorithm becasue "
+      VLOG(1) << "Fallback to non-v7 method to find conv algorithm because "
                  "the workspace size request("
               << result.workspace_size << ") exceeds the limit("
               << workspace_size_limit << ")";
@@ -518,7 +518,7 @@ struct SearchAlgorithmBase<ConvKind::kBackwardFilter> {
       ChooseAlgoByWorkspace<PerfT, AlgoT>(
           perf_results, workspace_size_limit, &result);
 #else
-      VLOG(1) << "Fallback to non-v7 method to find conv algorithm becasue "
+      VLOG(1) << "Fallback to non-v7 method to find conv algorithm because "
                  "the workspace size request("
               << result.workspace_size << ") exceeds the limit("
               << workspace_size_limit << ")";

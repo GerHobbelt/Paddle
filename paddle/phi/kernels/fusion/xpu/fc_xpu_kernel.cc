@@ -156,58 +156,132 @@ void FcXPUKernelImpl(const Context& ctx,
                              w_len);
         PADDLE_ENFORCE_XDNN_SUCCESS(r, "xpu_cast_te");
       }
-      int r =
-          xblas::fc_fusion<XPUTypeFP16, XPUTypeFP16, XPUTypeBF16, XPUTypeFP16>(
-              ctx.x_context(),
-              x_data_fp16,
-              w_data_fp16,
-              out_data,
-              m,
-              n,
-              k,
-              transpose_x,
-              true,
-              x_max_data ? x_max_data : xte_x_maxptr,
-              w_max_data ? w_max_data : xte_w_maxptr,
-              out_max_data,
-              transpose_x ? m : k,
-              k,
-              n,
-              alpha,
-              beta,
-              bias_data,
-              act,
-              xte_scale_x,
-              xte_scale_w);
+      baidu::xpu::xblas::FcFusionTensor<const XPUTypeFP16> tensor_a1{
+          x_data_fp16,
+          x_max_data ? x_max_data : xte_x_maxptr,
+          transpose_x ? k : m,
+          transpose_x ? m : k,
+          transpose_x ? m : k,
+          transpose_x};
+      baidu::xpu::xblas::FcFusionTensor<const XPUTypeFP16> tensor_b1{
+          w_data_fp16, w_max_data ? w_max_data : xte_w_maxptr, n, k, k, true};
+      baidu::xpu::xblas::FcFusionTensor<const XPUTypeBF16> tensor_c1{
+          out_data, nullptr, m, n, n, false};
+      baidu::xpu::xblas::FcFusionTensor<XPUTypeBF16> tensor_d1{
+          out_data, nullptr, m, n, n, false};
+      baidu::xpu::xblas::FcFusionDesc<XPUTypeFP16, float, float> desc{alpha,
+                                                                      beta};
+
+      baidu::xpu::xblas::FcFusionEpilogue<float, float> epilogue1{
+          act, bias_data, xte_scale_x, xte_scale_w, 0, 0, out_max_data};
+
+      if (act_type == xpu::Activation_t::SWISH_GLU) {
+        tensor_d1 = baidu::xpu::xblas::FcFusionTensor<XPUTypeBF16>{
+            out_data, nullptr, m, n / 2, n / 2, false};
+      } else {
+        tensor_d1 = baidu::xpu::xblas::FcFusionTensor<XPUTypeBF16>{
+            out_data, nullptr, m, n, n, false};
+      }
+
+      int r = baidu::xpu::xblas::fc_fusion<XPUTypeFP16,
+                                           XPUTypeFP16,
+                                           XPUTypeBF16,
+                                           XPUTypeBF16,
+                                           XPUTypeFP16,
+                                           float,
+                                           float,
+                                           float,
+                                           float>(ctx.x_context(),
+                                                  tensor_a1,
+                                                  tensor_b1,
+                                                  tensor_c1,
+                                                  tensor_d1,
+                                                  desc,
+                                                  epilogue1);
 
       PADDLE_ENFORCE_XDNN_SUCCESS(r, "xblas_fc_fusion");
     }
   }
   if (std::getenv("XPU_PADDLE_FC_BFLOAT16_XTE") == nullptr) {
-    int r = xpu::
-        fc_fusion<XPUTypeX, XPUTypeW, XPUTypeOut, T_GEMM>(  // TX/TW/TY/TGEMM
-            ctx.x_context(),                                // ctx
-            x_data,                                         // x
-            w_data,                                         // w
-            out_data,                                       // y
-            m,                                              // m
-            n,                                              // n
-            k,                                              // k
-            transpose_x,                                    // x_trans
-            true,                                           // w_trans
-            x_max_data,                                     // x_maxptr
-            w_max_data,                                     // w_maxptr
-            out_max_data,                                   // y_maxptr
-            transpose_x ? m : k,                            // ldx
-            k,                                              // ldw
-            n,                                              // ldy
-            alpha,                                          // alpha
-            beta,                                           // beta
-            bias_data,                                      // bias
-            act,                                            // act
-            scale_max_data);                                // scale
+    if constexpr (((std::is_same<T_X, float16>::value &&
+                    std::is_same<T_W, int16_t>::value &&
+                    std::is_same<T_GEMM, int16_t>::value &&
+                    std::is_same<T_OUT, float>::value) ||
+                   (std::is_same<T_X, float>::value &&
+                    std::is_same<T_W, int16_t>::value &&
+                    std::is_same<T_GEMM, int16_t>::value &&
+                    std::is_same<T_OUT, float16>::value) ||
+                   (std::is_same<T_X, float>::value &&
+                    std::is_same<T_W, signed char>::value &&
+                    std::is_same<T_GEMM, signed char>::value &&
+                    std::is_same<T_OUT, signed char>::value))) {
+      int r = xpu::
+          fc_fusion<XPUTypeX, XPUTypeW, XPUTypeOut, T_GEMM>(  // TX/TW/TY/TGEMM
+              ctx.x_context(),                                // ctx
+              x_data,                                         // x
+              w_data,                                         // w
+              out_data,                                       // y
+              m,                                              // m
+              n,                                              // n
+              k,                                              // k
+              transpose_x,                                    // x_trans
+              true,                                           // w_trans
+              x_max_data,                                     // x_maxptr
+              w_max_data,                                     // w_maxptr
+              out_max_data,                                   // y_maxptr
+              transpose_x ? m : k,                            // ldx
+              k,                                              // ldw
+              n,                                              // ldy
+              alpha,                                          // alpha
+              beta,                                           // beta
+              bias_data,                                      // bias
+              act,                                            // act
+              scale_max_data);                                // scale
+      PADDLE_ENFORCE_XDNN_SUCCESS(r, "fc_xpu");
+    } else {
+      baidu::xpu::xblas::FcFusionTensor<const XPUTypeX> tensor_a1{
+          x_data,
+          x_max_data,
+          transpose_x ? k : m,
+          transpose_x ? m : k,
+          transpose_x ? m : k,
+          transpose_x};
+      baidu::xpu::xblas::FcFusionTensor<const XPUTypeW> tensor_b1{
+          w_data, w_max_data, n, k, k, true};
+      baidu::xpu::xblas::FcFusionTensor<const XPUTypeOut> tensor_c1{
+          out_data, nullptr, m, n, n, false};
+      baidu::xpu::xblas::FcFusionTensor<XPUTypeOut> tensor_d1{
+          out_data, nullptr, m, n, n, false};
+      baidu::xpu::xblas::FcFusionDesc<T_GEMM, float, XPUTypeOut> desc{alpha,
+                                                                      beta};
 
-    PADDLE_ENFORCE_XDNN_SUCCESS(r, "fc_xpu");
+      baidu::xpu::xblas::FcFusionEpilogue<float, float> epilogue1{
+          act, bias_data, scale_max_data, nullptr, 0, 0, out_max_data};
+
+      if (act_type == xpu::Activation_t::SWISH_GLU) {
+        tensor_d1 = baidu::xpu::xblas::FcFusionTensor<XPUTypeOut>{
+            out_data, nullptr, m, n / 2, n / 2, false};
+      } else {
+        tensor_d1 = baidu::xpu::xblas::FcFusionTensor<XPUTypeOut>{
+            out_data, nullptr, m, n, n, false};
+      }
+      int r = baidu::xpu::xblas::fc_fusion<XPUTypeX,
+                                           XPUTypeW,
+                                           XPUTypeOut,
+                                           XPUTypeOut,
+                                           T_GEMM,
+                                           float,
+                                           XPUTypeOut,
+                                           float,
+                                           float>(ctx.x_context(),
+                                                  tensor_a1,
+                                                  tensor_b1,
+                                                  tensor_c1,
+                                                  tensor_d1,
+                                                  desc,
+                                                  epilogue1);
+      PADDLE_ENFORCE_XDNN_SUCCESS(r, "xblas_fc_fusion");
+    }
   }
 #else
   int r =

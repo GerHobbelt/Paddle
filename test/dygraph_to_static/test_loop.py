@@ -470,6 +470,7 @@ def loop_with_inner_mutate_list(x):
         a = []
         a.append(x)
         a.append(x + 1)
+        a.append(None)
         out += a[0]
         # After the loop, a is [x, x], which will be flattened to 2 elements
     return out
@@ -481,6 +482,24 @@ class TestLoopWithInnerMutateList(Dy2StTestBase):
         x = paddle.to_tensor(5)
         static_res = static_fn(x)
         dygraph_res = loop_with_inner_mutate_list(x)
+        np.testing.assert_allclose(dygraph_res.numpy(), static_res.numpy())
+
+
+def loop_change_value_to_int():
+    x = paddle.to_tensor(1, dtype='float32')
+    y = paddle.to_tensor(False, dtype='bool')
+    while y:
+        x = 2
+    return x
+
+
+class TestLoopChangeValueToInt(Dy2StTestBase):
+    def test_loop_change_value_to_int(self):
+        static_fn = paddle.jit.to_static(
+            loop_change_value_to_int, full_graph=True
+        )
+        static_res = static_fn()
+        dygraph_res = loop_change_value_to_int()
         np.testing.assert_allclose(dygraph_res.numpy(), static_res.numpy())
 
 

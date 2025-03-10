@@ -23,6 +23,7 @@
 #include "paddle/pir/include/dialect/shape/interface/infer_symbolic_shape/infer_symbolic_shape.h"
 #include "paddle/pir/include/dialect/shape/ir/shape_attribute.h"
 #include "paddle/pir/include/dialect/shape/ir/shape_dialect.h"
+#include "paddle/pir/include/dialect/shape/utils/original_attributes_filter.h"
 #include "paddle/pir/include/dialect/shape/utils/shape_analysis.h"
 #include "paddle/pir/include/pass/pass_manager.h"
 #include "paddle/pir/include/pass/pass_registry.h"
@@ -156,7 +157,7 @@ void CheckInferSymWithInferMeta(
 
     std::ostringstream print_stream;
 
-    // InferMeta funcs of some Ops are not corrrect now, we don't check them.
+    // InferMeta funcs of some Ops are not correct now, we don't check them.
     if (!NeedCheckInferSymbolicWithInferMeta(op->name(), i)) continue;
 
     if (res.type().isa<pir::DenseTensorType>()) {
@@ -371,7 +372,10 @@ void InferSymExprForBlock(const Block& block,
       input_shape_or_data.emplace_back(
           infer_context->GetShapeOrDataForValue(input));
     }
-    InferSymbolicShapeCacheKey op_infer_cache_key(op, input_shape_or_data);
+    InferSymbolicShapeCacheKey op_infer_cache_key(
+        op.name(),
+        input_shape_or_data,
+        GetOrderedOriginalAttributes(op.name(), op.attributes()));
     InferSymExprForOp(&op, infer_context, op_infer_cache_key);
     CacheForwardOpSymbolicShape(&op, infer_context, op_infer_cache_key);
     CacheBackwardOpSymbolicShape(&op, infer_context);

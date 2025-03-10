@@ -64,7 +64,7 @@ static int BuildFusion(Graph* graph,
 #define SET_IN(Key, node__) op_desc.SetInput(#Key, {node__->Name()});
     SET_IN(Ids, input);
     SET_IN(WeightH, weight_h);
-    // Neet to have this passed as We need Wc data for peephole connections
+    // Need to have this passed as We need Wc data for peephole connections
     SET_IN(Bias, bias);
 #undef SET_IN
 

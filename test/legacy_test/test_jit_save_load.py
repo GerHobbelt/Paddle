@@ -1776,8 +1776,11 @@ class TestJitSaveLoadFinetuneLoad(unittest.TestCase):
         result_10 = layer_finetune(inps0)
         result_11 = layer_finetune(inps1)
 
-        self.assertTrue(float((result_00 - result_10).abs().max()) < 1e-5)
-        self.assertTrue(float((result_01 - result_11).abs().max()) < 1e-5)
+        # (result_00 - result_10) is [nan, ...], so the result of (result_00 - result_10).abs().max() is -inf.
+        # Since -inf is always less than 1e-5, the assert will always evaluate to true.
+        # Therefore, this assert should be considered to remove.
+        # self.assertTrue(float((result_00 - result_10).abs().max()) < 1e-5)
+        # self.assertTrue(float((result_01 - result_11).abs().max()) < 1e-5)
 
 
 # NOTE(weixin): When there are multiple test functions in an

@@ -280,10 +280,10 @@ class TestDistBase(unittest.TestCase):
         tr0_cmd = tr_cmd % (self._python_interp, model_file)
         tr1_cmd = tr_cmd % (self._python_interp, model_file)
         path0 = os.path.join(
-            self.temp_dir.name, "/tmp/tr0_err_%d.log" % os.getpid()
+            self.temp_dir.name, f"/tmp/tr0_err_{os.getpid()}.log"
         )
         path1 = os.path.join(
-            self.temp_dir.name, "/tmp/tr1_err_%d.log" % os.getpid()
+            self.temp_dir.name, f"/tmp/tr1_err_{os.getpid()}.log"
         )
         tr0_pipe = open(path0, "w")
         tr1_pipe = open(path1, "w")

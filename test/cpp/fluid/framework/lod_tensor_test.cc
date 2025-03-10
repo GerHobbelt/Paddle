@@ -22,7 +22,7 @@
 namespace paddle {
 namespace framework {
 
-TEST(LegacyLoD, PrintLoDTensor) {
+TEST(LegacyLoD, PrintDenseTensor) {
   phi::DenseTensor tensor1;
   tensor1.Resize({2});
   tensor1.mutable_data<float>(phi::CPUPlace());

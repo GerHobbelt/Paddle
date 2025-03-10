@@ -72,7 +72,7 @@ void TestSequencePadding(const DeviceContext &context,
     phi::Copy(context, cpu_pad_value, place, true, &pad_value);
   }
 
-  phi::funcs::PaddingLoDTensorFunctor<DeviceContext, T>()(
+  phi::funcs::PaddingDenseTensorFunctor<DeviceContext, T>()(
       context,
       seq,
       &padding,
@@ -85,7 +85,7 @@ void TestSequencePadding(const DeviceContext &context,
   seq_back.set_lod(lod);
   seq_back.Resize(seq_dims);
   context.template Alloc<T>(&seq_back);
-  phi::funcs::UnpaddingLoDTensorFunctor<DeviceContext, T>()(
+  phi::funcs::UnpaddingDenseTensorFunctor<DeviceContext, T>()(
       context, padding, &seq_back, -1, 0, false, phi::funcs::kLengthBatchWidth);
 
   if (place.GetType() == phi::AllocationType::CPU) {

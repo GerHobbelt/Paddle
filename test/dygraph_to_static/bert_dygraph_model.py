@@ -153,7 +153,7 @@ class EncoderLayer(Layer):
         for i in range(n_layer):
             self._encoder_sublayers.append(
                 self.add_sublayer(
-                    'esl_%d' % i,
+                    f'esl_{i}',
                     EncoderSubLayer(
                         hidden_act,
                         n_head,

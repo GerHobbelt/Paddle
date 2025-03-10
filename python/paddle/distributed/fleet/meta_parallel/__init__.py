@@ -29,6 +29,7 @@ from .pipeline_parallel import (  # noqa: F401
     PipelineParallelMicroStepLocations,
     PipelineParallelWithInterleave,
     PipelineParallelWithInterleaveFthenB,
+    VPPFhenBInBalancedMemory,
     register_global_pipeline_parallel_hook,
 )
 from .segment_parallel import SegmentParallel  # noqa: F401

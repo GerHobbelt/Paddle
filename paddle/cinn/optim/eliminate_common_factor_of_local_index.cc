@@ -285,11 +285,10 @@ std::vector<ir::Expr> CalculateIndexCommonFactor(
           "should at least load and store once. "));
   for (std::size_t i = 1; i < indexes.size(); ++i) {
     // NOTE(Hongyu Jia): Ideally, we can guarantee the size of indexes are equal
-    // under flags FLAGS_cinn_bucket_compile=1. However, some unit tests (e.g.
-    // test_resnet_cinn, test_instance_norm_op) are still running with the
-    // deprecated OpScheduler, and the ir::Expr will break this guarantee after
-    // IRGpuScheduleBlockReduce function. So we have to relax the restriction
-    // here.
+    // However, some unit tests (e.g. test_resnet_cinn, test_instance_norm_op
+    // are still running with the deprecated OpScheduler, and the ir::Expr
+    // will break this guarantee after IRGpuScheduleBlockReduce function.
+    // So we have to relax the restriction here.
     if (indexes[i].size() != indexes[0].size()) {
       LOG(WARNING)
           << "Not supported for calculating common factor, local var = "

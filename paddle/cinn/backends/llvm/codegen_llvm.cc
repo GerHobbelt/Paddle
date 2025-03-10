@@ -305,6 +305,7 @@ llvm::Value *CodeGenLLVM::Visit(const ir::Mod *op) {
 }
 
 #define __IR_EMITTER_DEFINE_CMP_VISITOR(__sop, __uop, __fop) \
+  ir::TryElevateInt32ToInt64({op->a(), op->b()});            \
   auto *lhs = Visit(&op->a());                               \
   auto *rhs = Visit(&op->b());                               \
   CHECK(op->a().type() == op->b().type());                   \
@@ -1354,6 +1355,10 @@ int GetNaiveVecAlignmentImpl(common::NVGPUArch, const Target &target) {
 }
 
 int GetNaiveVecAlignmentImpl(common::HygonDCUArchHIP, const Target &target) {
+  return 128;
+}
+
+int GetNaiveVecAlignmentImpl(common::HygonDCUArchSYCL, const Target &target) {
   return 128;
 }
 

@@ -74,9 +74,7 @@ class TestPSPassWithBow(unittest.TestCase):
         is_sparse = True
 
         # query
-        q = paddle.static.data(
-            name="1", shape=[-1, 1], dtype="int64", lod_level=1
-        )
+        q = paddle.static.data(name="1", shape=[-1, 1], dtype="int64")
         # embedding
         q_emb = paddle.static.nn.sparse_embedding(
             input=q,
@@ -106,9 +104,7 @@ class TestPSPassWithBow(unittest.TestCase):
         # label data
         label = paddle.static.data(name="label", shape=[-1, 1], dtype="int64")
         # pt
-        pt = paddle.static.data(
-            name="2", shape=[-1, 1], dtype="int64", lod_level=1
-        )
+        pt = paddle.static.data(name="2", shape=[-1, 1], dtype="int64")
         # embedding
         pt_emb = paddle.static.nn.sparse_embedding(
             input=pt,
@@ -137,9 +133,7 @@ class TestPSPassWithBow(unittest.TestCase):
             bias_attr=base.ParamAttr(name="__fc_b__"),
         )
         # nt
-        nt = paddle.static.data(
-            name="3", shape=[-1, 1], dtype="int64", lod_level=1
-        )
+        nt = paddle.static.data(name="3", shape=[-1, 1], dtype="int64")
         # embedding
         nt_emb = paddle.static.nn.sparse_embedding(
             input=nt,
@@ -221,9 +215,7 @@ class TestPSPassWithBow(unittest.TestCase):
         slots = ["slot1", "slot2", "slot3", "slot4"]
         slots_vars = []
         for slot in slots:
-            var = paddle.static.data(
-                name=slot, shape=[-1, 1], dtype="int64", lod_level=1
-            )
+            var = paddle.static.data(name=slot, shape=[-1, 1], dtype="int64")
             slots_vars.append(var)
 
         dataset = paddle.distributed.InMemoryDataset()

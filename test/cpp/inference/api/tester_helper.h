@@ -1034,7 +1034,7 @@ void CompareAnalysisAndZeroCopy(
 }
 
 template <typename T>
-std::string LoDTensorSummary(const phi::DenseTensor &tensor) {
+std::string DenseTensorSummary(const phi::DenseTensor &tensor) {
   std::stringstream ss;
   ss << "\n---- tensor ---" << '\n';
   ss << "lod: [";

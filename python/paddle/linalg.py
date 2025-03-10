@@ -22,6 +22,7 @@ from .tensor.linalg import (
     cov,
     cross,
     det,
+    diagonal,
     eig,
     eigh,
     eigvals,
@@ -90,4 +91,5 @@ __all__ = [
     'lstsq',
     'ormqr',
     'fp8_fp8_half_gemm_fused',
+    'diagonal',
 ]

@@ -147,16 +147,14 @@ class TestBert(Dy2StTestBase):
                 if step_idx % PRINT_STEP == 0:
                     if step_idx == 0:
                         print(
-                            "Step: %d, loss: %f, ppl: %f, next_sent_acc: %f"
-                            % (step_idx, loss, ppl, acc)
+                            f"Step: {step_idx}, loss: {loss:f}, ppl: {ppl:f}, next_sent_acc: {acc:f}"
                         )
                         avg_batch_time = time.time()
                     else:
                         speed = PRINT_STEP / (time.time() - avg_batch_time)
                         speed_list.append(speed)
                         print(
-                            "Step: %d, loss: %f, ppl: %f, next_sent_acc: %f, speed: %.3f steps/s"
-                            % (step_idx, loss, ppl, acc, speed)
+                            f"Step: {step_idx}, loss: {loss:f}, ppl: {ppl:f}, next_sent_acc: {acc:f}, speed: {speed:.3f} steps/s"
                         )
                         avg_batch_time = time.time()
 

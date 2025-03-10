@@ -21,6 +21,7 @@ import paddle.nn.functional as F
 from paddle.base import core
 from paddle.nn.functional.flash_attention import (
     flash_attention,
+    flash_attn_unpadded,
 )
 
 
@@ -80,6 +81,55 @@ class TestFlashAttentionAPI(unittest.TestCase):
         self.run_case(dtype="float32", tolerance=5e-4, tolerance_dv=5e-4)
         self.run_case(dtype="float16", tolerance=5e-4, tolerance_dv=1e-3)
         self.run_case(dtype="bfloat16", tolerance=6e-3, tolerance_dv=1e-2)
+        self.run_unpadded_case(dtype="float16", rtol=5e-3, atol=1e-3)
+        self.run_unpadded_case(dtype="bfloat16", rtol=5e-3, atol=1e-3)
+
+    def run_unpadded_case(self, dtype, rtol, atol):
+        self.dtype = dtype
+        paddle.disable_static()
+
+        query = np.random.random(self.shape)
+        q = paddle.to_tensor(
+            query, place=self.place, dtype=self.dtype, stop_gradient=False
+        )
+        q_ = paddle.to_tensor(
+            query, place=self.place, dtype=self.dtype, stop_gradient=False
+        )
+
+        out_ = attention_naive(q_, q_, q_)
+
+        scale = 1.0 / np.sqrt(q.shape[-1])
+
+        bs = self.shape[0]
+        ms = self.shape[1]
+        nh = self.shape[2]
+        hd = self.shape[3]
+        cu_q = paddle.arange(0, (bs + 1) * ms, ms, dtype='int32')
+
+        qq = paddle.reshape(q, [bs * ms, nh, hd])
+        out, _ = flash_attn_unpadded(
+            qq,
+            qq,
+            qq,
+            cu_q,
+            cu_q,
+            ms,
+            ms,
+            scale,
+            self.dropout,
+            self.causal,
+            self.return_softmax,
+        )
+        out_ = paddle.reshape(out_, [bs * ms, nh, hd])
+
+        np.testing.assert_allclose(out.numpy(), out_, rtol=rtol, atol=atol)
+
+        out.backward()
+        out_.backward()
+
+        np.testing.assert_allclose(
+            q.grad.numpy(), q_.grad.numpy(), rtol=rtol, atol=atol
+        )
 
     def run_case(self, dtype, tolerance, tolerance_dv):
         # TODO(houj04) remove debug codes after correctness check

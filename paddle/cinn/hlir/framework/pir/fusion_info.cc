@@ -124,9 +124,19 @@ std::ostream& operator<<(std::ostream& os, const FusionOpInfo& info) {
   return os;
 }
 
+ProgramInfo::ProgramInfo(const ::pir::Program& program) { id_ = program.id(); }
+
+std::size_t ProgramInfo::hash() const { return std::hash<uint64_t>{}(id_); }
+
+std::ostream& operator<<(std::ostream& os, const ProgramInfo& info) {
+  os << "ProgramInfo - " << info.hash();
+  return os;
+}
+
 FusionInfo::FusionInfo(const OpLoweringGroup& group) {
   ParseOpInfos(group);
   ParseInputDimExprs(group);
+  ParseProgramInfo(group);
 }
 
 void FusionInfo::ParseOpInfos(const OpLoweringGroup& group) {
@@ -191,6 +201,10 @@ void FusionInfo::ParseInputDimExprs(const OpLoweringGroup& group) {
   }
 }
 
+void FusionInfo::ParseProgramInfo(const OpLoweringGroup& group) {
+  program_info_ = std::make_shared<ProgramInfo>(*group.GetParentProgram());
+}
+
 std::size_t FusionInfo::hash() const {
   if (cached_hash_value_ != 0U) {
     return cached_hash_value_;
@@ -198,6 +212,7 @@ std::size_t FusionInfo::hash() const {
   std::size_t seed = 2153;
   for (const auto& info : op_infos_) hash_combine(seed, info);
   for (const auto& dim_expr : input_dim_exprs_) hash_combine(seed, dim_expr);
+  hash_combine(seed, *program_info_);
   if (!FLAGS_enable_cinn_compile_cache) hash_combine(seed, unique_fn_name_);
 
   return seed;

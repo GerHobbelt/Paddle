@@ -478,7 +478,7 @@ void PirInterpreter::CheckCUDAGraphBeforeRun(
 #endif
 }
 
-void PirInterpreter::ClearLoDTensorArrayInLocalScope() {
+void PirInterpreter::ClearDenseTensorArrayInLocalScope() {
   auto vars = local_scope_->LocalVars();
   for (auto var : vars) {
     if (var->IsType<phi::TensorArray>()) {
@@ -1544,7 +1544,7 @@ paddle::framework::FetchList PirInterpreter::Run(
   }
 
   if (HasLocalScope()) {
-    ClearLoDTensorArrayInLocalScope();
+    ClearDenseTensorArrayInLocalScope();
   }
 
   // return Fetch Tensors
@@ -1623,7 +1623,7 @@ FetchList PirInterpreter::Run(const std::vector<std::string>& feed_names,
   }
 
   if (HasLocalScope()) {
-    ClearLoDTensorArrayInLocalScope();
+    ClearDenseTensorArrayInLocalScope();
   }
 
   framework::FetchList fetch_res;

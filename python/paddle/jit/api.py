@@ -292,9 +292,9 @@ def to_static(
             flag = ENV_ENABLE_SOT.get()
             full_graph = not flag
 
-        if sys.version_info >= (3, 13) and not full_graph:
+        if sys.version_info >= (3, 14) and not full_graph:
             warnings.warn(
-                "full_graph=False is not supported in Python 3.13+. Set full_graph=True automatically"
+                "full_graph=False is not supported in Python 3.14+. Set full_graph=True automatically"
             )
             full_graph = True
 
@@ -1435,7 +1435,7 @@ def save(
         if combine_params:
             if use_pir_api():
                 # NOTE(Ruting): concrete_program has been pruned when init partialProgramLayer,
-                # so we do not neet to prune again.
+                # so we do not need to prune again.
 
                 for var in concrete_program.main_program.list_vars():
                     if var.persistable:

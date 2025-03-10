@@ -14,183 +14,291 @@
 
 #include "paddle/cinn/optim/rearrange_load_instruction.h"
 
-#include <stack>
 #include <vector>
-#include "paddle/cinn/adt/map_expr.h"
-#include "paddle/cinn/ir/ir.h"
-#include "paddle/cinn/ir/ir_base.h"
+#include "paddle/cinn/ir/ir_analyzer/ir_analyzer.h"
 #include "paddle/cinn/ir/ir_mutator.h"
 #include "paddle/cinn/ir/ir_printer.h"
-#include "paddle/cinn/ir/utils/ir_compare.h"
-#include "paddle/cinn/optim/ir_simplify.h"
 
-#define VisitImpl(_TYPE)                                 \
-  void Visit(const ir::_TYPE *op, Expr *expr) override { \
-    auto old_last_op = last_op;                          \
-    auto *ncop = const_cast<ir::_TYPE *>(op);            \
-    last_op = Expr(ncop);                                \
-    ir::IRMutator<>::Visit(op, expr);                    \
-    last_op = old_last_op;                               \
-  }
+PD_DECLARE_bool(cinn_enable_rearrange_load);
 
 namespace cinn {
 namespace optim {
-
 namespace {
 
-struct RearrangeLoadInstructionMutator : public ir::IRMutator<Expr *> {
-  RearrangeLoadInstructionMutator() {
-    is_inner_store = false;
-    last_op = Expr(nullptr);
+constexpr int MaxRearrangeLoadNum = 8;
+
+template <typename NodeTy>
+bool ContainsExprNode(const ir::Expr& expr) {
+  auto res = ir::ir_utils::CollectIRNodes(
+      expr,
+      [](const ir::Expr* x) { return x->As<NodeTy>(); },
+      /* uniq_target = */ true);
+  return !res.empty();
+}
+
+/**
+ * Calculate the buffer size as a constant. For dynamic dims, since they are
+ * difficult to compare, we just estimate them to be 32.
+ * Note: this is a heuristic optimization, so the exact number is not very
+ * important.
+ */
+int64_t EstimateBufferSize(const ir::Buffer& buffer) {
+  int64_t size = 1;
+  for (auto& dim_size : buffer->shape) {
+    if (dim_size.is_constant()) {
+      size *= dim_size.as_int64();
+    } else {
+      size *= 32;
+    }
   }
-  void operator()(Expr *expr) { Visit(expr, expr); }
+  return size;
+}
+
+std::vector<std::string> SortLoadsByBufferSizes(
+    const std::unordered_map<std::string, const ir::Expr*>& load_map,
+    std::vector<std::string> load_list) {
+  // Calculate the buffer sizes of loads (with estimation).
+  std::map<ir::Buffer, int64_t> buffer_size_map;
+  for (auto& [_, load_expr] : load_map) {
+    auto& buffer = load_expr->As<ir::Load>()->tensor.as_tensor()->buffer;
+    if (buffer_size_map.count(buffer)) {
+      continue;
+    }
+    buffer_size_map[buffer] = EstimateBufferSize(buffer);
+  }
+
+  const auto GetBufferSize = [&](const std::string& key) {
+    auto& buffer = load_map.at(key)->As<ir::Load>()->tensor.as_tensor()->buffer;
+    return buffer_size_map[buffer];
+  };
+
+  // Sort loads by their buffer sizes from large to small.
+  // Note: we use stable sort here, because for equal-size loads, we want to
+  // keep their original order.
+  std::stable_sort(load_list.begin(),
+                   load_list.end(),
+                   [&](const std::string& key1, const std::string& key2) {
+                     return GetBufferSize(key1) > GetBufferSize(key2);
+                   });
+  return load_list;
+}
+
+struct LoadCollector : public ir::IRMutator<> {
+  explicit LoadCollector(const std::set<ir::Buffer>& locally_defined_buffers)
+      : locally_defined_buffers_(locally_defined_buffers) {}
+
+  void operator()(ir::Expr* expr) { ir::IRMutator<>::Visit(expr, expr); }
 
  private:
-  std::vector<ir::Store *> local_stores;
-  bool is_local_store(ir::Load *op) {
-    for (int i = 0; i < local_stores.size(); i++) {
-      if (ir::ir_utils::IRCompare(local_stores[i]->tensor, op->tensor)) {
-        if (local_stores[i]->indices.size() != op->indices.size()) continue;
-        bool all_same = true;
-        for (int j = 0; j < op->indices.size(); j++) {
-          if (!ir::ir_utils::IRCompare(local_stores[i]->indices[j],
-                                       op->indices[j])) {
-            all_same = false;
-          }
-        }
-        if (all_same) return true;
+  // Collect loads that meet the following criteria:
+  // 1) It is loading from global memory. Local loads are simply register reads
+  //    and do not require rearrangement.
+  // 2) The value being loaded is not defined locally by a previous store. In
+  //    such cases, the value resides in a register rather than in memory, thus
+  //    doesn't need rearrangement. This criteria also prevents data-dependency
+  //    harzards.
+  // 3) It doesn't contains indirect indices (i.e. loads within indices).
+  //    Indirect indices are hard to manage and are seldom seem, so we choose
+  //    not to handle them.
+  void Visit(const ir::Load* op, ir::Expr* expr) override {
+    auto& buffer = op->tensor.as_tensor()->buffer;
+    if (buffer->memory_type != ir::MemoryType::Heap) {
+      return;
+    }
+    if (locally_defined_buffers_.count(buffer) > 0) {
+      return;
+    }
+    for (auto& index_expr : op->indices) {
+      if (ContainsExprNode<ir::Load>(index_expr)) {
+        return;
       }
     }
-    return false;
-  }
-  void Visit(const ir::Load *op, Expr *expr) override {
-    auto load_op = expr->As<ir::Load>();
-    if (is_inner_store) {
-      if (op->tensor.as_tensor_ref()->buffer.operator->() != nullptr &&
-              (op->tensor.as_tensor_ref()->buffer->memory_type ==
-                   ir::MemoryType::GPULocal ||
-               op->tensor.as_tensor_ref()->buffer->memory_type ==
-                   ir::MemoryType::GPUShared) ||
-          is_local_store(load_op))
-        return;
-
-      auto local_var =
-          ir::_Var_::Make(common::UniqName("local_var"), op->type());
-      auto let_op = ir::Let::Make(local_var, const_cast<ir::Load *>(op));
-      let_list.push_back(let_op);
-      last_op->replace(Expr(const_cast<ir::Load *>(op)), local_var);
-    }
+    std::string key = utils::GetStreamCnt(*expr);
+    CollectLoad(key, expr);
   }
 
-  void Visit(const ir::Store *op, Expr *expr) override {
-    auto store_op = expr->As<ir::Store>();
-    auto old_last_op = last_op;
-    local_stores.push_back(store_op);
-    last_op = Expr(store_op);
-    is_inner_store = true;
-    ir::IRMutator<>::Visit(op, expr);
-    is_inner_store = false;
-    last_op = old_last_op;
+  // Handle Select as a special op.
+  // Since Select evaluates only one of its two branches, we can rearrange a
+  // load in Select only if the load appears in both branches, otherwise we may
+  // violate the control dependency.
+  void Visit(const ir::Select* op, ir::Expr* expr) override {
+    auto* node = expr->As<ir::Select>();
+    ir::IRMutator<>::Visit(&node->condition, &node->condition);
+
+    LoadCollector true_collector(locally_defined_buffers_);
+    true_collector(&node->true_value);
+    LoadCollector false_collector(locally_defined_buffers_);
+    false_collector(&node->false_value);
+
+    for (auto& key : true_collector.load_list_) {
+      if (false_collector.load_map_.count(key) > 0) {
+        CollectLoad(key, true_collector.load_map_[key]);
+      }
+    }
   }
 
-  void Visit(const ir::Block *op, Expr *expr) override {
-    auto old_last_op = last_op;
-    last_op = Expr(const_cast<ir::Block *>(op));
-    int old_let_size = let_list.size();
-    int old_stmts_size = stmts_list.size();
-
-    for (auto &stmt : op->stmts) {
-      IRVisitorRequireReImpl<void, Expr *>::Visit(
-          &stmt, const_cast<ir::Expr *>(&stmt));
-      stmts_list.push_back(stmt);
+  void CollectLoad(const std::string& key, const ir::Expr* expr) {
+    auto [_, is_first] = load_map_.emplace(key, expr);
+    if (is_first) {
+      load_list_.push_back(key);
     }
-
-    if (let_list.size() > old_let_size) {
-      replaceBlock(const_cast<ir::Block *>(op), old_let_size, old_stmts_size);
-    }
-    last_op = old_last_op;
   }
 
-  void Visit(const ir::Expr *op, Expr *expr) override {
-    ir::IRMutator<>::Visit(op, expr);
-  }
+ public:
+  // map from the signatures of loads to the load nodes
+  std::unordered_map<std::string, const ir::Expr*> load_map_;
+  // list of the signatures of loads in the order they are visited
+  std::vector<std::string> load_list_;
 
-  void Visit(const ir::Select *op, Expr *expr) override {}
-  void Visit(const ir::Broadcast *op, Expr *expr) override {}
-  void Visit(const ir::IfThenElse *op, Expr *expr) override {}
-
-  void replaceBlock(ir::Block *op, int old_let_size, int old_stmts_size) {
-    std::vector<Expr> new_stmts;
-
-    for (int i = old_let_size; i < let_list.size(); i++) {
-      new_stmts.push_back(let_list[i]);
-    }
-
-    for (int i = old_stmts_size; i < stmts_list.size(); i++) {
-      new_stmts.push_back(stmts_list[i]);
-    }
-
-    while (let_list.size() > old_let_size) {
-      let_list.pop_back();
-    }
-
-    while (stmts_list.size() > old_stmts_size) {
-      stmts_list.pop_back();
-    }
-
-    op->stmts = new_stmts;
-  }
-
-  std::unordered_map<std::string, ir::Expr> collection_name_map_expr;
-  std::vector<Expr> let_list;
-  std::vector<Expr> stmts_list;
-  bool is_inner_store;
-  Expr last_op;
-
-  VisitImpl(ScheduleBlock);
-  VisitImpl(For);
-  VisitImpl(Cast);
-  VisitImpl(PolyFor);
-  VisitImpl(Call);
-  VisitImpl(_Var_);
-  VisitImpl(Alloc);
-  VisitImpl(Free);
-  VisitImpl(_Buffer_);
-  VisitImpl(_Tensor_);
-  VisitImpl(Let);
-  VisitImpl(Reduce);
-  VisitImpl(Ramp);
-  VisitImpl(FracOp);
-  VisitImpl(Product);
-  VisitImpl(Sum);
-  VisitImpl(PrimitiveNode);
-  VisitImpl(IntrinsicOp);
-  VisitImpl(_BufferRange_);
-  VisitImpl(_Dim_);
-
-  VisitImpl(Add);
-  VisitImpl(Sub);
-  VisitImpl(Mul);
-  VisitImpl(Div);
-  VisitImpl(Mod);
-  VisitImpl(EQ);
-  VisitImpl(NE);
-  VisitImpl(LT);
-  VisitImpl(LE);
-  VisitImpl(GT);
-  VisitImpl(GE);
-  VisitImpl(And);
-  VisitImpl(Or);
-  VisitImpl(Not);
-  VisitImpl(Min);
-  VisitImpl(Max);
-  VisitImpl(Minus)
+ private:
+  const std::set<ir::Buffer>& locally_defined_buffers_;
 };
+
+struct LoadReplacer : public ir::IRMutator<> {
+  explicit LoadReplacer(const std::unordered_map<std::string, ir::Var>& var_map)
+      : var_map_(var_map) {}
+
+  void operator()(ir::Expr* expr) { ir::IRMutator<>::Visit(expr, expr); }
+
+ private:
+  void Visit(const ir::Load* op, ir::Expr* expr) override {
+    std::string key = utils::GetStreamCnt(*expr);
+    if (var_map_.count(key) > 0) {
+      *expr = Expr(var_map_.at(key));
+    }
+  }
+
+  const std::unordered_map<std::string, ir::Var>& var_map_;
+};
+
+struct RearrangeLoadInstructionMutator : public ir::IRMutator<> {
+  void operator()(ir::Expr* expr) { ir::IRMutator<>::Visit(expr, expr); }
+
+ private:
+  // A block is a leaf block if it is inside at least one loop, and all of its
+  // stmts are schedule blocks.
+  bool IsLeafBlock(const ir::Block& block) {
+    if (parent_loops_.empty()) {
+      return false;
+    }
+    for (auto& stmt : block.stmts) {
+      if (!stmt.As<ir::ScheduleBlockRealize>()) {
+        return false;
+      }
+      auto* node = stmt.As<ir::ScheduleBlockRealize>()
+                       ->schedule_block.As<ir::ScheduleBlock>();
+      if (node->name.substr(0, 4) == "root") {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  // Local buffer initialization is like:
+  //    var_1_local[0] = var_1[blockIdx.x],
+  // where the lhs is a local buffer and the rhs is a single load.
+  bool IsLocalBufferInit(const ir::Store& store) {
+    auto& store_buffer = store.tensor.as_tensor()->buffer;
+    return store_buffer->memory_type == ir::MemoryType::GPULocal &&
+           store.value.As<ir::Load>();
+  }
+
+  void DoRearrangeLoadInstruction(ir::Block* block) {
+    // Step 1. Collect loads in each schedule block under this block.
+    // Requirements:
+    // 1) The schedule block cannot contain IfThenElse, or we will violate the
+    //    control dependency. Schedule blocks that have IfThenElse usually don't
+    //    benefit from rearranging loads, so it's ok to skip them.
+    // 2) The schedule block is not local buffer initialization, because when
+    //    initializing the local buffer with a load, we have already rearranged
+    //    that load.
+    // 3) There are more constrains on the loads to collect, see LoadCollector
+    //    for details.
+    LoadCollector collector(locally_defined_buffers_);
+    for (auto& stmt : block->stmts) {
+      ir::Expr store = ir::analyzer::GetStoreOfSBlock(stmt);
+      auto* store_node = store.As<ir::Store>();
+      if (ContainsExprNode<ir::IfThenElse>(stmt)) continue;
+      if (IsLocalBufferInit(*store_node)) continue;
+      collector(&store_node->value);
+    }
+
+    // Step 2. Sort the loads by their buffer sizes from large to small, and
+    //    only keep the first `MaxRearrangeLoadNum` loads.
+    // Performance concerns:
+    // 1) Larger buffers need more time to access, so we should issue their
+    //    corresponding loads earlier.
+    // 2) Rearranged loads will consume registers, so we should set a limit
+    //    to prevent register overflow.
+    std::vector<std::string> load_list =
+        SortLoadsByBufferSizes(collector.load_map_, collector.load_list_);
+    if (load_list.size() > MaxRearrangeLoadNum) {
+      load_list.resize(MaxRearrangeLoadNum);
+    }
+
+    // Step 3. Create loads with Let at the beginning of the block.
+    std::vector<ir::Expr> new_stmts;
+    std::unordered_map<std::string, ir::Var> var_map;
+    for (auto& key : load_list) {
+      auto* load_expr = collector.load_map_[key];
+      auto* tensor = load_expr->As<ir::Load>()->tensor.as_tensor();
+      ir::Var local_var = ir::Var(common::UniqName(tensor->name + "_local"),
+                                  tensor->buffer->dtype);
+      ir::Expr let_expr = ir::Let::Make(local_var, *load_expr);
+      new_stmts.push_back(let_expr);
+      var_map[key] = local_var;
+    }
+
+    // Step 4. Replace loads in schedule blocks with the above Let vars.
+    LoadReplacer replacer(var_map);
+    for (auto& stmt : block->stmts) {
+      replacer(&stmt);
+      new_stmts.push_back(stmt);
+    }
+    block->stmts = std::move(new_stmts);
+  }
+
+  void Visit(const ir::Block* op, ir::Expr* expr) override {
+    auto* node = expr->As<ir::Block>();
+    ir::IRMutator<>::Visit(op, expr);
+    if (IsLeafBlock(*op)) {
+      DoRearrangeLoadInstruction(node);
+    }
+  }
+
+  void Visit(const ir::ScheduleBlockRealize* op, ir::Expr* expr) override {
+    auto* block_node = op->schedule_block.As<ir::ScheduleBlock>();
+    if (block_node->name.substr(0, 4) == "root") {
+      ir::IRMutator<>::Visit(op, expr);
+      return;
+    }
+    for (auto& buffer_range : block_node->write_buffers) {
+      auto& write_buffer = buffer_range.As<ir::_BufferRange_>()->buffer;
+      locally_defined_buffers_.insert(write_buffer.as_buffer_ref());
+    }
+  }
+
+  void Visit(const ir::For* op, ir::Expr* expr) override {
+    parent_loops_.push_back(op);
+    ir::IRMutator<>::Visit(op, expr);
+    parent_loops_.pop_back();
+  }
+
+ private:
+  // Buffers whose values are defined locally inside this function.
+  // Note: even if a buffer is allocated on global memory, its value may be
+  // assigned locally. If so, it also belongs to this set.
+  std::set<ir::Buffer> locally_defined_buffers_;
+
+  std::vector<const ir::For*> parent_loops_;
+};
+
 }  // namespace
 
-void RearrangeLoadInstruction(Expr *expr) {
-  RearrangeLoadInstructionMutator collector;
-  collector(expr);
+void RearrangeLoadInstruction(Expr* expr) {
+  if (!FLAGS_cinn_enable_rearrange_load) return;
+  RearrangeLoadInstructionMutator mutator;
+  mutator(expr);
 }
 
 }  // namespace optim

@@ -176,6 +176,19 @@ const std::unordered_map<std::string, uint32_t> NoBufferRelatedOps = {
     {paddle::dialect::BatchNorm_Op::name(), /*reserve_space*/ 5U},
 };
 
+// Please keep the consistency with paddle/phi/kernels/memcpy_kernel.cc
+const std::unordered_map<int, phi::Place> MemcpyOpAttr2Place = {
+    {0, phi::CPUPlace()},
+#if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
+    {1, phi::GPUPlace()},
+    {2, phi::GPUPinnedPlace()},
+#elif defined(PADDLE_WITH_XPU)
+    {3, phi::XPUPlace()},
+#elif defined(PADDLE_WITH_CUSTOM_DEVICE)
+    {4, phi::CustomPlace()}
+#endif
+};
+
 static bool NeedSkipPlaceTransfer(const pir::Operation* op) {
   bool need_skip = false;
   if (op->isa<paddle::dialect::FetchOp>()) {
@@ -2179,8 +2192,6 @@ void HandleForSpecialOp(
   // only deal with single output
   if (op_item->num_results() > 0) {
     for (size_t i = 0; i < op_item->num_results(); ++i) {
-      VLOG(6) << "2816:" << op_item->result(i).type();
-      VLOG(6) << "2817:" << op->result(i).type();
       (*map_value_pair)[op_item->result(i)] = op->result(i);
     }
   }
@@ -2507,6 +2518,13 @@ std::vector<pir::Type> BuildOutputs(
       if ((!UnchangeOutputOps.count(op_item->name())) &&
           (!IsLegacyOp(op_item->name())) && phi_kernel.IsValid()) {
         out_place = phi::TransToPhiPlace(output_defs[i].backend);
+      }
+      if (op_item->isa<MemcpyOp>()) {
+        // If the op is MemcpyOp, the output type is determined by the
+        // attribute "dst_place_type".
+        out_place = MemcpyOpAttr2Place.at(op_item->attribute("dst_place_type")
+                                              .dyn_cast<pir::Int32Attribute>()
+                                              .data());
       }
       PushBackOutputTypes(ctx,
                           op_item,

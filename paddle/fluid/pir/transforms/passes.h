@@ -49,8 +49,10 @@ USE_PIR_PASS(fused_rotary_position_embedding_pass);
 USE_PIR_PASS(auto_mixed_precision_pass);
 USE_PIR_PASS(horizontal_fuse_pass);
 USE_PIR_PASS(auto_layout_simplify_pass);
+USE_PIR_PASS(auto_layout_insert_pass);
 USE_PIR_PASS(auto_layout_pass);
 USE_PIR_PASS(common_subexpression_elimination_pass);
+USE_PIR_PASS(delete_assert_op_pass);
 USE_PIR_PASS(add_shadow_output_after_dead_parameter_pass);
 
 #ifdef PADDLE_WITH_DNNL
@@ -95,6 +97,7 @@ USE_PIR_PASS(cpu_bf16_quantize_squash_pass);
 USE_PIR_PASS(add_activation_xpu_fuse_pass);
 USE_PIR_PASS(add_layernorm_xpu_fuse_pass);
 USE_PIR_PASS(rms_norm_xpu_fuse_pass);
+USE_PIR_PASS(elementwise_mul_add_xpu_fuse_pass);
 USE_PIR_PASS(conv2d_bn_xpu_fuse_pass);
 USE_PIR_PASS(conv2d_add_xpu_fuse_pass);
 USE_PIR_PASS(fc_xpu_fuse_pass);

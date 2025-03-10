@@ -829,7 +829,7 @@ class TestPrimConcatWithGrad5(unittest.TestCase):
 
     def base_net(self, flag=None):
         if flag == "prim":
-            core._set_prim_all_enabled(True)
+            core._set_prim_backward_enabled(True)
         x = [paddle.to_tensor(self.x[i], stop_gradient=False) for i in range(4)]
         if flag == "prim":
             fn = apply_to_static(
@@ -861,7 +861,7 @@ class TestPrimConcatWithGrad5(unittest.TestCase):
                 .ops
             ]
             assert self.op_name not in ops
-            core._set_prim_all_enabled(False)
+            core._set_prim_backward_enabled(False)
         return res, [x_grad1, x_grad2, x_grad3, x_grad4]
 
     def test_prim_all_dynamic(self):

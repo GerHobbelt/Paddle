@@ -95,7 +95,7 @@ static void fast_mem_init(void* dest,
 }
 
 template <typename T>
-class PaddingLoDTensorFunctor<phi::CPUContext, T> {
+class PaddingDenseTensorFunctor<phi::CPUContext, T> {
  public:
   void operator()(const phi::CPUContext& context UNUSED,
                   const phi::DenseTensor& seq_tensor,
@@ -155,7 +155,7 @@ class PaddingLoDTensorFunctor<phi::CPUContext, T> {
 };
 
 template <typename T>
-class UnpaddingLoDTensorFunctor<phi::CPUContext, T> {
+class UnpaddingDenseTensorFunctor<phi::CPUContext, T> {
  public:
   void operator()(const phi::CPUContext& context UNUSED,
                   const phi::DenseTensor& pad_tensor,
@@ -192,7 +192,7 @@ class UnpaddingLoDTensorFunctor<phi::CPUContext, T> {
 
 #ifdef PADDLE_WITH_XPU
 template <typename T>
-class UnpaddingLoDTensorFunctor<phi::XPUContext, T> {
+class UnpaddingDenseTensorFunctor<phi::XPUContext, T> {
  public:
   void operator()(const phi::XPUContext& context,
                   const phi::DenseTensor& pad_tensor,
@@ -234,18 +234,18 @@ class UnpaddingLoDTensorFunctor<phi::XPUContext, T> {
 };
 #endif
 
-template class PaddingLoDTensorFunctor<phi::CPUContext, int>;
-template class PaddingLoDTensorFunctor<phi::CPUContext, int64_t>;
-template class PaddingLoDTensorFunctor<phi::CPUContext, float>;
-template class PaddingLoDTensorFunctor<phi::CPUContext, double>;
+template class PaddingDenseTensorFunctor<phi::CPUContext, int>;
+template class PaddingDenseTensorFunctor<phi::CPUContext, int64_t>;
+template class PaddingDenseTensorFunctor<phi::CPUContext, float>;
+template class PaddingDenseTensorFunctor<phi::CPUContext, double>;
 
-template class UnpaddingLoDTensorFunctor<phi::CPUContext, int>;
-template class UnpaddingLoDTensorFunctor<phi::CPUContext, int64_t>;
-template class UnpaddingLoDTensorFunctor<phi::CPUContext, float>;
-template class UnpaddingLoDTensorFunctor<phi::CPUContext, double>;
+template class UnpaddingDenseTensorFunctor<phi::CPUContext, int>;
+template class UnpaddingDenseTensorFunctor<phi::CPUContext, int64_t>;
+template class UnpaddingDenseTensorFunctor<phi::CPUContext, float>;
+template class UnpaddingDenseTensorFunctor<phi::CPUContext, double>;
 
 #ifdef PADDLE_WITH_XPU
-template class UnpaddingLoDTensorFunctor<phi::XPUContext, float>;
+template class UnpaddingDenseTensorFunctor<phi::XPUContext, float>;
 #endif
 
 }  // namespace phi::funcs

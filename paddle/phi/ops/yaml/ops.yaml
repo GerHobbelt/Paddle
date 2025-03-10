@@ -490,6 +490,16 @@
   inplace : (in_sum_1 -> out_sum_1), (in_sum_2 -> out_sum_2), (in_sum_3 -> out_sum_3), (in_num_accumulates -> out_num_accumulates), (in_old_num_accumulates -> out_old_num_accumulates), (in_num_updates -> out_num_updates)
   traits : paddle::dialect::ForwardOnlyTrait
 
+- op : barrier
+  args : (Tensor x, int ring_id=0)
+  output : Tensor(out)
+  infer_meta:
+    func : BarrierInferMeta
+    param: [x]
+  kernel :
+    func : barrier
+    param: [x]
+
 - op : batch_fc
   args : (Tensor input, Tensor w, Tensor bias)
   output : Tensor(out)
@@ -617,7 +627,7 @@
     backend : x
   inplace: (x -> out)
   interfaces : paddle::dialect::InferSymbolicShapeInterface
-  traits : paddle::dialect::ForwardOnlyTrait
+  traits : paddle::dialect::ForwardOnlyTrait, pir::BinaryElementWiseTrait
 
 - op : bitwise_left_shift
   args : (Tensor x, Tensor y, bool is_arithmetic = true)
@@ -653,7 +663,7 @@
     func : bitwise_or
     backend : x
   inplace: (x -> out)
-  traits : paddle::dialect::ForwardOnlyTrait
+  traits : paddle::dialect::ForwardOnlyTrait, pir::BinaryElementWiseTrait
   interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : bitwise_right_shift
@@ -678,7 +688,7 @@
     backend : x
   inplace: (x -> out)
   interfaces : paddle::dialect::InferSymbolicShapeInterface
-  traits : paddle::dialect::ForwardOnlyTrait
+  traits : paddle::dialect::ForwardOnlyTrait, pir::BinaryElementWiseTrait
 
 - op : bmm
   args : (Tensor x, Tensor y)
@@ -1107,6 +1117,7 @@
   inplace: (x -> out)
   backward : copysign_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+  traits : pir::BinaryElementWiseTrait
 
 - op : correlation
   args : (Tensor input1, Tensor input2, int pad_size, int kernel_size, int max_displacement, int stride1, int stride2, int corr_type_multiply=1)
@@ -1532,6 +1543,7 @@
   output : Tensor(out), Tensor(mask)
   infer_meta :
     func : DropoutInferMeta
+    spmd_rule: DropoutFwdInferSpmd
   kernel :
     func : dropout
     data_type : x
@@ -1605,6 +1617,18 @@
   inplace : (x -> out)
   backward : elu_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+
+- op : embedding_with_scaled_gradient
+  args : (Tensor x, Tensor weight, int64_t padding_idx=-1)
+  output : Tensor
+  infer_meta :
+    func : EmbeddingInferMeta
+    param : [x, weight, padding_idx]
+  kernel :
+    func : embedding {dense, dense -> dense}
+    param : [x, weight, padding_idx]
+    data_type : weight
+  backward : embedding_with_scaled_gradient_grad
 
 - op : empty
   args : (IntArray shape, DataType dtype=DataType::FLOAT32, Place place=CPUPlace())
@@ -2033,6 +2057,7 @@
     func : fmax
   backward : fmax_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+  traits : pir::BinaryElementWiseTrait
 
 - op : fmin
   args : (Tensor x, Tensor y)
@@ -2044,6 +2069,7 @@
     func : fmin
   backward : fmin_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+  traits : pir::BinaryElementWiseTrait
 
 - op : fold
   args: (Tensor x, int[] output_sizes, int[] kernel_sizes,  int[] strides, int[] paddings, int[] dilations)
@@ -2250,6 +2276,7 @@
   inplace: (x -> out)
   backward : gammaincc_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+  traits : pir::BinaryElementWiseTrait
 
 - op : gammaln
   args : (Tensor x)
@@ -2477,6 +2504,7 @@
   kernel :
     func : hardsigmoid
   backward : hardsigmoid_grad
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : hardtanh
   args : (Tensor x, float t_min=0, float t_max=24)
@@ -2499,6 +2527,7 @@
     func : heaviside
   backward : heaviside_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+  traits : pir::BinaryElementWiseTrait
 
 - op : hinge_loss
   args: (Tensor logits, Tensor labels)
@@ -3567,7 +3596,7 @@
   kernel :
     func : nextafter
     data_type : x
-  traits : paddle::dialect::ForwardOnlyTrait
+  traits : paddle::dialect::ForwardOnlyTrait, pir::BinaryElementWiseTrait
   interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : nll_loss
@@ -4800,7 +4829,7 @@
   kernel :
     func : strided_slice
   backward : strided_slice_grad
-  interfaces : paddle::dialect::InferSymbolicShapeInterface
+  # interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : sum
   args : (Tensor x, IntArray axis={}, DataType dtype=DataType::UNDEFINED, bool keepdim=false)

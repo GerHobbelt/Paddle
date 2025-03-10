@@ -507,11 +507,8 @@ void BindTensor(pybind11::module &m) {  // NOLINT
         return std::make_unique<phi::DenseTensor>(new_offset_lod);
       }))
       .def(py::init([]() { return std::make_unique<phi::DenseTensor>(); }))
-      // We implement offset based LOD in C++ while we use length based with
-      // Python API. So we changed set_lod to set_recursive_sequence_lengths
-      // to
-      // avoid misuse.
-      // The discussion is here:
+      // We implement offset based LegacyLoD in C++ while we use length based
+      // with Python API. The discussion is here:
       // https://github.com/PaddlePaddle/Paddle/issues/10855
       .def(
           "set_lod",
@@ -651,7 +648,6 @@ void BindTensor(pybind11::module &m) {  // NOLINT
           dst.clear();
           dst.Resize({0});
         }
-        dst.set_lod(self.lod());
         return dst;
 #ifdef _WIN32
       });
@@ -681,7 +677,6 @@ void BindTensor(pybind11::module &m) {  // NOLINT
              auto dtype =
                  static_cast<phi::DataType>(t[1].cast<int>());
              auto dims = common::make_ddim(t[2].cast<std::vector<int>>());
-             auto lod_info = t[3].cast<phi::LegacyLoD>();
              auto device_id = t[4].cast<int>();
 
              auto shared_reader_holder =
@@ -692,7 +687,6 @@ void BindTensor(pybind11::module &m) {  // NOLINT
 
              self.ResetHolderWithType(shared_reader_holder, dtype);
              self.Resize(dims);
-             self.set_lod(lod_info);
 
              VLOG(6) << "Reconstructed tensor with buffer shared!";
            },
@@ -792,7 +786,6 @@ void BindTensor(pybind11::module &m) {  // NOLINT
                  shared_reader_holder,
                  static_cast<phi::DataType>(t[3].cast<int>()));
              tensor.Resize(common::make_ddim(t[4].cast<std::vector<int>>()));
-             tensor.set_lod(t[5].cast<phi::LegacyLoD>());
 
              return tensor;
            },
@@ -927,7 +920,6 @@ void BindTensor(pybind11::module &m) {  // NOLINT
                  shared_holder,
                  static_cast<phi::DataType>(t[3].cast<int>()));
              tensor.Resize(common::make_ddim(t[4].cast<std::vector<int>>()));
-             tensor.set_lod(t[5].cast<phi::LegacyLoD>());
 
              return tensor;
            },
@@ -1015,7 +1007,6 @@ void BindTensor(pybind11::module &m) {  // NOLINT
                 shared_reader_holder,
                 static_cast<phi::DataType>(t[2].cast<int>()));
             tensor.Resize(common::make_ddim(t[3].cast<std::vector<int>>()));
-            tensor.set_lod(t[4].cast<phi::LegacyLoD>());
 
             return tensor;
           }));

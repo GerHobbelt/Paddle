@@ -87,6 +87,32 @@ class CastLonglong2Int : public ir::IRMutator<> {
     ir::IRMutator<>::Visit(&node->value, &node->value);
     ir::IRMutator<>::Visit(&node->tensor, &node->tensor);
   }
+  void Visit(const ir::IfThenElse* op, Expr* expr) override {
+    auto node = expr->As<ir::IfThenElse>();
+    auto cond = node->condition;
+    if (cond.is_cmp()) {
+      if (cond->operand(0).is_index())
+        cond->operand(0)->convert_int64_to_int32();
+      if (cond->operand(1).is_index())
+        cond->operand(1)->convert_int64_to_int32();
+    }
+    ir::IRMutator<>::Visit(&node->true_case, &node->true_case);
+    if (node->false_case.defined()) {
+      ir::IRMutator<>::Visit(&node->false_case, &node->false_case);
+    }
+  }
+  void Visit(const ir::Select* op, Expr* expr) override {
+    auto node = expr->As<ir::Select>();
+    auto cond = node->condition;
+    if (cond.is_cmp()) {
+      if (cond->operand(0).is_index())
+        cond->operand(0)->convert_int64_to_int32();
+      if (cond->operand(1).is_index())
+        cond->operand(1)->convert_int64_to_int32();
+    }
+    ir::IRMutator<>::Visit(&node->true_value, &node->true_value);
+    ir::IRMutator<>::Visit(&node->false_value, &node->false_value);
+  }
   void Visit(const ir::For* op, Expr* expr) override {
     auto node = expr->As<ir::For>();
     CastVarWithBound(node->loop_var);

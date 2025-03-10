@@ -285,10 +285,15 @@ struct FlashAttnFwdParamsV2 : public FlashAttnParamsBase {
     // with the same size.
     rng_state = Empty<int64_t>(ctx, {2});
 
-    auto seed_offset_pair = GenerateRNGState(
-        ctx, fixed_seed_offset, rng_name, batch_size, num_heads);
-    seed = seed_offset_pair.first;
-    offset = seed_offset_pair.second;
+    if (_dropout > 0.0f) {
+      auto seed_offset_pair = GenerateRNGState(
+          ctx, fixed_seed_offset, rng_name, batch_size, num_heads);
+      seed = seed_offset_pair.first;
+      offset = seed_offset_pair.second;
+    } else {
+      seed = 0;
+      offset = 0;
+    }
 
     seed_offset->Resize({2});
     int64_t* seed_offset_data = ctx.template HostAlloc<int64_t>(seed_offset);

@@ -177,22 +177,24 @@ std::vector<std::pair<size_t, size_t>> GetNonBroadCastDims(pir::Operation* op) {
   return res;
 }
 
+symbol::DimExpr GetShapeProduct(const std::vector<symbol::DimExpr>& shape,
+                                int start,
+                                int end) {
+  symbol::DimExpr product(1);
+  for (int i = start; i < end; ++i) {
+    product = product * shape[i];
+  }
+  return symbol::SimplifyDimExpr(product);
+}
+
 bool ShapeProductEqual(const std::vector<symbol::DimExpr>& in_shape,
                        const std::vector<symbol::DimExpr>& out_shape,
                        int in_start,
                        int in_end,
                        int out_start,
                        int out_end) {
-  symbol::DimExpr in_product(1);
-  symbol::DimExpr out_product(1);
-  for (int i = in_start; i < in_end; ++i) {
-    in_product = in_product * in_shape[i];
-  }
-  for (int i = out_start; i < out_end; ++i) {
-    out_product = out_product * out_shape[i];
-  }
-  return symbol::SimplifyDimExpr(in_product) ==
-         symbol::SimplifyDimExpr(out_product);
+  return GetShapeProduct(in_shape, in_start, in_end) ==
+         GetShapeProduct(out_shape, out_start, out_end);
 }
 
 std::vector<std::pair<int, int>> PartionReshapeAxes(

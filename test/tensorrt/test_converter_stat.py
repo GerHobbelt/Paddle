@@ -24,7 +24,7 @@ class TestMean0TRTPattern(TensorRTBaseTest):
     def setUp(self):
         self.python_api = paddle.mean
         self.api_args = {
-            "x": np.random.randn(2, 3).astype(np.float32),
+            "x": np.random.randn(2, 3).astype("float32"),
             "axis": [1],
             "keepdim": False,
         }
@@ -40,7 +40,7 @@ class TestMean1TRTPattern(TensorRTBaseTest):
     def setUp(self):
         self.python_api = paddle.mean
         self.api_args = {
-            "x": np.random.randn(2, 3, 2).astype(np.float32),
+            "x": np.random.randn(2, 3, 2).astype("float32"),
             "axis": [1, 1],
             "keepdim": True,
         }

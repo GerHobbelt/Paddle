@@ -36,8 +36,6 @@
 #include "paddle/pir/include/dialect/control_flow/ir/cf_op.h"
 #include "paddle/pir/include/dialect/shape/utils/shape_or_data_expr.h"
 
-PD_DECLARE_bool(cinn_bucket_compile);
-
 using cinn::hlir::framework::pir::CompatibleInfo;
 using cinn::hlir::framework::pir::OpLoweringGroup;
 using cinn::hlir::framework::pir::OpLoweringGroupPtr;

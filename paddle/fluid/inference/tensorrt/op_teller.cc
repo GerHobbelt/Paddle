@@ -946,12 +946,18 @@ struct SimpleOpTypeSetTeller : public Teller {
 
       auto resize_inputs = desc.Inputs();
       if (resize_inputs.find("SizeTensor") != resize_inputs.end()) {
+#if IS_TRT_VERSION_GE(8200)
+        if (desc.Input("SizeTensor").size() == 2) {
+          return true;
+        }
+#else
         if (!desc.Input("SizeTensor").empty()) {
           VLOG(3)
               << "The Paddle-TRT doesn't support the SizeTensor for op_type "
               << op_type;
           return false;
         }
+#endif
       }
       if (resize_inputs.find("OutSize") != resize_inputs.end()) {
         if (!with_dynamic_shape) {

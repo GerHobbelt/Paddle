@@ -341,13 +341,13 @@ class TestFakeInit(TranspilerTest):
         dict_size, embedding_size, neg_num = 10000, 8, 5
 
         input_word = paddle.static.data(
-            name="input_word", shape=[-1, 1], dtype='int64', lod_level=1
+            name="input_word", shape=[-1, 1], dtype='int64'
         )
         true_word = paddle.static.data(
-            name='true_label', shape=[-1, 1], dtype='int64', lod_level=1
+            name='true_label', shape=[-1, 1], dtype='int64'
         )
         neg_word = paddle.static.data(
-            name="neg_label", shape=[-1, 1], dtype='int64', lod_level=1
+            name="neg_label", shape=[-1, 1], dtype='int64'
         )
         inputs = [input_word, true_word, neg_word]
 
@@ -686,13 +686,13 @@ class TestDistLookupTableBase(TranspilerTest):
             return pool
 
         title_ids = paddle.static.data(
-            name='title_ids', shape=[-1, 1], dtype='int64', lod_level=1
+            name='title_ids', shape=[-1, 1], dtype='int64'
         )
         brand_ids = paddle.static.data(
-            name='brand_ids', shape=[-1, 1], dtype='int64', lod_level=1
+            name='brand_ids', shape=[-1, 1], dtype='int64'
         )
         profile_ids = paddle.static.data(
-            name='brand_ids', shape=[-1, 1], dtype='int64', lod_level=1
+            name='brand_ids', shape=[-1, 1], dtype='int64'
         )
         title_emb = emb_pool(title_ids, self.lookup_table_name, is_distributed)
         brand_emb = emb_pool(brand_ids, self.lookup_table_name, is_distributed)

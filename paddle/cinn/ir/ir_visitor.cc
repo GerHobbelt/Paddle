@@ -23,11 +23,6 @@
 namespace cinn {
 namespace ir {
 
-bool operator==(Expr a, Expr b) {
-  if (a.get() == b.get()) return true;
-  return ir_utils::IRCompare(a, b);
-}
-
 template <typename T>
 static bool CompareExpressions(const ir::IndexExpr& a, const ir::IndexExpr& b) {
   auto aPart = common::GetFlattenExprs<T>(a);
@@ -67,7 +62,28 @@ static bool CompareExpressions(const ir::IndexExpr& a, const ir::IndexExpr& b) {
   return true;
 }
 
+bool operator==(Expr a, Expr b) {
+  if (a.get() == b.get())
+    return true;
+  else if (a.is_index() && b.is_index())
+    return a.as_index() == b.as_index();
+  else
+    return ir_utils::IRCompare(a, b);
+}
+
 bool operator!=(Expr a, Expr b) { return !(a == b); }
+
+bool operator==(IndexExpr a, Expr b) {
+  return b.is_index() ? a == b.as_index() : Expr(a) == b;
+}
+
+bool operator!=(IndexExpr a, Expr b) { return !(a == b); }
+
+bool operator==(Expr a, IndexExpr b) {
+  return a.is_index() ? a.as_index() == b : a == Expr(b);
+}
+
+bool operator!=(Expr a, IndexExpr b) { return !(a == b); }
 
 bool operator==(IndexExpr a, IndexExpr b) {
   if (a.get() == b.get()) return true;
@@ -75,13 +91,6 @@ bool operator==(IndexExpr a, IndexExpr b) {
   std::vector<ir::IndexExpr> aPart;
   std::vector<ir::IndexExpr> bPart;
   switch (a.node_type()) {
-    case ir::IrNodeTy::IterMark:
-      [[fallthrough]];
-    case ir::IrNodeTy::IterSplit:
-      [[fallthrough]];
-    case ir::IrNodeTy::IterSum: {
-      return ir_utils::IRCompare(a, b);
-    }
     case ir::IrNodeTy::IntImm: {
       return a.as_int64() == b.as_int64();
     }
@@ -90,13 +99,12 @@ bool operator==(IndexExpr a, IndexExpr b) {
     }
     case ir::IrNodeTy::Div:
     case ir::IrNodeTy::Mod: {
-      return a->operand(0).as_index() == b->operand(0).as_index() &&
-             a->operand(1).as_index() == b->operand(1).as_index();
+      return a->operand(0) == b->operand(0) && a->operand(1) == b->operand(1);
     }
     case ir::IrNodeTy::Add:
-      return CompareExpressions<ir::Add>(a.as_index(), b.as_index());
+      return CompareExpressions<ir::Add>(a, b);
     case ir::IrNodeTy::Mul:
-      return CompareExpressions<ir::Mul>(a.as_index(), b.as_index());
+      return CompareExpressions<ir::Mul>(a, b);
   }
 }
 

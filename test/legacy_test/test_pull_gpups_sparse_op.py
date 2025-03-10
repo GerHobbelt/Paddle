@@ -33,7 +33,7 @@ class TestPullGpupsSparse(unittest.TestCase):
             slots = []
             with base.program_guard(train_program, startup_program):
                 l = paddle.static.data(
-                    name='input', shape=[-1, 1], dtype="int64", lod_level=1
+                    name='input', shape=[-1, 1], dtype="int64"
                 )
                 slots.append(l)
                 output = _pull_gpups_sparse(

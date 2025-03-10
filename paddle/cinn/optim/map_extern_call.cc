@@ -106,6 +106,12 @@ void DealWithIntrinsicsImpl(common::HygonDCUArchHIP,
   DealWithIntrinsicsNvHygon(node, expr);
 }
 
+void DealWithIntrinsicsImpl(common::HygonDCUArchSYCL,
+                            ir::Call *node,
+                            Expr *expr) {
+  DealWithIntrinsicsNvHygon(node, expr);
+}
+
 void DealWithIntrinsics(common::Arch arch, ir::Call *node, Expr *expr) {
   return std::visit(
       [&](const auto &impl) {

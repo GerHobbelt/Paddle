@@ -376,7 +376,7 @@ std::vector<FusibleOp> TransformReduceLoopRange(
             : GetOutputIters(*downstream),
         GetReduceIters(upstream),
         GetInitExpr(upstream),
-        ComposeUtils::CopyedReplaceExpr(GetComputeBody(upstream),
+        ComposeUtils::CopiedReplaceExpr(GetComputeBody(upstream),
                                         GetOutputIters(upstream),
                                         load_tensor.As<ir::Load>()->indices),
         new_tensor,

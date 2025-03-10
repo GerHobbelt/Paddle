@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cstdlib>
+#include <filesystem>
 #include <fstream>
 #include <memory>
 #include <set>
@@ -26,6 +27,7 @@
 #include <vector>
 
 #include "paddle/common/enforce.h"
+#include "paddle/common/errors.h"
 #include "paddle/fluid/framework/feed_fetch_method.h"
 #include "paddle/fluid/framework/feed_fetch_type.h"
 #include "paddle/fluid/framework/feed_hook.h"
@@ -102,6 +104,7 @@
 #include "paddle/cinn/hlir/dialect/operator/transforms/add_cinn_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/check_infer_symbolic_util.h"
 #include "paddle/pir/include/dialect/shape/ir/shape_dialect.h"
+#include "paddle/pir/include/dialect/shape/transforms/shape_optimization_pass.h"
 #include "paddle/pir/include/dialect/shape/utils/shape_analysis.h"
 #endif
 
@@ -114,6 +117,7 @@
 #include "paddle/fluid/pir/transforms/general/common_subexpression_elimination_pass.h"
 #include "paddle/fluid/pir/transforms/general/constant_folding_pass.h"
 #include "paddle/fluid/pir/transforms/general/dead_code_elimination_pass.h"
+#include "paddle/fluid/pir/transforms/general/delete_assert_op_pass.h"
 #include "paddle/fluid/pir/transforms/general/inplace_pass.h"
 #include "paddle/fluid/pir/transforms/general/params_sync_among_devices_pass.h"
 #include "paddle/fluid/pir/transforms/general/remove_shadow_feed_pass.h"
@@ -126,7 +130,6 @@
 #include "paddle/pir/include/core/block_argument.h"
 #include "paddle/pir/include/core/builtin_attribute.h"
 #include "paddle/pir/include/core/program.h"
-#include "paddle/pir/include/dialect/shape/transforms/shape_optimization_pass.h"
 #include "paddle/pir/include/pass/pass_manager.h"
 #include "paddle/pir/include/pass/pass_registry.h"
 
@@ -426,7 +429,8 @@ bool AnalysisPredictor::Init(
     platform::CudaProfilerStart();
     platform::NvprofEnableRecordEvent();
 #endif
-    platform::EnableProfiler(platform::ProfilerState::kAll);
+    platform::EnableProfiler(config_.use_gpu() ? platform::ProfilerState::kAll
+                                               : platform::ProfilerState::kCPU);
   }
 
   if (!status_is_cloned_) {
@@ -437,8 +441,21 @@ bool AnalysisPredictor::Init(
   paddle::platform::SetNumThreads(config_.cpu_math_library_num_threads());
 
   std::string model_path = config_.prog_file();
-  load_pir_model_ =
-      model_path.substr(model_path.find_last_of(".") + 1) == "json";
+  if (!model_path.empty()) {
+    load_pir_model_ =
+        model_path.substr(model_path.find_last_of(".") + 1) == "json";
+  } else if (!config_.model_dir().empty()) {
+    std::string model_dir = config_.model_dir();
+    load_pir_model_ = false;
+    for (const auto &entry : std::filesystem::directory_iterator(model_dir)) {
+      if (entry.is_regular_file() &&
+          entry.path().filename() == "__model__.json") {
+        load_pir_model_ = true;
+        config_.SetProgFile(config_.model_dir() + "/__model__.json");
+        break;
+      }
+    }
+  }
   if (load_pir_model_) {
     config_.use_pir_ = true;
     config_.use_new_executor_ = true;
@@ -642,6 +659,14 @@ void AnalysisPredictor::ClearExtraParams() {
         op_desc->SetAttr("predictor_id", predictor_id_);
       }
     }
+#ifdef PADDLE_WITH_OPENVINO
+    if (op_desc->Type() == "openvino_engine") {
+      if (op_desc->HasAttr("inference_num_threads")) {
+        op_desc->SetAttr("inference_num_threads",
+                         config_.cpu_math_library_num_threads_);
+      }
+    }
+#endif
   }
 
   std::vector<std::string> extra_params;
@@ -806,8 +831,7 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
 
   auto AddAutoLayoutPasses = [&](pir::PassManager &pass_manager) {
     auto &pass_registry = pir::PassRegistry::Instance();
-    std::vector<std::string> passes = {"auto_layout_pass",
-                                       "auto_layout_simplify_pass"};
+    std::vector<std::string> passes = {"auto_layout_pass"};
 
     for (const auto &pass_name : passes) {
       if (std::find(config_.deleted_passes_.begin(),
@@ -866,11 +890,26 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
       return pass_manager;
     };
 
+    if (config_.cinn_enabled() && !config_.custom_pass_only_) {
+      ::pir::PassManager delete_assert_op_pm(::pir::IrContext::Instance(),
+                                             config_.pm_opt_level_);
+      delete_assert_op_pm.AddPass(pir::CreateDeleteAssertOpPass());
+      delete_assert_op_pm.Run(pir_program_.get());
+    }
+
     if (config_.use_gpu() && config_.cinn_enabled()) {
       if (!config_.custom_pass_only_) {
         ::pir::PassManager fused_op_pm(::pir::IrContext::Instance(),
                                        config_.pm_opt_level_);
+        auto &shape_analysis =
+            pir::ShapeAnalysisManager::Instance().Get(pir_program_.get());
+        fused_op_pm.SetValueReplacedHook([&](pir::Value from, pir::Value to) {
+          shape_analysis.ShareShapeOrData(from, to);
+        });
+        // Infer symbol shape for all ops before fused pass
+        fused_op_pm.AddPass(pir::CreateShapeOptimizationPass());
         const std::vector<std::string> FusedOpPasses{// Operator fusion pass
+                                                     "map_op_to_another_pass",
                                                      "conv2d_bn_fuse_pass",
                                                      "conv2d_add_act_fuse_pass",
                                                      "conv2d_add_fuse_pass"};
@@ -903,7 +942,8 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
 
     if (config_.cinn_enabled()) {
       VLOG(4) << "[CINN] Begin ApplyCinnPass";
-      cinn::dialect::ir::ApplyCinnPass(pir_program_.get(), CreatePassMgr);
+      cinn::dialect::ir::ApplyCinnPass(
+          pir_program_.get(), CreatePassMgr, false);
     }
 #endif
 
@@ -1204,6 +1244,11 @@ bool AnalysisPredictor::SaveOrLoadPirParameters(bool for_save) {
               << " persistable is false, will ignore it when load variables.";
     }
   }
+  bool load_separate_params_ = true;
+  if (!for_save && config_.model_dir().empty()) {
+    // Combine model
+    load_separate_params_ = false;
+  }
 
   if (for_save) {
     std::string optimized_params =
@@ -1214,8 +1259,72 @@ bool AnalysisPredictor::SaveOrLoadPirParameters(bool for_save) {
         const_tensor_out, param_names, optimized_params, true, false, true);
     LOG(INFO) << "Optimized params saved to " << optimized_params;
   } else {
-    pir::LoadCombineFunction(
-        config_.params_file(), filter_param_names, &tensor_out, false, place_);
+    if (load_separate_params_) {
+      std::string params_dir = config_.model_dir();
+
+      auto process_params = [this, &params_dir, &filter_param_names](
+                                size_t start_idx, size_t end_idx) {
+        std::vector<phi::DenseTensor *> local_tensor_out;
+
+        for (size_t j = start_idx; j < end_idx; ++j) {
+          const auto &param_name = filter_param_names[j];
+          std::string param_file = params_dir + "/" + param_name;
+
+          auto *var = sub_scope_->FindVar(param_name);
+          VLOG(4) << "persistable variable's name: " << param_name;
+          if (var == nullptr) {
+            VLOG(4) << "Variable " << param_name << " not found in scope";
+            continue;
+          }
+          auto *tensor_temp = var->GetMutable<phi::DenseTensor>();
+
+          pir::LoadFunction(param_file, -1, {}, false, tensor_temp, place_);
+
+          local_tensor_out.push_back(tensor_temp);
+        }
+
+        return local_tensor_out;
+      };
+
+      size_t num_threads = 8;
+      size_t chunk_size = std::max(static_cast<size_t>(1),
+                                   filter_param_names.size() / num_threads);
+      num_threads =
+          std::min(num_threads, filter_param_names.size() / chunk_size);
+      size_t remain_size = filter_param_names.size() % num_threads;
+      VLOG(4) << "Start Load with multi-thread: " << num_threads
+              << " chund size: " << chunk_size;
+
+      std::vector<std::future<std::vector<phi::DenseTensor *>>> futures;
+
+      for (size_t i = 0; i < num_threads; ++i) {
+        size_t start_idx = i * chunk_size;
+        size_t end_idx = start_idx + chunk_size;
+
+        futures.push_back(
+            std::async(std::launch::async, process_params, start_idx, end_idx));
+      }
+      if (remain_size > 0) {
+        futures.push_back(std::async(std::launch::async,
+                                     process_params,
+                                     filter_param_names.size() - remain_size,
+                                     filter_param_names.size()));
+      }
+
+      std::vector<phi::DenseTensor *> tensor_out;
+      for (auto &future : futures) {
+        auto local_tensor_out = future.get();
+        tensor_out.insert(
+            tensor_out.end(), local_tensor_out.begin(), local_tensor_out.end());
+      }
+
+    } else {
+      pir::LoadCombineFunction(config_.params_file(),
+                               filter_param_names,
+                               &tensor_out,
+                               false,
+                               place_);
+    }
   }
   return true;
 }
@@ -1873,6 +1982,7 @@ void AnalysisPredictor::PrepareArgument() {
     argument_->SetTensorRtUseDLA(config_.trt_use_dla_);
     argument_->SetTensorRtDLACore(config_.trt_dla_core_);
     argument_->SetTensorRtUseStaticEngine(config_.trt_use_static_engine_);
+
     argument_->SetTensorRtUseCalibMode(config_.trt_use_calib_mode_);
     argument_->SetTensorRtUseCudaGraph(config_.trt_use_cuda_graph_);
     argument_->SetCloseTrtPluginFp16(config_.disable_trt_plugin_fp16_);
@@ -1889,7 +1999,12 @@ void AnalysisPredictor::PrepareArgument() {
   }
 
   argument_->SetUseXpu(config_.use_xpu_);
-
+#ifdef PADDLE_WITH_OPENVINO
+  argument_->SetUseOpenVINO(config_.use_openvino_);
+  argument_->SetCpuMathLibraryNumThreads(config_.cpu_math_library_num_threads_);
+  argument_->SetOpenvinoInferencePrecision(static_cast<int>(
+      paddle::ConvertPrecision(config_.openvino_inference_precision_)));
+#endif
 #ifdef PADDLE_WITH_IPU
   argument_->SetUseIpu(config_.use_ipu());
   argument_->SetIpuDeviceNum(config_.ipu_device_num());
@@ -2911,6 +3026,11 @@ uint64_t AnalysisPredictor::TryShrinkMemory() {
 }
 
 void AnalysisPredictor::ClearIntermediateTensor() {
+  if (config_.new_ir_enabled()) {
+    PADDLE_THROW(common::errors::PreconditionNotMet(
+        "Don't need to use this API [ClearIntermediateTensor] when PIR is "
+        "enabled."));
+  }
   PADDLE_ENFORCE_NOT_NULL(inference_program_.get(),
                           common::errors::PreconditionNotMet(
                               "The inference program should be loaded first."));
@@ -3012,6 +3132,14 @@ AnalysisPredictor::~AnalysisPredictor() {  // NOLINT
       }
       framework::global_transfer_scope_key().erase(sub_scope_);
     }
+    for (auto &var_name : scope_->LocalVarNames()) {
+      auto *var = scope_->FindVar(var_name);
+      if (var->IsType<phi::DenseTensor>()) {
+        auto *tensor = var->GetMutable<phi::DenseTensor>();
+        tensor->clear();
+      }
+    }
+
     scope_->DeleteScope(sub_scope_);
   }
 

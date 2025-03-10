@@ -104,6 +104,8 @@ const Target& DefaultNVGPUTarget();
 
 const Target& DefaultHygonDcuHipTarget();
 
+const Target& DefaultHygonDcuSyclTarget();
+
 const Target& DefaultDeviceTarget();
 
 const Target& DefaultTarget();

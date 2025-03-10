@@ -80,12 +80,20 @@ if(WITH_ROCM)
 else()
 
   add_definitions(-DPADDLE_WITH_FLASHATTN)
+  option(FA_BUILD_WITH_CACHE "Download cache so files from bos" ON)
 
   set(FLASHATTN_PREFIX_DIR ${THIRD_PARTY_PATH}/flashattn)
   set(FLASHATTN_SOURCE_SUBDIR csrc)
   set(FLASHATTN_INSTALL_DIR ${THIRD_PARTY_PATH}/install/flashattn)
   set(SOURCE_DIR ${PADDLE_SOURCE_DIR}/third_party/flashattn)
-  set(FLASHATTN_TAG 5fc132ac11e78d26471ca09e5ba0cd817c3424d8)
+
+  # get FA git commit
+  execute_process(
+    COMMAND git rev-parse HEAD
+    WORKING_DIRECTORY ${SOURCE_DIR}
+    OUTPUT_VARIABLE FLASHATTN_TAG
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "flashattn git commit: ${FLASHATTN_TAG}")
 
   set(FLASHATTN_INCLUDE_DIR
       "${FLASHATTN_INSTALL_DIR}/include"
@@ -166,6 +174,99 @@ else()
     endif()
   endforeach()
 
+  set(BASE_URL
+      "https://xly-devops.bj.bcebos.com/gpups/flash-attention/cu${FA_NVCC_ARCH_BIN}"
+  )
+  set(TAR_FILE_NAME "flashattn_libs_${FLASHATTN_TAG}.tar")
+  set(TAR_FILE_URL "${BASE_URL}/${TAR_FILE_NAME}")
+  set(FA_BUILD_DIR "${FLASHATTN_PREFIX_DIR}/src/extern_flashattn-build/")
+  set(CACHE_TAR_PATH "${FA_BUILD_DIR}/${TAR_FILE_NAME}")
+  set(CACHE_TAR_DIR "${FA_BUILD_DIR}/flashattn_libs_${FLASHATTN_TAG}")
+
+  set(SKIP_BUILD_FA OFF)
+  if(FA_BUILD_WITH_CACHE)
+
+    message(STATUS "Downloading ${TAR_FILE_URL} to ${CACHE_TAR_PATH}")
+    file(
+      DOWNLOAD "${TAR_FILE_URL}" "${CACHE_TAR_PATH}"
+      STATUS DOWNLOAD_STATUS
+      LOG DOWNLOAD_LOG)
+    list(GET DOWNLOAD_STATUS 0 DOWNLOAD_RESULT)
+
+    if(DOWNLOAD_RESULT EQUAL 0)
+      message(STATUS "Download Successful")
+
+      file(MAKE_DIRECTORY ${FA_BUILD_DIR})
+
+      execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xf ${CACHE_TAR_PATH}
+        WORKING_DIRECTORY ${FA_BUILD_DIR}
+        RESULT_VARIABLE TAR_RESULT)
+
+      if(NOT TAR_RESULT EQUAL 0)
+        message(FATAL_ERROR "Failed to extract ${CACHE_TAR_PATH}")
+      endif()
+
+      file(STRINGS ${CACHE_TAR_DIR}/MD5.txt FILE_MD5)
+
+      # Strip any leading or trailing whitespace
+      string(STRIP ${FILE_MD5} FILE_MD5)
+
+      file(MD5 ${CACHE_TAR_DIR}/fa_libs.tar FILE_MD5_ACTUAL)
+
+      message(STATUS "Expected MD5: ${FILE_MD5}")
+      message(STATUS "Actual MD5:   ${FILE_MD5_ACTUAL}")
+
+      if(NOT "${FILE_MD5}" STREQUAL "${FILE_MD5_ACTUAL}")
+        message(
+          FATAL_ERROR "MD5 checksum mismatch! The download may be corrupted.")
+      else()
+        message(STATUS "MD5 checksum verified successfully.")
+      endif()
+
+      execute_process(
+        COMMAND ${CMAKE_COMMAND} -E tar xf ${CACHE_TAR_DIR}/fa_libs.tar
+        WORKING_DIRECTORY ${CACHE_TAR_DIR}
+        RESULT_VARIABLE TAR_RESULT)
+
+      if(NOT TAR_RESULT EQUAL 0)
+        message(FATAL_ERROR "Failed to extract ${CACHE_TAR_PATH}/fa_libs.tar")
+      endif()
+
+      file(GLOB_RECURSE SO_FILES "${CACHE_TAR_DIR}/fa_libs/*.so")
+      foreach(so_file ${SO_FILES})
+        message(STATUS "Copy ${so_file} to ${FA_BUILD_DIR}")
+        message(STATUS "Copy ${so_file} to ${FLASHATTN_LIB_DIR}")
+        file(COPY "${so_file}" DESTINATION "${FA_BUILD_DIR}")
+        file(COPY "${so_file}" DESTINATION "${FLASHATTN_LIB_DIR}")
+      endforeach()
+
+      file(REMOVE_RECURSE ${CACHE_TAR_DIR})
+      message(STATUS "Extraction completed in ${FA_BUILD_DIR}")
+
+      set(SKIP_BUILD_FA ON)
+
+    elseif(DOWNLOAD_RESULT EQUAL 6)
+      message(
+        STATUS
+          "Could not resolve host. The given remote host was not resolvable.")
+    elseif(DOWNLOAD_RESULT EQUAL 7)
+      message(STATUS "Failed to connect to host.")
+    elseif(DOWNLOAD_RESULT EQUAL 22)
+      message(
+        STATUS
+          "HTTP page not retrieved. The requested URL was not found or a server returned a 4xx (client error) or 5xx (server error) response."
+      )
+    elseif(DOWNLOAD_RESULT EQUAL 28)
+      message(
+        STATUS
+          "Operation timeout. The specified time-out period was reached according to the conditions."
+      )
+    else()
+      message(STATUS "An error occurred. Error code: ${DOWNLOAD_RESULT}")
+    endif()
+  endif()
+
   ExternalProject_Add(
     extern_flashattn
     ${EXTERNAL_PROJECT_LOG_ARGS}
@@ -196,13 +297,13 @@ else()
                -DCMAKE_JOB_POOLS:STRING=compile=${FA_JOB_POOLS_COMPILE}
                -DNVCC_ARCH_BIN=${FA_NVCC_ARCH_BIN}
                -DWITH_FLASHATTN_V3=${WITH_FLASHATTN_V3}
+               -DSKIP_BUILD_FA=${SKIP_BUILD_FA}
                ${EXTERNAL_OPTIONAL_ARGS}
     CMAKE_CACHE_ARGS
       -DCMAKE_BUILD_TYPE:STRING=${THIRD_PARTY_BUILD_TYPE}
       -DCMAKE_POSITION_INDEPENDENT_CODE:BOOL=ON
       -DCMAKE_INSTALL_PREFIX:PATH=${FLASHATTN_INSTALL_DIR}
     BUILD_BYPRODUCTS ${BUILD_BYPRODUCTS_LIST})
-
 endif()
 
 message(STATUS "flash-attn library: ${FLASHATTN_LIBRARIES}")

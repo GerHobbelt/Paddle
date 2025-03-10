@@ -1531,7 +1531,7 @@ std::future<int32_t> BrpcPsClient::PushSparse(size_t table_id,
   CostTimer parse_timer("pserver_client_push_sparse_parse");
   int push_sparse_async_num = _push_sparse_task_queue_map[table_id]->Size();
   while (push_sparse_async_num > FLAGS_pserver_max_async_call_num) {
-    //    LOG(INFO) << "PushSparse Waiting for async_call_num comsume,
+    //    LOG(INFO) << "PushSparse Waiting for async_call_num consume,
     //    task_num:"
     //              << push_sparse_async_num
     //              << ", max_task_limit:" << FLAGS_pserver_max_async_call_num;
@@ -1892,7 +1892,7 @@ std::future<int32_t> BrpcPsClient::PushDense(const Region *regions,
       std::make_shared<CostTimer>("pserver_client_push_dense_parse");
   int push_dense_async_num = _push_dense_task_queue_map[table_id]->Size();
   while (push_dense_async_num > FLAGS_pserver_max_async_call_num) {
-    //    LOG(INFO) << "PushDense Waiting for async_call_num comsume,
+    //    LOG(INFO) << "PushDense Waiting for async_call_num consume,
     //    task_num:"
     //              << push_dense_async_num
     //              << ", max_task_limit:" << FLAGS_pserver_max_async_call_num;

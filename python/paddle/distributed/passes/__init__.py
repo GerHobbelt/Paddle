@@ -55,6 +55,9 @@ from .auto_parallel_recompute import (  # noqa: F401
     RecomputePass,
     RecomputeState,
 )
+from .auto_parallel_recompute_pir import (  # noqa: F401
+    AutoParallelRecomputePIRPass,
+)
 from .auto_parallel_replace_with_parallel_cross_entropy import (  # noqa: F401
     AutoParallelReplaceWithParallelCrossEntropyPass,
 )

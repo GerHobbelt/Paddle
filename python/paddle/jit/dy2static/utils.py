@@ -71,7 +71,7 @@ NO_SHAPE_VAR_TYPE = [
 ]
 
 
-def data_layer_not_check(name, shape, dtype='float32', lod_level=0):
+def data_layer_not_check(name, shape, dtype='float32'):
     """
     This function creates a Tensor on the global block. The created Tensor
     doesn't check the dtype and the shape of feed data because dygraph input
@@ -93,8 +93,6 @@ def data_layer_not_check(name, shape, dtype='float32', lod_level=0):
        dtype (np.dtype|VarType|str, optional): The type of the data. Supported
            dtype: bool, float16, float32, float64, int8, int16, int32, int64,
            uint8. Default: float32
-       lod_level (int, optional): The LoD level of the DenseTensor. Usually users
-           don't have to set this value. Default: 0
 
     Returns:
         Tensor: The global Tensor that gives access to the data.
@@ -111,7 +109,6 @@ def data_layer_not_check(name, shape, dtype='float32', lod_level=0):
         dtype=dtype,
         type=core.VarDesc.VarType.DENSE_TENSOR,
         stop_gradient=True,
-        lod_level=lod_level,
         is_data=True,
         need_check_feed=False,
     )

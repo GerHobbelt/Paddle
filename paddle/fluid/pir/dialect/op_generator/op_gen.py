@@ -23,7 +23,7 @@ from typing import Any, NamedTuple
 
 import yaml
 from decomp_interface_gen_op_list import (
-    decomp_interface_declare_gen_op_list,
+    decomp_rule_interface_declare_gen_op_list,
     decomp_vjp_interface_declare_gen_op_list,
 )
 from gen_utils import attr_types_map, to_pascal_case
@@ -1407,8 +1407,9 @@ def AutoCodeGen(
 
             for kernel_func_name in func_list:
                 if (
-                    op_name in decomp_interface_declare_gen_op_list
-                    and kernel_func_name in decomp_interface_declare_gen_op_list
+                    op_name in decomp_rule_interface_declare_gen_op_list
+                    and kernel_func_name
+                    in decomp_rule_interface_declare_gen_op_list
                     and dialect_name != "onednn_op"
                 ):
                     if decomp_interface_str not in op_interfaces:

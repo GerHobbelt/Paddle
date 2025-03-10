@@ -106,12 +106,12 @@ void MemcpyKernel(const Context& dev_ctx,
   PADDLE_ENFORCE_GE(
       dst_place_type,
       0,
-      errors::OutOfRange("dst_place_type only support 0-2, but got: %d",
+      errors::OutOfRange("dst_place_type only support 0-4, but got: %d",
                          dst_place_type));
   PADDLE_ENFORCE_LE(
       dst_place_type,
-      2,
-      errors::OutOfRange("dst_place_type only support 0-2, but got: %d",
+      4,
+      errors::OutOfRange("dst_place_type only support 0-4, but got: %d",
                          dst_place_type));
   switch (dst_place_type) {
     case 0: /* CPUPlace */

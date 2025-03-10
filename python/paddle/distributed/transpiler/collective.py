@@ -523,7 +523,7 @@ class SingleProcessMultiThread(GradAllReduce):
             print("begin to _transpile_startup_program for multi-node")
             print("current_endpoint: ", self.current_endpoint)
             print("total endpoints: ", self.endpoints)
-            print("rank: %d, ring_id: %d" % (self.rank, self.nrings))
+            print(f"rank: {self.rank}, ring_id: {self.nrings}")
             for ring_id in range(self.nrings):
                 self._init_communicator(
                     self.startup_program,
@@ -737,7 +737,7 @@ class MultiThread(GradAllReduce):
             print("begin to _transpile_startup_program for multi-node")
             print("current_endpoint: ", self.current_endpoint)
             print("total endpoints: ", self.endpoints)
-            print("rank: %d, ring_id: %d" % (self.rank, self.nrings))
+            print(f"rank: {self.rank}, ring_id: {self.nrings}")
             for ring_id in range(self.nrings):
                 self._init_communicator(
                     self.startup_program,

@@ -809,6 +809,27 @@ class TestMathOpPatchesPir(unittest.TestCase):
                 np.testing.assert_array_equal(res, a_np)
                 np.testing.assert_array_equal(res, b_np)
 
+    def test_negative(self):
+        x_np = np.random.uniform(-1, 1, [10, 1024]).astype(np.float32)
+        res = -x_np
+        with paddle.pir_utils.IrGuard():
+            main_program, exe, program_guard = new_program()
+            with program_guard:
+                x = paddle.static.data(
+                    name='x', shape=[10, 1024], dtype="float32"
+                )
+                a = -x
+                b = x.negative()
+                c = paddle.negative(x)
+                (a_np, b_np, c_np) = exe.run(
+                    main_program,
+                    feed={"x": x_np},
+                    fetch_list=[a, b, c],
+                )
+                np.testing.assert_array_equal(res, a_np)
+                np.testing.assert_array_equal(res, b_np)
+                np.testing.assert_array_equal(res, c_np)
+
     def test_abs(self):
         # test for real number
         x_np = np.random.uniform(-1, 1, [10, 1024]).astype(np.float32)

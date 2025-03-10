@@ -26,6 +26,24 @@ bool ArangeOpInferSymbolicShape(pir::Operation *op,
   const auto &step_shape_or_data =
       infer_context->GetShapeOrDataForValue(op->operand_source(2));
 
+  const auto result = op->result(0);
+  bool contain_unknown_dim = [&]() {
+    bool check = result && result.type() &&
+                 result.type().isa<paddle::dialect::DenseTensorType>();
+    PADDLE_ENFORCE_EQ(check,
+                      true,
+                      phi::errors::PreconditionNotMet(
+                          "result for arange must be DenseTensorType"));
+    const auto dims =
+        result.type().dyn_cast<paddle::dialect::DenseTensorType>().dims();
+    return ::common::contain_unknown_dim(dims);
+  }();
+
+  if (!contain_unknown_dim) {
+    infer_context->SetSymbolForValueByStaticShape(result);
+    return true;
+  }
+
   const symbol::ShapeOrDataDimExprs &shape_data = [&] {
     if (!start_shape_or_data.data().has_value() ||
         !end_shape_or_data.data().has_value() ||

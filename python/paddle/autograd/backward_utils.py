@@ -55,6 +55,7 @@ ALLOW_DYNAMIC_SHAPE_VJP_OPS = [
     "pd_op.gather",
     "pd_op.gather_nd",
     "pd_op.gelu",
+    "pd_op.hardsigmoid",
     "pd_op.hardswish",
     "pd_op.kron",
     "pd_op.kthvalue",
@@ -74,6 +75,7 @@ ALLOW_DYNAMIC_SHAPE_VJP_OPS = [
     "pd_op.prod",
     "pd_op.reduce_as",
     "pd_op.relu",
+    "pd_op.relu6",
     "pd_op.reshape",
     "pd_op.roll",
     "pd_op.rsqrt",
@@ -102,6 +104,7 @@ ALLOW_DYNAMIC_SHAPE_VJP_OPS = [
     "pd_op.trunc",
     "pd_op.unsqueeze",
     "pd_op.where",
+    "pd_op.p_norm",
 ]
 
 
@@ -236,8 +239,17 @@ class ValueSet:
     def pop(self):
         return self._set.pop()._value
 
+    def remove(self, val):
+        self._set.remove(ValueWrapper(val))
+
+    def discard(self, val):
+        self._set.discard(ValueWrapper(val))
+
     def __and__(self, other: ValueSet):
         return ValueSet(self._set & other._set)
+
+    def __sub__(self, other: ValueSet):
+        return ValueSet(self._set - other._set)
 
     def __or__(self, other: ValueSet):
         return ValueSet(self._set | other._set)
@@ -328,7 +340,11 @@ class State:
 def _check_vjp_dynamic_shape(op, inputs):
     for items in inputs:
         for item in items:
-            if item.initialized() and -1 in item.shape:
+            if (
+                item.is_dense_tensor_type()
+                and item.initialized()
+                and -1 in item.shape
+            ):
                 return True
 
 

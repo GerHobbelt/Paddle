@@ -30,7 +30,7 @@ std::optional<ir::IndexExpr> DivMulAddModCornerCase(const ir::IndexExpr& lhs,
   auto rhsMod = rhs.As<ir::Mod>();
   if (!lhsMul || !rhsMod) return std::nullopt;
 
-  // Why inner is lhs of Mul? beacuse we sort by expr length, and the length of
+  // Why inner is lhs of Mul? because we sort by expr length, and the length of
   // inner is longer in this case.
   auto inner = lhsMul->a().as_index();
   auto mult_outer = lhsMul->b().as_index();
@@ -40,7 +40,7 @@ std::optional<ir::IndexExpr> DivMulAddModCornerCase(const ir::IndexExpr& lhs,
     auto mulPtr = inner.As<ir::Mul>();
     if (mulPtr) {
       inner = mulPtr->a().as_index();
-      mult_outer = mulPtr->b().as_index() * mult_outer.as_index();
+      mult_outer = mulPtr->b().as_index() * mult_outer;
     } else {
       break;
     }
@@ -110,7 +110,7 @@ std::optional<ir::IndexExpr> SubModCornerCase(const ir::IndexExpr& lhs,
     // Check if the negation term is a mod
     auto innerMod = beforeNegation.As<ir::Mod>();
     if (!innerMod) continue;
-    if (!ProveDivisible(innerMod->b(), rhs)) continue;
+    if (!ProveDivisible(innerMod->b().as_index(), rhs)) continue;
 
     // Check if the sum of all other terms is equal to the lhs of mod
     auto diff = ir::IndexExpr(0);
@@ -156,22 +156,18 @@ std::optional<ir::IndexExpr> MultiArgsDivAndMod(const ir::IndexExpr& lhs,
 std::optional<ir::IndexExpr> SimplifyCornerCase(const ir::IndexExpr& expr) {
   switch (expr.node_type()) {
     case ir::IrNodeTy::IntImm:
-      [[fallthrough]];
     case ir::IrNodeTy::_Var_:
       return expr;
     case ir::IrNodeTy::Add:
-      return SimplifyAddCornerCase(expr->operand(0).as_index(),
-                                   expr->operand(1).as_index());
+      return SimplifyAddCornerCase(expr.operand(0), expr.operand(1));
     case ir::IrNodeTy::Mul:
-      return SimplifyMulCornerCase(expr->operand(0).as_index(),
-                                   expr->operand(1).as_index());
+      return SimplifyMulCornerCase(expr.operand(0), expr.operand(1));
     case ir::IrNodeTy::Div:
-      return SimplifyDivCornerCase(expr->operand(0).as_index(),
-                                   expr->operand(1).as_index());
+      return SimplifyDivCornerCase(expr.operand(0), expr.operand(1));
     case ir::IrNodeTy::Mod:
-      return SimplifyModCornerCase(expr->operand(0).as_index(),
-                                   expr->operand(1).as_index());
+      return SimplifyModCornerCase(expr.operand(0), expr.operand(1));
   }
+  return std::nullopt;
 }
 
 std::optional<ir::IndexExpr> SimplifyAddCornerCase(const ir::IndexExpr& lhs,

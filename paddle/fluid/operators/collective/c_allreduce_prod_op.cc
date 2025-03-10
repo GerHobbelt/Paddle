@@ -42,13 +42,3 @@ REGISTER_OP_WITHOUT_GRADIENT(c_allreduce_prod,
                              ops::CAllReduceOp,
                              ops::CAllReduceProdOpMaker,
                              ops::AllreduceProdInplaceInferer)
-
-PD_REGISTER_STRUCT_KERNEL(c_allreduce_prod,
-                          CPU,
-                          ALL_LAYOUT,
-                          ops::CAllReduceProdCPUKernel,
-                          float,
-                          double,
-                          int,
-                          int64_t,
-                          phi::dtype::float16) {}

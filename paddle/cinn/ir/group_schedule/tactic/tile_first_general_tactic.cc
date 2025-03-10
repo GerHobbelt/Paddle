@@ -39,7 +39,7 @@ bool UseContinuousDataTile(const ScheduleConfig& config) {
 
 class TileFirstGeneralTactic final : public ScheduleTactic {
  public:
-  void Init(ScheduleContext* context) override;
+  void Init(ScheduleContext* context, ir::IRSchedule* sch) override;
 
   void Apply(ir::IRSchedule* sch, const std::string& block_id) override;
   void ApplyContinuousDataTile(ir::IRSchedule* sch,
@@ -62,6 +62,7 @@ class TileFirstGeneralTactic final : public ScheduleTactic {
 
  private:
   ScheduleContext* context_;
+  bool can_apply_;
   std::vector<int32_t> vec_spatial_axis_first_;
   std::vector<int32_t> vec_spatial_axis_last_;
   std::vector<int32_t> vec_flatten_axis_;
@@ -70,15 +71,29 @@ class TileFirstGeneralTactic final : public ScheduleTactic {
   std::unordered_map<std::string, std::string> map_global_rf_block_;
 };
 
-void TileFirstGeneralTactic::Init(ScheduleContext* context) {
+void TileFirstGeneralTactic::Init(ScheduleContext* context,
+                                  ir::IRSchedule* sch) {
   context_ = context;
+  can_apply_ = false;
+
+  // Check whether this group has been tiled by previous tactic.
+  ir::Expr module_root = sch->GetModule().GetExprs().front();
+  ir::Expr root_block = ir::analyzer::GetRootSBlock(module_root);
+  auto* root_node = root_block.As<ir::ScheduleBlockRealize>()
+                        ->schedule_block.As<ir::ScheduleBlock>();
+  if (root_node->attrs.count(kTileMethod) > 0) {
+    return;
+  }
+  can_apply_ = true;
+  root_node->attrs[kTileMethod] = TacticName();
 
   // reduce axes have been re-ordered to the last
   vec_flatten_axis_.clear();
   vec_reduce_axis_.clear();
-  int32_t reduce_start_idx = context_->config.base_info->data_rank -
-                             context_->config.base_info->reduce_axis.size();
-  for (int32_t i = 0; i < context_->config.base_info->data_rank; ++i) {
+  int data_rank = context_->config.base_info->loop_ranges.size();
+  int32_t reduce_start_idx =
+      data_rank - context_->config.base_info->reduce_axis.size();
+  for (int32_t i = 0; i < data_rank; ++i) {
     if (i >= reduce_start_idx) {
       vec_reduce_axis_.push_back(i);
     } else {
@@ -110,6 +125,7 @@ void TileFirstGeneralTactic::Init(ScheduleContext* context) {
 
 void TileFirstGeneralTactic::Apply(ir::IRSchedule* sch,
                                    const std::string& block_id) {
+  if (!can_apply_) return;
   if (ir::IsReduceInitTensorName(block_id)) return;
 
   AlignToReduceInput(sch, block_id);

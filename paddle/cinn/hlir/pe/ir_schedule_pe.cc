@@ -95,7 +95,9 @@ void IRElementwiseSchedule(ir::IRSchedule &ir_sch,  // NOLINT
         auto blocks = ir_sch.GetAllBlocks();
         ir_sch.FlattenLoops(ir_sch.GetLoops(blocks[0]), true);
       },
-      [&](common::HygonDCUArchHIP) { schedule_nv_hygon(); });
+      [&](std::variant<common::HygonDCUArchHIP, common::HygonDCUArchSYCL>) {
+        schedule_nv_hygon();
+      });
   VLOG(3) << "After IRElementwiseSchedule, new ir is : "
           << ir_sch.GetModule().GetExprs().at(0);
 }
@@ -129,7 +131,9 @@ void IRInjectiveSchedule(ir::IRSchedule &ir_sch,  // NOLINT
         auto blocks = ir_sch.GetAllBlocks();
         ir_sch.FlattenLoops(ir_sch.GetLoops(blocks[0]), false);
       },
-      [&](common::HygonDCUArchHIP) { schedule_nv_hygon(); });
+      [&](std::variant<common::HygonDCUArchHIP, common::HygonDCUArchSYCL>) {
+        schedule_nv_hygon();
+      });
 
   VLOG(3) << "After IRInjectiveSchedule, new ir is : "
           << ir_sch.GetModule().GetExprs().at(0);
@@ -210,7 +214,7 @@ std::vector<cinn::common::CINNValue> IRGpuScheduleMatMul(
       [&](std::variant<common::UnknownArch, common::X86Arch, common::ARMArch>) {
         CINN_NOT_IMPLEMENTED;
       },
-      [&](common::HygonDCUArchHIP) {});
+      [&](std::variant<common::HygonDCUArchHIP, common::HygonDCUArchSYCL>) {});
   std::vector<Expr> vec_ast;
   for (int i = 0; i < arg_pack.size(); i++) {
     if (arg_pack[i].is_expr()) {
@@ -393,7 +397,9 @@ void IRCudaSplitSchedule(ir::IRSchedule &ir_sch,  // NOLINT
           }
         }
       },
-      [&](common::HygonDCUArchHIP) { SplitScheduleGpuDcu(); });
+      [&](std::variant<common::HygonDCUArchHIP, common::HygonDCUArchSYCL>) {
+        SplitScheduleGpuDcu();
+      });
   VLOG(3) << "In IRCudaSplitSchedule, After schedule expr is : "
           << ir_sch.GetModule().GetExprs().at(0);
 }

@@ -1094,7 +1094,7 @@ void OperatorBase::GenerateTemporaryNames() {
   }
 }
 
-const phi::DenseTensor* GetLoDTensorOrSelectedRowsValueFromVar(
+const phi::DenseTensor* GetDenseTensorOrSelectedRowsValueFromVar(
     const Variable& var) {
   if (var.IsType<phi::DenseTensor>()) {
     return static_cast<const phi::DenseTensor*>(&(var.Get<phi::DenseTensor>()));
@@ -1107,7 +1107,8 @@ const phi::DenseTensor* GetLoDTensorOrSelectedRowsValueFromVar(
   }
 }
 
-phi::DenseTensor* GetMutableLoDTensorOrSelectedRowsValueFromVar(Variable* var) {
+phi::DenseTensor* GetMutableDenseTensorOrSelectedRowsValueFromVar(
+    Variable* var) {
   if (var->IsType<phi::DenseTensor>()) {
     return var->GetMutable<phi::DenseTensor>();
   } else if (var->IsType<phi::SelectedRows>()) {
@@ -2462,12 +2463,12 @@ void OperatorWithKernel::TransferInplaceVarsBack(
                             common::errors::InvalidArgument(
                                 "The variable[%s] is nullptr.", var_name));
     auto* original_tensor =
-        GetMutableLoDTensorOrSelectedRowsValueFromVar(origin_var);
+        GetMutableDenseTensorOrSelectedRowsValueFromVar(origin_var);
     auto* var = transfer_scope.FindVar(var_name);
     PADDLE_ENFORCE_NOT_NULL(var,
                             common::errors::InvalidArgument(
                                 "The variable[%s] is nullptr.", var_name));
-    auto* transformed_tensor = GetLoDTensorOrSelectedRowsValueFromVar(*var);
+    auto* transformed_tensor = GetDenseTensorOrSelectedRowsValueFromVar(*var);
     original_tensor->ShareDataWith(*transformed_tensor);
   }
 }
@@ -2495,7 +2496,7 @@ void OperatorWithKernel::HandleComplexGradToRealGrad(
         continue;
       }
       auto* grad_tensor =
-          GetMutableLoDTensorOrSelectedRowsValueFromVar(grad_var);
+          GetMutableDenseTensorOrSelectedRowsValueFromVar(grad_var);
       // skip nullptr tensor
       if (grad_tensor == nullptr || !grad_tensor->IsInitialized()) {
         continue;
@@ -2515,7 +2516,7 @@ void OperatorWithKernel::HandleComplexGradToRealGrad(
       if (!VarIsTensor(*var)) {
         continue;
       }
-      const auto* tensor = GetLoDTensorOrSelectedRowsValueFromVar(*var);
+      const auto* tensor = GetDenseTensorOrSelectedRowsValueFromVar(*var);
       PADDLE_ENFORCE_NOT_NULL(
           tensor,
           common::errors::Unavailable(
@@ -2582,7 +2583,7 @@ Scope* OperatorWithKernel::PrepareData(
         continue;
       }
 
-      auto* tensor_in = GetLoDTensorOrSelectedRowsValueFromVar(*var);
+      auto* tensor_in = GetDenseTensorOrSelectedRowsValueFromVar(*var);
 
       // When no_buffer_ins then checking of phi::DenseTensor::holder_ is
       // not a thread safe. And for infershape scenario checks

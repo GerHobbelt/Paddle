@@ -104,7 +104,7 @@ Placements ToPlacements(const TensorDistAttr& dist_attr) {
 
       if (p->is_shard()) {
         PADDLE_THROW(common::errors::PreconditionNotMet(
-            "ProcessMesh dimension cann't be mapped to two  dimension of the "
+            "ProcessMesh dimension can't be mapped to two  dimension of the "
             "same tensor: {%d} and {%d}",
             i,
             dynamic_cast<Shard&>(*p).get_dim()));

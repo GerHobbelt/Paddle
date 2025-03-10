@@ -211,16 +211,17 @@ std::shared_ptr<framework::OpStrategy> StrategyForGatherNd(
                                         std::multiplies<int>());
     if (prod_size > 1) {
       target.arch.Match(
-          [&](common::UnknownArch) { CINN_NOT_IMPLEMENTED; },
+          [&](std::variant<common::UnknownArch, common::ARMArch>) {
+            CINN_NOT_IMPLEMENTED;
+          },
           [&](common::X86Arch) {
             pe::IRScheduleInjectiveCPU(
                 ir_sch, output_shapes.front(), target, true);
           },
-          [&](common::ARMArch) { CINN_NOT_IMPLEMENTED; },
           [&](common::NVGPUArch) {
             pe::IRGpuScheduleInjective(ir_sch, output_shapes.front(), target);
           },
-          [&](common::HygonDCUArchHIP) {
+          [&](std::variant<common::HygonDCUArchHIP, common::HygonDCUArchSYCL>) {
             pe::IRGpuScheduleInjective(ir_sch, output_shapes.front(), target);
           });
     }

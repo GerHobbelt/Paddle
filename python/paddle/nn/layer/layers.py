@@ -246,8 +246,7 @@ class LayerObjectHelper(LayerHelperBase):
                 dtype = each.dtype
             elif dtype != each.dtype:
                 raise ValueError(
-                    "Data Type mismatch: %d to %d in %s"
-                    % (dtype, each.dtype, self.name)
+                    f"Data Type mismatch: {dtype} to {each.dtype} in {self.name}"
                 )
         return dtype
 

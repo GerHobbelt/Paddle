@@ -101,52 +101,66 @@ void UnifyBroadcastGroupFuncArgs(
     std::vector<GroupCompilationContext>* contexts,
     pir::OpLoweringGroupPtr origin_group,
     std::unordered_map<int, ir::Var>* symbolic_shape_var_index) {
-  std::unordered_map<ir::Var, pir::CINNKernelInfo::SymbolArgBindInfo>
-      new_args_map;
   std::vector<ir::Argument> new_args_vec;
-  int total_args_num = 0;
 
-  const auto& AddTensorArgs = [&](GroupCompilationContext& context) {
-    const auto& func_args = context.lowered_funcs_[0]->args;
-    const auto& origin_symbol_args = context.group_->symbol_args_map();
+  const auto& AddTensorArgs = [&]() {
+    const auto& func_args = (*contexts)[0].lowered_funcs_[0]->args;
     for (size_t arg_idx = 0; arg_idx < func_args.size(); ++arg_idx) {
-      if (func_args[arg_idx].is_var()) {
-        new_args_map[func_args[arg_idx].var_arg()] =
-            origin_symbol_args.at(arg_idx);
-      } else {
+      if (func_args[arg_idx].is_buffer()) {
         new_args_vec.emplace_back(func_args[arg_idx]);
       }
     }
+  };
+
+  std::unordered_set<std::string> symbol_args_set;
+  const auto& AddSymbolArgs = [&](::pir::Value input, const int& input_idx) {
+    enum ArgType { Dim, Value };
+    const auto& AddSymbolArgFromDimExprVec =
+        [&](ArgType arg_type, const std::vector<symbol::DimExpr>& expr_vec) {
+          int vec_size = expr_vec.size();
+          for (int idx = 0; idx < vec_size; idx++) {
+            if (expr_vec[idx].isa<std::string>()) {
+              const std::string& symbol_name =
+                  expr_vec[idx].dyn_cast<std::string>();
+              if (symbol_args_set.count(symbol_name) != 0) {
+                continue;
+              }
+              symbol_args_set.insert(symbol_name);
+              const auto& arg = ir::Var(symbol_name, cinn::common::Int(64));
+              new_args_vec.emplace_back(ir::Argument{arg});
+              int arg_idx = new_args_vec.size() - 1;
+              symbolic_shape_var_index->insert({arg_idx, arg});
+              if (arg_type == Dim) {
+                origin_group->mut_symbol_args_map()[arg_idx] =
+                    pir::CINNKernelInfo::ArgDimIdx{input_idx, idx};
+              } else {
+                origin_group->mut_symbol_args_map()[arg_idx] =
+                    pir::CINNKernelInfo::ArgValueIdx{input_idx, idx};
+              }
+            }
+          }
+        };
+    const auto& shape_or_data = origin_group->GetShapeOrDataExprs(input);
+    // Add dim symbol args
+    AddSymbolArgFromDimExprVec(ArgType::Dim, shape_or_data.shape());
+    // Add value symbol args
+    if (shape_or_data.data())
+      AddSymbolArgFromDimExprVec(ArgType::Value, shape_or_data.data().value());
+  };
+
+  const auto& UpdateAllFuncArgs = [&](GroupCompilationContext& context) {
     for (ir::LoweredFunc& func : context.lowered_funcs_) {
       func->args = new_args_vec;
     }
   };
-  for (size_t i = 0; i < contexts->size(); ++i) {
-    AddTensorArgs((*contexts)[i]);
-    if (i == 0) total_args_num += new_args_vec.size();
-    new_args_vec.clear();
-  }
 
+  AddTensorArgs();
   origin_group->mut_symbol_args_map().clear();
-  const auto& new_symbol_args_vec = [&]() -> std::vector<ir::Argument> {
-    std::vector<ir::Argument> res;
-    for (const auto& [arg, idx_info] : new_args_map) {
-      symbolic_shape_var_index->insert({total_args_num, arg});
-      origin_group->mut_symbol_args_map()[total_args_num++] = idx_info;
-      res.emplace_back(ir::Argument{arg});
-    }
-    return res;
-  }();
-
-  const auto& AddUnifiedSymbolArgs = [&](GroupCompilationContext& context) {
-    for (ir::LoweredFunc& func : context.lowered_funcs_) {
-      func->args.insert(func->args.end(),
-                        new_symbol_args_vec.begin(),
-                        new_symbol_args_vec.end());
-    }
-  };
+  const auto& group_inputs = pir::GetBlockOutsideInput(origin_group->ops());
+  for (size_t input_idx = 0; input_idx < group_inputs.size(); ++input_idx)
+    AddSymbolArgs(group_inputs[input_idx], input_idx);
   for (int i = 0; i < contexts->size(); ++i) {
-    AddUnifiedSymbolArgs((*contexts)[i]);
+    UpdateAllFuncArgs((*contexts)[i]);
   }
 }
 

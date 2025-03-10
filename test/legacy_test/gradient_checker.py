@@ -717,8 +717,8 @@ def get_static_double_grad(
     if x_init:
         if len(x_init) != len(x):
             raise ValueError(
-                'len(x_init) (=%d) is not the same'
-                ' as len(x) (= %d)' % (len(x_init), len(x))
+                f'len(x_init) (={len(x_init)}) is not the same'
+                f' as len(x) (={len(x)})'
             )
         # init variable in main program
         for var, arr in zip(x, x_init):
@@ -836,8 +836,8 @@ def get_pir_static_double_grad(
     if x_init:
         if len(x_init) != len(x):
             raise ValueError(
-                'len(x_init) (=%d) is not the same'
-                ' as len(x) (= %d)' % (len(x_init), len(x))
+                f'len(x_init) (={len(x_init)}) is not the same'
+                f' as len(x) (={len(x)})'
             )
         # init variable in main program
         for var, arr in zip(x, x_init):
@@ -1028,9 +1028,8 @@ def double_grad_check_for_dygraph(
         ):
             msg = (
                 'Check eager double result fail. Mismatch between static_graph double grad '
-                'and eager double grad on %s, the output double grad tensor\'s index is : %d \n'
-                'static:%s\n eager:%s\n'
-                % (str(place), i, static_double_grad[i], eager_double_grad[i])
+                f'and eager double grad on {place!s}, the output double grad tensor\'s index is : {i} \n'
+                f'static:{static_double_grad[i]}\n eager:{eager_double_grad[i]}\n'
             )
             return fail_test(msg)
 
@@ -1293,8 +1292,7 @@ def triple_grad_check_for_dygraph(
         ):
             msg = (
                 'Check eager double result fail. Mismatch between static_graph double grad '
-                'and eager double grad on %s, the output double grad tensor\'s index is : %d \n'
-                'static:%s\n eager:%s\n'
-                % (str(place), i, static_triple_grad[i], eager_triple_grad[i])
+                f'and eager double grad on {place!s}, the output double grad tensor\'s index is : {i} \n'
+                f'static:{static_triple_grad[i]}\n eager:{eager_triple_grad[i]}\n'
             )
             return fail_test(msg)

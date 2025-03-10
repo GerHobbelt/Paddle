@@ -2365,8 +2365,8 @@ def mm(input: Tensor, mat2: Tensor, name: str | None = None) -> Tensor:
                     raise ValueError(
                         "When the matrix is larger than 2 dimensions, the higher "
                         "dimensional values of the two matrices need to be equal. "
-                        "But received x_shape[%d] != y_shape[%d]. X's shape: %s, "
-                        "Y's shape: %s.\n" % (i, i, x_shape, y_shape)
+                        f"But received x_shape[{i}] != y_shape[{i}]. X's shape: {x_shape}, "
+                        f"Y's shape: {y_shape}.\n"
                     )
 
     __check_input(input, mat2)
@@ -2890,8 +2890,8 @@ def inverse(x: Tensor, name: str | None = None) -> Tensor:
             if len(x.shape) < 2:
                 raise ValueError(
                     "The input of inverse is expected to be a Tensor whose number "
-                    "of dimensions is no less than 2. But received: %d, "
-                    "x's shape: %s." % (len(x.shape), x.shape)
+                    f"of dimensions is no less than 2. But received: {len(x.shape)}, "
+                    f"x's shape: {x.shape}."
                 )
 
         _check_input(x)
@@ -3956,19 +3956,17 @@ def trace(
         axis1_ = axis1 if axis1 >= 0 else len(input_shape) + axis1
         axis2_ = axis2 if axis2 >= 0 else len(input_shape) + axis2
 
-        assert (0 <= axis1_) and (axis1_ < len(input_shape)), (
-            "The argument axis1 is out of range (expected to be in range of [%d, %d], but got %d).\n"
-            % (-(len(input_shape)), len(input_shape) - 1, axis1)
-        )
+        assert (0 <= axis1_) and (
+            axis1_ < len(input_shape)
+        ), f"The argument axis1 is out of range (expected to be in range of [{-(len(input_shape))}, {len(input_shape) - 1}], but got {axis1}).\n"
 
-        assert (0 <= axis2_) and (axis2_ < len(input_shape)), (
-            "The argument axis2 is out of range (expected to be in range of [%d, %d], but got %d).\n"
-            % (-(len(input_shape)), len(input_shape) - 1, axis2)
-        )
+        assert (0 <= axis2_) and (
+            axis2_ < len(input_shape)
+        ), f"The argument axis2 is out of range (expected to be in range of [{-(len(input_shape))}, {len(input_shape) - 1}], but got {axis2}).\n"
 
         assert axis1_ != axis2_, (
             "axis1 and axis2 cannot be the same axis."
-            "But received axis1 = %d, axis2 = %d\n" % (axis1, axis2)
+            f"But received axis1 = {axis1}, axis2 = {axis2}\n"
         )
 
     if in_dynamic_or_pir_mode():
@@ -3981,135 +3979,6 @@ def trace(
 
         helper.append_op(
             type='trace',
-            inputs={'Input': [x]},
-            attrs={'offset': offset, 'axis1': axis1, 'axis2': axis2},
-            outputs={'Out': [out]},
-        )
-        return out
-
-
-def diagonal(
-    x: Tensor,
-    offset: int = 0,
-    axis1: int = 0,
-    axis2: int = 1,
-    name: str | None = None,
-) -> Tensor:
-    """
-    Computes the diagonals of the input tensor x.
-
-    If ``x`` is 2D, returns the diagonal.
-    If ``x`` has larger dimensions, diagonals be taken from the 2D planes specified by axis1 and axis2.
-    By default, the 2D planes formed by the first and second axis of the input tensor x.
-
-    The argument ``offset`` determines where diagonals are taken from input tensor x:
-
-    - If offset = 0, it is the main diagonal.
-    - If offset > 0, it is above the main diagonal.
-    - If offset < 0, it is below the main diagonal.
-
-    Args:
-        x (Tensor): The input tensor x. Must be at least 2-dimensional. The input data type should be bool, int32,
-            int64, bfloat16, float16, float32, float64.
-        offset (int, optional): Which diagonals in input tensor x will be taken. Default: 0 (main diagonals).
-        axis1 (int, optional): The first axis with respect to take diagonal. Default: 0.
-        axis2 (int, optional): The second axis with respect to take diagonal. Default: 1.
-        name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
-
-    Returns:
-        Tensor: a partial view of input tensor in specify two dimensions, the output data type is the same as input data type.
-
-    Examples:
-        .. code-block:: python
-
-            >>> import paddle
-
-            >>> paddle.seed(2023)
-            >>> x = paddle.rand([2, 2, 3],'float32')
-            >>> print(x)
-            Tensor(shape=[2, 2, 3], dtype=float32, place=Place(cpu), stop_gradient=True,
-            [[[0.86583614, 0.52014720, 0.25960937],
-              [0.90525323, 0.42400089, 0.40641287]],
-             [[0.97020894, 0.74437362, 0.51785129],
-              [0.73292869, 0.97786582, 0.04315904]]])
-
-            >>> out1 = paddle.diagonal(x)
-            >>> print(out1)
-            Tensor(shape=[3, 2], dtype=float32, place=Place(cpu), stop_gradient=True,
-            [[0.86583614, 0.73292869],
-             [0.52014720, 0.97786582],
-             [0.25960937, 0.04315904]])
-
-            >>> out2 = paddle.diagonal(x, offset=0, axis1=2, axis2=1)
-            >>> print(out2)
-            Tensor(shape=[2, 2], dtype=float32, place=Place(cpu), stop_gradient=True,
-            [[0.86583614, 0.42400089],
-             [0.97020894, 0.97786582]])
-
-            >>> out3 = paddle.diagonal(x, offset=1, axis1=0, axis2=1)
-            >>> print(out3)
-            Tensor(shape=[3, 1], dtype=float32, place=Place(cpu), stop_gradient=True,
-            [[0.90525323],
-             [0.42400089],
-             [0.40641287]])
-
-            >>> out4 = paddle.diagonal(x, offset=0, axis1=1, axis2=2)
-            >>> print(out4)
-            Tensor(shape=[2, 2], dtype=float32, place=Place(cpu), stop_gradient=True,
-            [[0.86583614, 0.42400089],
-             [0.97020894, 0.97786582]])
-
-    """
-    if in_dynamic_or_pir_mode():
-        return _C_ops.diagonal(x, offset, axis1, axis2)
-    else:
-
-        def __check_input(x, offset, axis1, axis2):
-            check_dtype(
-                x.dtype,
-                'Input',
-                [
-                    'bool',
-                    'int32',
-                    'int64',
-                    'float16',
-                    'uint16',
-                    'float32',
-                    'float64',
-                ],
-                'diagonal',
-            )
-
-            input_shape = list(x.shape)
-            assert len(input_shape) >= 2, (
-                "The x must be at least 2-dimensional, "
-                f"But received Input x's dimensional: {len(input_shape)}.\n"
-            )
-
-            axis1_ = axis1 if axis1 >= 0 else len(input_shape) + axis1
-            axis2_ = axis2 if axis2 >= 0 else len(input_shape) + axis2
-
-            assert axis1_ < len(input_shape), (
-                "The argument axis1 is out of range (expected to be in range of [%d, %d], but got %d).\n"
-                % (-(len(input_shape)), len(input_shape) - 1, axis1)
-            )
-
-            assert axis2_ < len(input_shape), (
-                "The argument axis2 is out of range (expected to be in range of [%d, %d], but got %d).\n"
-                % (-(len(input_shape)), len(input_shape) - 1, axis2)
-            )
-
-            assert axis1_ != axis2_, (
-                "axis1 and axis2 cannot be the same axis."
-                "But received axis1 = %d, axis2 = %d\n" % (axis1, axis2)
-            )
-
-        __check_input(x, offset, axis1, axis2)
-        helper = LayerHelper('diagonal', **locals())
-        out = helper.create_variable_for_type_inference(dtype=x.dtype)
-
-        helper.append_op(
-            type='diagonal',
             inputs={'Input': [x]},
             attrs={'offset': offset, 'axis1': axis1, 'axis2': axis2},
             outputs={'Out': [out]},
@@ -5101,7 +4970,7 @@ def all(
     Computes the ``logical and`` of tensor elements over the given dimension.
 
     Args:
-        x (Tensor): An N-D Tensor, the input data type should be 'bool', 'float32', 'float64', 'int32', 'int64'.
+        x (Tensor): An N-D Tensor, the input data type should be 'bool', 'float32', 'float64', 'int32', 'int64', 'complex64', 'complex128'.
         axis (int|list|tuple|None, optional): The dimensions along which the ``logical and`` is compute. If
             :attr:`None`, and all elements of :attr:`x` and return a
             Tensor with a single element, otherwise must be in the
@@ -5167,7 +5036,18 @@ def all(
             'reduce_all': reduce_all,
         }
         check_variable_and_dtype(
-            x, 'x', ['bool', 'float32', 'float64', 'int32', 'int64'], 'all'
+            x,
+            'x',
+            [
+                'bool',
+                'float32',
+                'float64',
+                'int32',
+                'int64',
+                'complex64',
+                'complex128',
+            ],
+            'all',
         )
         check_type(axis, 'axis', (int, list, tuple, type(None)), 'all')
 
@@ -5192,7 +5072,7 @@ def any(
     Computes the ``logical or`` of tensor elements over the given dimension, and return the result.
 
     Args:
-        x (Tensor): An N-D Tensor, the input data type should be 'bool', 'float32', 'float64', 'int32', 'int64'.
+        x (Tensor): An N-D Tensor, the input data type should be 'bool', 'float32', 'float64', 'int32', 'int64', 'complex64', 'complex128'.
         axis (int|list|tuple|None, optional): The dimensions along which the ``logical or`` is compute. If
             :attr:`None`, and all elements of :attr:`x` and return a
             Tensor with a single element, otherwise must be in the
@@ -5259,7 +5139,18 @@ def any(
             'reduce_all': reduce_all,
         }
         check_variable_and_dtype(
-            x, 'x', ['bool', 'float32', 'float64', 'int32', 'int64'], 'any'
+            x,
+            'x',
+            [
+                'bool',
+                'float32',
+                'float64',
+                'int32',
+                'int64',
+                'complex64',
+                'complex128',
+            ],
+            'any',
         )
         check_type(axis, 'axis', (int, list, tuple, type(None)), 'any')
 
@@ -5731,7 +5622,7 @@ def neg_(x: Tensor, name: str | None = None) -> Tensor:
     )
 
 
-def positive(x: Tensor) -> Tensor:
+def positive(x: Tensor, name: str | None = None) -> Tensor:
     r"""
     Returns the input Tensor as it is. This is used in `Tensor.__pos__`, applying the
     unary `+` operator to the tensor.
@@ -5741,6 +5632,7 @@ def positive(x: Tensor) -> Tensor:
 
     Args:
         x (Tensor): The input tensor. The tensor cannot be of type bool.
+        name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
         Tensor: A tensor with the same shape and data type as the input tensor. The returned tensor
@@ -5761,6 +5653,39 @@ def positive(x: Tensor) -> Tensor:
     if x.dtype == paddle.bool:
         raise TypeError("The `+` operator, on a bool tensor is not supported.")
     return x
+
+
+def negative(x: Tensor, name: str | None = None) -> Tensor:
+    r"""
+    Returns the negated version of the input Tensor. This is used in `Tensor.__neg__`, applying the
+    unary `-` operator to the tensor.
+
+    .. math::
+        Out = -X
+
+    Args:
+        x (Tensor): The input tensor. The tensor cannot be of type bool.
+        name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
+
+    Returns:
+        Tensor: A tensor with the same shape and data type as the input tensor. The returned tensor
+                is the negative.
+
+    Examples:
+        .. code-block:: python
+
+            >>> import paddle
+            >>> x = paddle.to_tensor([-1, 0, 1])
+            >>> out = paddle.negative(x)
+            >>> print(out)
+            Tensor(shape=[3], dtype=int64, place=Place(cpu), stop_gradient=True,
+            [1,  0,  -1])
+    """
+
+    # Check if the input tensor is of bool type and raise an error
+    if x.dtype == paddle.bool:
+        raise TypeError("The `-` operator, on a bool tensor is not supported.")
+    return -x
 
 
 def atan2(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
@@ -7335,7 +7260,7 @@ def vander(
     if x.dim() != 1:
         raise ValueError(
             "The input of x is expected to be a 1-D Tensor."
-            "But now the dims of Input(X) is %d." % x.dim()
+            f"But now the dims of Input(X) is {x.dim()}."
         )
 
     if n is None:

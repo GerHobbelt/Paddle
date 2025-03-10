@@ -15,7 +15,7 @@
 from __future__ import annotations
 
 import os
-from typing import Generic, TypeVar
+from typing import Generic, List, TypeVar
 
 from typing_extensions import Self
 
@@ -111,6 +111,22 @@ class IntegerEnvironmentVariable(EnvironmentVariable[int]):
             value, bool
         ), "value must be an integer"
         os.environ[self.name] = str(value)
+
+
+class StringListEnvironmentVariable(EnvironmentVariable[List[str]]):
+    def __init__(self, name: str, default: list[str]):
+        super().__init__(name, default)
+        assert isinstance(default, list), "default must be a list"
+
+    def get(self) -> list[str]:
+        return os.getenv(self.name, ",".join(self.default)).split(",")
+
+    def set(self, value: list[str]) -> None:
+        assert isinstance(value, list), "value must be a list"
+        assert all(
+            isinstance(x, str) for x in value
+        ), "value must be a list of strings"
+        os.environ[self.name] = ",".join(value)
 
 
 class EnvironmentVariableGuard(Generic[T]):

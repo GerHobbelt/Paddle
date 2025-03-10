@@ -17,7 +17,7 @@ import unittest
 
 import numpy as np
 from op_test import OpTest, convert_float_to_uint16, skip_check_grad_ci
-from utils import static_guard
+from utils import dygraph_guard, static_guard
 
 import paddle
 from paddle import base
@@ -962,6 +962,158 @@ class TestAll8DOpWithKeepDim(OpTest):
         self.check_output(check_pir=True)
 
 
+class TestAllComplex64Op(OpTest):
+    def setUp(self):
+        self.op_type = "reduce_all"
+        self.python_api = paddle.all
+        real_part = np.random.uniform(-1, 1, (2, 5, 3, 2, 2, 3, 4, 2))
+        imag_part = np.random.uniform(-1, 1, (2, 5, 3, 2, 2, 3, 4, 2))
+        self.inputs = {'X': (real_part + 1j * imag_part).astype("complex64")}
+        self.attrs = {'dim': (5,), 'keep_dim': True}
+        self.outputs = {
+            'Out': np.expand_dims(
+                self.inputs['X'].all(axis=self.attrs['dim']), axis=5
+            )
+        }
+
+    def test_check_output(self):
+        self.check_output(check_pir=True)
+
+
+class TestAllComplex64OpInf(TestAllComplex64Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.inf)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.inf)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex64")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAllComplex64OpNegInf(TestAllComplex64Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), -np.inf)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), -np.inf)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex64")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAllComplex64OpNan(TestAllComplex64Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.nan)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.nan)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex64")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAllComplex64OpZero(TestAllComplex64Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.zeros((2, 5, 3, 2, 2, 3, 4, 2))
+        imag_part = np.zeros((2, 5, 3, 2, 2, 3, 4, 2))
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex64")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAllComplex64OpMixed(TestAllComplex64Op):
+    def setUp(self):
+        super().setUp()
+        special_values = np.array(
+            [np.inf, -np.inf, np.nan, 0], dtype=np.float64
+        )
+        real_part = np.random.choice(special_values, (2, 5, 3, 2, 2, 3, 4, 2))
+        imag_part = np.random.choice(special_values, (2, 5, 3, 2, 2, 3, 4, 2))
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex64")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAllComplex128Op(OpTest):
+    def setUp(self):
+        self.op_type = "reduce_all"
+        self.python_api = paddle.all
+        real_part = np.random.uniform(-1, 1, (2, 5, 3, 2, 2, 3, 4, 2))
+        imag_part = np.random.uniform(-1, 1, (2, 5, 3, 2, 2, 3, 4, 2))
+        self.inputs = {'X': (real_part + 1j * imag_part).astype("complex128")}
+        self.attrs = {'dim': (5,), 'keep_dim': True}
+        self.outputs = {
+            'Out': np.expand_dims(
+                self.inputs['X'].all(axis=self.attrs['dim']), axis=5
+            )
+        }
+
+    def test_check_output(self):
+        self.check_output(check_pir=True)
+
+
+class TestAllComplex128OpInf(TestAllComplex128Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.inf)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.inf)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex128")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAllComplex128OpNegInf(TestAllComplex128Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), -np.inf)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), -np.inf)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex128")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAllComplex128OpNan(TestAllComplex128Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.nan)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.nan)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex128")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAllComplex128OpZero(TestAllComplex128Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.zeros((2, 5, 3, 2, 2, 3, 4, 2))
+        imag_part = np.zeros((2, 5, 3, 2, 2, 3, 4, 2))
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex128")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAllComplex128OpMixed(TestAllComplex128Op):
+    def setUp(self):
+        super().setUp()
+        special_values = np.array(
+            [np.inf, -np.inf, np.nan, 0], dtype=np.float64
+        )
+        real_part = np.random.choice(special_values, (2, 5, 3, 2, 2, 3, 4, 2))
+        imag_part = np.random.choice(special_values, (2, 5, 3, 2, 2, 3, 4, 2))
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex128")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
 class TestAllOpError(unittest.TestCase):
 
     def test_errors(self):
@@ -1017,6 +1169,130 @@ class TestAnyIntOp(OpTest):
 
     def test_check_output(self):
         self.check_output(check_pir=True, check_prim_pir=True)
+
+
+class TestAnyComplex64Op(OpTest):
+    def setUp(self):
+        self.op_type = "reduce_any"
+        self.python_api = paddle.any
+        real_part = np.random.uniform(-1, 1, (2, 5, 3, 2, 2, 3, 4, 2))
+        imag_part = np.random.uniform(-1, 1, (2, 5, 3, 2, 2, 3, 4, 2))
+        self.inputs = {'X': (real_part + 1j * imag_part).astype("complex64")}
+        self.attrs = {'dim': (5,), 'keep_dim': True}
+        self.outputs = {
+            'Out': np.expand_dims(
+                self.inputs['X'].all(axis=self.attrs['dim']), axis=5
+            )
+        }
+
+    def test_check_output(self):
+        self.check_output(check_pir=True)
+
+
+class TestAnyComplex64OpInf(TestAnyComplex64Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.inf)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.inf)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex64")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAnyComplex64OpNegInf(TestAnyComplex64Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), -np.inf)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), -np.inf)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex64")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAnyComplex64OpNan(TestAnyComplex64Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.nan)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.nan)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex64")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAnyComplex64OpZero(TestAnyComplex64Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.zeros((2, 5, 3, 2, 2, 3, 4, 2))
+        imag_part = np.zeros((2, 5, 3, 2, 2, 3, 4, 2))
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex64")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAnyComplex128Op(OpTest):
+    def setUp(self):
+        self.op_type = "reduce_any"
+        self.python_api = paddle.any
+        real_part = np.random.uniform(-1, 1, (2, 5, 3, 2, 2, 3, 4, 2))
+        imag_part = np.random.uniform(-1, 1, (2, 5, 3, 2, 2, 3, 4, 2))
+        self.inputs = {'X': (real_part + 1j * imag_part).astype("complex128")}
+        self.attrs = {'dim': (5,), 'keep_dim': True}
+        self.outputs = {
+            'Out': np.expand_dims(
+                self.inputs['X'].all(axis=self.attrs['dim']), axis=5
+            )
+        }
+
+    def test_check_output(self):
+        self.check_output(check_pir=True)
+
+
+class TestAnyComplex128OpInf(TestAnyComplex128Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.inf)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.inf)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex128")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAnyComplex128OpNegInf(TestAnyComplex128Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), -np.inf)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), -np.inf)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex128")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAnyComplex128OpNan(TestAnyComplex128Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.nan)
+        imag_part = np.full((2, 5, 3, 2, 2, 3, 4, 2), np.nan)
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex128")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
+
+
+class TestAnyComplex128OpZero(TestAnyComplex128Op):
+    def setUp(self):
+        super().setUp()
+        real_part = np.zeros((2, 5, 3, 2, 2, 3, 4, 2))
+        imag_part = np.zeros((2, 5, 3, 2, 2, 3, 4, 2))
+        self.inputs['X'] = (real_part + 1j * imag_part).astype("complex128")
+        self.outputs['Out'] = np.expand_dims(
+            np.all(self.inputs['X'], axis=self.attrs['dim']), axis=5
+        )
 
 
 class TestAnyOp_ZeroDim(OpTest):
@@ -1971,16 +2247,93 @@ class TestAnyAPI(unittest.TestCase):
         paddle.enable_static()
 
 
-class TestAllZeroError(unittest.TestCase):
-    def test_errors(self):
-        with paddle.base.dygraph.guard():
+class TestAllZero(unittest.TestCase):
+    def setUp(self):
+        np.random.seed(123)
+        self.shape = [1, 0, 2]
+        self.dtypes = [
+            "bool",
+            "float32",
+            "float64",
+            "int32",
+            "complex64",
+            "complex128",
+        ]
+        self.places = [base.CPUPlace()]
+        if core.is_compiled_with_cuda():
+            self.places.append(base.CUDAPlace(0))
 
-            def test_0_size():
-                array = np.array([], dtype=np.float32)
-                x = paddle.to_tensor(np.reshape(array, [0, 0, 0]), dtype='bool')
-                paddle.all(x, axis=1)
+    def calculate_expected_result(self, x_np, axis, keepdim):
+        expected_result = np.all(x_np, axis=axis, keepdims=keepdim)
+        return expected_result
 
-            self.assertRaises(ValueError, test_0_size)
+    def check_result(
+        self, static_result, expected_result, axis, keepdim, dtype, place
+    ):
+        self.assertTrue(
+            (static_result == expected_result).all(),
+            f"Static Mode - Shape: {self.shape}, Axis: {axis}, Keepdim: {keepdim}, Dtype: {dtype}, Place: {place}",
+        )
+
+    def _test_static(self, place, axis, keepdim, dtype):
+        with static_guard():
+            with base.program_guard(
+                paddle.static.Program(), paddle.static.Program()
+            ):
+                input = paddle.static.data(
+                    name="x", shape=self.shape, dtype=dtype
+                )
+                result = paddle.all(x=input, axis=axis, keepdim=keepdim)
+                x_np = np.zeros(self.shape, dtype=dtype)
+
+                exe = base.Executor(place)
+                fetches = exe.run(
+                    feed={"x": x_np},
+                    fetch_list=[result],
+                )
+                expected_result = self.calculate_expected_result(
+                    x_np, axis, keepdim
+                )
+                self.check_result(
+                    fetches[0], expected_result, axis, keepdim, dtype, place
+                )
+
+    def _test_dygraph(self, place, axis, keepdim, dtype):
+        with dygraph_guard():
+            x_np = np.zeros(self.shape, dtype=dtype)
+            x = paddle.to_tensor(x_np)
+            dygraph_result = paddle.all(x, axis=axis, keepdim=keepdim).numpy()
+            expected_result = self.calculate_expected_result(
+                x_np, axis, keepdim
+            )
+            self.check_result(
+                dygraph_result, expected_result, axis, keepdim, dtype, place
+            )
+
+    def _test_all(self, place, axis, keepdim, dtype):
+        self._test_dygraph(place, axis, keepdim, dtype)
+        self._test_static(place, axis, keepdim, dtype)
+
+    def test_zero_size(self):
+        axes_options = [
+            None,
+            0,
+            1,
+            2,
+            -1,
+            -2,
+            (),
+            (0, 1),
+            (0, 2),
+            (1, 2),
+            (-1, -2),
+        ]
+        keepdims_options = [True, False]
+        for place in self.places:
+            for dtype in self.dtypes:
+                for axis in axes_options:
+                    for keepdim in keepdims_options:
+                        self._test_all(place, axis, keepdim, dtype)
 
 
 if __name__ == '__main__':

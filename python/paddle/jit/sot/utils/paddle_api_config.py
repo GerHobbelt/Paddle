@@ -129,3 +129,28 @@ def is_break_graph_tensor_methods(method_name):
 
 def add_break_graph_apis(apis: list):
     break_graph_set.update(apis)
+
+
+def is_directly_run_api(api):
+    from .utils import hashable
+
+    if not hashable(api):
+        return False
+    NATIVE_CODE_PURE_FUNCTIONS = {
+        paddle.base.libpaddle.is_compiled_with_avx,
+        paddle.base.libpaddle.is_compiled_with_cuda,
+        paddle.base.libpaddle.is_compiled_with_cudnn_frontend,
+        paddle.base.libpaddle.is_compiled_with_rocm,
+        paddle.base.libpaddle.is_compiled_with_custom_device,
+        paddle.base.libpaddle.is_compiled_with_ipu,
+        paddle.base.libpaddle.is_compiled_with_xpu,
+        paddle.base.libpaddle.is_compiled_with_mkldnn,
+        paddle.base.libpaddle.is_compiled_with_nccl,
+        paddle.base.libpaddle.is_compiled_with_mpi,
+        paddle.base.libpaddle.is_compiled_with_mpi_aware,
+        paddle.base.libpaddle.is_compiled_with_cinn,
+        paddle.base.libpaddle.is_compiled_with_distribute,
+        paddle.base.libpaddle.is_compiled_with_brpc,
+        paddle.base.libpaddle.is_compiled_with_dist,
+    }
+    return api in NATIVE_CODE_PURE_FUNCTIONS

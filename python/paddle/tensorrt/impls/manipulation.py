@@ -22,7 +22,6 @@ from paddle.tensorrt.converter_utils import (
     cast_tensor,
     fix_negative_indices,
     get_axes_for_reduce_op,
-    get_positive_dim,
     get_shape_tensor_element,
     has_dynamic_shape,
     resize_to_1d,
@@ -44,7 +43,7 @@ from paddle.tensorrt.register import converter_registry
 from ..util import get_trt_version_list
 
 
-@converter_registry.register("pd_op.reshape", trt_version="8.x")
+@converter_registry.register("pd_op.reshape", trt_version="trt_version_ge=8.0")
 def reshape_converter(network, paddle_op, inputs):
     x = inputs[0]
     is_constant_shape = False
@@ -87,7 +86,7 @@ def gather_nd_converter(network, paddle_op, inputs):
     return non_zero_layer.get_output(0)
 
 
-@converter_registry.register("pd_op.flatten", trt_version="8.x")
+@converter_registry.register("pd_op.flatten", trt_version="trt_version_ge=8.0")
 def flatten_converter(network, paddle_op, inputs):
     input_val = inputs[0]
     input_val_shape = paddle_op.operands()[0].source().shape
@@ -172,7 +171,7 @@ def flatten_converter(network, paddle_op, inputs):
 
 
 # In the converter, pd_op.concat has three inputs, because builtin.combine has two inputs.
-@converter_registry.register("pd_op.concat", trt_version="8.x")
+@converter_registry.register("pd_op.concat", trt_version="trt_version_ge=8.0")
 def concat_converter(network, paddle_op, inputs):
     input_tensors = inputs[0]
     axis_tensor = inputs[1]
@@ -187,16 +186,19 @@ def concat_converter(network, paddle_op, inputs):
     return concat_layer.get_output(0)
 
 
-@converter_registry.register("pd_op.unsqueeze", trt_version="8.x")
-@converter_registry.register("pd_op.unsqueeze_", trt_version="8.x")
+@converter_registry.register(
+    "pd_op.unsqueeze", trt_version="trt_version_ge=8.0"
+)
+@converter_registry.register(
+    "pd_op.unsqueeze_", trt_version="trt_version_ge=8.0"
+)
 def unsqueeze_converter(network, paddle_op, inputs):
     x = inputs[0]
     input_dims = x.shape
     axes = paddle_op.operands()[1].source().get_defining_op().attrs()["value"]
-    assert len(axes) > 0, (
-        "axes size should be > 0 in when convert unsqueeze op in TensorRT, but received len(axes) = %d."
-        % (len(axes))
-    )
+    assert (
+        len(axes) > 0
+    ), f"axes size should be > 0 in when convert unsqueeze op in TensorRT, but received len(axes) = {len(axes)}."
 
     should_unsqueeze = [False] * (len(input_dims) + len(axes))
     cur_out_rank = len(input_dims)
@@ -236,32 +238,69 @@ def unsqueeze_converter(network, paddle_op, inputs):
     return layer.get_output(0)
 
 
-@converter_registry.register("pd_op.squeeze", trt_version="8.x")
-@converter_registry.register("pd_op.squeeze_", trt_version="8.x")
+@converter_registry.register("pd_op.squeeze", trt_version="trt_version_ge=8.0")
+@converter_registry.register("pd_op.squeeze_", trt_version="trt_version_ge=8.0")
 def squeeze_converter(network, paddle_op, inputs):
     input_val = inputs[0]
     input_shape = input_val.shape
     input_shape_size = len(input_shape)
 
-    if type(input_val) == trt.Weights:
+    # If input is weights, convert to TensorRT tensor
+    if isinstance(input_val, trt.Weights):
         input_val = network.add_constant(input_shape, input_val).get_output(0)
 
-    axis = paddle_op.operands()[1].source().get_defining_op().attrs()["value"]
-    axis = axis[0]
+    # Get axis
+    axis = (
+        paddle_op.operands()[1]
+        .source()
+        .get_defining_op()
+        .attrs()
+        .get("value", [])
+    )
 
-    axis = get_positive_dim(axis, input_shape_size + 1)
-    output_shape = []
-    for i, s in enumerate(input_shape):
-        if i == axis and s == 1:
-            continue
-        output_shape.append(s)
+    if not axis:
+        for i in range(input_shape_size):
+            if input_shape[i] == -1:
+                raise RuntimeError(
+                    "The necessary attributes of the squeeze operator axis is missing"
+                )
+            elif input_shape[i] == 1:
+                axis.append(i)
+    else:
+        # Verify that each axis to squeeze has size 1
+        for a in axis:
+            if a < 0:
+                a += input_shape_size
+            if input_shape[a] != 1:
+                raise RuntimeError(
+                    f"Cannot squeeze dimension {a} with size {input_shape[a]}. Only dimensions with size 1 can be squeezed."
+                )
 
+    axes_size = len(axis)
+    if axes_size == 0:
+        raise RuntimeError(
+            f"axis.size should be >0 in pd_op.squeeze op in TensorRT, but received {axes_size}"
+        )
+    # Mark which dimensions to squeeze
+    should_squeeze = [False] * input_shape_size
+    for a in axis:
+        should_squeeze[a] = True
+
+    # Get dimensions to keep
+    gather_indices = [
+        i for i, squeeze in enumerate(should_squeeze) if not squeeze
+    ]
+
+    # Add Shuffle layer
     layer = network.add_shuffle(input_val)
-    layer.reshape_dims = tuple(output_shape)
+    shape_tensor = trt_shape(network, input_val)
+    real_shape_tensor = trt_gather(network, shape_tensor, gather_indices)
+    layer.set_input(1, real_shape_tensor)
+
     return layer.get_output(0)
 
 
-@converter_registry.register("pd_op.expand", trt_version="8.x")
+@converter_registry.register("pd_op.expand", trt_version="trt_version_ge=8.0")
 def expand_converter(network, paddle_op, inputs):
     input = inputs[0]
     input_dims = input.shape
@@ -283,7 +322,9 @@ def expand_converter(network, paddle_op, inputs):
     return trt_expand(network, input, rank, shape_tensor, shape_rank)
 
 
-@converter_registry.register("pd_op.expand_as", trt_version="8.x")
+@converter_registry.register(
+    "pd_op.expand_as", trt_version="trt_version_ge=8.0"
+)
 def expand_as_converter(network, paddle_op, inputs):
     input = inputs[0]
     input_dims = input.shape
@@ -329,7 +370,7 @@ def cast_converter(network, paddle_op, inputs):
     return cast_layer.get_output(0)
 
 
-@converter_registry.register("pd_op.slice", trt_version="8.x")
+@converter_registry.register("pd_op.slice", trt_version="trt_version_ge=8.0")
 def slice_converter(network, paddle_op, inputs):
     input_tensor = inputs[0]
     axes = paddle_op.attrs()["axes"]
@@ -337,7 +378,7 @@ def slice_converter(network, paddle_op, inputs):
 
     starts_op = paddle_op.operands()[1].source().get_defining_op()
     ends_op = paddle_op.operands()[2].source().get_defining_op()
-    input_shape_tensor = network.add_shape(input_tensor).get_output(0)
+    input_shape_tensor = trt_shape(network, input_tensor)
     input_rank = len(input_tensor.shape)
 
     starts_tensor = []
@@ -352,10 +393,7 @@ def slice_converter(network, paddle_op, inputs):
         starts = starts_op.attrs()["value"]
         assert len(starts) == len(
             axes
-        ), "The size of this starts: %d must be equal to the axes: %d." % (
-            len(starts),
-            len(axes),
-        )
+        ), f"The size of this starts: {len(starts)} must be equal to the axes: {len(axes)}."
         for idx in range(len(axes)):
             if starts[idx] < 0:
                 starts_tensor[axes[idx]] = trt_max(
@@ -388,10 +426,7 @@ def slice_converter(network, paddle_op, inputs):
         ends = ends_op.attrs()["value"]
         assert len(ends) == len(
             axes
-        ), "The size of this ends: %d must be equal to the axes: %d." % (
-            len(ends),
-            len(axes),
-        )
+        ), f"The size of this ends: {len(ends)} must be equal to the axes: {len(axes)}."
         for idx in range(len(axes)):
             if ends[idx] < 0:
                 ends_tensor[axes[idx]] = trt_max(
@@ -704,6 +739,13 @@ def stack_converter(network, paddle_op, inputs):
     concat_layer.axis = axis
     output_tensor = concat_layer.get_output(0)
 
+    # Because we change tensor to 1-dim in 0-dim tensor situation when use trt,
+    # so after stack, output will become 2-dim, if paddle output is a 1d tensor, we need reshape it.
+    if (
+        len(paddle_op.results()[0].shape) == 1
+        and paddle_op.results()[0].shape[0] != -1
+    ):
+        output_tensor = resize_to_1d(network, output_tensor)
     return output_tensor
 
 

@@ -29,6 +29,8 @@
 #include "paddle/pir/include/core/utils.h"
 #include "paddle/pir/include/core/value.h"
 
+COMMON_DECLARE_bool(print_ir);
+
 namespace pir {
 
 namespace {
@@ -186,13 +188,10 @@ void IrPrinter::PrintOperation(const Operation& op) {
 void IrPrinter::PrintOperationWithNoRegion(const Operation& op) {
   // TODO(lyk): add API to get opresults directly
   PrintOpResult(op);
-  os << " =";
+  os << " = ";
+  PrintOpName(op);
 
-  os << " \"" << op.name() << "\"";
-
-  if (VLOG_IS_ON(1)) {
-    os << " [id:" << op.id() << "]";
-  }
+  PrintOpId(op);
 
   // TODO(lyk): add API to get operands directly
   PrintOpOperands(op);
@@ -323,6 +322,15 @@ void IrPrinter::PrintAttributeMap(const Operation& op) {
   os << "}";
 }
 
+void IrPrinter::PrintOpName(const Operation& op) {
+  os << "\"" << op.name() << "\"";
+}
+void IrPrinter::PrintOpId(const Operation& op) {
+  if (VLOG_IS_ON(1) || FLAGS_print_ir) {
+    os << " [id:" << op.id() << "]";
+  }
+}
+
 void IrPrinter::PrintOpOperands(const Operation& op) {
   os << " (";
   auto num_op_operands = op.num_operands();
@@ -381,10 +389,9 @@ void IrPrinter::PrintOpReturnType(const Operation& op) {
 
 void IrPrinter::AddValueAlias(Value v, const std::string& alias) {
   const void* key = v.impl();
-  PADDLE_ENFORCE_EQ(aliases_.find(key),
-                    aliases_.end(),
-                    common::errors::InvalidArgument("Value already has alias"));
-  aliases_[key] = alias;
+  if (aliases_.find(key) == aliases_.end()) {
+    aliases_[key] = alias;
+  }
 }
 
 class CustomPrinter : public IrPrinter {

@@ -22,7 +22,13 @@ import paddle
 
 from .opcode_translator import eval_frame_callback
 from .profiler import SotStepProfilerGuard
-from .utils import GraphLogger, StepInfoManager, StepState, log_do
+from .utils import (
+    GraphLogger,
+    InfoCollector,
+    StepInfoManager,
+    StepState,
+    log_do,
+)
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -96,6 +102,7 @@ def symbolic_translate(fn: Callable[P, R], **kwargs) -> Callable[P, R]:
         ), "Target function doesn't have code for simulating."
         StepInfoManager().sot_step()
         GraphLogger().clear()
+        InfoCollector().clear()
         paddle.framework.core.set_eval_frame(callback)
         try:
             outs = fn(*args, **kwargs)
@@ -105,6 +112,7 @@ def symbolic_translate(fn: Callable[P, R], **kwargs) -> Callable[P, R]:
             paddle.framework.core.set_eval_frame(None)
 
         log_do(1, lambda: GraphLogger().print_info())
+        InfoCollector().print_report()
         return outs
 
     def impl_dynamic(*args: P.args, **kwargs: P.kwargs) -> R:

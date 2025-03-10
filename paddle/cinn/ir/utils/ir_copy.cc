@@ -42,7 +42,15 @@ struct IRCopyVisitor : public ir::IRVisitorRequireReImpl<Expr> {
   bool copy_buffer_node;
 
   Expr Visit(const Expr* op) override {
-    return IRVisitorRequireReImpl::Visit(op);
+    bool is_index = op->is_index();
+    auto copy = IRVisitorRequireReImpl::Visit(op);
+    return copy.set_index(is_index);
+  }
+
+  Expr Visit(const IndexExpr* op) override {
+    Expr e = *op;
+    auto copy = Visit(&e);
+    return copy.set_index(true);
   }
 
   Module Visit(const ir::_Module_* op) {
@@ -474,7 +482,7 @@ struct IRCopyVisitor : public ir::IRVisitorRequireReImpl<Expr> {
     return IterSplit::Make(source, lower_factor, extent, scale);
   }
   Expr Visit(const ir::IterSum* op) override {
-    std::vector<IndexExpr> args;
+    std::vector<Expr> args;
     for (const auto& v : op->args) {
       args.push_back(Visit(&v));
     }

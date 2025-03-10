@@ -692,17 +692,21 @@ std::vector<Expr> CasSimplifyMutator::SimplifyBinarySum(Expr left, Expr right) {
   if (!left.As<Sum>() && !right.As<Sum>()) {
     auto a = left;
     auto b = right;
-
+    // clang-format off
     auto* ai = a.As<IntImm>();
+    auto* au = a.As<UIntImm>();
     auto* af = a.As<FloatImm>();
     auto* bi = b.As<IntImm>();
+    auto* bu = b.As<UIntImm>();
     auto* bf = b.As<FloatImm>();
 
     // case 1, both are constants
     if (a.is_constant() && b.is_constant()) {
       if (ai) return {make_const(a.type(), ai->value + bi->value)};
       if (af) return {make_const(a.type(), af->value + bf->value)};
+      if (au) return {make_const(a.type(), au->value + bu->value)};
     }
+    // clang-format on
 
     // cinn_min/cinn_max(a, b)+c = cinn_min/cinn_max(a+c, b+c)
     // c + cinn_min/cinn_max(a, b) = cinn_min/cinn_max(a+c, b+c)
@@ -1115,7 +1119,9 @@ bool CasSimplifyMutator::SimplifySpecificSumMod(Expr* result, Expr a, Expr b) {
   }
   return cinn::common::DefaultDeviceTarget().arch.Match(
       [&](common::NVGPUArch) { return false; },
-      [&](common::HygonDCUArchHIP) { return false; },
+      [&](std::variant<common::HygonDCUArchHIP, common::HygonDCUArchSYCL>) {
+        return false;
+      },
       [&](std::variant<common::UnknownArch, common::X86Arch, common::ARMArch>) {
         int const_value = 0;
         Expr lower_bound;

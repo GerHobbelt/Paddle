@@ -1173,7 +1173,7 @@ class NameScope:
             self._children[prefix] = [new_child]
         else:
             new_child = NameScope(
-                prefix + "_%d" % len(self._children[prefix]), self
+                f"{prefix}_{len(self._children[prefix])}", self
             )
             self._children[prefix].append(new_child)
         return new_child
@@ -1264,7 +1264,7 @@ class NameStruct:
             self._children[prefix] = [new_child]
         else:
             new_child = NameStruct(
-                prefix + "_%d" % len(self._children[prefix]), self
+                f"{prefix}_{len(self._children[prefix])}", self
             )
             self._children[prefix].append(new_child)
         return new_child
@@ -3315,8 +3315,7 @@ class Operator:
                             in_args = [in_args]
                         if not in_proto.duplicable and len(in_args) > 1:
                             raise ValueError(
-                                "Input %s expects only one input, but %d are given."
-                                % (in_proto.name, len(in_args))
+                                f"Input {in_proto.name} expects only one input, but {len(in_args)} are given."
                             )
                         in_arg_names = []
                         for index, arg in enumerate(in_args):
@@ -3370,8 +3369,7 @@ class Operator:
                         out_args = [out_args]
                     if not out_proto.duplicable and len(out_args) > 1:
                         raise ValueError(
-                            "Output %s expects only one output, but %d are given."
-                            % (out_proto.name, len(out_args))
+                            f"Output {out_proto.name} expects only one output, but {len(out_args)} are given."
                         )
                     out_arg_names = []
                     for arg in out_args:
@@ -4327,9 +4325,8 @@ class Block:
         )
         if with_details:
             re_add_indent = re.compile(r"\n(.)")
-            res_str = "blocks {\n  idx: %d\n  parent_idx: %d" % (
-                self.idx,
-                self.parent_idx,
+            res_str = (
+                f"blocks {{\n  idx: {self.idx}\n  parent_idx: {self.parent_idx}"
             )
             for var in list(self.vars.values()):
                 res_str += "\n  vars {{\n    {}  }}".format(
@@ -5556,7 +5553,7 @@ class IrGraph:
 
         Args:
             name(str): the name of the persistable variable node.
-            vart_type(core.VarDesc.VarType): the type of the persistable variable node.
+            var_type(core.VarDesc.VarType): the type of the persistable variable node.
             shape(list): the shape of the persistable variable node.
             var_dtype(core.VarDesc.VarType): the data type of the persistable variable node.
 
@@ -5577,7 +5574,7 @@ class IrGraph:
 
         Args:
             name(str): the name of the variable node.
-            vart_type(core.VarDesc.VarType): the type of the variable node.
+            var_type(core.VarDesc.VarType): the type of the variable node.
             shape(list): the shape of the variable node.
             var_dtype(core.VarDesc.VarType): the data type of the variable node.
 
@@ -6852,7 +6849,7 @@ class Program:
         res.blocks = [Block(res, i) for i in range(res.desc.num_blocks())]
         res._sync_with_cpp()
 
-        # Note: The op_role and op_role_var cann't be deleted currently,
+        # Note: The op_role and op_role_var can't be deleted currently,
         # and we will try to remove them in the future.
         common_clipped_attrs_list = ["op_callstack", "with_quant_attr"]
 

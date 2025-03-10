@@ -986,7 +986,7 @@ class TestElementwiseAddOpAutoParallel(OpTest):
         pass
 
 
-class TestElementwiseAddOpAutoParallelXShardBoardcast(
+class TestElementwiseAddOpAutoParallelXShardBroadcast(
     TestElementwiseAddOpAutoParallel
 ):
     def init_placements(self):
@@ -1023,7 +1023,7 @@ class TestElementwiseAddOpAutoParallelXYShard(TestElementwiseAddOpAutoParallel):
         self.out = np.add(self.x, self.y)
 
 
-class TestElementwiseAddOpAutoParallelXYShardBroardcast(
+class TestElementwiseAddOpAutoParallelXYShardBroadcast(
     TestElementwiseAddOpAutoParallelXYShard
 ):
     def init_placements(self):

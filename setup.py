@@ -1462,6 +1462,26 @@ def get_package_data_and_package_dir():
                 env_dict.get("ONNXRUNTIME_LIB_NAME"),
             ]
 
+    if env_dict.get("WITH_OPENVINO") == 'ON':
+        shutil.copy(env_dict.get("OPENVINO_LIB"), libs_path)
+        shutil.copy(env_dict.get("TBB_LIB"), libs_path)
+        shutil.copy(env_dict.get("OPENVINO_PADDLE_LIB"), libs_path)
+        shutil.copy(env_dict.get("OPENVINO_CPU_PLUGIN_LIB"), libs_path)
+        if os.name != 'nt':
+            package_data['paddle.libs'] += [
+                'libopenvino.so.2500',
+                'libtbb.so.12',
+                'libopenvino_paddle_frontend.so.2500',
+                'libopenvino_intel_cpu_plugin.so',
+            ]
+        else:
+            package_data['paddle.libs'] += [
+                'openvino.dll',
+                'tbb.dll',
+                'openvino_paddle_frontend.dll',
+                'openvino_intel_cpu_plugin.dll',
+            ]
+
     if env_dict.get("WITH_XPU") == 'ON':
         shutil.copy(env_dict.get("XPU_API_LIB"), libs_path)
         package_data['paddle.libs'] += [env_dict.get("XPU_API_LIB_NAME")]
@@ -1836,6 +1856,14 @@ def get_headers():
         headers += list(
             find_files('*', env_dict.get("ONEDNN_INSTALL_DIR") + '/include')
         )  # mkldnn
+
+    if env_dict.get("WITH_OPENVINO") == 'ON':
+        headers += list(
+            find_files('*', env_dict.get("OPENVINO_INC_DIR"))
+        )  # openvino
+        headers += list(
+            find_files('*', env_dict.get("TBB_INC_DIR"))
+        )  # openvino
 
     if env_dict.get("WITH_GPU") == 'ON' or env_dict.get("WITH_ROCM") == 'ON':
         # externalErrorMsg.pb for External Error message

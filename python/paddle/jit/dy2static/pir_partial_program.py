@@ -58,6 +58,17 @@ def get_value_name(value):
     return value.name
 
 
+def apply_general_passes(
+    program, *, enable_cse=True, enable_delete_assert_op=True
+):
+    pm = paddle.pir.PassManager(2)
+    if enable_cse:
+        pm.add_pass("common_subexpression_elimination_pass", {})
+    if enable_delete_assert_op:
+        pm.add_pass("delete_assert_op_pass", {})
+    pm.run(program)
+
+
 class NestSequence:
     """
     A wrapper class that easily to flatten and restore the nest structure of
@@ -457,33 +468,55 @@ class IndicesPreservePass:
 class ValuePreservePass:
     OP_NAME_PREFIX = "preserved_value_"
 
-    def __init__(self, values):
+    def __init__(self, values, use_cinn_pass):
         self.values = values
+        self.use_cinn_pass = use_cinn_pass
 
     def apply(self, program):
         raise RuntimeError("Not implemented.")
 
-    def __call__(self, program):
-        # create fake values for args
-        all_values = list(
-            filter(
-                lambda x: isinstance(x, Value) and not is_fake_value(x),
-                paddle.utils.flatten(self.values),
-            )
-        )
+    @staticmethod
+    def create_name_generator(prefix):
+        count = 0
 
+        def name_gen():
+            nonlocal count
+            name = f"{prefix}{count}"
+            count += 1
+            return name
+
+        return name_gen
+
+    @staticmethod
+    def attach_preserved_name(value, program, value2name, name_generator):
+        if is_fake_value(value):
+            return None
+        if value in value2name:
+            return value2name[value]
+        name = name_generator()
+        value2name[value] = name
+        paddle.base.libpaddle.pir.append_shadow_output(
+            program,
+            value,
+            name,
+            len(program.global_block().ops),
+        )
+        return name
+
+    def __call__(self, program):
+        # create preserved op for args
         value2name = ValueDict()
-        for idx, v in enumerate(all_values):
-            name = f"{ValuePreservePass.OP_NAME_PREFIX}{idx}"
-            if v in value2name:
-                continue
-            value2name[v] = name
-            paddle.base.libpaddle.pir.append_shadow_output(
-                program,
-                v,
-                name,
-                len(program.global_block().ops),
-            )
+        name_generator = ValuePreservePass.create_name_generator(
+            ValuePreservePass.OP_NAME_PREFIX
+        )
+        names = paddle.utils.map_structure(
+            lambda value: ValuePreservePass.attach_preserved_name(
+                value, program, value2name, name_generator  # noqa: F821
+            ),
+            self.values,
+        )
+        # NOTE(SigureMo): Value maybe removed in pass, don't use value2name after pass
+        del value2name
 
         # apply program pass
         program = self.apply(program)
@@ -505,27 +538,17 @@ class ValuePreservePass:
         for op in to_remove_op:
             program.global_block().remove_op(op)
 
-        # get new values
-        value2new_value = ValueDict(
-            {
-                v: name2new_value.get(name, fake_value())
-                for v, name in value2name.items()
-            }
+        self.values = paddle.utils.map_structure(
+            lambda name: name2new_value.get(name, fake_value()), names
         )
-
-        new_args = paddle.utils.map_structure(
-            lambda x: (
-                value2new_value[x] if not is_fake_value(x) else fake_value()
-            ),
-            self.values,
-        )
-        self.values = new_args
         return program
 
 
-class FusedBnAddActPass(ValuePreservePass):
+class FullGraphPreProcessPass(ValuePreservePass):
     def apply(self, program):
         program = paddle.base.libpaddle.pir.apply_bn_add_act_pass(program)
+        if self.use_cinn_pass:
+            program = paddle.base.libpaddle.pir.reduce_as_sum_pass(program)
         return program
 
 
@@ -695,8 +718,14 @@ class PartialProgramLayer:
                     pm, forward_program
                 )
                 pm.run(forward_program)
-                if cse_is_enabled():
-                    paddle.base.libpaddle.pir.apply_cse_pass(forward_program)
+
+                apply_general_passes(
+                    forward_program,
+                    enable_cse=cse_is_enabled(),
+                    enable_delete_assert_op=cinn_is_enabled(
+                        self._build_strategy, self._backend
+                    ),
+                )
 
                 # if-else pass
                 if cinn_is_enabled(self._build_strategy, self._backend):
@@ -713,7 +742,6 @@ class PartialProgramLayer:
             if auto_layout_is_enabled():
                 pm = paddle.pir.PassManager(2)
                 pm.add_pass("auto_layout_pass", {})
-                pm.add_pass("auto_layout_simplify_pass", {})
                 pm.run(infer_program.program)
             for hooker in self._hookers:
                 hooker.after_infer(infer_program)
@@ -727,7 +755,6 @@ class PartialProgramLayer:
             if auto_layout_is_enabled():
                 pm = paddle.pir.PassManager(2)
                 pm.add_pass("auto_layout_pass", {})
-                pm.add_pass("auto_layout_simplify_pass", {})
                 pm.run(train_program.program)
             train_program = self._append_backward_desc(train_program)
             # Note: Only set grad type once after initializing train program. So we put it here.
@@ -771,7 +798,7 @@ class PartialProgramLayer:
                         elif kw_name in forward_name_value_map:
                             return forward_name_value_map[kw_name]
                         else:
-                            return None
+                            raise Exception(f"kw_args: {kw_name} not found")
 
                     for [kw_name, kw_value] in (
                         backward_program.global_block().kwargs().items()
@@ -779,14 +806,24 @@ class PartialProgramLayer:
                         forward_matched_value = (
                             get_kwargs_forward_matched_value(kw_name, kw_value)
                         )
-                        if forward_matched_value is not None:
-                            share_symbol_shape_from_forward_to_backward(
-                                forward_matched_value, kw_value
-                            )
+                        share_symbol_shape_from_forward_to_backward(
+                            forward_matched_value, kw_value
+                        )
 
-                if cse_is_enabled():
-                    paddle.base.libpaddle.pir.apply_cse_pass(forward_program)
-                    paddle.base.libpaddle.pir.apply_cse_pass(backward_program)
+                apply_general_passes(
+                    forward_program,
+                    enable_cse=cse_is_enabled(),
+                    enable_delete_assert_op=cinn_is_enabled(
+                        self._build_strategy, self._backend
+                    ),
+                )
+                apply_general_passes(
+                    backward_program,
+                    enable_cse=cse_is_enabled(),
+                    enable_delete_assert_op=cinn_is_enabled(
+                        self._build_strategy, self._backend
+                    ),
+                )
                 if cinn_is_enabled(self._build_strategy, self._backend):
                     paddle.base.libpaddle.pir.apply_cinn_pass(forward_program)
                     init_backward_program_shape_analysis(
@@ -1043,13 +1080,15 @@ class PartialProgramLayer:
         )
 
         # construct a runnable program.
-        fused_bn_add_act_pass = FusedBnAddActPass(
-            [inputs, params, targets, x_grad_value, p_grad_value, o_grad_value]
+        fused_bn_add_act_pass = FullGraphPreProcessPass(
+            [inputs, params, targets, x_grad_value, p_grad_value, o_grad_value],
+            cinn_is_enabled(self._build_strategy, self._backend),
         )
         forward_index_pass = IndicesPreservePass(
             [forward_end_idx, backward_start_op_index, backward_end_op_index],
             fused_bn_add_act_pass,
         )
+
         program = forward_index_pass(program)
         (
             inputs,

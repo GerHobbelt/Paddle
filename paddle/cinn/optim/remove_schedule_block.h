@@ -25,7 +25,34 @@ namespace cinn {
 namespace optim {
 
 /**
- * Remove schedule block.
+ * Removes ScheduleBlock nodes from the IR tree.
+ *
+ * This pass is applicable in scenarios where ScheduleBlock nodes are present in
+ * the IR tree but are no longer needed for further optimization.
+ *
+ * When applied, this pass will traverse the IR tree and replace each
+ * ScheduleBlockRealize node with its body. During this process, it will also
+ * replace the iter_vars in the body with their corresponding iter_values. This
+ * effectively removes the ScheduleBlock structure while preserving the
+ * computational logic within it.
+ *
+ * Performance impact: This pass addresses the overhead of maintaining
+ * ScheduleBlock structures in the IR. By removing these structures, it
+ * simplifies the IR, which can lead to faster subsequent passes and potentially
+ * more efficient code generation.
+ *
+ * Examples:
+ * 1. Basic ScheduleBlock removal:
+ *    Input IR:
+ *      ScheduleBlockRealize {
+ *        iter_vars: [i, j]
+ *        iter_values: [0, 1]
+ *        ScheduleBlock {
+ *          body: A[i, j] = B[i, j] + C[i, j]
+ *        }
+ *      }
+ *    Output IR:
+ *      A[0, 1] = B[0, 1] + C[0, 1]
  */
 void RemoveScheduleBlock(ir::Expr *expr);
 

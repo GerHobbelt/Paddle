@@ -1548,29 +1548,6 @@ void RegisterCustomDeviceCommonKernel(const std::string& dev_type) {
       barrier,
       device_type,
       paddle::operators::BarrierOpCustomDeviceKernel<int>) {}
-  REGISTER_OP_CUSTOM_DEVICE_KERNEL(
-      number_count,
-      device_type,
-      paddle::operators::NumberCountOpCustomDeviceKernel<int64_t>) {}
-  REGISTER_OP_CUSTOM_DEVICE_KERNEL(
-      limit_by_capacity,
-      device_type,
-      paddle::operators::LimitByCapacityOpCustomDeviceKernel<int64_t>) {}
-  REGISTER_OP_CUSTOM_DEVICE_KERNEL(
-      prune_gate_by_capacity,
-      device_type,
-      paddle::operators::PruneGateByCapacityCustomDeviceKernel<int64_t>) {}
-  REGISTER_OP_CUSTOM_DEVICE_KERNEL(
-      random_routing,
-      device_type,
-      paddle::operators::RandomRoutingOpCustomDeviceKernel<float>,
-      paddle::operators::RandomRoutingOpCustomDeviceKernel<double>,
-      paddle::operators::RandomRoutingOpCustomDeviceKernel<
-          phi::dtype::float16>) {}
-  REGISTER_OP_CUSTOM_DEVICE_KERNEL(
-      assign_pos,
-      device_type,
-      paddle::operators::AssignPosCustomDeviceKernel<int64_t>) {}
 
   REGISTER_OP_CUSTOM_DEVICE_KERNEL(
       global_scatter,

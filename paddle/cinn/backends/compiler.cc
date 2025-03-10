@@ -238,7 +238,8 @@ void Compiler::Build(const Module& module, const std::string& code) {
       [&](common::X86Arch) { CompileX86Module(module); },
       [&](common::ARMArch) { CINN_NOT_IMPLEMENTED; },
       [&](common::NVGPUArch) { CompileCudaModule(module, code); },
-      [&](common::HygonDCUArchHIP) { CompileHipModule(module, code); });
+      [&](common::HygonDCUArchHIP) { CompileHipModule(module, code); },
+      [&](common::HygonDCUArchSYCL) { CompileSyclModule(module, code); });
 }
 
 void Compiler::AppendCX86(const Module& module) {
@@ -286,7 +287,8 @@ std::string Compiler::GetSourceCode(const ir::Module& module) {
 #else
         CINN_NOT_IMPLEMENTED
 #endif
-      });
+      },
+      [&](common::HygonDCUArchSYCL) -> std::string { CINN_NOT_IMPLEMENTED });
 }
 
 void Compiler::BuildDefault(const Module& module) {
@@ -295,7 +297,8 @@ void Compiler::BuildDefault(const Module& module) {
       [&](common::X86Arch) { CompileX86Module(module); },
       [&](common::ARMArch) { CINN_NOT_IMPLEMENTED; },
       [&](common::NVGPUArch) { CompileCudaModule(module); },
-      [&](common::HygonDCUArchHIP) { CompileHipModule(module); });
+      [&](common::HygonDCUArchHIP) { CompileHipModule(module); },
+      [&](common::HygonDCUArchSYCL) { CompileSyclModule(module); });
 }
 
 namespace {
@@ -322,7 +325,8 @@ void Compiler::RegisterDeviceModuleSymbol() {
       [&](common::X86Arch) { return; },
       [&](common::ARMArch) { return; },
       [&](common::NVGPUArch) { RegisterCudaModuleSymbol(); },
-      [&](common::HygonDCUArchHIP) { RegisterHipModuleSymbol(); });
+      [&](common::HygonDCUArchHIP) { RegisterHipModuleSymbol(); },
+      [&](common::HygonDCUArchSYCL) { RegisterSyclModuleSymbol(); });
 }
 
 void Compiler::RegisterCudaModuleSymbol() {
@@ -388,6 +392,8 @@ void Compiler::RegisterHipModuleSymbol() {
   CINN_NOT_IMPLEMENTED
 #endif
 }
+
+void Compiler::RegisterSyclModuleSymbol() { CINN_NOT_IMPLEMENTED }
 
 void Compiler::CompileCudaModule(const Module& module,
                                  const std::string& code) {
@@ -464,6 +470,11 @@ void Compiler::CompileHipModule(const Module& module, const std::string& code) {
 #else
   CINN_NOT_IMPLEMENTED
 #endif
+}
+
+void Compiler::CompileSyclModule(const Module& module,
+                                 const std::string& code) {
+  CINN_NOT_IMPLEMENTED
 }
 
 void Compiler::CompileX86Module(const Module& module) {

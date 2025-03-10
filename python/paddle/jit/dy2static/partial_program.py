@@ -808,15 +808,15 @@ class PartialProgramLayer:
     @switch_to_static_graph
     def _build_infer_program(self, infer_program, forward_end_op_index):
         forward_skip_vars = self._parse_skip_gc_vars(infer_program)
-        builded_infer_program = add_build_strategy_for(
+        built_infer_program = add_build_strategy_for(
             infer_program,
             0,
             forward_end_op_index,
             self._build_strategy,
             forward_skip_vars,
         )
-        self._apply_inplace_pass(builded_infer_program, None)
-        return builded_infer_program
+        self._apply_inplace_pass(built_infer_program, None)
+        return built_infer_program
 
     @switch_to_static_graph
     def _get_forward_backward_program_form(
@@ -833,7 +833,7 @@ class PartialProgramLayer:
         backward_skip_vars = self._parse_skip_gc_vars(
             whole_program
         ) + self._grad_var_names.get('param', [])
-        backward_builded_program = add_build_strategy_for(
+        backward_built_program = add_build_strategy_for(
             whole_program,
             backward_start_op_index,
             backward_end_op_index,
@@ -842,9 +842,9 @@ class PartialProgramLayer:
         )
 
         forward_skip_vars = self._parse_skip_gc_vars(
-            whole_program, backward_builded_program
+            whole_program, backward_built_program
         )
-        forward_builded_program = add_build_strategy_for(
+        forward_built_program = add_build_strategy_for(
             whole_program,
             0,
             forward_end_op_index,
@@ -852,27 +852,25 @@ class PartialProgramLayer:
             forward_skip_vars,
         )
 
-        self._apply_inplace_pass(
-            forward_builded_program, backward_builded_program
-        )
+        self._apply_inplace_pass(forward_built_program, backward_built_program)
 
         # NOTE(Aurelius84): Export forward/backward program for SubGraphChecker,
         # see export_subgraph for detail.
         pir_exporter(
             self,
-            forward_builded_program,
+            forward_built_program,
             SubGraphRole.Forward,
             set(),
             set(forward_skip_vars),
         )
         pir_exporter(
             self,
-            backward_builded_program,
+            backward_built_program,
             SubGraphRole.Backward,
             set(forward_skip_vars),
             set(backward_skip_vars),
         )
-        return [forward_builded_program, backward_builded_program]
+        return [forward_built_program, backward_built_program]
 
     def _apply_inplace_pass(self, forward_program, backward_program):
         attr_types = {
@@ -1157,19 +1155,17 @@ def add_build_strategy_for(
             core.Scope(), framework._current_expected_place()
         )
         ir_graph = framework.IrGraph(compiled_program._graph)
-        builded_program = ir_graph.to_program()
+        built_program = ir_graph.to_program()
         if hasattr(compiled_program._program, 'lr_scheduler'):
-            builded_program.lr_scheduler = (
-                compiled_program._program.lr_scheduler
-            )
+            built_program.lr_scheduler = compiled_program._program.lr_scheduler
     else:
         # can't just create a new program, we need copy the vardesc.
-        builded_program = paddle.static.Program()
+        built_program = paddle.static.Program()
         for var in program.block(0).vars.values():
-            builded_program.block(0)._clone_variable(var, False)
+            built_program.block(0)._clone_variable(var, False)
 
     # set back the parent_idx of blocks
-    for origin, current in zip(program.blocks, builded_program.blocks):
+    for origin, current in zip(program.blocks, built_program.blocks):
         current.desc.set_parent_idx(origin.desc.parent)
 
-    return builded_program
+    return built_program

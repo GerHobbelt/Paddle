@@ -1166,7 +1166,7 @@ class BinaryOneDNNHandler : public OneDNNHandlerNoCachingT<T, dnnl::binary> {
       float scale_y,
       float scale_out,
       dnnl::post_ops post_ops = dnnl::post_ops{}) {
-    // Scales set in attributes for inputs contibute to the output equation
+    // Scales set in attributes for inputs contribute to the output equation
     // in the following way (assuming no broadcasting takes place):
     // output_i = scale_0 * x_i <+ or *> scale_1 * y_i;
     // Hence we have to create scales that will:

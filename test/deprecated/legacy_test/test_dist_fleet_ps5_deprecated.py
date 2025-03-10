@@ -71,9 +71,7 @@ class TestPSPassWithBow(unittest.TestCase):
         is_sparse = True
 
         # query
-        q = paddle.static.data(
-            name="query_ids", shape=[-1, 1], dtype="int64", lod_level=1
-        )
+        q = paddle.static.data(name="query_ids", shape=[-1, 1], dtype="int64")
         # embedding
         q_emb = paddle.static.nn.embedding(
             input=q,
@@ -106,7 +104,7 @@ class TestPSPassWithBow(unittest.TestCase):
         label = paddle.static.data(name="label", shape=[-1, 1], dtype="int64")
         # pt
         pt = paddle.static.data(
-            name="pos_title_ids", shape=[-1, 1], dtype="int64", lod_level=1
+            name="pos_title_ids", shape=[-1, 1], dtype="int64"
         )
         # embedding
         pt_emb = paddle.static.nn.embedding(
@@ -139,7 +137,7 @@ class TestPSPassWithBow(unittest.TestCase):
         )
         # nt
         nt = paddle.static.data(
-            name="neg_title_ids", shape=[-1, 1], dtype="int64", lod_level=1
+            name="neg_title_ids", shape=[-1, 1], dtype="int64"
         )
         # embedding
         nt_emb = paddle.static.nn.embedding(

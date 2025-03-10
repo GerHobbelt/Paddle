@@ -102,6 +102,7 @@ class MLPLayer(nn.Layer):
         dropout_ratio=0.1,
         initializer_range=0.02,
         manual=True,
+        hidden_layer=4,
     ):
         super().__init__()
 
@@ -112,7 +113,9 @@ class MLPLayer(nn.Layer):
         if manual:
             self.layer_to_mesh = [PP_MESH_0, PP_MESH_1, PP_MESH_0, PP_MESH_1]
         else:
-            self.layer_to_mesh = [PP_MESH_0, PP_MESH_0, PP_MESH_1, PP_MESH_1]
+            self.layer_to_mesh = [PP_MESH_0] * (
+                hidden_layer - hidden_layer // 2
+            ) + [PP_MESH_1] * (hidden_layer // 2)
 
         self.layers = nn.LayerList(
             [
@@ -123,7 +126,7 @@ class MLPLayer(nn.Layer):
                     weight_attr,
                     mesh=self.layer_to_mesh[i],
                 )
-                for i in range(4)
+                for i in range(hidden_layer)
             ]
         )
 
@@ -217,11 +220,12 @@ class TestVPPPass(unittest.TestCase):
         manual=True,
         enable_send_recv_overlap=False,
         batch_size=BATCH_SIZE,
+        hidden_layer=4,
     ):
         self.init()
 
         strategy = apply_pass(schedule_mode, acc_step, enable_send_recv_overlap)
-        model = MLPLayer(manual=manual)
+        model = MLPLayer(manual=manual, hidden_layer=hidden_layer)
         opt = paddle.optimizer.AdamW(
             learning_rate=0.00001, parameters=model.parameters()
         )
@@ -267,6 +271,11 @@ class TestVPPPass(unittest.TestCase):
         )
         self.check_result(Non_uniform_loss_vpp, Non_uniform_loss_vpp_manual)
         self.check_result(loss_fthenb, Non_uniform_loss_vpp)
+        # Tail-removed-vpp
+        Tail_removed_loss_vpp = self.run_pipeline(
+            schedule_mode="VPP", acc_step=4, manual=False, hidden_layer=7
+        )
+        self.check_result(Tail_removed_loss_vpp, loss_vpp)
 
     def check_result(self, loss1, loss2):
         return np.array_equal(loss1, loss2)

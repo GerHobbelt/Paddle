@@ -1176,16 +1176,17 @@ static PyObject* tensor__share_underline_tensor_to(TensorObject* self,
   EAGER_TRY
   paddle::Tensor* src_ptr =
       &(reinterpret_cast<TensorObject*>(PyTuple_GET_ITEM(args, 0))->tensor);
-  if (!self->tensor.initialized()) {
-    PADDLE_ENFORCE(self->tensor.is_dist_tensor() &&
-                       !phi::distributed::IsCurRankInMesh(
-                           static_cast<phi::distributed::DistTensor*>(
-                               self->tensor.impl().get())
-                               ->process_mesh()),
-                   common::errors::InvalidArgument(
-                       "Tensor %s has not been initialized! Please initialize "
-                       "src tensor before share_buffer_with to other.",
-                       self->tensor.name()));
+  if (!(self->tensor.defined() && self->tensor.has_allocation())) {
+    PADDLE_ENFORCE(
+        self->tensor.is_dist_tensor() &&
+            !phi::distributed::IsCurRankInMesh(
+                static_cast<phi::distributed::DistTensor*>(
+                    self->tensor.impl().get())
+                    ->process_mesh()),
+        common::errors::InvalidArgument(
+            "Tensor %s either lacks impl_ or holder_, Please initialize "
+            "src tensor before share_buffer_with to other.",
+            self->tensor.name()));
   }
   src_ptr->set_impl(self->tensor.impl());
   RETURN_PY_NONE
@@ -3147,12 +3148,14 @@ static PyObject* tensor_data_ptr(TensorObject* self,
                                  PyObject* args,
                                  PyObject* kwargs) {
   EAGER_TRY
-  if (self->tensor.initialized() && self->tensor.is_dense_tensor()) {
+  if (self->tensor.defined() && self->tensor.has_allocation() &&
+      self->tensor.is_dense_tensor()) {
     return ToPyObject(
         (int64_t)std::dynamic_pointer_cast<phi::DenseTensor>(  // NOLINT
             self->tensor.impl())
             ->data());
-  } else if (self->tensor.initialized() && self->tensor.is_dist_tensor()) {
+  } else if (self->tensor.defined() && self->tensor.has_allocation() &&
+             self->tensor.is_dist_tensor()) {
     return ToPyObject(
         (int64_t)
             std::dynamic_pointer_cast<phi::distributed::DistTensor>(  // NOLINT

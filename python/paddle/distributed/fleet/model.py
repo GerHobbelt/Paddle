@@ -24,6 +24,7 @@ from .meta_parallel import (
     SegmentParallel,
     ShardingParallel,
     TensorParallel,
+    VPPFhenBInBalancedMemory,
 )
 
 _grad_scalar = None
@@ -169,9 +170,16 @@ def distributed_model(model):
                     model, fleet_env._hcg, strategy=strategy
                 )
             elif pp_degree <= accumulate_steps < 2 * pp_degree:
-                model = PipelineParallelWithInterleaveFthenB(
-                    model, fleet_env._hcg, strategy=strategy
-                )
+                if strategy.hybrid_configs[
+                    "pp_configs"
+                ].best_unbalanced_scheduler:
+                    model = VPPFhenBInBalancedMemory(
+                        model, fleet_env._hcg, strategy=strategy
+                    )
+                else:
+                    model = PipelineParallelWithInterleaveFthenB(
+                        model, fleet_env._hcg, strategy=strategy
+                    )
             else:
                 raise ValueError(
                     f"The accumulate_steps({accumulate_steps}) should be greater than or equal to pp_degree({pp_degree})"

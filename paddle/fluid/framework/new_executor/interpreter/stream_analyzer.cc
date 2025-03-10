@@ -332,7 +332,7 @@ template <typename T>
 DownstreamRunType analyse_run_type_for_two_instructions(T* cur_instr,
                                                         T* next_instr,
                                                         const Place& place) {
-  // xpu&ipu memcpy kerenl is synchronous.
+  // xpu&ipu memcpy kernel is synchronous.
   if (phi::is_ipu_place(place) || phi::is_xpu_place(place)) {
     return DownstreamRunType::kDirectRun;
   }

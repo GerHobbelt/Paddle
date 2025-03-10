@@ -17,12 +17,11 @@
 #include "paddle/cinn/ir/group_schedule/config/schedule_config_manager.h"
 #include "paddle/cinn/ir/group_schedule/tactic/compute_at_reduction_tactic.h"
 #include "paddle/cinn/ir/group_schedule/tactic/compute_inline_tactic.h"
+#include "paddle/cinn/ir/group_schedule/tactic/tile_broadcast_tactic.h"
 #include "paddle/cinn/ir/group_schedule/tactic/tile_first_general_tactic.h"
 #include "paddle/cinn/ir/ir_analyzer/ir_analyzer.h"
 #include "paddle/cinn/ir/op/ir_operators.h"
 #include "paddle/common/enforce.h"
-
-PD_DECLARE_bool(cinn_bucket_compile);
 
 namespace cinn {
 namespace ir {
@@ -33,12 +32,10 @@ void DynamicShapeGroupScheduler::Init() {
   VLOG(4) << "original group func body: \n"
           << ir_sch_->GetModule().GetExprs()[0];
   InitBuckets();
+  tactics_.emplace_back(CreateTileBroadcastTactic());
   tactics_.emplace_back(CreateTileFirstGeneralTactic());
-  VLOG(4) << "CreateTileFirstGeneralTactic End";
   tactics_.emplace_back(CreateComputeInlineTactic());
-  VLOG(4) << "CreateTileCreateComputeInlineTactic End";
   tactics_.emplace_back(CreateComputeAtReductionTactic());
-  VLOG(4) << "CreateComputeAtReductionTactic End";
 }
 
 void DynamicShapeGroupScheduler::InitBuckets() {
@@ -158,7 +155,8 @@ void DynamicShapeGroupScheduler::ApplyTactics(BucketContext* bucket_context) {
               << "] on ScheduleBlockNode [" << node->id() << "] func body:\n"
               << bucket_context->ir_sch->GetModule().GetExprs().front();
     };
-    tactic->Init(&(bucket_context->schedule_context));
+    tactic->Init(&(bucket_context->schedule_context),
+                 bucket_context->ir_sch.get());
     bucket_context->schedule_block_graph->DFSTopoWalk(ApplyTacticFunc);
     bucket_context->schedule_block_graph->Update(*(bucket_context->ir_sch));
     VLOG(5) << "[End " << tactic->TacticName() << "] func body: "

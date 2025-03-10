@@ -131,9 +131,10 @@ inline bool VarIsTensor(const Variable& var) {
   return var.IsType<phi::DenseTensor>() || var.IsType<phi::SelectedRows>();
 }
 
-const phi::DenseTensor* GetLoDTensorOrSelectedRowsValueFromVar(
+const phi::DenseTensor* GetDenseTensorOrSelectedRowsValueFromVar(
     const Variable& var);
-phi::DenseTensor* GetMutableLoDTensorOrSelectedRowsValueFromVar(Variable* var);
+phi::DenseTensor* GetMutableDenseTensorOrSelectedRowsValueFromVar(
+    Variable* var);
 
 class ExecutionContext;
 class OperatorBase;

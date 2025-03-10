@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import unittest
 
-from test_case_base import TestCaseBase
+from test_case_base import TestCaseBase, test_with_faster_guard
 
 import paddle
 from paddle.jit.sot.psdb import check_no_breakgraph
@@ -55,6 +55,7 @@ def tensor_subscript_tensor(x: paddle.Tensor):
 
 
 class TestSlice(TestCaseBase):
+    @test_with_faster_guard
     def test_simple(self):
         x = list(range(10))
         y = paddle.arange(10)
@@ -83,6 +84,7 @@ def layer_list_slice(layer, x):
 
 
 class TestLayerList(TestCaseBase):
+    @test_with_faster_guard
     def test_layer_list_slice(self):
         layer = MyLayer()
         x = paddle.randn([5, 10])
@@ -127,6 +129,7 @@ class LayerListNet(paddle.nn.Layer):
 
 
 class TestLayerListSlice(TestCaseBase):
+    @test_with_faster_guard
     def test_layer_list_slice(self):
         x = paddle.randn([2, 5])
         net = LayerListNet()

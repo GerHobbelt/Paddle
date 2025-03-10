@@ -44,7 +44,7 @@ class TestConverterResNet50(unittest.TestCase):
         # Set input
         input_config = Input(
             min_input_shape=(1, 3, 224, 224),
-            optim_input_shape=(2, 3, 224, 224),
+            optim_input_shape=(1, 3, 224, 224),
             max_input_shape=(4, 3, 224, 224),
             input_data_type='float32',
         )
@@ -71,6 +71,7 @@ class TestConverterResNet50(unittest.TestCase):
 
         output_expected = standardize(output_expected[0])
         output_trt = standardize(output_converted[0])
+
         # Check that the results are close to each other within a tolerance of 1e-3
         np.testing.assert_allclose(
             output_expected,

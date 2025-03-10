@@ -64,9 +64,16 @@ for element in "${target_lists_for_dygraph_ci[@]}";do
   count=$((count+1))
 done
 
+# There are two types of tests included here:
+# 1. The auto-parallel unit testing in Paddle repository. CI will immediately end with
+# an error when a test fails.
+# 2. The auto-parallel testing of large language models in `PaddleNLP` repository. The execution
+# status of each test will be recorded through global variables. When a test fails, it does not
+# affect the execution of subsequent tests. They will be summarized and output after the CI is completed.
+# Therefore, it is required to perform paddle unit testing first, followed by testing in `PaddleNLP`.
+case_list[${#case_list[*]}]="llama_auto_unit_test"
 case_list[${#case_list[*]}]=llama_auto
 case_list[${#case_list[*]}]=gpt-3_auto
-case_list[${#case_list[*]}]="llama_auto_unit_test"
 case_list[${#case_list[*]}]=gpt-3_dygraph
 }
 
@@ -155,9 +162,13 @@ if [[ ${#case_list[*]} -ne 0 ]];then
     # Install external_ops
     install_external_ops
     case_num=1
+    # `FLAGS_install_deps` defaults to 0, indicating that certain required packages must be installed
+    # via `install requirements.txt` prior to running `PaddleNLP` tests.
+    # By setting `FLAGS_install_deps` to 1, indicating that there is no need for reinstallation.
     export FLAGS_install_deps=0
     for case in ${case_list[*]};do
         echo -e "\033[31m ---- running case $case_num/${#case_list[*]}: ${case} \033"
+        # Suggest that the logical order here be consistent with the `case_stst` order.
         if [[ ${case} == "auto_unit_test" ]];then
             bash /workspace/Paddle/tools/auto_parallel/ci_case_unit.sh auto_unit_test
             print_info $? `ls -lt ${log_path} | grep "test" | head -n 1 | awk '{print $9}'` ${case}
@@ -174,13 +185,18 @@ if [[ ${#case_list[*]} -ne 0 ]];then
             cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
             bash $cmd prepare_case llama_case_list_auto $FLAGS_install_deps $FLAGS_download_data
             execute_func_list $cmd llama_auto
+            # There is no need to reinstall the related packages of `PaddleNLP` afterward.
             export FLAGS_install_deps=1
+            # The `llama` test data has been downloaded, and the `FLAGS_download_data` flag indicates
+            # that there is no need to repeat the download process later.
             export FLAGS_download_data="llama ""$FLAGS_download_data"
             let case_num++
         elif [[ ${case} == "gpt-3_auto" ]];then
             cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
             bash $cmd prepare_case llm_gpt_case_list_auto $FLAGS_install_deps $FLAGS_download_data
             execute_func_list $cmd gpt-3_auto
+            # there is no need to repeat the `gpt` download process later.
+            export FLAGS_download_data="gpt ""$FLAGS_download_data"
             let case_num++
         elif [[ ${case} == "gpt-3_dygraph" ]];then
             cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh

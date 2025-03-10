@@ -67,6 +67,7 @@ class IRVisitorRequireReImpl {
     }
     return RetTy();
   }
+  virtual RetTy Visit(const ir::IndexExpr* expr, Args... args) {}
   // @}
  protected:
   virtual RetTy Visit(const IterMark* op, Args... args) {}
@@ -101,6 +102,12 @@ struct IRVisitor : public IRVisitorRequireReImpl<void> {
 
 bool operator==(Expr a, Expr b);
 bool operator!=(Expr a, Expr b);
+
+bool operator==(IndexExpr a, Expr b);
+bool operator!=(IndexExpr a, Expr b);
+
+bool operator==(Expr a, IndexExpr b);
+bool operator!=(Expr a, IndexExpr b);
 
 bool operator==(IndexExpr a, IndexExpr b);
 bool operator!=(IndexExpr a, IndexExpr b);

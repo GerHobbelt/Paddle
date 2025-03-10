@@ -76,7 +76,7 @@ class CutlassTeller {
       int kh = filter_tensor.dims()[2];
       int kw = filter_tensor.dims()[3];
 
-      // For convience, we only support EXPLICIT
+      // For convenience, we only support EXPLICIT
       auto padding_algorithm =
           op_desc->GetAttrIfExists<std::string>("padding_algorithm");
       if (padding_algorithm != "EXPLICIT") {
@@ -144,7 +144,7 @@ class CutlassTeller {
       int kh = filter_tensor.dims()[2];
       int kw = filter_tensor.dims()[3];
 
-      // For convience, we only support EXPLICIT
+      // For convenience, we only support EXPLICIT
       auto padding_algorithm =
           op_desc->GetAttrIfExists<std::string>("padding_algorithm");
       if (padding_algorithm != "EXPLICIT") {
@@ -220,7 +220,7 @@ class CutlassTeller {
       int kh = filter_tensor.dims()[2];
       int kw = filter_tensor.dims()[3];
 
-      // For convience, we only support EXPLICIT
+      // For convenience, we only support EXPLICIT
       auto padding_algorithm =
           op_desc->GetAttrIfExists<std::string>("padding_algorithm");
       if (padding_algorithm != "EXPLICIT") {

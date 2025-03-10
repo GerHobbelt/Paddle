@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import unittest
 
-from test_case_base import TestCaseBase
+from test_case_base import TestCaseBase, test_with_faster_guard
 
 import paddle
 from paddle.jit.sot.psdb import check_no_breakgraph
@@ -368,6 +368,7 @@ class TestListMethods(TestCaseBase):
     def test_list_inplace_add(self):
         self.assert_results(list_inplace_add)
 
+    @test_with_faster_guard
     def test_list_extend_range(self):
         self.assert_results(list_extend_range, paddle.to_tensor([1, 2]))
 

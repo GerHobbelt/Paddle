@@ -148,9 +148,12 @@ phi::DeviceContext* ParseDeviceContext(pir::Operation* op,
       phi::distributed::CommContext* comm_context = nullptr;
       if (comm_context_manager.Has(std::to_string(ring_id))) {
         comm_context = comm_context_manager.Get(std::to_string(ring_id));
-      } else if (op_name.compare(
-                     paddle::dialect::CSoftmaxWithCrossEntropyOp::name()) ==
-                 0) {
+      } else if (op_name.compare(paddle::dialect::MpAllreduceSum_Op::name()) ==
+                     0 ||
+                 op_name.compare(paddle::dialect::AllReduce_Op::name()) == 0 ||
+                 op_name.compare(paddle::dialect::CIdentity_Op::name()) == 0 ||
+                 op_name.compare(paddle::dialect::CConcatOp::name()) == 0 ||
+                 op_name.compare(paddle::dialect::Broadcast_Op::name()) == 0) {
         auto map = distributed::ProcessGroupMapFromGid::getInstance();
         distributed::ProcessGroup* pg = map->get(ring_id);
         comm_context = static_cast<paddle::distributed::ProcessGroupNCCL*>(pg)
@@ -168,8 +171,9 @@ phi::DeviceContext* ParseDeviceContext(pir::Operation* op,
             op_name.compare(paddle::dialect::Broadcast_Op::name()) == 0 ||
             op_name.compare(paddle::dialect::BroadcastOp::name()) == 0 ||
             op_name.compare(paddle::dialect::AllGatherOp::name()) == 0 ||
-            op_name.compare(
-                paddle::dialect::CSoftmaxWithCrossEntropyOp::name()) == 0) {
+            op_name.compare(paddle::dialect::MpAllreduceSum_Op::name()) == 0 ||
+            op_name.compare(paddle::dialect::CIdentity_Op::name()) == 0 ||
+            op_name.compare(paddle::dialect::CConcatOp::name()) == 0) {
           if (phi::is_gpu_place(place) && execution_stream == kDefaultStream) {
             if (origin_dev_ctx != nullptr) {
               // set stream
@@ -206,7 +210,6 @@ phi::DeviceContext* ParseDeviceContext(pir::Operation* op,
   }
   return origin_dev_ctx;
 }
-
 OpFuncType AnalyseOpFuncType(pir::Operation* op, const phi::Place& place) {
   if (phi::is_cpu_place(place)) {
     return OpFuncType::kCpuSync;
@@ -403,7 +406,7 @@ std::unordered_set<pir::Value> GetTuplePushContainer(pir::Block* block) {
   return inner_outputs;
 }
 
-void InsertTuplePushContinerToOuts(
+void InsertTuplePushContainerToOuts(
     pir::Block* block,
     const ValueExecutionInfo& value_exec_info,
     std::unordered_map<pir::Value, std::vector<int>>* outputs) {
@@ -412,7 +415,7 @@ void InsertTuplePushContinerToOuts(
 
   for (pir::Value value : inner_stack_outputs) {
     outputs->emplace(value, GetValueIds(value, value_exec_info));
-    VLOG(6) << "InsertTuplePushContinerToOuts of " << value.impl();
+    VLOG(6) << "InsertTuplePushContainerToOuts of " << value.impl();
   }
 }
 

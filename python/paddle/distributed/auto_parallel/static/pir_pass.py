@@ -63,11 +63,19 @@ def reshard_single_value(program, op, operand, attr):
             # fold reshard
             if prev_var.get_defining_op().name() == 'dist_op.reshard':
                 prev_reshard = prev_var.get_defining_op()
-                prev_var = prev_reshard.operand_source(0)
-                if prev_var.dist_attr() == operand_attr:
-                    return prev_var
-                reshard_var = paddle._C_ops.reshard_v2(prev_var, operand_attr)
-                return reshard_var
+                prev_reshard_input = prev_reshard.operand_source(0)
+                prev_reshard_result = prev_reshard.result(0)
+                # skil global to sub mesh reshard
+                if (
+                    prev_reshard_input.dist_attr().process_mesh.ndim
+                    == prev_reshard_result.dist_attr().process_mesh.ndim
+                ):
+                    if prev_reshard_input.dist_attr() == operand_attr:
+                        return prev_reshard_input
+                    reshard_var = paddle._C_ops.reshard_v2(
+                        prev_reshard_input, operand_attr
+                    )
+                    return reshard_var
             # insert reshard
             reshard_var = paddle._C_ops.reshard_v2(prev_var, operand_attr)
             return reshard_var
@@ -1027,9 +1035,10 @@ def complete_chunk_id(dist_program, startup_program, pipeline_strategy):
     )
     ops = dist_program.global_block().ops
 
-    assert (
-        len(seg_struct_names) % num_chunks == 0
-    ), f"The number of layers[{seg_method}] ({len(seg_struct_names)}) should be divided by part number ({num_chunks})."
+    assert (len(seg_struct_names) % num_chunks == 0) or (
+        (len(seg_struct_names) + 1) % num_chunks == 0
+        and (len(seg_struct_names) + 1) // num_chunks != 1
+    ), f"The number of layers[{seg_method}] ({len(seg_struct_names)}) should be divisible by part number ({num_chunks}),or ({len(seg_struct_names)} + 1) should be divisible by {num_chunks} and not equal to {num_chunks}."
 
     # Step2: analysis whether the pp_stage is non-decreasing among segments
     # 1. if non_use_custom_mesh is True, the ops' process_mesh will be changed by vpp strategy
@@ -1039,7 +1048,10 @@ def complete_chunk_id(dist_program, startup_program, pipeline_strategy):
     # Step3: Get op index boundary, pp_stage, chunk_id, struct_names of each segment
     seg_pp_stages = [i % pp_degree for i in range(num_chunks)]
     seg_chunk_ids = [i // pp_degree for i in range(num_chunks)]
-    seg_layer_num = len(seg_struct_names) // num_chunks
+    seg_layer_num = [0] * num_chunks
+    for j in range(0, len(seg_struct_names)):
+        i = j % num_chunks
+        seg_layer_num[i] = seg_layer_num[i] + 1
     seg_parts = [0]
 
     for idx, op in enumerate(ops):
@@ -1053,15 +1065,20 @@ def complete_chunk_id(dist_program, startup_program, pipeline_strategy):
     # Step4: Set the process_mesh of each op
     seg_id = 0
     reshard_ops = []
+    previous_seg_parts_end_idx = 0
     for seg_id in range(num_chunks):
-        start_idx = seg_parts[seg_id * seg_layer_num]
-        end_idx = seg_parts[seg_id * seg_layer_num + seg_layer_num]
+        start_idx = seg_parts[previous_seg_parts_end_idx]
+        end_idx = seg_parts[previous_seg_parts_end_idx + seg_layer_num[seg_id]]
         pp_stage = seg_pp_stages[seg_id]
         chunk_id = seg_chunk_ids[seg_id]
         struct_name = ",".join(
             seg_struct_names[
-                seg_id * seg_layer_num : seg_id * seg_layer_num + seg_layer_num
+                previous_seg_parts_end_idx : previous_seg_parts_end_idx
+                + seg_layer_num[seg_id]
             ]
+        )
+        previous_seg_parts_end_idx = (
+            previous_seg_parts_end_idx + seg_layer_num[seg_id]
         )
         process_mesh = sub_process_meshes[pp_stage]
 

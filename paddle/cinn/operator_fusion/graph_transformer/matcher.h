@@ -226,8 +226,19 @@ struct TransposeOpMatcher {
 
 struct ReshapeOpMatcher {
   bool operator()(const PatternGraph& graph, const PatternNodePtr& node) {
+    auto has_dynamic_shape = [](const PatternNodePtr& node) {
+      const auto in_value = node->sink_op()->operand_source(0);
+      const auto out_value = node->sink_op()->result(0);
+      const auto in_shape = GetDimExprsFromValue(in_value);
+      const auto out_shape = GetDimExprsFromValue(out_value);
+      return GetShapeProduct(in_shape, 0, in_shape.size())
+                 .isa<std::int64_t>() &&
+             GetShapeProduct(out_shape, 0, out_shape.size())
+                 .isa<std::int64_t>();
+    };
     return node->ops().size() == 1 &&
-           node->sink_op()->name() == "cinn_op.reshape";
+           node->sink_op()->name() == "cinn_op.reshape" &&
+           has_dynamic_shape(node);
   }
 };
 

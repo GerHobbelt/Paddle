@@ -55,6 +55,8 @@ class TestBuildOp(unittest.TestCase):
                 .name(),
                 "pd_op.tanh",
             )
+        paddle.pir.create_shaped_type(tanh_out.type(), [3148873728])
+        paddle.pir.create_shaped_type(tanh_out.type(), [1])
 
 
 class TestBuildOp2(unittest.TestCase):

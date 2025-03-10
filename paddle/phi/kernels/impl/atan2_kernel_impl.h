@@ -17,6 +17,7 @@
 #include "paddle/phi/core/dense_tensor.h"
 #include "paddle/phi/core/device_context.h"
 #include "paddle/phi/kernels/atan2_kernel.h"
+#include "paddle/phi/kernels/broadcast_tensors_kernel.h"
 #include "paddle/phi/kernels/funcs/for_range.h"
 
 namespace phi {
@@ -74,21 +75,31 @@ void Atan2Kernel(const Context& ctx,
                  const DenseTensor& x,
                  const DenseTensor& y,
                  DenseTensor* out) {
-  auto numel = x.numel();
-  auto x_data = x.data<T>();
-  auto y_data = y.data<T>();
+  if (x.numel() == 0 || y.numel() == 0) {
+    std::vector<int64_t> out_dims_array = common::vectorize(out->dims());
+    std::replace(out_dims_array.begin(), out_dims_array.end(), -1, 0);
+    out->Resize(common::make_ddim(out_dims_array));
+    ctx.template Alloc<typename Atan2Out<T>::type>(out);
+    return;
+  }
 
-  PADDLE_ENFORCE_LE(numel,
-                    y.numel(),
-                    common::errors::InvalidArgument(
-                        "The count (%d) of elements of X shall not "
-                        "greater than count (%d) of elements of Y.",
-                        numel,
-                        y.numel()));
+  const auto* x_data = x.data<T>();
+  const auto* y_data = y.data<T>();
 
-  auto* out_data = ctx.template Alloc<typename Atan2Out<T>::type>(
-      out, size_t(x.numel() * sizeof(typename Atan2Out<T>::type)));
+  DenseTensor x_broadcasted, y_broadcasted;
+  if (x.dims() != y.dims()) {
+    std::vector<const DenseTensor*> inputs = {&x, &y};
+    std::vector<DenseTensor*> outputs = {&x_broadcasted, &y_broadcasted};
+    for (auto* tensor : outputs) {
+      tensor->Resize(out->dims());
+    }
+    BroadcastTensorsKernel<T, Context>(ctx, inputs, outputs);
+    x_data = x_broadcasted.data<T>();
+    y_data = y_broadcasted.data<T>();
+  }
 
+  auto* out_data = ctx.template Alloc<typename Atan2Out<T>::type>(out);
+  const auto numel = out->numel();
   phi::funcs::ForRange<Context> for_range(ctx, numel);
   phi::Atan2Functor<T> functor(x_data, y_data, out_data, numel);
   for_range(functor);

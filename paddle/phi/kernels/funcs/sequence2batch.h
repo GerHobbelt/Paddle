@@ -44,7 +44,7 @@ class CopyMatrixRowsFunctor {
 };
 
 template <typename DeviceContext, typename T>
-class LoDTensor2BatchFunctor {
+class DenseTensor2BatchFunctor {
   // Calculate the length of each sequence and
   // sort sequence index by the length.
   // example:  sequences = {s0, s1, s2}
@@ -174,7 +174,7 @@ class LoDTensor2BatchFunctor {
 };
 
 template <typename DeviceContext, typename T>
-class Batch2LoDTensorFunctor {
+class Batch2DenseTensorFunctor {
  public:
   void operator()(const DeviceContext& context,
                   const phi::DenseTensor& batch,

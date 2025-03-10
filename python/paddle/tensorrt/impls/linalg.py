@@ -25,7 +25,7 @@ from paddle.tensorrt.converter_utils import (
 from paddle.tensorrt.register import converter_registry
 
 
-@converter_registry.register("pd_op.matmul", trt_version="8.x")
+@converter_registry.register("pd_op.matmul", trt_version="trt_version_ge=8.0")
 def matmul_converter(network, paddle_op, inputs):
     weight_shape = paddle_op.operands()[1].source().shape
     transpose_x = paddle_op.attrs()["transpose_x"]
@@ -61,7 +61,9 @@ def matmul_converter(network, paddle_op, inputs):
     return out.get_output(0)
 
 
-@converter_registry.register("pd_op.transpose", trt_version="8.x")
+@converter_registry.register(
+    "pd_op.transpose", trt_version="trt_version_ge=8.0"
+)
 def transpose_converter(network, paddle_op, inputs):
     perm = paddle_op.attrs()["perm"]
     transposed_tensor = network.add_shuffle(inputs[0])

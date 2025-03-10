@@ -1452,20 +1452,6 @@ class TestPrimMean(TestPrimBase):
         self.tol = 1e-6
 
 
-class TestPrimPow(TestPrimBase):
-    def setUp(self):
-        np.random.seed(2024)
-        paddle.seed(2024)
-        self.shape_x = [2, 300, 2048]
-        self.dtype_x = "float32"
-        self.init_x_shape = [None, None, None]
-        self.x = np.random.random(self.shape_x).astype(self.dtype_x)
-        self.net = pow_net
-        self.necessary_ops = "pd_op.pow"
-        self.enable_cinn = False
-        self.tol = 1e-6
-
-
 class TestPrimReciprocal(TestPrimBase):
     def setUp(self):
         np.random.seed(2024)

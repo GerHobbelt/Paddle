@@ -15,6 +15,9 @@
 from paddle.base.libpaddle.pir import (  # noqa: F401
     Block,
     CloneOptions,
+    # drr
+    DrrPatternContext,
+    #
     IrMapping,
     Operation,
     OpOperand,
@@ -41,6 +44,7 @@ from paddle.base.libpaddle.pir import (  # noqa: F401
     set_op_role,
     translate_to_pir,
     translate_to_pir_with_param_map,
+    value_is_persistable,
 )
 from paddle.base.wrapped_decorator import signature_safe_contextmanager
 

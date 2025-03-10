@@ -1714,6 +1714,8 @@ class Embedding(Layer):
             The local word vector needs to be transformed into numpy format, and the shape of local word
             vector should be consistent with :attr:`num_embeddings` . Then :ref:`api_paddle_nn_initializer_Assign`
             is used to load custom or pre-trained word vectors. See code example for details.
+        scale_grad_by_freq(bool, optional): Indicating whether to scale the gradients by the inverse frequency of the
+            word ids in input `x`. Default: False.
         name(str|None, optional): For detailed information, please refer to :ref:`api_guide_Name`. Usually name is no need to set and
             None by default.
 
@@ -1771,6 +1773,7 @@ class Embedding(Layer):
         norm_type: float = 2.0,
         sparse: bool = False,
         weight_attr: ParamAttrLike | None = None,
+        scale_grad_by_freq: bool = False,
         name: str | None = None,
     ) -> None:
         super().__init__()
@@ -1781,6 +1784,7 @@ class Embedding(Layer):
         self._max_norm = max_norm
         self._norm_type = norm_type
         self._padding_idx = padding_idx
+        self._scale_grad_by_freq = scale_grad_by_freq
 
         if self._num_embeddings <= 0:
             raise ValueError("num_embeddings must be gather than 0")
@@ -1828,6 +1832,7 @@ class Embedding(Layer):
             max_norm=self._max_norm,
             norm_type=self._norm_type,
             sparse=self._sparse,
+            scale_grad_by_freq=self._scale_grad_by_freq,
             name=self._name,
         )
 
@@ -1836,6 +1841,7 @@ class Embedding(Layer):
         if self._padding_idx is not None:
             main_str += ', padding_idx={_padding_idx}'
         main_str += ', sparse={_sparse}'
+        main_str += ', scale_grad_by_freq={_scale_grad_by_freq}'
         if self._name is not None:
             main_str += ', name={_name}'
         return main_str.format(**self.__dict__)

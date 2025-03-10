@@ -138,7 +138,8 @@ struct CollectHostFunctionVisitor : public ir::IRMutator<> {
           codegen_dev.Compile(ir::LoweredFunc(func));
           shared_mem_bytes = codegen_dev.GetDynSharedMemOffset();
 #endif
-        });
+        },
+        [&](common::HygonDCUArchSYCL) { CINN_NOT_IMPLEMENTED });
 
     VLOG(6) << "Add a call node for func->name " << func->name << "\n"
             << "grid_dim: (" << func->cuda_axis_info.grid_dim(0) << ", "
@@ -159,6 +160,9 @@ struct CollectHostFunctionVisitor : public ir::IRMutator<> {
         },
         [&](common::HygonDCUArchHIP) {
           call_kernel = runtime::intrinsic::call_hip_kernel;
+        },
+        [&](common::HygonDCUArchSYCL) {
+          call_kernel = runtime::intrinsic::call_sycl_kernel;
         });
 
     auto call_extern_api =

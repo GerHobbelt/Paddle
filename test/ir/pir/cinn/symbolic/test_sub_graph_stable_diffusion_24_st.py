@@ -33,14 +33,14 @@ class LayerCase(paddle.nn.Layer):
             shape=[640],
             dtype=paddle.float32,
         )
+        self.size = [3, 8]
 
     def forward(
         self,
         var_0,  # (shape: [1, 640, 1, 1], dtype: paddle.float32, stop_gradient: False)
-        var_1,  # (shape: [2], dtype: paddle.int32, stop_gradient: True)
     ):
         var_2 = paddle.nn.functional.common.interpolate(
-            var_0, size=var_1, mode='nearest'
+            var_0, size=self.size, mode='nearest'
         )
         var_3 = paddle.nn.functional.conv.conv2d(
             var_2, self.parameter_0, self.parameter_1, [1, 1], 1, [1, 1], 1
@@ -49,10 +49,7 @@ class LayerCase(paddle.nn.Layer):
 
 
 def create_paddle_inputs():
-    inputs = (
-        paddle.rand(shape=[1, 640, 1, 1], dtype=paddle.float32),
-        paddle.randint(low=0, high=10, shape=[2], dtype=paddle.int32),
-    )
+    inputs = (paddle.rand(shape=[1, 640, 1, 1], dtype=paddle.float32),)
     return inputs
 
 

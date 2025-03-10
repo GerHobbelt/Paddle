@@ -54,6 +54,7 @@ class CinnJitInstruction : public InstructionBase {
 
   bool need_update_shape{false};
   std::vector<phi::DenseTensor*> tensor_args_;
+  std::vector<phi::DDim> ir_dims_;
 
   // Tensors that hold the temporary spaces used by the kernel. These tensors
   // are managed by CinnJitInstruction, and not exposed to phi executor.

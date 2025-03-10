@@ -114,8 +114,8 @@ class TestCholeskyOp(OpTest):
             if x_init:
                 if len(x_init) != len(root):
                     raise ValueError(
-                        'len(x_init) (=%d) is not the same'
-                        ' as len(x) (= %d)' % (len(x_init), len(root))
+                        f'len(x_init) (={len(x_init)}) is not the same'
+                        f' as len(x) (={len(root)})'
                     )
                 # init variable in main program
                 for var, arr in zip(root, x_init):

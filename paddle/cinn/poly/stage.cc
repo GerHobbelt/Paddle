@@ -1660,7 +1660,7 @@ void Stage::CopyTransform(Stage *other, int level) {
   for (int i = target_map_dims.size(); i < this_map_dims.size(); i++) {
     sup_dims.push_back(this_map_dims[i]);
   }
-  //! Check the dim range in this domain and target domain. Correspoding dim's
+  //! Check the dim range in this domain and target domain. Corresponding dim's
   //! range must be equal.
 
   auto dim_names = isl_get_dim_names(domain_.get());

@@ -37,7 +37,7 @@
 #include "paddle/fluid/pir/dialect/operator/ir/op_dialect.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_type.h"
 #include "paddle/fluid/pir/dialect/operator/ir/pd_op.h"
-#include "paddle/fluid/pir/transforms/general/auto_layout_pass.h"
+#include "paddle/fluid/pir/transforms/general/auto_layout_insert_pass.h"
 #include "paddle/fluid/pir/transforms/general/auto_layout_simplify_pass.h"
 #include "paddle/fluid/pir/transforms/general/constant_folding_pass.h"
 #include "paddle/fluid/pir/transforms/passes.h"
@@ -62,7 +62,10 @@ TEST(auto_layout_pass, pass_test) {
   auto program = pir::IrParser(ctx, ss).ParseProgram();
 
   pir::PassManager auto_layout_pm(::pir::IrContext::Instance(), 3);
-  auto_layout_pm.AddPass(pir::CreateAutoLayoutPass());
+  auto_layout_pm.AddPass(
+      pir::CreateAutoLayoutInsertPass({"pd_op.fused_conv2d_add_act",
+                                       "pd_op.conv2d",
+                                       "pd_op.conv2d_transpose"}));
   auto_layout_pm.AddPass(pir::CreateAutoLayoutSimplifyPass());
   auto_layout_pm.Run(program.get());
 }

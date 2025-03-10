@@ -68,20 +68,20 @@ void SetupTensor(phi::DenseTensor* input,
 }
 
 template <typename T>
-void SetupLoDTensor(phi::DenseTensor* input,
-                    const phi::LegacyLoD& lod,
-                    T lower,
-                    T upper) {
+void SetupDenseTensor(phi::DenseTensor* input,
+                      const phi::LegacyLoD& lod,
+                      T lower,
+                      T upper) {
   input->set_lod(lod);
   int dim = lod[0][lod[0].size() - 1];
   SetupTensor<T>(input, {dim, 1}, lower, upper);
 }
 
 template <typename T>
-void SetupLoDTensor(phi::DenseTensor* input,
-                    phi::DDim dims,
-                    const phi::LegacyLoD lod,
-                    const std::vector<T>& data) {
+void SetupDenseTensor(phi::DenseTensor* input,
+                      phi::DDim dims,
+                      const phi::LegacyLoD lod,
+                      const std::vector<T>& data) {
   const size_t level = lod.size() - 1;
   PADDLE_ENFORCE_EQ(dims[0],
                     static_cast<int64_t>((lod[level]).back()),

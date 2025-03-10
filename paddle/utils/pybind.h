@@ -29,6 +29,8 @@ namespace pybind {
 
 typedef struct {
   PyObject_HEAD paddle::Tensor tensor;
+  // Dynamic attributes
+  PyObject* dict;
   // Weak references
   PyObject* weakrefs;
 } TensorObject;

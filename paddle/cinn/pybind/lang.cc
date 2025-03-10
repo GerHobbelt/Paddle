@@ -137,7 +137,8 @@ void BindModule(py::module *m) {
                    optim::OptimizeExprGPU(&(func->body));
 #endif
                  },
-                 [&](common::HygonDCUArchHIP) {
+                 [&](std::variant<common::HygonDCUArchHIP,
+                                  common::HygonDCUArchSYCL>) {
                    PADDLE_THROW(::common::errors::Unimplemented(
                        "CINN old obsolete code!"));
                  });

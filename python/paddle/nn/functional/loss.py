@@ -101,12 +101,11 @@ def dice_loss(
     ), "The rank of input should be greater than or equal to 2."
     assert len(input.shape) == len(label.shape), (
         "The rank of input and label should be equal, "
-        "but received input: %d, label: %d."
-        % (len(input.shape), len(label.shape))
+        f"but received input: {len(input.shape)}, label: {len(label.shape)}."
     )
     assert label.shape[-1] == 1, (
         "The last dimension of label should be 1, "
-        "but received %d." % label.shape[-1]
+        f"but received {label.shape[-1]}."
     )
     assert (
         input.shape[:-1] == label.shape[:-1]

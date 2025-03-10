@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import math
 import unittest
 
 from test_case_base import (
@@ -56,6 +57,12 @@ def dynamic_shape_access_inner_var_shape(x):
 
 def dynamic_shape_in_list(x, shape):
     return x.reshape(shape)
+
+
+def dynamic_shape_int_mul_float(x):
+    y = x * 0.5
+    z = math.sin(y)  # Trigger get_py_value
+    return z
 
 
 class CustomConv(paddle.nn.Conv2D):
@@ -192,6 +199,13 @@ class TestOpcodeExecutorDynamicShapeCache(TestCaseBase):
             for i in range(1, 5):
                 self.assert_results(pad_func, paddle.randn([1, 3, 224, 224]), i)
                 self.assertEqual(ctx.translate_count, i)
+
+    def test_dynamic_shape_int_mul_float(self):
+        with allow_dynamic_shape_guard(
+            True
+        ), test_instruction_translator_cache_context() as ctx:
+            for i in range(1, 6):
+                self.assert_results(dynamic_shape_int_mul_float, i)
 
 
 if __name__ == '__main__':

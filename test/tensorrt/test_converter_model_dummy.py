@@ -21,6 +21,7 @@ from get_program import (
 
 from paddle.tensorrt.export import (
     Input,
+    PrecisionMode,
     TensorRTConfig,
     convert_to_trt,
 )
@@ -43,6 +44,9 @@ class TestConverterDummy(unittest.TestCase):
         _, input_optim_data, _ = input_config.generate_input_data()
         # Create a TensorRTConfig with inputs as a required field.
         trt_config = TensorRTConfig(inputs=[input_config])
+        trt_config.precision_mode = PrecisionMode.FP16
+        trt_config.ops_run_float = "pd_op.add"
+        trt_config.optimization_level = 5
 
         output_var = program.list_vars()[-1]
 

@@ -106,6 +106,13 @@ DTYPE_ABBRS = {
 STATIC_DIM_FREQ_THRESHOLD = 5
 
 
+def method_to_reverse_method(method_name: str) -> str | None:
+    if not method_name.startswith("__") or not method_name.endswith("__"):
+        return None
+    name = method_name[2:-2]
+    return f"__r{name}__"
+
+
 class ConstantVariable(VariableBase):
     """
     ConstantVariable is a subclass of VariableBase used to wrap a Variable of the const type.
@@ -802,11 +809,30 @@ class SymbolicVariable(VariableBase):
             ), f"self.value is None, but tracker is not SymbolicOperationTracker. tracker: {self.tracker}"
             inputs = self.tracker.inputs
             assert len(inputs) >= 1
-            other_inputs_value = [x.get_py_value() for x in inputs[1:]]
-            self.value = getattr(
-                inputs[0].get_py_value(), self.tracker.method_name
-            )(*other_inputs_value)
-            assert isinstance(self.value, (bool, int, float))
+            input_values = [x.get_py_value() for x in inputs]
+            value = getattr(input_values[0], self.tracker.method_name)(
+                *input_values[1:]
+            )
+            # TODO(SigureMo): A Temporary solution for the case that the method is not implemented.
+            # e.g. In user code, we have `1 * 0.1`, the lhs is a SymbolicVariable, and the rhs is a float.
+            # We trace the method `__mul__` from the lhs, but actually, python use `float.__rmul__`,
+            # `int.__mul__(float)` is not implemented. So we get NotImplemented here.
+            # We need to find a better way to handle this case.
+            if isinstance(value, type(NotImplemented)):
+                reversed_method = method_to_reverse_method(
+                    self.tracker.method_name
+                )
+                if reversed_method is None:
+                    raise InnerError(
+                        f"Unsupported method {self.tracker.method_name} for SymbolicVariable"
+                    )
+                value = getattr(input_values[1], reversed_method)(
+                    input_values[0], *input_values[2:]
+                )
+            self.value = value
+            assert isinstance(
+                self.value, (bool, int, float)
+            ), f"SymbolicVariable.get_py_value() should return bool, int or float, but got {type(self.value)}"
         return self.value
 
     def get_py_type(self):
@@ -1043,8 +1069,9 @@ class SliceVariable(VariableBase):
     def make_stringified_guard(self) -> list[StringifiedExpression]:
         frame_value_tracer = self.tracker.trace_value_from_frame()
         result = [
-            StringifiedExpression(
-                "isinstance({}, slice)",
+            FasterStringifiedExpression(
+                "id(type({{}})) == id(slice)",
+                paddle.framework.core.TypeMatchGuard(slice),
                 [frame_value_tracer],
                 frame_value_tracer.free_vars,
             ),

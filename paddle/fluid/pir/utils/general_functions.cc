@@ -279,4 +279,35 @@ bool ValueIsPersistable(const pir::Value& value) {
   return true;
 }
 
+phi::DataType GetTensorDtype(pir::Type type) {
+  if (!type) {
+    PADDLE_THROW(
+        common::errors::InvalidArgument("The type of value is nullptr."));
+  }
+  if (auto dense_tensor_type = type.dyn_cast<pir::DenseTensorType>()) {
+    return paddle::dialect::TransToPhiDataType(dense_tensor_type.dtype());
+  } else if (auto sparse_coo_tensor_type =
+                 type.dyn_cast<paddle::dialect::SparseCooTensorType>()) {
+    return paddle::dialect::TransToPhiDataType(sparse_coo_tensor_type.dtype());
+  } else if (auto sparse_csr_tensor_type =
+                 type.dyn_cast<paddle::dialect::SparseCsrTensorType>()) {
+    return paddle::dialect::TransToPhiDataType(sparse_csr_tensor_type.dtype());
+  } else if (auto select_rows =
+                 type.dyn_cast<paddle::dialect::SelectedRowsType>()) {
+    return paddle::dialect::TransToPhiDataType(select_rows.dtype());
+  } else if (auto dense_array =
+                 type.dyn_cast<paddle::dialect::DenseTensorArrayType>()) {
+    return paddle::dialect::TransToPhiDataType(dense_array.dtype());
+  } else {
+    PADDLE_THROW(common::errors::InvalidArgument(
+        "Currently, we can only get phi::DataType from DenseTensorType and "
+        "SelectedRowsType, DenseTensorArrayType,SparseCooTensorType or "
+        "SparseCsrTensorType."));
+  }
+}
+
+phi::DataType GetValueDtype(const pir::Value& val) {
+  return GetTensorDtype(val.type());
+}
+
 }  // namespace pir

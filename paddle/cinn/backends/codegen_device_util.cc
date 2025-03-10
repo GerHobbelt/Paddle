@@ -18,16 +18,12 @@
 #include "paddle/cinn/common/cas.h"
 #include "paddle/cinn/ir/ir_mutator.h"
 #include "paddle/common/enforce.h"
-PD_DECLARE_bool(cinn_bucket_compile);
+
 namespace cinn {
 namespace backends {
 
 std::tuple<ir::Module, ir::Module> SplitDeviceAndHostModule(ir::Module module) {
-  if (FLAGS_cinn_bucket_compile) {
-    detail::CollectBucketStrategyHostFunctionVisitor visitor(module->name);
-    return visitor(module);
-  }
-  detail::CollectHostFunctionVisitor visitor(module->name);
+  detail::CollectBucketStrategyHostFunctionVisitor visitor(module->name);
   return visitor(module);
 }
 
@@ -219,6 +215,11 @@ void detail::CollectBucketStrategyHostFunctionVisitor::ProcessLoweredFunc(
 #ifdef CINN_WITH_HIP
         shared_mem_bytes = CalculateSharedMemory(func);
 #endif
+      },
+      [&](common::HygonDCUArchSYCL) {
+#ifdef CINN_WITH_SYCL
+        shared_mem_bytes = Expr(0);
+#endif
       });
 
   VLOG(6) << "Add a call node for func_node->name " << func_node->name << "\n"
@@ -239,6 +240,9 @@ void detail::CollectBucketStrategyHostFunctionVisitor::ProcessLoweredFunc(
       },
       [&](common::HygonDCUArchHIP) {
         call_kernel = runtime::intrinsic::call_hip_kernel;
+      },
+      [&](common::HygonDCUArchSYCL) {
+        call_kernel = runtime::intrinsic::call_sycl_kernel;
       });
   ir::Expr call_extern_api =
       ir::Call::Make(Void(),
