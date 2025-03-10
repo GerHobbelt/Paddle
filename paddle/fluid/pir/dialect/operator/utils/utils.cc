@@ -36,32 +36,12 @@ namespace paddle {
 namespace dialect {
 
 const std::unordered_set<std::string> LegacyOpList = {
-    CBroadcast_Op::name(),
-    CBroadcastOp::name(),
     DistributedPushSparseOp::name(),
     SendV2Op::name(),
     RecvV2Op::name(),
-    CAllreduceProd_Op::name(),
     CAllreduceSumOp::name(),
     CAllreduceSum_Op::name(),
-    CAllreduceAvgOp::name(),
-    CAllreduceAvg_Op::name(),
-    CReduceSumOp::name(),
-    CReduceSum_Op::name(),
-    CAllreduceMax_Op::name(),
-    CAllreduceMaxOp::name(),
-    CAllreduceMin_Op::name(),
-    CAllgatherOp::name(),
-    CSplitOp::name(),
     PushDenseOp::name(),
-    SoftReluOp::name(),
-    SoftReluGradOp::name(),
-    CReduceAvgOp::name(),
-    CReduceAvg_Op::name(),
-    CReduceMaxOp::name(),
-    CReduceMinOp::name(),
-    CReduceProdOp::name(),
-    CScatterOp::name(),
     PullBoxSparseOp::name(),
     PushBoxSparseOp::name(),
     PushSparseV2Op::name(),
@@ -85,6 +65,8 @@ enum class AttrType {
   PLACE,
 
   STRING,
+
+  TENSOR_NAME,
 
   NUM_ATTR_TYPES,
 };
@@ -110,6 +92,8 @@ static inline AttrType GetAttributeType(const pir::Attribute& attr) {
     return AttrType::DATA_TYPE;
   } else if (attr.isa<paddle::dialect::PlaceAttribute>()) {
     return AttrType::PLACE;
+  } else if (attr.isa<pir::TensorNameAttribute>()) {
+    return AttrType::TENSOR_NAME;
   } else {
     PADDLE_THROW(common::errors::Unimplemented(
         "Unsupported ir Attribute type when casting it into "
@@ -160,6 +144,10 @@ static std::function<T(const pir::Attribute& attr)> GetAttrCast(
           {AttrType::PLACE,
            [](const pir::Attribute& attr) {
              return T{attr.dyn_cast<paddle::dialect::PlaceAttribute>().data()};
+           }},
+          {AttrType::TENSOR_NAME,
+           [](const pir::Attribute& attr) {
+             return T{attr.dyn_cast<pir::TensorNameAttribute>().data()};
            }},
           {AttrType::ARRAY,
            [](const pir::Attribute& attr) {
@@ -516,7 +504,7 @@ const std::unordered_map<std::string, phi::DataType>& StringToDataTypeMap() {
       {"complex64", phi::DataType::COMPLEX64},
       {"complex128", phi::DataType::COMPLEX128},
       {"Undefined", phi::DataType::UNDEFINED},
-      {"psting", phi::DataType::PSTRING},
+      {"pstring", phi::DataType::PSTRING},
       {"float16", phi::DataType::FLOAT16},
       {"bfloat16", phi::DataType::BFLOAT16},
       {"float64", phi::DataType::FLOAT64}};

@@ -158,7 +158,7 @@ void analysis::TensorRtSubgraphPass::ApplyImpl(
              node->Op()->Type()) != trt_disabled_ops.end()) {
       VLOG(3) << node->Op()->Type().c_str()
 
-              << " is diabled by config in TensorRT";
+              << " is disabled by config in TensorRT";
       return false;
     }
     for (const auto &out_var : node->Op()->OutputNames()) {
@@ -166,7 +166,7 @@ void analysis::TensorRtSubgraphPass::ApplyImpl(
         if (find(trt_disabled_ops.begin(), trt_disabled_ops.end(), var_name) !=
             trt_disabled_ops.end()) {
           VLOG(3) << node->Op()->Type().c_str()
-                  << " is diabled by config in TensorRT";
+                  << " is disabled by config in TensorRT";
           return false;
         }
       }
@@ -759,7 +759,7 @@ std::string TensorRtSubgraphPass::CreateTensorRTOp(
   op_desc->SetAttr("calibration_data", calibration_data);
   op_desc->SetAttr("enable_int8", enable_int8);
   op_desc->SetAttr("enable_fp16", enable_fp16);
-  op_desc->SetAttr("enbale_bfp16", enable_bfp16);
+  op_desc->SetAttr("enable_bfp16", enable_bfp16);
   op_desc->SetAttr("use_calib_mode", use_calib_mode);
   op_desc->SetAttr("engine_key", engine_key);
   op_desc->SetAttr("calibration_engine_key", calibration_engine_key);

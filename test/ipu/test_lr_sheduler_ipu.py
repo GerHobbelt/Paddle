@@ -81,7 +81,7 @@ class TestConvNet(IPUOpTest):
     def test_training(self):
         data = np.random.rand(1, 3, 10, 10).astype(np.float32)
         self.feed = {'image': data}
-        # cpu and ipu dimenstion mismatch, cpu:(100, 1, 1), ipu:(100, 1)
+        # cpu and ipu dimension mismatch, cpu:(100, 1, 1), ipu:(100, 1)
         ipu_loss = self.run_model(True).flatten()
         cpu_loss = self.run_model(False).flatten()
 

@@ -672,10 +672,15 @@ def vector_norm(
     if isinstance(axis, list) and len(axis) == 1:
         axis = axis[0]
 
+    if paddle.is_complex(x):
+        abs_x = paddle.abs(x)
+    else:
+        abs_x = x
+
     # when len(axis) == 1, use the original op to calculate
     if isinstance(axis, int):
         return vector_norm_axis_int(
-            x,
+            abs_x,
             axis=axis,
             porder=p,
             keepdim=keepdim,
@@ -686,12 +691,16 @@ def vector_norm(
     # when len(axis) >= 1, calculate by combining other Python apis
     elif isinstance(axis, list):
         if p == np.inf or p == -np.inf:
-            return inf_norm(x, porder=p, axis=axis, keepdim=keepdim, name=name)
+            return inf_norm(
+                abs_x, porder=p, axis=axis, keepdim=keepdim, name=name
+            )
         elif p == 0:
-            return zero_norm(x, porder=p, axis=axis, keepdim=keepdim, name=name)
+            return zero_norm(
+                abs_x, porder=p, axis=axis, keepdim=keepdim, name=name
+            )
         else:
             return vector_norm_axis_tuple(
-                x, porder=p, axis=axis, keepdim=keepdim, name=name
+                abs_x, porder=p, axis=axis, keepdim=keepdim, name=name
             )
 
 

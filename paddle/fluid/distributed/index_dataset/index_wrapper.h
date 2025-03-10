@@ -55,7 +55,7 @@ class TreeIndex : public Index {
                                          int level);
   std::vector<uint64_t> GetChildrenCodes(uint64_t ancestor, int level);
   std::vector<uint64_t> GetTravelCodes(uint64_t id, int start_level);
-  std::vector<IndexNode> GetAllLeafs();
+  std::vector<IndexNode> GetAllLeaves();
 
   std::unordered_map<uint64_t, IndexNode> data_;
   std::unordered_map<uint64_t, uint64_t> id_codes_map_;

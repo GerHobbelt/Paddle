@@ -14,6 +14,7 @@
 
 #pragma once
 #if !defined(_WIN32)
+#include <stdint.h>
 #include <cstddef>
 #include <cstring>
 

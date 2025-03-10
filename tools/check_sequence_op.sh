@@ -31,8 +31,8 @@ function check_sequnece_op_unittests(){
             INVALID_SEQUENCE_OP_UNITTEST="${INVALID_SEQUENCE_OP_UNITTEST}${unittest_file} (unittest file does not exists)\n"
             continue
         fi
-        batch_size_1_funtion_calls=`grep ${function_grep} ${PADDLE_ROOT}/${unittest_file} || true`
-        if [ "${batch_size_1_funtion_calls}" == "" ]; then
+        batch_size_1_function_calls=`grep ${function_grep} ${PADDLE_ROOT}/${unittest_file} || true`
+        if [ "${batch_size_1_function_calls}" == "" ]; then
             INVALID_SEQUENCE_OP_UNITTEST="${INVALID_SEQUENCE_OP_UNITTEST}${unittest_file} (missing required function call)\n"
         fi
     done

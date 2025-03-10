@@ -16,6 +16,7 @@
 import numpy as np
 import tensorrt as trt
 
+from paddle.tensorrt.converter_utils import get_input_constant_value
 from paddle.tensorrt.register import converter_registry
 
 
@@ -36,12 +37,10 @@ def pool2d_converter(network, paddle_op, inputs):
     padding_algorithm = paddle_op.attrs().get("padding_algorithm", "EXPLICIT")
 
     if not paddle_op.attrs().get("kernel_size") and len(inputs) == 2:
-        full_int_op = paddle_op.operands()[1].source().get_defining_op()
-        if full_int_op.name() == "pd_op.full_int_array":
-            kernel_size = full_int_op.attrs().get("value", [1, 1])
-        else:
+        kernel_size = get_input_constant_value(paddle_op, inputs, 1)
+        if kernel_size is None:
             raise Exception(
-                "The defining op of kernel size must be pd_op.full_int_array"
+                "The defining op of kernel size must be builtin.constant/pd_op.full_int_array"
             )
     else:
         kernel_size = paddle_op.attrs().get("kernel_size", [1, 1])

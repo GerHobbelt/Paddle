@@ -92,15 +92,15 @@ class TestLbfgs(unittest.TestCase):
             np.testing.assert_allclose(minimum, results[2].numpy(), rtol=1e-05)
 
     def test_inf_minima(self):
-        extream_point = np.array([-1, 2]).astype('float32')
+        extreme_point = np.array([-1, 2]).astype('float32')
 
         def func(x):
             # df = 3(x - 1.01)(x - 0.99)
             # f = x^3 - 3x^2 + 3*1.01*0.99x
             return (
                 x * x * x / 3.0
-                - (extream_point[0] + extream_point[1]) * x * x / 2
-                + extream_point[0] * extream_point[1] * x
+                - (extreme_point[0] + extreme_point[1]) * x * x / 2
+                + extreme_point[0] * extreme_point[1] * x
             )
 
         x0 = np.array([-1.7]).astype('float32')

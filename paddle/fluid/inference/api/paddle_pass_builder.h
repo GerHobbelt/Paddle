@@ -102,7 +102,7 @@ class PD_INFER_DECL PaddlePassBuilder {
   std::vector<std::string> AnalysisPasses() const {
     auto passes = analysis_passes_;
     // To make sure the ir_graph_to_program should be the last pass so any
-    // modication of IR will persist to the program.
+    // modification of IR will persist to the program.
     passes.push_back("ir_graph_to_program_pass");
     return passes;
   }

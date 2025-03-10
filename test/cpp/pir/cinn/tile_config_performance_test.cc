@@ -631,13 +631,13 @@ void TestPerformanceForTileConfig(int spatial_left_bound,
                             best_tile_config_map,
                             iter_space_type);
     }  // end of r_dimension_lower loop
-  }    // end of s_dimention_lower loop
+  }    // end of s_dimension_lower loop
   if (test_single_large) {
     // (II) Test in the single large areas,
     // i.e., S:[4096-32768]*R:[2-1024], S:[2-1024]*R:[4096-32768]
     for (int s_dimension_lower = 2; s_dimension_lower < 1024;
          s_dimension_lower += spatial_tile_config) {
-      // adjust the tile size for the spatial dimension dymaically
+      // adjust the tile size for the spatial dimension dynamically
       spatial_tile_config =
           get_tile_size_config_in_large_area(s_dimension_lower);
       spatial_tile_width = (is_spatial_dynamic ? spatial_tile_config : 1);

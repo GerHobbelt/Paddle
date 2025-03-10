@@ -140,12 +140,9 @@ class TestCollectiveRunnerBase:
         rank = args["trainerid"]
         current_endpoint = args["currentendpoint"]
         nranks = 2
-        if args["dynamic_static_unified_comm"]:
-            _init_parallel_env("bkcl")
-        else:
-            self.initCommunicator(
-                startup_prog, rank, nranks, True, current_endpoint, endpoints
-            )
+
+        _init_parallel_env("bkcl")
+
         self.rank = rank
         np_dtype = DataTypeCast(args["dtype"])
         result = self.get_model(train_prog, startup_prog, np_dtype)
@@ -174,9 +171,6 @@ def runtime_main(test_class, col_type, sub_type):
     args["col_type"] = col_type
     args["dtype"] = os.getenv("DTYPE")
     args["batch_size"] = os.getenv("BATCH_SIZE")
-    args["dynamic_static_unified_comm"] = bool(
-        int(os.getenv("FLAGS_dynamic_static_unified_comm", "1"))
-    )
     model.run_trainer(args)
 
 

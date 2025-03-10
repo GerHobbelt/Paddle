@@ -98,17 +98,10 @@ if(WITH_DISTRIBUTE AND WITH_GPU)
                   test_pass_gradient_merge_deprecated)
   set_tests_properties(test_pass_gradient_merge_deprecated
                        PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 50)
-  py_test_modules(test_pass_amp_deprecated MODULES test_pass_amp_deprecated)
-  set_tests_properties(test_pass_amp_deprecated
-                       PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 80)
   py_test_modules(test_amp_o2_pass_deprecated MODULES
                   test_amp_o2_pass_deprecated)
   set_tests_properties(test_amp_o2_pass_deprecated
                        PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 50)
-  py_test_modules(test_pass_quantization_deprecated MODULES
-                  test_pass_quantization_deprecated)
-  set_tests_properties(test_pass_quantization_deprecated
-                       PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 60)
   py_test_modules(test_pass_bf16_deprecated MODULES test_pass_bf16_deprecated)
   py_test_modules(test_pass_base_list_deprecated MODULES
                   test_pass_base_list_deprecated)
@@ -164,10 +157,6 @@ if(WITH_DISTRIBUTE AND WITH_GPU)
                   test_pipeline_scheduler_zb_vpp_deprecated)
   set_tests_properties(test_pipeline_scheduler_zb_vpp_deprecated
                        PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 100)
-  py_test_modules(test_gpt_with_prim_deprecated MODULES
-                  test_gpt_with_prim_deprecated)
-  set_tests_properties(test_gpt_with_prim_deprecated
-                       PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 200)
   py_test_modules(test_mp_allreduce_matmul_grad_overlapping_deprecated MODULES
                   test_mp_allreduce_matmul_grad_overlapping_deprecated)
   set_tests_properties(test_mp_allreduce_matmul_grad_overlapping_deprecated

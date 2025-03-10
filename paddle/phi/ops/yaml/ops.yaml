@@ -743,49 +743,6 @@
   backward: broadcast_tensors_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
 
-- op : c_allgather
-  args : (Tensor x, int ring_id, int nranks, bool use_calc_stream)
-  output : Tensor(out)
-  infer_meta :
-    func : AllGatherInferMeta
-    param: [x, nranks]
-  kernel :
-    func : c_allgather
-  traits : paddle::dialect::ForwardOnlyTrait
-
-- op : c_allreduce_max
-  args : (Tensor x, int ring_id, bool use_calc_stream, bool use_model_parallel)
-  output : Tensor(out)
-  infer_meta :
-    func : AllReduceInferMeta
-    param : [x]
-  kernel :
-    func : c_allreduce_max
-  inplace : (x -> out)
-  traits : paddle::dialect::ForwardOnlyTrait
-
-- op : c_allreduce_min
-  args : (Tensor x, int ring_id, bool use_calc_stream, bool use_model_parallel)
-  output : Tensor(out)
-  infer_meta :
-    func : AllReduceInferMeta
-    param : [x]
-  kernel :
-    func : c_allreduce_min
-  inplace : (x -> out)
-  traits : paddle::dialect::ForwardOnlyTrait
-
-- op : c_allreduce_prod
-  args : (Tensor x, int ring_id, bool use_calc_stream, bool use_model_parallel)
-  output : Tensor(out)
-  infer_meta :
-    func : AllReduceInferMeta
-    param : [x]
-  kernel :
-    func : c_allreduce_prod
-  inplace : (x -> out)
-  traits : paddle::dialect::ForwardOnlyTrait
-
 - op : c_allreduce_sum
   args : (Tensor x, int ring_id, bool use_calc_stream, bool use_model_parallel)
   output : Tensor(out)
@@ -794,17 +751,6 @@
     param : [x]
   kernel :
     func : c_allreduce_sum
-  inplace : (x -> out)
-  traits : paddle::dialect::ForwardOnlyTrait
-
-- op : c_broadcast
-  args : (Tensor x, int ring_id=0, int root=0, bool use_calc_stream=false)
-  output : Tensor(out)
-  infer_meta :
-    func : UnchangedInferMeta
-    param : [x]
-  kernel :
-    func : c_broadcast
   inplace : (x -> out)
   traits : paddle::dialect::ForwardOnlyTrait
 
@@ -828,17 +774,6 @@
   inplace : (x -> out)
   traits : paddle::dialect::ForwardOnlyTrait
 
-- op : c_reduce_sum
-  args : (Tensor x, int ring_id, int root_id, bool use_calc_stream)
-  output : Tensor(out)
-  infer_meta :
-    func : DistReduceInferMeta
-    param : [x]
-  kernel :
-    func : c_reduce_sum
-  inplace : (x -> out)
-  traits : paddle::dialect::ForwardOnlyTrait
-
 - op : c_scatter
   args : (Tensor x, int ring_id = 0, int root = 0, int nranks = 0, bool use_calc_stream = false)
   output : Tensor(out)
@@ -848,6 +783,16 @@
   kernel :
     func : c_scatter
   traits : paddle::dialect::ForwardOnlyTrait
+
+- op : c_split
+  args : (Tensor x, int rank = 0, int nranks = 1, int ring_id = 0, bool use_model_parallel = true)
+  output : Tensor(out)
+  infer_meta :
+    func : CSplitInferMeta
+    param : [x, nranks]
+  kernel :
+    func : c_split
+    param: [x, rank, nranks, use_model_parallel]
 
 - op : calc_reduced_attn_scores
   args : (Tensor q, Tensor k, Tensor softmax_lse)

@@ -242,7 +242,7 @@ struct CollectBucketStrategyHostFunctionVisitor
         op->priorities.size(),
         ::common::errors::InvalidArgument(
             "The size of functions and priorities should be equal"));
-    // Sort funcitons and predicates according to the priority
+    // Sort functions and predicates according to the priority
     std::vector<std::pair<ir::LoweredFunc, Expr>> func_predicate;
     std::vector<std::pair<int, std::pair<ir::LoweredFunc, Expr>>>
         predicate_priority;

@@ -71,6 +71,10 @@ def amin_net5(x):
     return paddle.amin(x, axis=[-1, 0], keepdim=False)
 
 
+def angle_net(x):
+    return paddle.angle(x)
+
+
 def argsort_net1(x):
     return paddle.argsort(x, axis=-1)
 
@@ -491,6 +495,19 @@ class TestPrimAminWithGrad6(TestPrimBaseWithGrad):
         self.init_x_shape = [None, None, None]
         self.x = np.random.random(self.x_shape).astype(self.dtype)
         self.net = amin_net5
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAngleWithGrad(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.angle_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = angle_net
         self.enable_cinn = False
         self.tol = 1e-6
 

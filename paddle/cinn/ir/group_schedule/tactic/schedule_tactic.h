@@ -81,9 +81,9 @@ struct IterativeSpaceInfo {
 };
 
 struct ScheduleContext {
-  // TODO(BiynXu): Unify fields with similar meanings
   std::unordered_set<std::string> output_names;
   Target target;
+  // TODO(liangshuhao): this struct is deprecated and will be removed later.
   IterativeSpaceInfo iter_space_info;
   BucketInfo bucket_info;
   ScheduleConfig config;

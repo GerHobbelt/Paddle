@@ -280,6 +280,10 @@ def fused_allreduce_gradients(parameter_list, hcg):
             group = sep_group if group is None else dp_sep_group
 
     logger.debug("dp or sep start fuse allreduce gradients")
+    from paddle.distributed import in_auto_parallel_align_mode
+
+    if in_auto_parallel_align_mode():
+        scale = 1.0
     fused_allreduce_gradients_with_group(parameter_list, group, scale=scale)
 
 

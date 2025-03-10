@@ -48,7 +48,6 @@ class TileFirstGeneralTactic final : public ScheduleTactic {
   std::string TacticName() const override { return "TileFirstGeneralTactic"; }
 
  private:
-  void AlignToReduceInput(ir::IRSchedule* sch, const std::string& block_id);
   void MergeFlattenAxis(ir::IRSchedule* sch, const std::string& block_id);
   void MergeDiscreteFlattenAxis(ir::IRSchedule* sch,
                                 const std::string& block_id);
@@ -127,11 +126,6 @@ void TileFirstGeneralTactic::Apply(ir::IRSchedule* sch,
                                    const std::string& block_id) {
   if (!can_apply_) return;
   if (ir::IsReduceInitTensorName(block_id)) return;
-
-  AlignToReduceInput(sch, block_id);
-  VLOG(6) << "After AlignToReduceInput on block: [" << block_id
-          << "], loop nest:\n"
-          << sch->GetLoops(block_id)[0];
 
   if (UseContinuousDataTile(context_->config)) {
     VLOG(4) << "Using ApplyContinuousDataTile";
@@ -291,44 +285,6 @@ void TileFirstGeneralTactic::ApplyContinuousDataTile(
 
   VariableTypeAssignment(sch, block_id);
   SetReduceType(sch, block_id);
-}
-
-void TileFirstGeneralTactic::AlignToReduceInput(ir::IRSchedule* sch,
-                                                const std::string& block_id) {
-  const auto& loop_strides = context_->config.base_info->loop_strides;
-  if (loop_strides.empty()) {
-    return;
-  }
-
-  std::vector<ir::Expr> loops = sch->GetLoops(block_id);
-  std::vector<int64_t> loop_perm(loops.size());
-  std::iota(loop_perm.begin(), loop_perm.end(), 0);
-
-  const auto IsReduce = [&](int64_t axis) {
-    auto& reduce_axis = context_->config.base_info->reduce_axis;
-    return std::find(reduce_axis.begin(), reduce_axis.end(), axis) !=
-           reduce_axis.end();
-  };
-
-  std::sort(loop_perm.begin(), loop_perm.end(), [&](int64_t a, int64_t b) {
-    if (IsReduce(a) == IsReduce(b)) {
-      return loop_strides[a] > loop_strides[b];
-    }
-    return IsReduce(b);
-  });
-  VLOG(4) << "loop_perm: " << utils::Join(loop_perm, ", ");
-
-  // Reorder S/R loops seperately, otherwise reduce_init will be de-inlined.
-  std::vector<Expr> sp_loops, rd_loops;
-  for (auto i : loop_perm) {
-    if (IsReduce(i)) {
-      rd_loops.push_back(loops[i]);
-    } else if (loop_strides[i] != 0) {
-      sp_loops.push_back(loops[i]);
-    }
-  }
-  sch->Reorder(sp_loops);
-  sch->Reorder(rd_loops);
 }
 
 void TileFirstGeneralTactic::MergeFlattenAxis(ir::IRSchedule* sch,

@@ -24,7 +24,7 @@ from paddle import nn
 from paddle.distributed import to_distributed
 from paddle.distributed.auto_parallel.high_level_api import ToDistributedConfig
 
-EPOCHES = 1
+EPOCHS = 1
 VOCAB_SIZE = 8000
 BATCH_NUM = 2
 BATCH_SIZE = 4
@@ -117,7 +117,7 @@ def scaled_dot_product_attention(
     key_states = paddle.transpose(key_states, [0, 2, 1, 3])
     value_states = paddle.transpose(value_states, [0, 2, 1, 3])
 
-    # matmul and devide by sqrt(head_dim)
+    # matmul and divide by sqrt(head_dim)
     attn_weights = paddle.matmul(
         query_states / math.sqrt(head_dim), key_states.transpose([0, 1, 3, 2])
     )
@@ -627,7 +627,7 @@ class TestLlamaDecoderForSemiAutoParallel:
             dist_config,
         )
 
-        for epoch in range(EPOCHES):
+        for epoch in range(EPOCHS):
             dist_model.train()
             for i, data in enumerate(dist_loader()):
                 inputs, labels = data

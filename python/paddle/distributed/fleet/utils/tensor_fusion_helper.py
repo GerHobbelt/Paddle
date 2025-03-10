@@ -322,9 +322,19 @@ class ShardingGradView:
                 self._param_end - self._rank_begin,
             )
 
+    @property
+    def has_effective_slice_param(self):
+        return self._param_begin < self._param_end
+
 
 def build_reduce_scatter_buffer(
-    parameters, sharding_degree, rank, use_main_grad=False, release_grad=False
+    parameters,
+    sharding_degree,
+    rank,
+    use_main_grad=False,
+    release_grad=False,
+    init_slice_param=False,
+    slice_params={},
 ):
     total_buffer_size = 0
     param2index = {}
@@ -345,6 +355,11 @@ def build_reduce_scatter_buffer(
     grad_dtype = paddle.float32 if use_main_grad else dtype
 
     param_buffer = paddle.zeros(shape=[total_buffer_size], dtype=dtype)
+    # TODO(@gexiao): Currently only support gpus
+    if core.is_compiled_with_cuda() and not core.is_compiled_with_rocm():
+        param_buffer_ipc_meta = param_buffer.value().get_tensor()._share_cuda()
+    else:
+        param_buffer_ipc_meta = None
     grad_buffer = (
         paddle.zeros(shape=[total_buffer_size], dtype=grad_dtype)
         if not release_grad
@@ -365,9 +380,18 @@ def build_reduce_scatter_buffer(
             use_main_grad,
             release_grad,
         )
+        if init_slice_param and grad_view.has_effective_slice_param:
+            assert param.name in slice_params
+            grad_view.fill_slice_param(slice_params[param.name])
         # hack main_grad
         sharding_grad_view[param.name] = grad_view
-    return sharding_grad_view, total_buffer_size, param_buffer, grad_buffer
+    return (
+        sharding_grad_view,
+        total_buffer_size,
+        param_buffer,
+        grad_buffer,
+        param_buffer_ipc_meta,
+    )
 
 
 def get_grad_address(param, use_main_grad):
@@ -396,6 +420,8 @@ class FusedCommBuffer:
         release_grads=False,
         use_reduce_avg=False,
         free_grads_in_comm=False,
+        init_slice_param=False,
+        slice_params={},
     ):
         self._id = id
         self._params = params
@@ -434,6 +460,8 @@ class FusedCommBuffer:
         self._params_step_dict = {}
         self._params_checked_in = 0
         self._grads_to_addr = {}
+
+        self.param_buffer_ipc_meta = None
 
         self._act = act
         if self._act == HOOK_ACTION.ALL_REDUCE:
@@ -490,12 +518,15 @@ class FusedCommBuffer:
                 self.buffer_size,
                 self.param_storage,
                 self.grad_storage,
+                self.param_buffer_ipc_meta,
             ) = build_reduce_scatter_buffer(
                 self._params,
                 self._comm_group.nranks,
                 self._comm_group.rank,
                 use_main_grad=self.use_main_grad,
                 release_grad=self._release_grads,
+                init_slice_param=init_slice_param,
+                slice_params=slice_params,
             )
             # hack, for parameter sync in dygraph sharding optimizer after step
             self._params[0].comm_buffer_ref = weakref.ref(self)

@@ -195,7 +195,7 @@ class TestElementwiseDivOp_ZeroDim3(ElementwiseDivOp):
 )
 class TestElementwiseDivOpBF16(ElementwiseDivOp):
     def init_args(self):
-        # In due to output data type inconsistence of bfloat16 paddle op, we disable the dygraph check.
+        # In due to output data type inconsistency of bfloat16 paddle op, we disable the dygraph check.
         self.check_dygraph = False
         self.place = core.CUDAPlace(0)
 

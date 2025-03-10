@@ -196,7 +196,7 @@ class ShardingPass(PassBase):
         # NOTE Multi / Sub-Block Support
         # we assume that only parameter are present and partitioned in main_block,
         # there is NO new param in sub_block, and all params in sub_block follows the same
-        # partition as main_block. the above constraint fullfill the 3 most common use-cases in Paddle sub_block:
+        # partition as main_block. the above constraint fulfill the 3 most common use-cases in Paddle sub_block:
         # 1. subblock for lr scheduler
         # 2. sub-block uses the same or partial network of main-block, e.g. GPT3 generation model
         # 3. sub-block used for double backward

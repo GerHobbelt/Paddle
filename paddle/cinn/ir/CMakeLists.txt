@@ -21,6 +21,7 @@ gather_srcs(
   schedule_block_graph.cc
   stmt.cc
   stmt_visitors.cc
+  expr_visitors.cc
   dim.cc)
 
 add_subdirectory(ir_analyzer)

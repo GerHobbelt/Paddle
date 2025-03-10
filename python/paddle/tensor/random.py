@@ -366,7 +366,7 @@ def log_normal(
         std (float|Tensor, optional): The standard deviation of the output Tensor's underlying normal distribution.
             If ``std`` is float, all elements of the output Tensor share the same standard deviation.
             If ``std`` is a Tensor(data type supports float32, float64), it has per-element standard deviations.
-            Defaule is 2.0
+            Default is 2.0
         shape (tuple|list|Tensor|None, optional): Shape of the Tensor to be created. The data type is ``int32`` or ``int64`` .
             If ``shape`` is a list or tuple, each element of it should be integer or 0-D Tensor with shape [].
             If ``shape`` is an Tensor, it should be an 1-D Tensor which represents a list. If ``mean`` or ``std``

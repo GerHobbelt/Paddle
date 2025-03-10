@@ -22,7 +22,7 @@
 #include "paddle/phi/kernels/legacy/elementwise_add_kernel.h"
 #include "paddle/phi/kernels/legacy/elementwise_divide_kernel.h"
 #include "paddle/phi/kernels/legacy/elementwise_kernel.h"
-#include "paddle/phi/kernels/legacy/elementwise_multipy_kernel.h"
+#include "paddle/phi/kernels/legacy/elementwise_multiply_kernel.h"
 #include "paddle/phi/kernels/legacy/elementwise_subtract_kernel.h"
 
 namespace phi {

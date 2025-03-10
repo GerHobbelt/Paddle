@@ -241,7 +241,9 @@ class FleetWrapper {
   // barrier with barrier table
   void BarrierWithTable(uint32_t barrier_type);
 
-  void PrintTableStat(const uint64_t table_id);
+  void PrintTableStat(const uint64_t table_id,
+                      uint32_t pass_id,
+                      size_t threshold);
   void SaveCacheTable(const uint64_t table_id,
                       uint16_t pass_id,
                       size_t threshold);

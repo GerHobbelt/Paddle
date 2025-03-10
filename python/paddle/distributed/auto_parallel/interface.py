@@ -43,7 +43,7 @@ def shard_tensor(x, process_mesh=None, shard_spec=None):
             current process mesh cannot be found. Default: None.
         shard_spec (list, optional): a list to describe the sharding mapping between `x` and `process_mesh`,
             which means the dimension `i` of `x` is split across the dimension `shard_spec[i]` of `process_mesh`,
-            where `None` means that tensor dimension is not split. For example, given a tensor wih
+            where `None` means that tensor dimension is not split. For example, given a tensor with
             the shape [6, 12] and a process mesh with the shape [2, 3] and the dimension names ["x", "y"]:
                 If `shard_spec=["x", "y"]`, each shard of the tensor will have a shape [3, 4];
                 If `shard_spec=["y", "x"]`, each shard of the tensor will have a shape [2, 6];

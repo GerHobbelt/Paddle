@@ -44,6 +44,7 @@ class TestDropoutWithUpscaleModeTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 2, 3]}
+        self.opt_shape = {"x": [1, 2, 3]}
         self.max_shape = {"x": [10, 2, 3]}
 
     def test_trt_result(self):
@@ -60,6 +61,7 @@ class TestDropoutWithDowngradeModeTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 2, 3]}
+        self.opt_shape = {"x": [1, 2, 3]}
         self.max_shape = {"x": [10, 2, 3]}
 
     def test_trt_result(self):
@@ -126,6 +128,7 @@ class TestBilinearScaleTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [2, 3, 6, 10]}
+        self.opt_shape = {"x": [2, 3, 6, 10]}
         self.max_shape = {"x": [12, 3, 6, 10]}
 
     def test_trt_result(self):
@@ -155,6 +158,7 @@ class TestBilinearNHWCTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [2, 6, 10, 3]}
+        self.opt_shape = {"x": [2, 6, 10, 3]}
         self.max_shape = {"x": [12, 6, 10, 3]}
 
     def test_trt_result(self):
@@ -182,6 +186,7 @@ class TestBilinearOutSizeTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x", "OutSize"]}
         self.min_shape = {"x": [2, 3, 6, 10]}
+        self.opt_shape = {"x": [2, 3, 6, 10]}
         self.max_shape = {"x": [12, 3, 6, 10]}
 
     def test_trt_result(self):
@@ -214,6 +219,7 @@ class TestBilinearSizeTensorTRTPattern(TensorRTBaseTest):
             "feed_list": ["x", "OutSize", "SizeTensor", "Scale"]
         }
         self.min_shape = {"x": [2, 3, 6, 10]}
+        self.opt_shape = {"x": [2, 3, 6, 10]}
         self.max_shape = {"x": [12, 3, 6, 10]}
 
     def test_trt_result(self):
@@ -243,6 +249,7 @@ class TestNearestNHWCTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [2, 6, 10, 3]}
+        self.opt_shape = {"x": [2, 6, 10, 3]}
         self.max_shape = {"x": [12, 6, 10, 3]}
 
     def test_trt_result(self):
@@ -274,6 +281,7 @@ class TestNearestSizeTensorTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x", "SizeTensor"]}
         self.min_shape = {"x": [2, 3, 6, 10]}
+        self.opt_shape = {"x": [2, 3, 6, 10]}
         self.max_shape = {"x": [12, 3, 6, 10]}
 
     def test_trt_result(self):
@@ -302,6 +310,7 @@ class TestNearestOutAndScaleTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [2, 3, 6, 10]}
+        self.opt_shape = {"x": [2, 3, 6, 10]}
         self.max_shape = {"x": [12, 3, 6, 10]}
 
     def test_trt_result(self):
@@ -314,6 +323,7 @@ class TestBilinearTRTPattern(TensorRTBaseTest):
         self.api_args = {"x": np.random.random([2, 3, 6, 10]).astype("float32")}
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [2, 3, 6, 10]}
+        self.opt_shape = {"x": [2, 3, 6, 10]}
         self.max_shape = {"x": [12, 3, 6, 10]}
 
     def test_trt_result(self):
@@ -331,6 +341,7 @@ class TestNearestInterpTRTPattern(TensorRTBaseTest):
         self.api_args = {"x": np.random.random([2, 3, 6, 10]).astype("float32")}
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [2, 3, 6, 10]}
+        self.opt_shape = {"x": [2, 3, 6, 10]}
         self.max_shape = {"x": [12, 3, 6, 10]}
 
     def test_trt_result(self):

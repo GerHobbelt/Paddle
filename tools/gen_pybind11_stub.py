@@ -399,7 +399,7 @@ def post_process(output_dir: str):
             replace_bad_attr(filename)
             check_remove_syntax_error(filename)
 
-            # insert moduels if necessary
+            # insert modules if necessary
             insert_import_modules(filename)
 
 

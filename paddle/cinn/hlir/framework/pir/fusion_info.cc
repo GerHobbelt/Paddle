@@ -236,7 +236,7 @@ std::ostream& operator<<(std::ostream& os, const FusionInfo& fusion_info) {
 
 std::vector<const ::pir::Operation*> TopologySort(
     const OpLoweringGroup& group) {
-  // NOTE(Aurelius84): Use simplest one-by-one order temporaly.
+  // NOTE(Aurelius84): Use simplest one-by-one order temporarily.
   auto* block = group.GetParentBlock();
   std::vector<const ::pir::Operation*> ops;
   ops.reserve(block->size());

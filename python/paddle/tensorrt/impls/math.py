@@ -24,9 +24,15 @@ from paddle.tensorrt.converter_utils import (
     cast_tensor,
     fill_constant_layer,
     get_axes_for_reduce_op,
+    get_axis_length,
+    get_input_constant_value,
+    get_shape_tensor_element,
     trt_cast,
+    trt_concat,
     trt_expand,
     trt_max,
+    trt_reshape,
+    trt_shape,
 )
 from paddle.tensorrt.register import converter_registry
 
@@ -58,9 +64,8 @@ def scale_converter(network, paddle_op, inputs):
     reshape_layer_bias = network.add_shuffle(bias_tensor)
     reshape_layer_bias.set_input(1, bias_shapes_tensor)
 
-    scale_op = paddle_op.operands()[1].source().get_defining_op()
-    if scale_op.name() == "pd_op.full":
-        scale = scale_op.attrs()["value"]
+    scale = get_input_constant_value(paddle_op, inputs, 1)
+    if scale is not None:
         has_scale_tensor = False
         if is_int:
             scale_tensor = add_1D_constant_layer(
@@ -120,7 +125,7 @@ def scale_converter(network, paddle_op, inputs):
 @converter_registry.register("pd_op.max", trt_version="trt_version_ge=8.0")
 def max_converter(network, paddle_op, inputs):
     input_tensor = inputs[0]
-    axis = paddle_op.operands()[1].source().get_defining_op().attrs()["value"]
+    axis = get_input_constant_value(paddle_op, inputs, 1)
     input_shape = input_tensor.shape
     keepdim = paddle_op.attrs()["keepdim"]
     if network.has_implicit_batch_dimension:
@@ -166,10 +171,10 @@ def multiply_converter(network, paddle_op, inputs):
 @converter_registry.register("pd_op.clip", trt_version="8.x")
 def clip_converter(network, paddle_op, inputs):
     def _get_constant_or_expand_tensor(
-        op, constant_inputs, input_shape_tensor, rank
+        value, constant_inputs, input_shape_tensor, rank
     ):
-        if op.name() == "pd_op.full":
-            value = op.attrs()["value"]
+
+        if value is not None:
             return fill_constant_layer(
                 network, input_shape_tensor, rank, value, input_tensor.dtype
             )
@@ -189,15 +194,15 @@ def clip_converter(network, paddle_op, inputs):
     input_shape_tensor = network.add_shape(input_tensor).get_output(0)
 
     # handle min operation
-    min_op = paddle_op.operands()[1].source().get_defining_op()
+    min_value = get_input_constant_value(paddle_op, inputs, 1)
     alpha_t = _get_constant_or_expand_tensor(
-        min_op, inputs[1], input_shape_tensor, rank
+        min_value, inputs[1], input_shape_tensor, rank
     )
 
     # handle max operation
-    max_op = paddle_op.operands()[2].source().get_defining_op()
+    max_value = get_input_constant_value(paddle_op, inputs, 2)
     beta_t = _get_constant_or_expand_tensor(
-        max_op, inputs[2], input_shape_tensor, rank
+        max_value, inputs[2], input_shape_tensor, rank
     )
 
     # run the clip operation
@@ -283,6 +288,94 @@ def all_converter(network, paddle_op, inputs):
     return add_cast_reduce_layer(
         network, paddle_op, inputs, trt.ReduceOperation.MIN
     )
+
+
+@converter_registry.register("pd_op.cumsum", trt_version="8.x")
+def cumsum_converter(network, paddle_op, inputs):
+    input_tensor = inputs[0]
+    dtype = input_tensor.dtype
+    axis = get_input_constant_value(paddle_op, inputs, 1)[0]
+    input_shape = input_tensor.shape
+    rank = len(input_shape)
+
+    if axis < 0:
+        axis += rank
+    axis = int(axis)
+
+    # Obtain the number of cycles
+    if input_shape[axis] > 0:
+        trip_limit = add_1D_constant_layer(
+            network, input_shape[axis], is_scalar=True
+        )
+    else:
+        dynamic_shape = trt_shape(network, input_tensor)
+        trip_limit = get_shape_tensor_element(
+            network, dynamic_shape, axis, True
+        )
+
+    # Obtain the slice shape
+    shape_list = []
+    for i in range(rank):
+        if i == axis:
+            shape_list.append(add_1D_constant_layer(network, [1]))
+        else:
+            shape_list.append(get_axis_length(network, input_tensor, i))
+    slice_shape = trt_concat(network, shape_list)
+
+    start = [0] * rank
+    size = [1] * rank
+    stride = [1] * rank
+    input_sliced = network.add_slice(input_tensor, start, size, stride)
+    input_sliced.set_input(2, slice_shape)
+
+    # squeeze axis
+    if rank > 1:
+        shape_list.pop(axis)
+    new_shape = trt_concat(network, shape_list)
+    squeeze_output = trt_reshape(
+        network, input_sliced.get_output(0), new_shape, is_shape_tensor=True
+    )
+
+    loop = network.add_loop()
+    loop.add_trip_limit(trip_limit, trt.TripLimit.COUNT)
+
+    iterator = loop.add_iterator(input_tensor, axis)
+    data = iterator.get_output(0)
+
+    # create zero tensor
+    zero_vec = np.array([0.0], dtype=np.float32)
+    zero = add_1D_constant_layer(network, zero_vec)
+    lhs_val, rhs_val = broadcast(
+        network,
+        squeeze_output,
+        zero,
+        squeeze_output.name,
+        zero.name,
+    )
+    cast_tensor = trt_cast(network, rhs_val, dtype)
+    zero_tensor = network.add_elementwise(
+        lhs_val, cast_tensor, trt.ElementWiseOperation.PROD
+    ).get_output(0)
+
+    # Set as scalar
+    if rank == 1:
+        zero_tensor = trt_reshape(network, zero_tensor, ())
+
+    # Cycle and add according to the axis
+    running_sum = loop.add_recurrence(zero_tensor)
+    running_sum_tensor = running_sum.get_output(0)
+
+    cur_sum = network.add_elementwise(
+        data, running_sum_tensor, trt.ElementWiseOperation.SUM
+    ).get_output(0)
+
+    running_sum.set_input(1, cur_sum)
+
+    reverse_flag = trt.LoopOutput.CONCATENATE
+    loop_out = loop.add_loop_output(cur_sum, reverse_flag, axis)
+    loop_out.set_input(1, trip_limit)
+
+    return loop_out.get_output(0)
 
 
 @converter_registry.register("pd_op.floor_divide", trt_version="8.x")

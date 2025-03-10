@@ -453,6 +453,7 @@ def trt_reduce_to_scalar(network, tensor, dtype=trt.int32):
 def convert_conv2d(network, paddle_op, inputs):
     from paddle.tensorrt.util import support_fp32_mix_precision
 
+    bias = None
     if (
         paddle_op.name() == "pd_op.conv2d"
         or paddle_op.name() == "pd_op.depthwise_conv2d"
@@ -469,7 +470,8 @@ def convert_conv2d(network, paddle_op, inputs):
             output_size = None
         else:
             raise ValueError("Invalid number of inputs for conv2d_transpose")
-
+    if paddle_op.name() == "pd_op.fused_conv2d_add_act":
+        input_tensor, filter, bias, _ = inputs
     input_shape = paddle_op.operands()[0].source().shape
     filter_shape = paddle_op.operands()[1].source().shape
 
@@ -521,13 +523,14 @@ def convert_conv2d(network, paddle_op, inputs):
     if (
         paddle_op.name() == "pd_op.conv2d"
         or paddle_op.name() == "pd_op.depthwise_conv2d"
+        or paddle_op.name() == "pd_op.fused_conv2d_add_act"
     ):
         layer = network.add_convolution_nd(
             input=input_tensor,
             num_output_maps=n_output,
             kernel_shape=nv_ksize,
             kernel=filter,
-            bias=None,
+            bias=bias,
         )
     elif (
         paddle_op.name() == "pd_op.conv2d_transpose"
@@ -564,9 +567,21 @@ def convert_conv2d(network, paddle_op, inputs):
     return layer.get_output(0)
 
 
+def get_input_constant_value(paddle_op, inputs, input_index):
+    input_op = paddle_op.operands()[input_index].source().get_defining_op()
+    if input_op.name() == "builtin.constant":
+        return inputs[input_index].numpy().tolist()
+    elif input_op.name() == "pd_op.full_int_array":
+        return input_op.attrs()["value"]
+    elif input_op.name() == "pd_op.full":
+        return [input_op.attrs()["value"]]
+    else:
+        return None
+
+
 def add_reduce_layer(network, paddle_op, inputs, op_type):
     input_tensor = inputs[0]
-    axis = paddle_op.operands()[1].source().get_defining_op().attrs()["value"]
+    axis = get_input_constant_value(paddle_op, inputs, 1)
     input_shape = paddle_op.operands()[0].source().shape
     keepdim = paddle_op.attrs()["keepdim"]
     if network.has_implicit_batch_dimension:
@@ -686,6 +701,29 @@ def squeeze_trt(network, input_tensor, axes):
 def unary_op_converter(network, paddle_op, inputs):
     from paddle.tensorrt import PrecisionMode
 
+    ops_type_map = {
+        "pd_op.sqrt": [trt.UnaryOperation.SQRT],
+        "pd_op.sqrt_": [trt.UnaryOperation.SQRT],
+        "pd_op.floor": [trt.UnaryOperation.FLOOR],
+        "pd_op.exp": [trt.UnaryOperation.EXP],
+        "pd_op.abs": [trt.UnaryOperation.ABS],
+        "pd_op.abs_": [trt.UnaryOperation.ABS],
+        "pd_op.sin": [trt.UnaryOperation.SIN],
+        "pd_op.cos": [trt.UnaryOperation.COS],
+        "pd_op.sinh": [trt.UnaryOperation.SINH],
+        "pd_op.cosh": [trt.UnaryOperation.COSH],
+        "pd_op.asinh": [trt.UnaryOperation.ASINH],
+        "pd_op.acosh": [trt.UnaryOperation.ACOSH],
+        "pd_op.atanh": [trt.UnaryOperation.ATANH],
+        "pd_op.ceil": [trt.UnaryOperation.CEIL],
+        "pd_op.reciprocal": [trt.UnaryOperation.RECIP],
+        "pd_op.erf": [trt.UnaryOperation.ERF],
+        "pd_op.sign": [trt.UnaryOperation.SIGN],
+        "pd_op.round": [trt.UnaryOperation.ROUND],
+        "pd_op.logical_not": [trt.UnaryOperation.NOT],
+        "pd_op.rsqrt": [trt.UnaryOperation.SQRT, trt.UnaryOperation.RECIP],
+    }
+
     input_tensor = inputs[0]
     layer = None
     org_type = input_tensor.dtype
@@ -707,9 +745,10 @@ def unary_op_converter(network, paddle_op, inputs):
             identity_layer.set_output_type(0, trt.float16)
         input_tensor = identity_layer.get_output(0)
 
-    if paddle_op.name() in ["pd_op.logical_not", "pd_op.logical_not_"]:
-        layer = network.add_unary(input_tensor, trt.UnaryOperation.NOT)
-        input_tensor = layer.get_output(0)
+    if paddle_op.name() in ops_type_map:
+        for trt_op in ops_type_map[paddle_op.name()]:
+            layer = network.add_unary(input_tensor, trt_op)
+            input_tensor = layer.get_output(0)
     else:
         raise NotImplementedError(
             f"Unsupported unary operation: {paddle_op.name()}"
@@ -720,3 +759,18 @@ def unary_op_converter(network, paddle_op, inputs):
         input_tensor = restore_layer.get_output(0)
 
     return input_tensor
+
+
+# get the length of the specified axis for input_tensor
+def get_axis_length(network, input_tensor, axis, is_scalar=False):
+    input_shape = input_tensor.shape
+    if input_shape[axis] >= 0:
+        output_tensor = add_1D_constant_layer(
+            network, input_shape[axis], is_scalar=is_scalar
+        )
+    else:
+        dynamic_shape = trt_shape(network, input_tensor)
+        output_tensor = get_shape_tensor_element(
+            network, dynamic_shape, axis, is_scalar
+        )
+    return output_tensor

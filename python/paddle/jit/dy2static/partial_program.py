@@ -27,7 +27,6 @@ from paddle.base.framework import get_flags
 from paddle.optimizer.lr import LRScheduler
 
 from . import logging_utils
-from .export_subgraph import SubGraphRole, pir_exporter
 from .utils import (
     RETURN_NO_VALUE_MAGIC_NUM,
     backend_guard,
@@ -214,7 +213,6 @@ class PartialProgramLayer:
         self._out_var_descs = [
             self._outputs[var_id].desc for var_id in self._outputs.var_ids
         ]
-        self._debug_name = None
 
     def __call__(self, inputs):
         """
@@ -517,14 +515,11 @@ class PartialProgramLayer:
             infer_program = self._infer_pure_fp16_program
         else:
             infer_program = self._infer_program
-        # NOTE(Aurelius84): Export forward_program for SubGraphChecker,
-        # see export_subgraph for detail.
-        pir_exporter(self, infer_program, SubGraphRole.Infer)
         return infer_program
 
     @property
     def forward_program(self):
-        forward_program, role = None, None
+        forward_program = None
         if self.training:
             if _in_amp_guard():
                 progs = self._train_amp_forward_backward_program
@@ -854,22 +849,6 @@ class PartialProgramLayer:
 
         self._apply_inplace_pass(forward_built_program, backward_built_program)
 
-        # NOTE(Aurelius84): Export forward/backward program for SubGraphChecker,
-        # see export_subgraph for detail.
-        pir_exporter(
-            self,
-            forward_built_program,
-            SubGraphRole.Forward,
-            set(),
-            set(forward_skip_vars),
-        )
-        pir_exporter(
-            self,
-            backward_built_program,
-            SubGraphRole.Backward,
-            set(forward_skip_vars),
-            set(backward_skip_vars),
-        )
         return [forward_built_program, backward_built_program]
 
     def _apply_inplace_pass(self, forward_program, backward_program):

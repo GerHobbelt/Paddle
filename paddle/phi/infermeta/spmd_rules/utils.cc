@@ -299,7 +299,7 @@ void AlignDimsSharding(std::vector<TensorDistAttr>* input_attrs_ptr,
     return false;
   };
 
-  // a dim can not be sharded twice along diffrent mesh_dim
+  // a dim can not be sharded twice along different mesh_dim
   std::set<char> sharded_axis;
   std::map<int32_t, ReduceType> partial_dim_to_type;
   std::map<int32_t, char> mesh_dim_to_axis;

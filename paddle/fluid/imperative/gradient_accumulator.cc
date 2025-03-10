@@ -134,7 +134,7 @@ const TType& GetInnerTensor(const framework::Variable& src) {
 template <typename TType>
 TType& GetInnerTensor(const paddle::Tensor& src) {
   PADDLE_ENFORCE_EQ(
-      src.initialized(),
+      (src.has_allocation()),
       true,
       common::errors::Fatal("We only add tensor with value if a tensor is "
                             "NOT INITIALIZED, it should just move instead of "
@@ -690,7 +690,7 @@ void EagerGradientAccumulator::SumGrad(std::shared_ptr<VariableWrapper> var,
     dst_var->SetType(framework::proto::VarType::SELECTED_ROWS);
   }
 
-  // Increase curent count
+  // Increase current count
   IncreaseCurCnt();
 }
 

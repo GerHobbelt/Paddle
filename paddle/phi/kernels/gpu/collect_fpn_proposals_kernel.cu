@@ -36,13 +36,13 @@ namespace cub = hipcub;
 namespace phi {
 
 static constexpr int kNumCUDAThreads = 64;
-static constexpr int kNumMaxinumNumBlocks = 4096;
+static constexpr int kNumMaximumNumBlocks = 4096;
 
 const int kBBoxSize = 4;
 
 static inline int NumBlocks(const int N) {
   return std::min((N + kNumCUDAThreads - 1) / kNumCUDAThreads,
-                  kNumMaxinumNumBlocks);
+                  kNumMaximumNumBlocks);
 }
 
 static __global__ void GetLengthLoD(const int nthreads,

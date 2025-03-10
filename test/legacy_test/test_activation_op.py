@@ -1667,6 +1667,11 @@ class TestSqrt(TestActivation, TestParameter):
 
         np.random.seed(1023)
         x = np.random.uniform(0.1, 1, self.shape).astype(self.dtype)
+        if self.dtype == np.complex64 or self.dtype == np.complex128:
+            x = (
+                np.random.uniform(-1, 1, self.shape)
+                + 1j * np.random.uniform(-1, 1, self.shape)
+            ).astype(self.dtype)
         out = np.sqrt(x)
 
         self.inputs = {'X': OpTest.np_dtype_to_base_dtype(x)}
@@ -1679,14 +1684,20 @@ class TestSqrt(TestActivation, TestParameter):
     def test_check_grad(self):
         if self.dtype == np.float16:
             return
-        self.check_grad(
-            ['X'],
-            'Out',
-            check_prim=True,
-            check_pir=True,
-            check_prim_pir=True,
-            check_pir_onednn=self.check_pir_onednn,
-        )
+        if self.dtype not in [np.complex64, np.complex128]:
+            self.check_grad(
+                ['X'],
+                'Out',
+                check_prim=True,
+                check_pir=True,
+                check_prim_pir=True,
+                check_pir_onednn=self.check_pir_onednn,
+            )
+        else:
+            self.check_grad(
+                ['X'],
+                'Out',
+            )
 
     def test_check_output(self):
         self.check_output(
@@ -1744,6 +1755,16 @@ class TestSqrtPrimFp32(TestActivation):
 class TestSqrt_ZeroDim(TestSqrt):
     def init_shape(self):
         self.shape = []
+
+
+class TestSqrt_Complex64(TestSqrt):
+    def init_dtype(self):
+        self.dtype = np.complex64
+
+
+class TestSqrt_Complex128(TestSqrt):
+    def init_dtype(self):
+        self.dtype = np.complex128
 
 
 @unittest.skipIf(

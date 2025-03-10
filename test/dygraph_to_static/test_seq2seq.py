@@ -75,11 +75,11 @@ def train(args, attn_model=False):
                 )
             )
 
-        gloabl_norm_clip = ClipGradByGlobalNorm(args.max_grad_norm)
+        global_norm_clip = ClipGradByGlobalNorm(args.max_grad_norm)
         optimizer = paddle.optimizer.SGD(
             args.learning_rate,
             parameters=model.parameters(),
-            grad_clip=gloabl_norm_clip,
+            grad_clip=global_norm_clip,
         )
 
         model.train()

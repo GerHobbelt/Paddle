@@ -235,7 +235,7 @@ inline phi::DenseTensor TransDataPlace(const phi::DenseTensor& tensor,
 #endif
 
   // FIXME(zcd): TransDataPlace is used to transform data from GPU to CPU and
-  // the enforced checkings have been done in GetDeviceContext, so the
+  // the enforced checks have been done in GetDeviceContext, so the
   // `dev_ctx->Wait()` is necessary. But `dev_ctx->Wait()` will make the program
   // slow, especially when the number of elements is little, for example,
   // the elements of learning rate are one and it's CPU side.

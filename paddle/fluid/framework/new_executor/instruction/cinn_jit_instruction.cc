@@ -181,7 +181,9 @@ class CinnJitInstruction::FnPtrImpl {
     for (int i = 0; i < output_tensor_size; ++i) {
       DDim dim(output_tensor_shapes[i],
                kernel_tensor_args[input_tensor_size + i]->dims().size());
-      CheckDims(ir_dim[i], dim);
+      if (static_cast<size_t>(i) < ir_dim.size()) {
+        CheckDims(ir_dim[i], dim);
+      }
       kernel_tensor_args[input_tensor_size + i]->Resize(dim);
       free(output_tensor_shapes[i]);
     }

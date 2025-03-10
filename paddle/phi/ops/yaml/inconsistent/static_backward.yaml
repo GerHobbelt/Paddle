@@ -120,6 +120,19 @@
     data_type: loss_grad
     param: [softmax, label, loss_grad, ignore_index, rank, nranks]
 
+- backward_op : c_softmax_with_multi_label_cross_entropy_grad
+  forward: c_softmax_with_multi_label_cross_entropy (Tensor logits, Tensor label, Tensor smooth_weight, int64_t ignore_index=-100, bool sum_multi_label_loss=true, int ring_id=0, int rank=0, int nranks=0) -> Tensor(softmax), Tensor(loss)
+  args: (Tensor softmax, Tensor label, Tensor smooth_weight, Tensor loss_grad, int64_t ignore_index=-100, bool sum_multi_label_loss=true, int ring_id=0, int rank=0, int nranks=0)
+  output: Tensor(logits_grad)
+  infer_meta :
+    func: CSoftmaxWithMultiLabelCrossEntropyGradInferMeta
+    spmd_rule : CSoftmaxWithMultiLabelCrossEntropyGradSpmd
+    param: [softmax, label, smooth_weight, loss_grad, ignore_index, sum_multi_label_loss, rank, nranks]
+  kernel:
+    func: c_softmax_with_multi_label_cross_entropy_grad
+    data_type: loss_grad
+    param: [softmax, label, smooth_weight, loss_grad, ignore_index, sum_multi_label_loss, rank, nranks]
+
 - backward_op : divide_double_grad
   forward : divide_grad (Tensor x, Tensor y, Tensor out, Tensor grad_out, int axis = -1) -> Tensor(grad_x), Tensor(grad_y)
   args : (Tensor y, Tensor out, Tensor grad_out, Tensor grad_x, Tensor grad_x_grad, Tensor grad_y_grad, int axis = -1)

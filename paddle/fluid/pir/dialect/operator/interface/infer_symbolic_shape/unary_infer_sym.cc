@@ -2779,20 +2779,12 @@ bool Pad3dOpInferSymbolicShape(pir::Operation *op,
                         x_shape.size()));
   const auto &paddings_shape =
       infer_context->GetShapeOrDataForValue(op->operand_source(1));
-  if (!paddings_shape.data().has_value()) {
-    std::stringstream ss;
-    ss << paddings_shape;
-    PADDLE_THROW(
-        common::errors::InvalidArgument("The data of paddings's symbol shape "
-                                        "should have value, but now got [%s].",
-                                        ss.str()));
-  }
   const std::string &data_format =
       op->attribute<pir::StrAttribute>("data_format").AsString();
-
+  const std::vector<symbol::DimExpr> &paddings =
+      paddle::dialect::details::GetDataFromTensorOrTensorList(paddings_shape);
   const std::vector<symbol::DimExpr> &out_dims = [&] {
     std::vector<symbol::DimExpr> out_dims = x_shape;
-    const auto &paddings = paddings_shape.data().value();
     PADDLE_ENFORCE_EQ(paddings.size(),
                       6,
                       common::errors::InvalidArgument(
@@ -3487,7 +3479,7 @@ bool SplitWithNumOpInferSymbolicShape(
       }
     }
     if (count == 1) {
-      // caculate the axis of split_with_num_op
+      // calculate the axis of split_with_num_op
       symbol::TensorListShapeOrDataDimExprs res_list_s_d(
           num, out_s_d(candidate_axis, num));
       infer_context->SetShapeOrDataForValue(

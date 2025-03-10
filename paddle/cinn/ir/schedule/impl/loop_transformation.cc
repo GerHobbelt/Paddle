@@ -125,7 +125,7 @@ std::vector<Expr> DyScheduleImpl::Split(const Expr& loop,
           Expr(temp_var) + substitute_value * Expr(processed_factors[i]);
       new_loop_vars.push_back(temp_var);
     }
-    substitute_value = cinn::common::AutoSimplify(substitute_value);
+    substitute_value = optim::ArithSimplify(substitute_value);
     Expr new_node = ir::ir_utils::IRCopy(for_node->body);
     ReplaceExpr(&new_node, {for_node->loop_var}, {substitute_value});
     std::vector<Expr> splited_loops;
@@ -167,8 +167,7 @@ std::vector<Expr> DyScheduleImpl::Split(const Expr& loop,
   for (auto factor : factors) prod_size = prod_size * Expr(factor);
   std::for_each(factors.begin(), factors.end(), [&](int factor) {
     if (factor == -1) {
-      process_factors.push_back(
-          cinn::common::AutoSimplify(tot_extent / prod_size));
+      process_factors.push_back(optim::ArithSimplify(tot_extent / prod_size));
       idx_neg1 = -idx_neg1;
     } else {
       process_factors.push_back(Expr(factor));
@@ -180,12 +179,11 @@ std::vector<Expr> DyScheduleImpl::Split(const Expr& loop,
 
   idx_neg1 = (-idx_neg1) - 1;
 
-  bool exact_split =
-      (tot_extent ==
-       cinn::common::AutoSimplify(process_factors[0] * process_factors[1]));
+  bool exact_split = (tot_extent == optim::ArithSimplify(process_factors[0] *
+                                                         process_factors[1]));
   if (!exact_split) {
     process_factors[idx_neg1] =
-        cinn::common::AutoSimplify(process_factors[idx_neg1] + Expr(1));
+        optim::ArithSimplify(process_factors[idx_neg1] + Expr(1));
   }
 
   PADDLE_ENFORCE_LE(
@@ -218,7 +216,7 @@ std::vector<Expr> DyScheduleImpl::Split(const Expr& loop,
     substitute_value = Expr(temp_var) + substitute_value * process_factors[i];
     new_loop_vars.push_back(temp_var);
   }
-  substitute_value = cinn::common::AutoSimplify(substitute_value);
+  substitute_value = optim::ArithSimplify(substitute_value);
   Expr new_node = ir::ir_utils::IRCopy(for_node->body);
   ReplaceExpr(&new_node, {for_node->loop_var}, {substitute_value});
   std::vector<Expr> splited_loops;
@@ -329,7 +327,7 @@ std::vector<Expr> DyScheduleImpl::Split(const Expr& loop,
     substitute_value = Expr(temp_var) + substitute_value * process_factors[i];
     new_loop_vars.push_back(temp_var);
   }
-  substitute_value = cinn::common::AutoSimplify(substitute_value);
+  substitute_value = optim::ArithSimplify(substitute_value);
   Expr new_node = ir::ir_utils::IRCopy(for_node->body);
   ReplaceExpr(&new_node, {for_node->loop_var}, {substitute_value});
   std::vector<Expr> splited_loops;
@@ -442,7 +440,7 @@ Expr DyScheduleImpl::Fuse(const std::vector<Expr>& loops) {
   for (int i = 0; i < loops_number; ++i) {
     fused_extent = fused_extent * for_nodes[i]->extent;
   }
-  fused_extent = cinn::common::AutoSimplify(fused_extent);
+  fused_extent = optim::ArithSimplify(fused_extent);
   if (!fused_body.As<ir::Block>()) fused_body = Block::Make({fused_body});
   Expr new_stmt = For::Make(fused_var,
                             Expr(0),

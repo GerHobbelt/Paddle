@@ -34,6 +34,15 @@ pir::Value GetOutputValueByName(const pir::Program &program,
         }
         value = op.operand_source(0);
       }
+    } else if (op.isa<paddle::dialect::FeedOp>() ||
+               op.isa<paddle::dialect::FetchOp>()) {
+      if (op.attribute("name") == name_attr) {
+        if (value) {
+          PADDLE_THROW(common::errors::PreconditionNotMet(
+              "More than one feed/fetch named with %s found.", name));
+        }
+        value = op.result(0);
+      }
     }
   }
   return value;

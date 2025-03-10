@@ -66,6 +66,40 @@ static inline ov::element::Type PhiType2OVType(phi::DataType type) {
   return it->second;
 }
 
+static inline ov::element::Type VarType2OVType(
+    ::paddle::framework::proto::VarType_Type var_type) {
+  static const std::map<::paddle::framework::proto::VarType_Type,
+                        ov::element::Type>
+      type_map{{paddle::framework::proto::VarType_Type::VarType_Type_BOOL,
+                ov::element::boolean},
+               {paddle::framework::proto::VarType_Type::VarType_Type_INT16,
+                ov::element::i16},
+               {paddle::framework::proto::VarType_Type::VarType_Type_INT32,
+                ov::element::i32},
+               {paddle::framework::proto::VarType_Type::VarType_Type_INT64,
+                ov::element::i64},
+               {paddle::framework::proto::VarType_Type::VarType_Type_FP16,
+                ov::element::f16},
+               {paddle::framework::proto::VarType_Type::VarType_Type_FP32,
+                ov::element::f32},
+               {paddle::framework::proto::VarType_Type::VarType_Type_FP64,
+                ov::element::f64},
+               {paddle::framework::proto::VarType_Type::VarType_Type_UINT8,
+                ov::element::u8},
+               {paddle::framework::proto::VarType_Type::VarType_Type_INT8,
+                ov::element::i8},
+               {paddle::framework::proto::VarType_Type::VarType_Type_BF16,
+                ov::element::bf16}};
+  auto it = type_map.find(var_type);
+  PADDLE_ENFORCE_EQ(
+      it != type_map.end(),
+      true,
+      common::errors::InvalidArgument(
+          "VarType[%s] not supported convert to ov::element::Type .",
+          var_type));
+  return it->second;
+}
+
 static inline phi::DataType OVType2PhiType(ov::element::Type type) {
   static const std::map<ov::element::Type, phi::DataType> type_map{
       {ov::element::boolean, phi::DataType::BOOL},

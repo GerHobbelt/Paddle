@@ -21,6 +21,7 @@ from paddle.base.log_helper import get_logger
 from paddle.tensorrt.converter_utils import (
     add_1D_constant_layer,
     fill_constant_layer,
+    get_input_constant_value,
     get_shape_tensor_element,
     get_trt_plugin,
     trt_concat,
@@ -164,43 +165,13 @@ def set_value_converter(network, paddle_op, inputs):
         paddle_op.name() == "pd_op.set_value"
         or paddle_op.name() == "pd_op.set_value_"
     ):
-        starts = (
-            paddle_op.operands()[1]
-            .source()
-            .get_defining_op()
-            .attrs()["value"][0]
-        )
-        ends = (
-            paddle_op.operands()[2]
-            .source()
-            .get_defining_op()
-            .attrs()["value"][0]
-        )
-        steps = (
-            paddle_op.operands()[3]
-            .source()
-            .get_defining_op()
-            .attrs()["value"][0]
-        )
+        starts = get_input_constant_value(paddle_op, inputs, 1)[0]
+        ends = get_input_constant_value(paddle_op, inputs, 2)[0]
+        steps = get_input_constant_value(paddle_op, inputs, 3)[0]
     else:
-        starts = (
-            paddle_op.operands()[2]
-            .source()
-            .get_defining_op()
-            .attrs()["value"][0]
-        )
-        ends = (
-            paddle_op.operands()[3]
-            .source()
-            .get_defining_op()
-            .attrs()["value"][0]
-        )
-        steps = (
-            paddle_op.operands()[4]
-            .source()
-            .get_defining_op()
-            .attrs()["value"][0]
-        )
+        starts = get_input_constant_value(paddle_op, inputs, 2)[0]
+        ends = get_input_constant_value(paddle_op, inputs, 3)[0]
+        steps = get_input_constant_value(paddle_op, inputs, 4)[0]
     axes = paddle_op.attrs()["axes"][0]
 
     input_dims = x.shape
@@ -301,3 +272,114 @@ def share_data_converter(network, paddle_op, inputs):
     identity_layer = network.add_identity(x)
 
     return identity_layer.get_output(0)
+
+
+@converter_registry.register("pd_op.anchor_generator", trt_version="8.x")
+def anchor_generator_converter(network, paddle_op, inputs):
+    inputs = inputs[0]
+    input_dims = inputs.shape
+    anchor_sizes = paddle_op.attrs().get("anchor_sizes")
+    aspect_ratios = paddle_op.attrs().get("aspect_ratios")
+    stride = paddle_op.attrs().get("stride")
+    variances = paddle_op.attrs().get("variances")
+    offset = paddle_op.attrs().get("offset")
+    num_anchors = len(aspect_ratios) * len(anchor_sizes)
+
+    height = input_dims[1]
+    width = input_dims[2]
+    box_num = width * height * num_anchors
+    data_type = trt.float32
+
+    plugin_fields = [
+        trt.PluginField(
+            "anchor_sizes",
+            np.array(anchor_sizes, dtype=np.float32),
+            trt.PluginFieldType.FLOAT32,
+        ),
+        trt.PluginField(
+            "aspect_ratios",
+            np.array(aspect_ratios, dtype=np.float32),
+            trt.PluginFieldType.FLOAT32,
+        ),
+        trt.PluginField(
+            "stride",
+            np.array(stride, dtype=np.float32),
+            trt.PluginFieldType.FLOAT32,
+        ),
+        trt.PluginField(
+            "variances",
+            np.array(variances, dtype=np.float32),
+            trt.PluginFieldType.FLOAT32,
+        ),
+        trt.PluginField(
+            "offset",
+            np.array(offset, dtype=np.float32),
+            trt.PluginFieldType.FLOAT32,
+        ),
+        trt.PluginField(
+            "num_anchors",
+            np.array(num_anchors, dtype=np.int32),
+            trt.PluginFieldType.INT32,
+        ),
+    ]
+    plugin_field_collection = trt.PluginFieldCollection(plugin_fields)
+    plugin_name = "pir_anchor_generator_plugin_dynamic"
+    plugin_version = "1"
+    plugin = get_trt_plugin(
+        plugin_name, plugin_field_collection, plugin_version
+    )
+    anchor_generator_layer = network.add_plugin_v2([inputs], plugin)
+    out0 = anchor_generator_layer.get_output(0)
+    out1 = anchor_generator_layer.get_output(1)
+    return (out0, out1)
+
+
+@converter_registry.register("pd_op.affine_channel", trt_version="8.x")
+def affine_channel_converter(network, paddle_op, inputs):
+    x, scale_weights, bias_weights = inputs
+    data_layout = paddle_op.attrs().get("data_layout")
+
+    if data_layout == "NCHW":
+        channel_axis = 1
+        x_input = x
+    elif data_layout == "NHWC":
+        # Permute NHWC to NCHW
+        shuffle_layer1 = network.add_shuffle(x)
+        shuffle_layer1.first_transpose = (0, 3, 1, 2)
+        x_input = shuffle_layer1.get_output(0)
+        channel_axis = 1
+    else:
+        raise ValueError(f"affine_channel: Unsupported layout: {data_layout}")
+
+    if not isinstance(scale_weights, trt.Weights):
+        raise TypeError("affine_channel requires scale as trt.Weights")
+    if not isinstance(bias_weights, trt.Weights):
+        raise TypeError("affine_channel requires bias as trt.Weights")
+
+    if scale_weights.size != bias_weights.size:
+        raise ValueError(
+            f"affine_channel: scale.size({scale_weights.size}) != bias.size({bias_weights.size})"
+        )
+
+    power_array = np.ones((scale_weights.size,), dtype=np.float32)
+    power_weights = trt.Weights(power_array)
+
+    layer = network.add_scale_nd(
+        input=x_input,
+        mode=trt.ScaleMode.CHANNEL,
+        shift=bias_weights,
+        scale=scale_weights,
+        power=power_weights,
+        channel_axis=channel_axis,
+    )
+    if not layer:
+        raise RuntimeError("affine_channel: add_scale_nd failed.")
+
+    out_tensor = layer.get_output(0)
+
+    if data_layout == "NHWC":
+        shuffle_layer2 = network.add_shuffle(out_tensor)
+        shuffle_layer2.first_transpose = (0, 2, 3, 1)
+        out_tensor = shuffle_layer2.get_output(0)
+
+    return out_tensor

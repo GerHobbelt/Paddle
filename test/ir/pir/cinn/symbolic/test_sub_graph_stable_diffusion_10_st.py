@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# repo: diffusers_sub_grpah
+# repo: diffusers_sub_graph
 # model: stable_diffusion
 # api:paddle.nn.functional.conv.conv2d||method:transpose||method:flatten||api:paddle.nn.functional.norm.layer_norm||api:paddle.nn.functional.common.linear||api:paddle.nn.functional.common.linear||api:paddle.nn.functional.common.linear||method:reshape||method:transpose||method:reshape||method:transpose||method:reshape||method:transpose||api:paddle.tensor.linalg.matmul||method:__mul__||api:paddle.nn.functional.activation.softmax||api:paddle.tensor.linalg.matmul||method:transpose||method:reshape||api:paddle.nn.functional.common.linear||api:paddle.nn.functional.common.dropout||method:__truediv__||method:__add__||api:paddle.nn.functional.norm.layer_norm||api:paddle.nn.functional.common.linear||api:paddle.nn.functional.common.linear||api:paddle.nn.functional.common.linear||method:reshape||method:transpose||method:reshape||method:transpose||method:reshape||method:transpose||api:paddle.tensor.linalg.matmul||method:__mul__||api:paddle.nn.functional.activation.softmax||api:paddle.tensor.linalg.matmul||method:transpose||method:reshape||api:paddle.nn.functional.common.linear||api:paddle.nn.functional.common.dropout||method:__truediv__||method:__add__||api:paddle.nn.functional.norm.layer_norm||api:paddle.nn.functional.common.linear||method:chunk||api:paddle.nn.functional.activation.gelu||method:__mul__||api:paddle.nn.functional.common.dropout||api:paddle.nn.functional.common.linear||method:__add__||method:reshape||method:transpose||api:paddle.nn.functional.conv.conv2d||method:__add__
 import unittest

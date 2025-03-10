@@ -1114,6 +1114,8 @@ def sqrt(x: Tensor, name: str | None = None) -> Tensor:
                 'int16',
                 'int32',
                 'int64',
+                'complex64',
+                'complex128',
             ],
             'sqrt',
         )

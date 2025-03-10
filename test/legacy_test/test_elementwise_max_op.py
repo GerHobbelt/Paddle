@@ -36,7 +36,7 @@ class TestElementwiseOp(OpTest):
         self.init_data()
         self.op_type = "elementwise_max"
         self.prim_op_type = "prim"
-        self.if_enbale_cinn()
+        self.if_enable_cinn()
         self.python_api = paddle.maximum
         self.public_python_api = paddle.maximum
         self.inputs = {'X': self.x, 'Y': self.y}
@@ -103,7 +103,7 @@ class TestElementwiseOp(OpTest):
                 check_prim_pir=True,
             )
 
-    def if_enbale_cinn(self):
+    def if_enable_cinn(self):
         pass
 
 
@@ -119,7 +119,7 @@ class TestElementwiseFP16Op(TestElementwiseOp):
         self.init_data()
         self.op_type = "elementwise_max"
         self.prim_op_type = "prim"
-        self.if_enbale_cinn()
+        self.if_enable_cinn()
         self.python_api = paddle.maximum
         self.dtype = np.float16
         self.public_python_api = paddle.maximum

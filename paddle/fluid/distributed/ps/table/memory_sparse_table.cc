@@ -545,7 +545,7 @@ int32_t MemorySparseTable::Save_v2(const std::string &dirname,
                                                           _shard_idx,
                                                           file_start_idx + i);
       channel_config_for_slot_feature.path =
-          paddle::string::format_string("%s/slot_featue/part-%03d-%05d",
+          paddle::string::format_string("%s/slot_feature/part-%03d-%05d",
                                         table_path.c_str(),
                                         _shard_idx,
                                         file_start_idx + i);

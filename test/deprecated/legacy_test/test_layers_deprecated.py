@@ -375,7 +375,7 @@ class TestLayer(LayerTest):
             static_pir_result = _test_static(inp_np_x, inp_np_y)
         np.testing.assert_array_equal(static_pir_result, static_rlt)
 
-    def test_embeding(self):
+    def test_embedding(self):
         inp_word = np.array([[[1]]]).astype('int64')
         dict_size = 20
         with self.static_graph():

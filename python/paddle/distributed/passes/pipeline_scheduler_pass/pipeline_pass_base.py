@@ -20,7 +20,6 @@ from paddle.base import core
 from ...utils.log_utils import get_logger
 from ..pass_base import PassBase
 from ..pass_utils import (
-    set_pir_skip_gc_vars,
     set_skip_gc_vars,
     shadow_var_between_sub_programs,
 )
@@ -130,7 +129,7 @@ class PipelinePassBase(PassBase):
             )
 
         jobs = self._create_job_list()
-        type_to_program = set_pir_skip_gc_vars(
+        type_to_program = set_skip_gc_vars(
             self.get_attr("num_micro_batches"), job_types, sub_programs, jobs
         )
 

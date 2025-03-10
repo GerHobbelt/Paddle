@@ -17,7 +17,10 @@ import numpy as np
 import tensorrt as trt
 
 from paddle import pir
-from paddle.tensorrt.converter_utils import get_shape_tensor_element
+from paddle.tensorrt.converter_utils import (
+    get_input_constant_value,
+    get_shape_tensor_element,
+)
 from paddle.tensorrt.register import converter_registry
 from paddle.tensorrt.util import get_trt_version_list
 
@@ -25,8 +28,7 @@ from paddle.tensorrt.util import get_trt_version_list
 @converter_registry.register("pd_op.dropout", trt_version="8.x")
 def dropout_converter(network, paddle_op, inputs):
     input_x = inputs[0]
-    p_defining_op = paddle_op.operands()[2].source().get_defining_op()
-    dropout_prob = p_defining_op.attrs()["value"]
+    dropout_prob = get_input_constant_value(paddle_op, inputs, 2)[0]
     downgrade_in_infer = paddle_op.attrs().get("mode")
 
     if downgrade_in_infer == "upscale_in_train":

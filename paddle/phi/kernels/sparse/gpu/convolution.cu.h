@@ -109,7 +109,7 @@ inline IntT* SortedAndUniqueIndex(const Context& dev_ctx,
 /**
  * @brief: update the out index and indices
  * unique_keys: save the index of the output feature list
- * unique_values: indiates the index of key before deduplication
+ * unique_values: indicates the index of key before deduplication
  * out_indexs: indicates the position of the output index in the rulebook
  * rulebook_len: indicates the length of rulebook
  * out_dims: indicates the output dims

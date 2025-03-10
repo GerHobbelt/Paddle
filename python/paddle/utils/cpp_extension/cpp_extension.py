@@ -659,7 +659,7 @@ class BuildExtension(build_ext):
                 elif isinstance(self.cflags, list):
                     cflags = MSVC_COMPILE_FLAGS + self.cflags
                     cmd += cflags
-                # Append this macor only when jointly compiling .cc with .cu
+                # Append this macro only when jointly compiling .cc with .cu
                 if not is_cuda_file(src) and self.contain_cuda_file:
                     cmd.append('-DPADDLE_WITH_CUDA')
 

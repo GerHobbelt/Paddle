@@ -83,7 +83,7 @@ struct Cast : public ExprNode<Cast> {
  * The sum of two expressions.
  */
 struct Add : public BinaryOpNode<Add> {
-  Add(Expr a, Expr b);
+  Add(Expr a, Expr b) : BinaryOpNode<Add>(a.type(), a, b) { Verify(); }
 
   static Expr Make(Expr a, Expr b);
   static IndexExpr Make(IndexExpr a, IndexExpr b);
@@ -97,9 +97,10 @@ struct Add : public BinaryOpNode<Add> {
  * The difference of two expressions.
  */
 struct Sub : public BinaryOpNode<Sub> {
-  Sub(Expr a, Expr b) : BinaryOpNode<Sub>(a.type(), a, b) {}
+  Sub(Expr a, Expr b) : BinaryOpNode<Sub>(a.type(), a, b) { Verify(); }
 
   static Expr Make(Expr a, Expr b);
+  static IndexExpr Make(IndexExpr a, IndexExpr b);
 
   void Verify() const override;
 
@@ -110,7 +111,7 @@ struct Sub : public BinaryOpNode<Sub> {
  * The product of two expressions.
  */
 struct Mul : public BinaryOpNode<Mul> {
-  Mul(Expr a, Expr b) : BinaryOpNode<Mul>(a.type(), a, b) {}
+  Mul(Expr a, Expr b) : BinaryOpNode<Mul>(a.type(), a, b) { Verify(); }
 
   static Expr Make(Expr a, Expr b);
   static IndexExpr Make(IndexExpr a, IndexExpr b);
@@ -124,7 +125,7 @@ struct Mul : public BinaryOpNode<Mul> {
  * The ratio of two expressions.
  */
 struct Div : public BinaryOpNode<Div> {
-  Div(Expr a, Expr b) : BinaryOpNode<Div>(a.type(), a, b) {}
+  Div(Expr a, Expr b) : BinaryOpNode<Div>(a.type(), a, b) { Verify(); }
 
   static Expr Make(Expr a, Expr b);
   static IndexExpr Make(IndexExpr a, IndexExpr b);
@@ -137,7 +138,7 @@ struct Div : public BinaryOpNode<Div> {
  * The mod of two expressions.
  */
 struct Mod : public BinaryOpNode<Mod> {
-  Mod(Expr a, Expr b) : BinaryOpNode<Mod>(a.type(), a, b) {}
+  Mod(Expr a, Expr b) : BinaryOpNode<Mod>(a.type(), a, b) { Verify(); }
 
   static Expr Make(Expr a, Expr b);
   static IndexExpr Make(IndexExpr a, IndexExpr b);
@@ -149,7 +150,7 @@ struct Mod : public BinaryOpNode<Mod> {
  * The lesser of two expressions.
  */
 struct Min : public BinaryOpNode<Min> {
-  Min(Expr a, Expr b) : BinaryOpNode<Min>(a.type(), a, b) {}
+  Min(Expr a, Expr b) : BinaryOpNode<Min>(a.type(), a, b) { Verify(); }
 
   static Expr Make(Expr a, Expr b);
   // TODO(liiujinnan): simplify Min and Max.
@@ -163,7 +164,7 @@ struct Min : public BinaryOpNode<Min> {
  * The larger of two expressions.
  */
 struct Max : public BinaryOpNode<Max> {
-  Max(Expr a, Expr b) : BinaryOpNode<Max>(a.type(), a, b) {}
+  Max(Expr a, Expr b) : BinaryOpNode<Max>(a.type(), a, b) { Verify(); }
 
   static Expr Make(Expr a, Expr b);
   // TODO(liiujinnan): simplify Min and Max.
@@ -178,7 +179,7 @@ struct Max : public BinaryOpNode<Max> {
  * Tell whether the first expression equals to the second expression.
  */
 struct EQ : public BinaryOpNode<EQ> {
-  EQ(Expr a, Expr b) : BinaryOpNode<EQ>(a.type(), a, b) {}
+  EQ(Expr a, Expr b) : BinaryOpNode<EQ>(a.type(), a, b) { Verify(); }
 
   Type type() const { return Bool(a()->type().lanes()); }
 
@@ -191,7 +192,7 @@ struct EQ : public BinaryOpNode<EQ> {
  * Tell whether the first expression not equals to the second expression.
  */
 struct NE : public BinaryOpNode<NE> {
-  NE(Expr a, Expr b) : BinaryOpNode<NE>(a.type(), a, b) {}
+  NE(Expr a, Expr b) : BinaryOpNode<NE>(a.type(), a, b) { Verify(); }
 
   Type type() const { return Bool(a()->type().lanes()); }
 
@@ -204,7 +205,7 @@ struct NE : public BinaryOpNode<NE> {
  * Tell whether the first expression is lower than the second expression.
  */
 struct LT : public BinaryOpNode<LT> {
-  LT(Expr a, Expr b) : BinaryOpNode<LT>(a.type(), a, b) {}
+  LT(Expr a, Expr b) : BinaryOpNode<LT>(a.type(), a, b) { Verify(); }
 
   Type type() const { return Bool(a()->type().lanes()); }
 
@@ -217,7 +218,7 @@ struct LT : public BinaryOpNode<LT> {
  * Tell whether the first expression is no larger than the second expression.
  */
 struct LE : public BinaryOpNode<LE> {
-  LE(Expr a, Expr b) : BinaryOpNode<LE>(a.type(), a, b) {}
+  LE(Expr a, Expr b) : BinaryOpNode<LE>(a.type(), a, b) { Verify(); }
 
   Type type() const { return Bool(a()->type().lanes()); }
 
@@ -230,7 +231,7 @@ struct LE : public BinaryOpNode<LE> {
  * Tell whether the first expression is larger than the second expression.
  */
 struct GT : public BinaryOpNode<GT> {
-  GT(Expr a, Expr b) : BinaryOpNode<GT>(a.type(), a, b) {}
+  GT(Expr a, Expr b) : BinaryOpNode<GT>(a.type(), a, b) { Verify(); }
 
   Type type() const { return Bool(a()->type().lanes()); }
 
@@ -243,7 +244,7 @@ struct GT : public BinaryOpNode<GT> {
  * Tell whether the first expression is not less than the second expression.
  */
 struct GE : public BinaryOpNode<GE> {
-  GE(Expr a, Expr b) : BinaryOpNode<GE>(a.type(), a, b) {}
+  GE(Expr a, Expr b) : BinaryOpNode<GE>(a.type(), a, b) { Verify(); }
 
   Type type() const { return Bool(a()->type().lanes()); }
 
@@ -530,22 +531,7 @@ struct Select : public ExprNode<Select> {
   Expr true_value;
   Expr false_value;
 
-  Select(Expr condition, Expr true_value, Expr false_value)
-      : ExprNode<Select>(true_value.type()),
-        condition(condition),
-        true_value(true_value),
-        false_value(false_value) {
-    PADDLE_ENFORCE_EQ(
-        true_value.type(),
-        false_value.type(),
-        ::common::errors::InvalidArgument(
-            "The type of true_value and false_value should be the same."));
-    PADDLE_ENFORCE_EQ(condition.type().is_bool(),
-                      true,
-                      ::common::errors::PreconditionNotMet(
-                          "The condition must be of boolean type."));
-    type_ = true_value.type();
-  }
+  Select(Expr condition, Expr true_value, Expr false_value);
 
   static Expr Make(Expr condition, Expr true_value, Expr false_value) {
     auto node = make_shared<Select>(condition, true_value, false_value);
@@ -862,7 +848,7 @@ struct ForBase {
   BindInfo bind_info_;
 };
 
-/// LLVM loop unroll metadata infomation
+/// LLVM loop unroll metadata information
 struct LLVMForLoopMeta {
   enum UnrollMode { DefaultUnroll, FullyUnroll, NoUnroll };
 

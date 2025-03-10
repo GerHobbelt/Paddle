@@ -428,7 +428,7 @@ pir::Attribute AttrTypeReader::ReadPaddleOperatorAttr(
                                         std::vector<int64_t>>(attr_json, ctx);
   } else if (attr_name == paddle::dialect::ScalarAttribute::name()) {
     VLOG(8) << "Parse ScalarAttribute .";
-    // this func's return type is pir::Attribute which is diffrent
+    // this func's return type is pir::Attribute which is different
     // from paddle::dialect::ScalarAttribute
     return pir::deserializeAttrFromJson_scalarAttr(attr_json, ctx);
   } else if (attr_name == paddle::dialect::DataTypeAttribute::name()) {

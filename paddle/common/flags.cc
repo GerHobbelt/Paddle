@@ -1106,11 +1106,11 @@ PHI_DEFINE_EXPORTED_string(cinn_subgraph_graphviz_dir,
  * Since Version: 3.0 Beta
  * Value Range: bool, default=false
  * Example: FLAGS_cinn_specify_input_dynamic_dim=true will use file set by
- * FLAGS_cinn_input_dynamic_dim_spec_file to specify input dynamic dimention.
+ * FLAGS_cinn_input_dynamic_dim_spec_file to specify input dynamic dimension.
  */
 PHI_DEFINE_EXPORTED_bool(cinn_specify_input_dynamic_dim,
                          false,
-                         "Whether to specify input dynamic dimention.");
+                         "Whether to specify input dynamic dimension.");
 
 /*
  * CINN related FLAG
@@ -1118,13 +1118,13 @@ PHI_DEFINE_EXPORTED_bool(cinn_specify_input_dynamic_dim,
  * Since Version: 3.0 Beta
  * Value Range: string, default=""
  * Example: FLAGS_cinn_input_dynamic_dim_spec_file="./config.json",
- * FLAGS_cinn_specify_input_dynamic_dim=true would use input dynamic dimention
- * predefined in ./config.json to specify input dynamic dimention.
+ * FLAGS_cinn_specify_input_dynamic_dim=true would use input dynamic dimension
+ * predefined in ./config.json to specify input dynamic dimension.
  */
 PHI_DEFINE_EXPORTED_string(
     cinn_input_dynamic_dim_spec_file,
     "",
-    "File path of predefined input dynamic dimention specification.");
+    "File path of predefined input dynamic dimension specification.");
 
 #endif
 
@@ -1318,6 +1318,12 @@ PHI_DEFINE_EXPORTED_bool(
 PHI_DEFINE_EXPORTED_bool(eager_communication_connection,
                          false,
                          "enable eager to create nccl comm");
+
+PHI_DEFINE_EXPORTED_int64(
+    tcp_max_syn_backlog,
+    2048,
+    "The maximum length of the queue for completely established sockets "
+    "waiting to be accepted for tcp, default is 2048.");
 
 /**
  * Autotune related FLAG
@@ -1644,18 +1650,6 @@ PHI_DEFINE_EXPORTED_string(
     ir_inplace_kernel_blacklist,
     "",
     "It controls the ir inplace kernel subset do not use.");
-/**
- * Specify the directory of saving PIR subgraph from @to_static
- * Name: pir_subgraph_saving_dir
- * Since Version: 2.6.0
- * Value Range: str, default=""
- * Example:
- * Note: "/workspace/my_path", it will save into my_path dir;
- */
-PHI_DEFINE_EXPORTED_string(
-    pir_subgraph_saving_dir,
-    "",
-    "Specify the directory of saving PIR subgraph from @to_static.");
 
 PHI_DEFINE_EXPORTED_bool(enable_record_memory, false, "Enable memory recorder");
 
@@ -1700,6 +1694,19 @@ PHI_DEFINE_EXPORTED_string(
     prim_forward_blacklist,
     "",
     "It controls the forward blacklist ops not to be decomposed.");
+
+/**
+ * Remove some redundant information when printing the pir program
+ * Name: disable_logging_op_attr_list
+ * Since Version: 3.0.0
+ * Value Range: string, default=""
+ * Example: FLAGS_disable_logging_op_attr_list="op_dist_attr"
+ * Note: If "dtype", "dtype:float32" will be deleted in Pir program
+ */
+PHI_DEFINE_EXPORTED_string(
+    disable_logging_op_attr_list,
+    "",
+    "Remove some redundant information when printing the pir program");
 
 #if defined(PADDLE_WITH_NCCL) || defined(PADDLE_WITH_RCCL) || \
     defined(PADDLE_WITH_XPU_BKCL) || defined(PADDLE_WITH_CUSTOM_DEVICE)

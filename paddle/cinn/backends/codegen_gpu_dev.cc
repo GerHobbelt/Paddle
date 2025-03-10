@@ -115,7 +115,7 @@ std::vector<Expr> FilterDeallocTempBuffers(const std::vector<Expr> &frees) {
     bool has_symbolic_constant = false;
     const ir::_Buffer_ *buffer = op->destination.As<ir::_Buffer_>();
     for (Expr shape : buffer->shape) {
-      shape = common::AutoSimplify(shape);
+      shape = optim::ArithSimplify(shape);
       ir::ir_utils::CollectIRNodes(shape, [&](const Expr *x) {
         if (x->as_var()) {
           PADDLE_ENFORCE_EQ(
@@ -540,7 +540,7 @@ ir::Expr CalculateSharedMemory(const ir::LoweredFunc &func) {
       shm_size = shm_size + CalculateSharedMemory(buffer);
     }
   }
-  return common::AutoSimplify(shm_size);
+  return optim::ArithSimplify(shm_size);
 }
 
 }  // namespace backends

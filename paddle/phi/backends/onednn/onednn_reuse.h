@@ -1751,7 +1751,7 @@ class PoolingOneDNNHandler
       const OneDNNContext& dev_ctx, const std::string& unique_name) {
     dnnl::memory::desc workspace_md = this->fwd_pd_->workspace_desc();
     // Pooling Workspace has to be passed to Grad op that
-    // may be executed by diffrent thread, hence
+    // may be executed by different thread, hence
     // for that one we use key that does not contain TID
     std::string workspace_key = CreateKey(dev_ctx,
                                           workspace_md.get_dims(),

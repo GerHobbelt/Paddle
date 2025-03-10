@@ -73,7 +73,7 @@
   output : Tensor(out)
   infer_meta :
     func : ReduceSumInferMeta
-    param : [x, axis, keepdim]
+    param : [x, axis, keepdim, dtype]
   kernel :
     func : frobenius_norm
     param : [x, axis, keepdim]

@@ -532,7 +532,7 @@ void DependencyBuilder::ShrinkDownstreamMap() {
       continue;
     }
 
-    std::set<size_t> minumum_nexts;
+    std::set<size_t> minimum_nexts;
     for (size_t item : op_downstream_map_->at(i)) {
       bool not_after_any = true;
       // find the op that is not executed after any
@@ -546,12 +546,12 @@ void DependencyBuilder::ShrinkDownstreamMap() {
       }
       if (not_after_any) {
         VLOG(8) << "downstream op of " << i << ": " << item;
-        minumum_nexts.insert(item);
+        minimum_nexts.insert(item);
       }
     }
     // NOTE(Ruibiao): op_happens_before will not be changed when shrink
     // downstream map
-    (*op_downstream_map_)[i] = minumum_nexts;
+    (*op_downstream_map_)[i] = minimum_nexts;
   }
   VLOG(8) << "Finish shrink downstream map";
   VLOG(8) << "downstream count: " << CountDownstreamMap(*op_downstream_map_);
@@ -1008,7 +1008,7 @@ void DependencyBuilderSimplify::ShrinkDownstreamMap() {
       continue;
     }
 
-    std::set<size_t> minumum_nexts;
+    std::set<size_t> minimum_nexts;
     for (size_t item : op_downstream_map_.at(i)) {
       bool not_after_any = true;
       // find the op that is not executed  any
@@ -1022,12 +1022,12 @@ void DependencyBuilderSimplify::ShrinkDownstreamMap() {
       }
       if (not_after_any) {
         VLOG(8) << "downstream op of " << i << ": " << item;
-        minumum_nexts.insert(item);
+        minimum_nexts.insert(item);
       }
     }
     // NOTE(Ruibiao): op_happens_before will not be changed when shrink
     // downstream map
-    op_downstream_map_.at(i) = minumum_nexts;
+    op_downstream_map_.at(i) = minimum_nexts;
   }
   VLOG(8) << "Finish shrink downstream map";
   VLOG(8) << "downstream count: " << CountDownstreamMap(op_downstream_map_);

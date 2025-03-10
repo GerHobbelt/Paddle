@@ -205,7 +205,7 @@ inline bool NeedTypePromotion(
   // Tensor + Tensor type promotion only support calculations between
   // floating-point numbers and between complex and real numbers.
   if (x_dtype != y_dtype) {
-// TODO(Xi Zhao): we got special case for add now, should remove it in furture.
+// TODO(Xi Zhao): we got special case for add now, should remove it in future.
 #ifdef PADDLE_WITH_CUDA
     if ((op_name == "add" || op_name == "add_") &&
         x_dtype == DataType::FLOAT32 &&
@@ -244,7 +244,7 @@ inline bool NeedTypePromotionOldIr(const std::string& op_name,
   // Tensor + Tensor type promotion only support calculations between
   // floating-point numbers and between complex and real numbers.
   if (x != y) {
-// TODO(Xi Zhao): we got special case for add now, should remove it in furture.
+// TODO(Xi Zhao): we got special case for add now, should remove it in future.
 #ifdef PADDLE_WITH_CUDA
     if ((op_name == "add" || op_name == "add_") && x == DataType::FLOAT32 &&
         (y == phi::DataType::BFLOAT16 || y == phi::DataType::FLOAT16)) {

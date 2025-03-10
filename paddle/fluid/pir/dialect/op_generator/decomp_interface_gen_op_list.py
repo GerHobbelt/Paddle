@@ -93,6 +93,7 @@ decomp_ops_contain_unused_output = ["squeeze", "unsqueeze"]
 GENERATE_IMPL_VJP = [
     'abs_grad',
     'add_grad',
+    'angle_grad',
     'bce_loss_grad',
     'cos_grad',
     'divide_grad',

@@ -97,13 +97,6 @@ class CollectiveHelper:
             other_endpoints = endpoints[:]
             other_endpoints.remove(current_endpoint)
 
-        if rank == 0 and wait_port:
-            use_new_comm = paddle.get_flags(
-                "FLAGS_dynamic_static_unified_comm"
-            )["FLAGS_dynamic_static_unified_comm"]
-            if not use_new_comm:
-                wait_server_ready(other_endpoints)
-
         def _add_sync_by_allreduce(block):
             sync_var = block.create_var(
                 name=unique_name.generate('sync_var'),

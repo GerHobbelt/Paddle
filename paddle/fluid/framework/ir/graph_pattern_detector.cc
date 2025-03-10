@@ -1365,7 +1365,7 @@ PDNode *patterns::BatchNormActGrad::operator()(
   auto *act_out_var = pattern->NewNode(act_out_repr())
                           ->assert_is_ops_input(act_grad_types, "Out");
   auto *d_intermediate_var =
-      pattern->NewNode(d_itermediate_out_repr())
+      pattern->NewNode(d_intermediate_out_repr())
           ->assert_is_ops_output(act_grad_types, GradVarName("X"))
           ->assert_has_n_outputs(1);
   auto *bn_x_var = pattern->NewNode(bn_x_repr())
@@ -1600,7 +1600,7 @@ PDNode *patterns::ElewiseAddActInplaceGrad::operator()(
       pattern->NewNode(act_out_repr())->assert_is_ops_input(act_types, "Out");
 
   auto *d_intermediate_var =
-      pattern->NewNode(d_itermediate_out_repr())
+      pattern->NewNode(d_intermediate_out_repr())
           ->assert_is_ops_output(act_types, GradVarName("X"));
 
   act_grad->LinksFrom({d_act_out_var, act_out_var})

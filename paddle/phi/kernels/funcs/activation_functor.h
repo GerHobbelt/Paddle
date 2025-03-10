@@ -759,6 +759,24 @@ struct SqrtGradFunctor : public BaseActivationFunctor<T> {
   }
 };
 
+template <typename T>
+struct SqrtGradFunctor<ComplexType<T>>
+    : public BaseActivationFunctor<ComplexType<T>> {
+  template <typename Device,
+            typename X,
+            typename Out,
+            typename dOut,
+            typename dX>
+  void operator()(Device d, X x UNUSED, Out out, dOut dout, dX dx) const {
+    dx.device(d) =
+        dout * (static_cast<ComplexType<T>>(0.5) / out).unaryExpr(Conj<T>());
+  }
+
+  static constexpr ActBwdOpFwdDeps FwdDeps() {
+    return ActBwdOpFwdDeps::kDepOut;
+  }
+};
+
 // rsqrt(x) = x^(-1/2)
 template <typename T>
 struct RsqrtFunctor : public BaseActivationFunctor<T> {
@@ -2952,7 +2970,7 @@ struct RoundFunctor : public BaseActivationFunctor<T> {
   int decimals;
 
   std::vector<std::pair<const char*, int*>> GetAttrs() {
-    return {{"deciamls", &decimals}};
+    return {{"decimals", &decimals}};
   }
 
   template <typename Device, typename X, typename Out>
@@ -4043,6 +4061,22 @@ struct CudaSqrtGradFunctor : public BaseActivationFunctor<T> {
   // dx = dout * 0.5 / out
   __device__ __forceinline__ T operator()(const T dout, const T out) const {
     return one_half * dout / out;
+  }
+
+  static constexpr ActBwdOpFwdDeps FwdDeps() {
+    return ActBwdOpFwdDeps::kDepOut;
+  }
+};
+
+template <typename T>
+struct CudaSqrtGradFunctor<ComplexType<T>>
+    : public BaseActivationFunctor<ComplexType<T>> {
+  ComplexType<T> one_half = static_cast<ComplexType<T>>(0.5f);
+
+  // dx = dout * 0.5 / out
+  __device__ __forceinline__ ComplexType<T> operator()(
+      const ComplexType<T> dout, const ComplexType<T> out) const {
+    return dout * conj(one_half / out);
   }
 
   static constexpr ActBwdOpFwdDeps FwdDeps() {
@@ -5178,7 +5212,7 @@ struct CudaRoundFunctor : public BaseActivationFunctor<T> {
   int decimals;
 
   std::vector<std::pair<const char*, int*>> GetAttrs() {
-    return {{"deciamls", &decimals}};
+    return {{"decimals", &decimals}};
   }
   // round(x) = round(x)
   __device__ __forceinline__ T operator()(const T arg_x) const {

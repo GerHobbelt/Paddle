@@ -139,12 +139,16 @@ pir::Type TranslateToIrDataType(phi::DataType dtype) {
   return data_type;
 }
 
-pir::Operation* CreateOpeartionByName(const std::string& op_name,
+pir::Operation* CreateOperationByName(const std::string& op_name,
                                       const std::vector<pir::Value>& inputs,
                                       const pir::AttributeMap& attrs,
                                       const pir::PatternRewriter& rewriter) {
   return paddle::drr::OperationFactory::Instance().CreateOperation(
       op_name, inputs, attrs, const_cast<pir::PatternRewriter&>(rewriter));
+}
+
+pir::Attribute CreateDataTypeAttr(pir::IrContext* ctx, phi::DataType dtype) {
+  return paddle::dialect::DataTypeAttribute::get(ctx, dtype);
 }
 
 template <typename T>

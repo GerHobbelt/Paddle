@@ -878,7 +878,7 @@ void BindTensor(pybind11::module &m) {  // NOLINT
 
            Returns:
                tuple: contains ipc name, data size, data type,
-                      tensor dims and lod imformation.
+                      tensor dims and lod information.
 
            Examples:
                 .. code-block:: python

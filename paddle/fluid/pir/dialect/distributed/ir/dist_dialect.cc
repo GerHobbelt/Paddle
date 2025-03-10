@@ -31,13 +31,17 @@ DistDialect::DistDialect(pir::IrContext *context)
 
 void DistDialect::initialize() {
   RegisterAttributes<ProcessMeshAttribute,
+                     PlacementsAttribute,
                      TensorDistAttribute,
                      OperationDistAttribute>();
   RegisterTypes<DistDenseTensorType>();
   RegisterOps<ShardTensorOp,
               ReshardOp,
+              DtensorFromLocalOp,
+              DtensorToLocalOp,
               MoESubMeshTensorsOp,
-              MoEGlobalMeshTensorOp>();
+              MoEGlobalMeshTensorOp,
+              DistReshapeOp>();
 }
 
 void DistDialect::PrintType(pir::Type type, std::ostream &os) const {
@@ -95,6 +99,10 @@ void DistDialect::PrintAttribute(pir::Attribute attr, std::ostream &os) const {
       os << ", "
          << phi::distributed::auto_parallel::str_join(partial_status_strs);
     }
+    if (tensor_dist_attr.placements_attr().has_value()) {
+      os << ", placements:"
+         << tensor_dist_attr.placements_attr().value().to_string();
+    }
   } else if (auto op_dist_attr = attr.dyn_cast<OperationDistAttribute>()) {
     os << "{mesh:{shape:[" +
               phi::distributed::auto_parallel::str_join(
@@ -114,6 +122,8 @@ void DistDialect::PrintAttribute(pir::Attribute attr, std::ostream &os) const {
     }
     os << ",chunk_id:" << op_dist_attr.chunk_id();
     os << "}";
+  } else if (auto placements_attr = attr.dyn_cast<PlacementsAttribute>()) {
+    os << placements_attr.to_string();
   } else {
     os << "error_attribute_type";
   }

@@ -157,7 +157,7 @@ static std::string CurTailFnName(const std::string &origin_fn_name) {
   if (origin_fn_name.length() <= MaxStrLength) {
     return origin_fn_name;
   }
-  VLOG(6) << "Funtion name too long. Curtail and concat hash.";
+  VLOG(6) << "Function name too long. Curtail and concat hash.";
   const std::string new_fn_name =
       origin_fn_name.substr(0, MaxStrLength) +
       std::to_string(std::hash<std::string>()(origin_fn_name));

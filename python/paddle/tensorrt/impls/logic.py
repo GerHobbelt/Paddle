@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import tensorrt as trt
 
 from paddle.tensorrt.converter_utils import (
@@ -24,6 +25,8 @@ logic_type_map = {
     "pd_op.greater_than": trt.ElementWiseOperation.GREATER,
     "pd_op.less_than": trt.ElementWiseOperation.LESS,
     "pd_op.equal": trt.ElementWiseOperation.EQUAL,
+    "pd_op.bitwise_and": trt.ElementWiseOperation.AND,
+    "pd_op.bitwise_or": trt.ElementWiseOperation.OR,
     "pd_op.logical_xor": trt.ElementWiseOperation.XOR,
     "pd_op.logical_or": trt.ElementWiseOperation.OR,
     "pd_op.logical_or_": trt.ElementWiseOperation.OR,
@@ -34,6 +37,8 @@ logic_type_map = {
 @converter_registry.register("pd_op.greater_than", trt_version="8.x")
 @converter_registry.register("pd_op.less_than", trt_version="8.x")
 @converter_registry.register("pd_op.equal", trt_version="8.x")
+@converter_registry.register("pd_op.bitwise_and", trt_version="8.x")
+@converter_registry.register("pd_op.bitwise_or", trt_version="8.x")
 @converter_registry.register("pd_op.logical_xor", trt_version="8.x")
 @converter_registry.register("pd_op.logical_or", trt_version="8.x")
 @converter_registry.register("pd_op.logical_or_", trt_version="8.x")
@@ -52,6 +57,30 @@ def not_equal_converter(network, paddle_op, inputs):
     )
     not_layer = network.add_unary(layer_output, trt.UnaryOperation.NOT)
     layer_output = not_layer.get_output(0)
+    return layer_output
+
+
+@converter_registry.register("pd_op.bitwise_not", trt_version="8.x")
+def bitwise_not_converter(network, paddle_op, inputs):
+    input_tensor = inputs[0]
+    if input_tensor.dtype == trt.bool:
+        bitwise_not_layer = network.add_unary(
+            input_tensor, trt.UnaryOperation.NOT
+        )
+        layer_output = bitwise_not_layer.get_output(0)
+    else:
+        neg_one_tensor_dims = trt.Dims([1] * len(input_tensor.shape))
+        neg_one_value = np.array([-1], dtype=np.int32)
+        neg_one_weights = trt.Weights(neg_one_value)
+        neg_one_tensor = network.add_constant(
+            neg_one_tensor_dims, neg_one_weights
+        ).get_output(0)
+        mul_neg_one = network.add_elementwise(
+            input_tensor, neg_one_tensor, trt.ElementWiseOperation.PROD
+        ).get_output(0)
+        layer_output = network.add_elementwise(
+            mul_neg_one, neg_one_tensor, trt.ElementWiseOperation.SUM
+        ).get_output(0)
     return layer_output
 
 

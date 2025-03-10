@@ -4077,79 +4077,13 @@
   outputs:
     output : Output
 
-- op: c_allgather
-  inputs :
-    x : X
-  outputs :
-    out: Out
-
-- op: c_allreduce_avg
-  inputs :
-    x : X
-  outputs :
-    out: Out
-
-- op: c_allreduce_max
-  inputs :
-    x : X
-  outputs :
-    out: Out
-
-- op: c_allreduce_min
-  inputs :
-    x : X
-  outputs :
-    out: Out
-
-- op: c_allreduce_prod
-  inputs :
-    x : X
-  outputs :
-    out: Out
-
 - op: c_allreduce_sum
   inputs :
     x : X
   outputs :
     out: Out
 
-- op: c_broadcast
-  inputs :
-    x : X
-  outputs :
-    out : Out
-
 - op: c_identity
-  inputs :
-    x : X
-  outputs :
-    out: Out
-
-- op: c_reduce_avg
-  inputs :
-    x : X
-  outputs :
-    out: Out
-
-- op: c_reduce_max
-  inputs :
-    x : X
-  outputs :
-    out: Out
-
-- op: c_reduce_min
-  inputs :
-    x : X
-  outputs :
-    out: Out
-
-- op: c_reduce_prod
-  inputs :
-    x : X
-  outputs :
-    out: Out
-
-- op: c_reduce_sum
   inputs :
     x : X
   outputs :

@@ -226,7 +226,6 @@ void IfInstruction::Run() {
       // phi::is_xpu_place(cond.place()) is true
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP) || \
     defined(PADDLE_WITH_XPU) || defined(PADDLE_WITH_CUSTOM_DEVICE)
-      DeviceContext().Wait();
       phi::DenseTensor cpu_cond;
       paddle::framework::TensorCopySync(
           cond_tensor, phi::CPUPlace(), &cpu_cond);

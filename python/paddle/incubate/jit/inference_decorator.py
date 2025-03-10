@@ -74,11 +74,15 @@ def is_fixed_type(input):
         return False
 
 
+def is_list_or_tuple(args):
+    return isinstance(args, (list, tuple))
+
+
 # get paddle.Tensor for paddle inference use.
 def get_tensor(run_time_args, arg_name):
     if isinstance(run_time_args, paddle.Tensor):
         return [run_time_args]
-    elif isinstance(run_time_args, list):
+    elif is_list_or_tuple(run_time_args):
         this_input_tensor_lists = []
         for ele in run_time_args:
             assert isinstance(
@@ -90,7 +94,7 @@ def get_tensor(run_time_args, arg_name):
         return [run_time_args]
     else:
         raise AssertionError(
-            f'''we only support adding paddle.incubate.jit.inference() in functions whose arguments are paddle.Tensor or list[paddle.Tensor] or None,
+            f'''we only support adding paddle.incubate.jit.inference() in functions whose arguments are paddle.Tensor or list[paddle.Tensor] & tuple[paddle.Tensor] or None,
             but here we get {arg_name} in your function is {type(run_time_args)}, please modify your function to meet our requirement.'''
         )
 
@@ -99,7 +103,7 @@ def get_tensor(run_time_args, arg_name):
 def get_d2s_spec(run_time_args, name):
     if isinstance(run_time_args, paddle.Tensor):
         return InputSpec.from_tensor(run_time_args, name=name)
-    elif isinstance(run_time_args, list):
+    elif is_list_or_tuple(run_time_args):
         this_input_spec = []
         suffix = 0
         for ele in run_time_args:
@@ -273,7 +277,7 @@ class InferenceEngine:
                 input_specs.append(this_input)
 
         for i in range(len(input_specs)):
-            if isinstance(input_specs[i], list):
+            if is_list_or_tuple(input_specs[i]):
                 for j in range(len(input_specs[i])):
                     input_specs[i][j].stop_gradient = True
             elif isinstance(input_specs[i], paddle.static.InputSpec):
@@ -285,7 +289,7 @@ class InferenceEngine:
         if len(self.d2s_input_names) == 0:
             self.d2s_input_names.extend([None] * len(input_tensor_lists))
         for i in range(len(input_specs)):
-            if isinstance(input_specs[i], list):
+            if is_list_or_tuple(input_specs[i]):
                 for j in range(len(input_specs[i])):
                     input_specs[i][j].shape = self.d2s_input_shapes[
                         d2s_shapes_id
@@ -640,7 +644,7 @@ def inference(
         )
 
         # This is the innermost_decorator, ie. when user invoke the function decorated by @paddle.incubate.jit.inference()
-        # he is actually invoke this internel function.
+        # he is actually invoke this internal function.
         def innermost_decorator(*args, **kwargs):
             input_tensor_lists = infer_engine.get_input_tensor_lists(
                 *args, **kwargs

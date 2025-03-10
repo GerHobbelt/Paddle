@@ -211,7 +211,7 @@ int GetArrayPackingFactor(int shape,
                           const cinn::common::Target &target) {
   int split_base = GetBasicFactor(type, target);
   int split_factor = 1;
-  // temporily use shape-1 instead of shape for isl wrong for1 elimination
+  // temporarily use shape-1 instead of shape for isl wrong for1 elimination
   int i = split_base * split_base < shape ? split_base * split_base : shape;
   for (; i > 1; i--) {
     if (shape % i == 0) {

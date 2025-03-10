@@ -4788,7 +4788,16 @@ def prod(
         check_variable_and_dtype(
             x,
             'x/input',
-            ['float32', 'float64', 'int32', 'int64', "float16", "uint16"],
+            [
+                'float32',
+                'float64',
+                'int32',
+                'int64',
+                "float16",
+                "uint16",
+                "complex64",
+                "complex128",
+            ],
             'reduce_prod',
         )
         out = helper.create_variable_for_type_inference(
@@ -4805,10 +4814,10 @@ def prod(
 
 def sign(x: Tensor, name: str | None = None) -> Tensor:
     """
-    Returns sign of every element in `x`: 1 for positive, -1 for negative and 0 for zero.
+    Returns sign of every element in `x`: For real numbers, 1 for positive, -1 for negative and 0 for zero. For complex numbers, the return value is a complex number with unit magnitude. If a complex number element is zero, the result is 0+0j.
 
     Args:
-        x (Tensor): The input tensor. The data type can be uint8, int8, int16, int32, int64, bfloat16, float16, float32 or float64.
+        x (Tensor): The input tensor. The data type can be uint8, int8, int16, int32, int64, bfloat16, float16, float32, float64, complex64 or complex128.
         name (str|None, optional): Name for the operation (optional, default is None). For more information, please refer to :ref:`api_guide_Name`.
 
     Returns:
@@ -4841,6 +4850,8 @@ def sign(x: Tensor, name: str | None = None) -> Tensor:
                 'bfloat16',
                 'float32',
                 'float64',
+                'complex64',
+                'complex128',
             ],
             'sign',
         )
@@ -5734,8 +5745,17 @@ def atan2(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
 
     """
 
+    x_shape = list(x.shape)
+    y_shape = list(y.shape)
     if in_dynamic_or_pir_mode():
-        return _C_ops.atan2(x, y)
+        broadcast_x = x
+        broadcast_y = y
+        if x_shape != y_shape:
+            broadcast_shape = paddle.broadcast_shape(x_shape, y_shape)
+            broadcast_x = paddle.broadcast_to(broadcast_x, broadcast_shape)
+            broadcast_y = paddle.broadcast_to(broadcast_y, broadcast_shape)
+
+        return _C_ops.atan2(broadcast_x, broadcast_y)
     else:
         check_variable_and_dtype(
             x,

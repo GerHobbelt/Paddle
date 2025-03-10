@@ -24,7 +24,7 @@ using TileConfigMap =
 
 namespace {
 
-const int kMaxNumel = INT32_MAX;
+const int kMaxNumel = BucketInfo::kMaxNumel;
 
 int64_t CeilPow2(int64_t n) {
   int64_t pow = 1;

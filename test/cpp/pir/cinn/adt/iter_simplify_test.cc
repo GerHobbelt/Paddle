@@ -17,6 +17,7 @@
 #include <gtest/gtest.h>
 #include "paddle/cinn/common/integer_set.h"
 #include "paddle/cinn/common/ir_util.h"
+#include "paddle/cinn/common/simplify_special_pattern.h"
 #include "paddle/cinn/ir/op/ir_operators.h"
 #include "paddle/cinn/ir/schedule/ir_schedule.h"
 #include "paddle/cinn/ir/schedule/schedule_base.h"
@@ -498,11 +499,6 @@ TEST_F(TestIterSimplify, MergeMulMod) {
   auto S0 = ir::Var(ir::Expr(0), ir::Expr(4), "S0").set_index(1);
   auto S1 = ir::Var(ir::Expr(0), ir::Expr(256), "S1").set_index(1);
   auto S2 = ir::Var(ir::Expr(0), ir::Expr(13), "S2").set_index(1);
-  common::cas_intervals_t var_intervals = {
-      {"S0", CasInterval(S0->lower_bound, S0->upper_bound)},
-      {"S1", CasInterval(S1->lower_bound, S1->upper_bound)},
-      {"S2", CasInterval(S2->lower_bound, S2->upper_bound)}};
-  common::SymbolicExprAnalyzer analyzer{var_intervals};
 
   auto e1 = ((((((((S0 * 256) + S1) + (S2 * 1024)) / 2500) * 50) +
                (((((S0 * 256) + S1) + (S2 * 1024)) % 2500) / 50)) *
@@ -513,10 +509,9 @@ TEST_F(TestIterSimplify, MergeMulMod) {
 
   auto e3 = (S1 / 784 * 28 + S1 % 784 / 28) * 28 + S1 % 28;
 
-  EXPECT_EQ(MergeMulMod(&analyzer, e1), (((S0 * 256) + S1) + (S2 * 1024)));
-  EXPECT_EQ(MergeMulMod(&analyzer, e2),
-            ((((S0 * 256) + S1) + (S2 * 1024)) + -10000));
-  EXPECT_EQ(MergeMulMod(&analyzer, e3), S1);
+  EXPECT_EQ(MergeMulMod(e1), (((S0 * 256) + S1) + (S2 * 1024)));
+  EXPECT_EQ(MergeMulMod(e2), ((((S0 * 256) + S1) + (S2 * 1024)) + -10000));
+  EXPECT_EQ(MergeMulMod(e3), S1);
 }
 }  // namespace common
 }  // namespace cinn

@@ -134,3 +134,28 @@ def async_reload(src_tensor, async_load):
          - task (Task): The task that reloads the source tensor into the destination tensor.
     """
     return _load_reload_impl(src_tensor, async_load.reload)
+
+
+def async_offload_with_offset(
+    src_tensor, dst_tensor, src_offset, dst_offset, offload_size, async_loader
+):
+    """
+    Offloading the source tensor into the destination tensor asynchronously with offset and size customized.
+
+    Args:
+        src_tensor (EagerParamBase|paddle.Tensor): The source tensor.
+        dst_tensor (EagerParamBase|paddle.Tensor): The destination tensor.
+        src_offset (int): The element offset of the source tensor.
+        dst_offset (int): The element offset of the destination tensor.
+        offload_size (int): The size of the data to be loaded.
+        async_loader (core.AsyncLoad): The AsyncLoad object.
+
+    Returns:
+        task (Task): The task that operates partial offloading.
+    """
+    assert len(src_tensor.shape) <= 1, "Only support 1-D tensor"
+    assert len(dst_tensor.shape) <= 1, "Only support 1-D tensor"
+    assert src_tensor.dtype == dst_tensor.dtype, "Only support same dtype"
+    return async_loader.offload_with_offset(
+        dst_tensor, src_tensor, dst_offset, src_offset, offload_size
+    )

@@ -27,6 +27,7 @@ class TestFlattenTRTPattern(TensorRTBaseTest):
         self.api_args = {"shape": [3, 2], "fill_value": 1.0}
         self.program_config = {"feed_list": []}
         self.min_shape = {}
+        self.opt_shape = {}
         self.max_shape = {}
 
     def test_trt_result(self):
@@ -41,6 +42,7 @@ class TestAssignTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 2]}
+        self.opt_shape = {"x": [2, 2]}
         self.max_shape = {"x": [3, 2]}
 
     def test_trt_result(self):
@@ -96,6 +98,7 @@ class TestAssignValueInTRTPattern(TensorRTBaseTest):
                 self.api_args = api_args
                 self.program_config = {"feed_list": ["x"]}
                 self.min_shape = {}
+                self.opt_shape = {}
                 self.max_shape = {}
                 self.check_trt_result()
 
@@ -110,6 +113,7 @@ class TestArangeTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": []}
         self.min_shape = {}
+        self.opt_shape = {}
         self.max_shape = {}
 
     def test_trt_result(self):
@@ -125,6 +129,7 @@ class TestAssignOutTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x", "output"]}
         self.min_shape = {"x": [1, 2], "output": [1, 2]}
+        self.opt_shape = {"x": [2, 2], "output": [2, 2]}
         self.max_shape = {"x": [3, 2], "output": [3, 2]}
 
     def test_trt_result(self):
@@ -140,6 +145,7 @@ class TestFullLikeBoolTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["input"]}
         self.min_shape = {"input": [1, 2]}
+        self.opt_shape = {"input": [3, 2]}
         self.max_shape = {"input": [5, 2]}
 
     def test_trt_result(self):
@@ -155,6 +161,7 @@ class TestFullLikeFloatTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["input"]}
         self.min_shape = {"input": [1, 2]}
+        self.opt_shape = {"input": [3, 2]}
         self.max_shape = {"input": [5, 2]}
 
     def test_trt_result(self):
@@ -170,6 +177,7 @@ class TestFullLikeIntTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["input"]}
         self.min_shape = {"input": [1, 2]}
+        self.opt_shape = {"input": [3, 2]}
         self.max_shape = {"input": [5, 2]}
 
     def test_trt_result(self):
@@ -185,6 +193,7 @@ class TestFullLikeDynamicTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["input", "fill_value"]}
         self.min_shape = {"input": [1, 2]}
+        self.opt_shape = {"input": [3, 2]}
         self.max_shape = {"input": [5, 2]}
 
     def test_trt_result(self):
@@ -201,6 +210,7 @@ class TestFullWithTensorTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["value", "shape"]}
         self.min_shape = {}
+        self.opt_shape = {}
         self.max_shape = {}
 
     def test_trt_result(self):
@@ -217,6 +227,7 @@ class TestFullWithTensorCase1TRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["value"]}
         self.min_shape = {}
+        self.opt_shape = {}
         self.max_shape = {}
 
     def test_trt_result(self):

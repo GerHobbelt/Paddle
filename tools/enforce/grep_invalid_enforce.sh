@@ -43,7 +43,7 @@
 #         PADDLE_ENFORCE_EQ(addr.size(), 2UL,
 #                             "The endpoint should contain host and port: %s", ep);
 #         PADDLE_THROW("create socket failed");
-#         PADDLE_THROW("invalied address: %s", ep);
+#         PADDLE_THROW("invalid address: %s", ep);
 
 #         - paddle/fluid/imperative/jit/program_desc_tracer.cc
 #         PADDLE_ENFORCE_NOT_NULL(new_var);

@@ -143,11 +143,11 @@ static void kvReduceForGQA(const Context& ctx,
   PADDLE_ENFORCE_EQ(
       dk->strides()[2],
       1,
-      common::errors::InvalidArgument("headdim dimention must be contiguous"));
+      common::errors::InvalidArgument("headdim dimension must be contiguous"));
   PADDLE_ENFORCE_EQ(
       dk_tmp.strides()[3],
       1,
-      common::errors::InvalidArgument("headdim dimention must be contiguous"));
+      common::errors::InvalidArgument("headdim dimension must be contiguous"));
   const int64_t reduceDimSize = dk_tmp.dims()[2];
   const size_t blockNum =
       std::min((static_cast<int64_t>(dk_tmp.dims()[0] + 31) / 32),
@@ -177,19 +177,19 @@ static void kvReduceBatchedForGQA(const Context& ctx,
   PADDLE_ENFORCE_EQ(
       dk->strides()[3],
       1,
-      common::errors::InvalidArgument("headdim dimention must be contiguous"));
+      common::errors::InvalidArgument("headdim dimension must be contiguous"));
   PADDLE_ENFORCE_EQ(
       dk_tmp.strides()[4],
       1,
-      common::errors::InvalidArgument("headdim dimention must be contiguous"));
+      common::errors::InvalidArgument("headdim dimension must be contiguous"));
   PADDLE_ENFORCE_EQ(dk->strides()[0],
                     dk->strides()[1] * dk->dims()[1],
                     common::errors::InvalidArgument(
-                        "batchsize dimention must be contiguous"));
+                        "batchsize dimension must be contiguous"));
   PADDLE_ENFORCE_EQ(dk_tmp.strides()[0],
                     dk_tmp.strides()[1] * dk_tmp.dims()[1],
                     common::errors::InvalidArgument(
-                        "batchsize dimention must be contiguous"));
+                        "batchsize dimension must be contiguous"));
   const int64_t reduceDimSize = dk_tmp.dims()[3];
   const size_t blockNum = std::min(
       (static_cast<int64_t>(dk_tmp.dims()[0] * dk_tmp.dims()[1] + 31) / 32),

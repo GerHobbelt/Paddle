@@ -64,7 +64,7 @@ However the var's format is '{p}'."""
 def _process_conditions(conditions):
     """
     Desc:
-        Input condition expression in cmake grammer and return a string warpped by 'AND ()'.
+        Input condition expression in cmake grammar and return a string warpped by 'AND ()'.
         If the conditions string is empty, return an empty string.
     Example 1:
         Input: "LINUX"
@@ -83,7 +83,7 @@ def _process_conditions(conditions):
 def _proccess_archs(arch):
     """
     desc:
-        Input archs options and warp it with 'WITH_', 'OR' and '()' in cmakelist grammer.
+        Input archs options and warp it with 'WITH_', 'OR' and '()' in cmakelist grammar.
         The case is ignored.
         If the input is empty, return "LOCAL_ALL_ARCH".
     Example 1:
@@ -218,7 +218,7 @@ class DistUTPortManager:
     def reset_current_port(self, port=None):
         self.dist_ut_port = 21200 if port is None else port
 
-    def get_currnt_port(self):
+    def get_current_port(self):
         return self.dist_ut_port
 
     def gset_port(self, test_name, port):
@@ -238,7 +238,7 @@ class DistUTPortManager:
             re.compile("^[0-9]+$").search(port_num)
             and int(port_num) > 0
             or port_num.strip() == ""
-        ), f"""port_num must be foramt as a positive integer or empty, but this port_num is '{port_num}'"""
+        ), f"""port_num must be format as a positive integer or empty, but this port_num is '{port_num}'"""
         port_num = port_num.strip()
         if len(port_num) == 0:
             return 0
@@ -270,7 +270,7 @@ class DistUTPortManager:
                         break
                 name = lines[k - 1].strip()
 
-                # matcg right tets name format, the name must start with 'test_' follwed bu at least one char of
+                # matcg right tets name format, the name must start with 'test_' followed bu at least one char of
                 # '0-9'. 'a-z'. 'A-Z' or '_'
                 assert re.compile("^test_[0-9a-zA-Z_]+").search(
                     name
@@ -387,7 +387,7 @@ class CMakeGenerator:
 
     def parse_csvs(self):
         '''
-        parse csv files, return the lists of craeted or modified files
+        parse csv files, return the lists of created or modified files
         '''
         self.modified_or_created_files = []
         for c in self.current_dirs:
@@ -415,7 +415,7 @@ class CMakeGenerator:
     def _parse_line(self, line, curdir):
         """
         Desc:
-            Input a line in csv file and output a string in cmake grammer, adding the specified test and setting its properties.
+            Input a line in csv file and output a string in cmake grammar, adding the specified test and setting its properties.
         Example:
             Input: "test_allreduce,linux,gpu;rocm,120,DIST,test_runner.py,20071,1,PYTHONPATH=..;http_proxy=;https_proxy=,"
             Output:

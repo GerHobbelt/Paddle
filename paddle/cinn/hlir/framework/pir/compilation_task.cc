@@ -93,7 +93,7 @@ void GroupCompilationContext::PrepareModuleBuilder() {
 /**
  * For functions belonging to different broadcast groups, int args and the name
  * of the tensor args may be variate, but the number of the tensor args should
- * be fixed. So we need to unify the tensor args and symbol args. For exmaple,
+ * be fixed. So we need to unify the tensor args and symbol args. For example,
  * func1(_var, _var_1, S4, S5); func2(_var, _var_2, S1) would be unified to
  * func1(_var, _var_1, S4, S5, S1); func2(_var, _var_2, S4, S5, S1).
  */

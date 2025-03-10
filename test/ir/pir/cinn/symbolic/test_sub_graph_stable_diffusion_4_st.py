@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# repo: diffusers_sub_grpah
+# repo: diffusers_sub_graph
 # model: stable_diffusion
 # api:paddle.randn||method:__mul__||method:__add__||method:__mul__||api:paddle.randn||api:paddle.randint||method:cast||method:__getitem__||method:__pow__||method:flatten||method:unsqueeze||method:unsqueeze||method:unsqueeze||method:__getitem__||method:__rsub__||method:__pow__||method:flatten||method:unsqueeze||method:unsqueeze||method:unsqueeze||method:__mul__||method:__mul__||method:__add__
 import unittest

@@ -273,7 +273,7 @@ def save_state_dict(
         if coordinator_rank == paddle.distributed.get_rank():
             logger.debug(f"metadata:{metadata}")
             paddle.save(metadata, os.path.join(path, f"{unique_id}.metadata"))
-        logger.debug(f"local_state_dict:{local_state_dict}")
+
         dedup_tensor(
             local_state_dict, local_storage_metadata, metadata.storage_metadata
         )

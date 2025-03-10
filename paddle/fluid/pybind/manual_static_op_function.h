@@ -28,6 +28,7 @@
 #include "paddle/fluid/pybind/exception.h"
 #include "paddle/fluid/pybind/op_callstack_utils.h"
 #include "paddle/fluid/pybind/op_function_common.h"
+#include "paddle/fluid/pybind/static_op_function.h"
 #include "paddle/phi/common/int_array.h"
 #include "paddle/phi/core/enforce.h"
 #include "paddle/phi/infermeta/spmd_rules/rules.h"
@@ -1188,6 +1189,18 @@ static PyObject *fused_gemm_epilogue(PyObject *self,
   }
 }
 
+static PyObject *anchor_generator(PyObject *self,
+                                  PyObject *args,
+                                  PyObject *kwargs) {
+  if (egr::Controller::Instance().GetCurrentTracer() == nullptr) {
+    VLOG(6) << "Call static_api_anchor_generator";
+    return static_api_anchor_generator(self, args, kwargs);
+  } else {
+    ThrowExceptionToPython(std::current_exception());
+    return nullptr;
+  }
+}
+
 static PyObject *share_var(PyObject *self, PyObject *args, PyObject *kwargs) {
   try {
     VLOG(6) << "Add share_var op into program";
@@ -1267,6 +1280,10 @@ static PyMethodDef ManualOpsAPI[] = {
      (PyCFunction)(void (*)(void))fused_gemm_epilogue,
      METH_VARARGS | METH_KEYWORDS,
      "C++ interface function for fused_gemm_epilogue."},
+    {"anchor_generator",
+     (PyCFunction)(void (*)(void))anchor_generator,
+     METH_VARARGS | METH_KEYWORDS,
+     "C++ interface function for anchor_generator."},
     {"_run_custom_op",
      (PyCFunction)(void (*)(void))run_custom_op,
      METH_VARARGS | METH_KEYWORDS,

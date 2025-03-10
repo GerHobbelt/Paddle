@@ -292,10 +292,10 @@ PyObject* tensor_properties_get_grad(TensorObject* self, void* closure) {
   EAGER_TRY
   VLOG(6) << "Get grad for tensor: " << self->tensor.name();
   auto meta = egr::EagerUtils::nullable_autograd_meta(self->tensor);
-  if (meta && meta->Grad().initialized()) {
+  if (meta && meta->Grad().has_allocation()) {
     return ToPyObject(meta->Grad());
   } else {
-    if (meta && !meta->Grad().initialized() && meta->Grad().impl() &&
+    if (meta && !meta->Grad().has_allocation() && meta->Grad().impl() &&
         meta->Grad().is_dist_tensor()) {
       return ToPyObject(meta->Grad(), false);
     }

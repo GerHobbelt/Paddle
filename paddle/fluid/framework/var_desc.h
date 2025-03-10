@@ -222,7 +222,7 @@ class TEST_API VarDesc {
   proto::VarType::TensorDesc *mutable_tensor_desc();
   std::vector<proto::VarType::TensorDesc *> mutable_tensor_descs();
 
-  // Is it really needed? Or just mantain a ptr from the block?
+  // Is it really needed? Or just maintain a ptr from the block?
   proto::VarDesc desc_;
   AttributeMap attrs_;
 

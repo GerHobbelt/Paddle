@@ -184,7 +184,7 @@ class AnalyzeLoopVarRange : public ir::IRMutator<> {
                         0,
                         ::common::errors::PreconditionNotMet(
                             "Cannot find the extent of var %s", var_name));
-      size = common::AutoSimplify(size * var_name_to_extent_.at(var_name));
+      size = optim::ArithSimplify(size * var_name_to_extent_.at(var_name));
     }
 
     return size;
@@ -215,7 +215,7 @@ class AnalyzeLoopVarRange : public ir::IRMutator<> {
       }
     }
     ir::Expr tmp = ir::Add::Make(copy, ir::Expr(1));
-    ir::Expr simplified = common::AutoSimplify(tmp);
+    ir::Expr simplified = optim::ArithSimplify(tmp);
     if (simplified.As<ir::Min>()) {
       ir::Expr lhs = simplified.As<ir::Min>()->a();
       ir::Expr rhs = simplified.As<ir::Min>()->b();

@@ -365,7 +365,7 @@ def get_worker_info(name: str) -> WorkerInfo:
 
 def get_all_worker_infos() -> list[WorkerInfo]:
     """
-    Get all worker informations.
+    Get all worker information.
 
     Returns:
         List[WorkerInfo].

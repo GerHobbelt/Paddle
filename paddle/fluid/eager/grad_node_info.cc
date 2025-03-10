@@ -37,11 +37,11 @@
 namespace egr {
 
 static void CheckTensor(const paddle::Tensor& pre, const paddle::Tensor& post) {
-  if (!pre.initialized() && post.initialized()) {
+  if (!pre.has_allocation() && post.has_allocation()) {
     PADDLE_THROW(common::errors::PermissionDenied(
         "The tensor in before and after hook are not consistent"));
   }
-  if (pre.initialized() && post.initialized()) {
+  if (pre.has_allocation() && post.has_allocation()) {
     VLOG(7) << phi::DataTypeToString(pre.dtype()) << " "
             << phi::DataTypeToString(post.dtype());
     PADDLE_ENFORCE_EQ(
@@ -105,7 +105,7 @@ void GradNodeBase::SetGradInMeta(const paddle::Tensor& fwd_out,
     meta.SetStopGradient(fwd_out_meta->StopGradient());
   }
 
-  if (!fwd_out.initialized()) {
+  if (!fwd_out.has_allocation()) {
     if (fwd_out.defined() && fwd_out.is_dist_tensor() &&
         phi::distributed::NeedComputationClipForPP(fwd_out.impl())) {
       VLOG(3) << "Tensor " << fwd_out.name() << " is DistTensor,"
@@ -195,7 +195,7 @@ void GradNodeBase::SetGradInMeta(const std::vector<paddle::Tensor>& fwd_out,
       meta.SetStopGradient(fwd_out_meta->StopGradient());
     }
 
-    if (!fwd_out_tensor.initialized()) {
+    if (!fwd_out_tensor.has_allocation()) {
       if (fwd_out_tensor.defined() && fwd_out_tensor.is_dist_tensor() &&
           phi::distributed::NeedComputationClipForPP(fwd_out_tensor.impl())) {
         VLOG(3) << "Tensor " << fwd_out_tensor.name() << " is DistTensor,"
@@ -295,7 +295,7 @@ void GradNodeBase::SetGradInMeta(const std::vector<paddle::Tensor*>& fwd_out,
       meta.SetStopGradient(fwd_out_meta->StopGradient());
     }
 
-    if (!fwd_out_tensor.initialized()) {
+    if (!fwd_out_tensor.has_allocation()) {
       if (fwd_out_tensor.defined() && fwd_out_tensor.is_dist_tensor() &&
           phi::distributed::NeedComputationClipForPP(fwd_out_tensor.impl())) {
         VLOG(3) << "Tensor " << fwd_out_tensor.name() << " is DistTensor,"
@@ -762,7 +762,7 @@ GradNodeBase::ApplyGradientHooks(
     std::vector<paddle::Tensor>& slot_out = outs[slot_id];
     slot_out.resize(tensors[slot_id].size());
     paddle::Tensor& out = slot_out[rank];
-    if (!out.defined() || !out.initialized()) {
+    if (!out.defined() || !out.has_allocation()) {
       out = (*hook)(tensors[slot_id][rank]);
     } else {
       // If more than one hook is registered, the input to the next hook func

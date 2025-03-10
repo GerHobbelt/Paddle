@@ -66,7 +66,7 @@ class TestAnchorFusion(unittest.TestCase):
         if kernel_num is not None:
             utils.check_jit_kernel_number(static_compute, kernel_num)
 
-    def test_identiy_iters_fusion(self):
+    def test_identity_iters_fusion(self):
         #        T
         #      / | \
         #     /  |  \
@@ -108,7 +108,7 @@ class TestAnchorFusion(unittest.TestCase):
             x = paddle.ones((16, 32, 64, 128))
             return (x,)
 
-        # This case can't be fused to one kernel because muti-downstream
+        # This case can't be fused to one kernel because multi-downstream
         # transpose op will sink currently.
         self.check_accuracy_and_kernel_num(init, func)
 

@@ -271,7 +271,7 @@ PreparedOp PrepareImpl(
       if (is_xpu_kp_support) {
         auto expected_kernel_key_backend = expected_kernel_key.backend();
         expected_kernel_key.set_backend(phi::Backend::KPS);
-        VLOG(3) << "modifing XPU KP kernel: " << phi_kernel_name
+        VLOG(3) << "modifying XPU KP kernel: " << phi_kernel_name
                 << ", using_kernel_key:" << expected_kernel_key;
 
         if (!phi_kernel_factory.HasKernel(phi_kernel_name,
@@ -333,7 +333,8 @@ PreparedOp PrepareImpl(
           if (phi::is_gpu_place(place) &&
               ((attrs.find("use_calc_stream") != attrs.end() &&
                 PADDLE_GET_CONST(bool, attrs.at("use_calc_stream"))) ||
-               phi_kernel_name == "c_softmax_with_cross_entropy")) {
+               phi_kernel_name == "c_softmax_with_cross_entropy" ||
+               phi_kernel_name == "c_softmax_with_multi_label_cross_entropy")) {
             static_cast<phi::GPUContext*>(dev_ctx)->SetCUDAStream(
                 original_stream, false);
             auto& instance =
@@ -370,7 +371,8 @@ PreparedOp PrepareImpl(
           if (phi::is_xpu_place(place) &&
               ((attrs.find("use_calc_stream") != attrs.end() &&
                 PADDLE_GET_CONST(bool, attrs.at("use_calc_stream"))) ||
-               phi_kernel_name == "c_softmax_with_cross_entropy")) {
+               phi_kernel_name == "c_softmax_with_cross_entropy" ||
+               phi_kernel_name == "c_softmax_with_multi_label_cross_entropy")) {
             static_cast<phi::XPUContext*>(dev_ctx)->SetStream(original_stream,
                                                               false);
             auto& instance =

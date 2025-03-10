@@ -3630,6 +3630,23 @@ void p_norm_grad(const Tensor& x,
   }
 }
 
+template <typename T>
+void angle_grad(const Tensor& x, const Tensor& out_grad, Tensor* x_grad) {
+  if (x_grad) {
+    Tensor cast_x = ConvertToMT<T>(x);
+    Tensor zero_tensor;
+    if (has_dynamic_shape(cast_x.shape())) {
+      const Tensor x_shape = shape64<T>(cast_x);
+      zero_tensor = backend::full_with_tensor<T>(
+          x_shape, 0.0, cast_x.dtype(), cast_x.place());
+    } else {
+      zero_tensor = full<T>(cast_x.shape(), 0, cast_x.dtype(), cast_x.place());
+    }
+
+    set_output<T>(ConvertToOrig<T>(zero_tensor, x.dtype()), x_grad);
+  }
+}
+
 }  // namespace details
 }  // namespace primitive
 }  // namespace paddle

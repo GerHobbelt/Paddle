@@ -657,7 +657,7 @@ void cinn_call_cnnl_conv2d_forward(void *v_args,
       num_args,
       3,
       ::common::errors::InvalidArgument(
-          "Expected number of argruments is 3, but recived %d.", num_args));
+          "Expected number of argruments is 3, but received %d.", num_args));
   cnnlHandle_t handle = CnnlHandle::GetInstance().GetCnnlHandle();
   auto Queue = SYCLBackendAPI::Global()->get_now_queue();
   CNdev device = Queue->get_device().get_native<::sycl::backend::cnrt>();
@@ -790,7 +790,7 @@ void cinn_call_cnnl_conv2d_backward_data(void *v_args,
       num_args,
       3,
       ::common::errors::InvalidArgument(
-          "Expected number of argruments is 3, but recived %d.", num_args));
+          "Expected number of argruments is 3, but received %d.", num_args));
   cnnlHandle_t handle = CnnlHandle::GetInstance().GetCnnlHandle();
   auto Queue = SYCLBackendAPI::Global()->get_now_queue();
   CNdev device = Queue->get_device().get_native<::sycl::backend::cnrt>();
@@ -918,7 +918,7 @@ void cinn_call_cnnl_conv2d_backward_filter(void *v_args,
       num_args,
       3,
       ::common::errors::InvalidArgument(
-          "Expected number of argruments is 3, but recived %d.", num_args));
+          "Expected number of argruments is 3, but received %d.", num_args));
   cnnlHandle_t handle = CnnlHandle::GetInstance().GetCnnlHandle();
   auto Queue = SYCLBackendAPI::Global()->get_now_queue();
   CNdev device = Queue->get_device().get_native<::sycl::backend::cnrt>();
@@ -1042,7 +1042,7 @@ void cinn_call_cnnl_pool2d_forward(void *v_args,
       num_args,
       2,
       ::common::errors::InvalidArgument(
-          "Expected number of argruments is 2, but recived %d.", num_args));
+          "Expected number of argruments is 2, but received %d.", num_args));
   cnnlHandle_t handle = CnnlHandle::GetInstance().GetCnnlHandle();
   auto Queue = SYCLBackendAPI::Global()->get_now_queue();
   CNdev device = Queue->get_device().get_native<::sycl::backend::cnrt>();
@@ -1178,7 +1178,7 @@ void cinn_call_cnnl_pool2d_backward(void *v_args,
       num_args,
       4,
       ::common::errors::InvalidArgument(
-          "Expected number of argruments is 4, but recived %d.", num_args));
+          "Expected number of argruments is 4, but received %d.", num_args));
   cnnlHandle_t handle = CnnlHandle::GetInstance().GetCnnlHandle();
   auto Queue = SYCLBackendAPI::Global()->get_now_queue();
   CNdev device = Queue->get_device().get_native<::sycl::backend::cnrt>();

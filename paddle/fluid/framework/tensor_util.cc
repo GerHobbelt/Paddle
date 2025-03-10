@@ -1121,7 +1121,7 @@ TEST_API std::ostream& operator<<(std::ostream& os, const phi::DenseTensor& t) {
   os << "  - shape: [" << t.dims() << "]\n";
   os << "  - layout: " << common::DataLayoutToString(t.layout()) << "\n";
 
-  if (!t.initialized()) {
+  if (!t.has_allocation()) {
     os << "uninited\n";
     return os;
   }

@@ -30,6 +30,7 @@ class TestMean0TRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 3]}
+        self.opt_shape = {"x": [2, 3]}
         self.max_shape = {"x": [5, 3]}
 
     def test_trt_result(self):
@@ -46,6 +47,7 @@ class TestMean1TRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 3, 2]}
+        self.opt_shape = {"x": [2, 3, 2]}
         self.max_shape = {"x": [5, 3, 2]}
 
     def test_trt_result(self):

@@ -3768,7 +3768,7 @@ struct QuantizeLinearOpTranscriber : public OpTranscriber {
   }
 };
 
-// NOTE(Dev): heleper funtions for WithXShapeGradOpTranscriber
+// NOTE(Dev): heleper functions for WithXShapeGradOpTranscriber
 static std::pair<pir::Value, pir::Value> ParseXAndOutGradValue(
     const OpDesc& op_desc,
     pir::IrContext* ctx,
@@ -3783,7 +3783,7 @@ static std::pair<pir::Value, pir::Value> ParseXAndOutGradValue(
   auto dtype = ::phi::TransToPhiDataType(var_desc->GetDataType());
   auto shape_vec = var_desc->GetShape();
   // NOTE(dev): GrapOp depends on X instead of XShape, so we need
-  // earse fisrt element in xshape.
+  // erase first element in xshape.
   shape_vec.erase(shape_vec.begin());
   xshape_value = builder
                      ->Build<paddle::dialect::DataOp>(

@@ -56,6 +56,7 @@ class TestPoolingTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 1, 2, 3]}
+        self.opt_shape = {"x": [1, 1, 2, 3]}
         self.max_shape = {"x": [5, 1, 2, 3]}
 
     def test_trt_result(self):
@@ -80,6 +81,7 @@ class TestPoolingTRTCase1Pattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 1, 2, 3]}
+        self.opt_shape = {"x": [1, 1, 2, 3]}
         self.max_shape = {"x": [5, 1, 2, 3]}
 
     def test_trt_result(self):
@@ -104,6 +106,7 @@ class TestPoolingTRTCase2Pattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 1, 2, 3]}
+        self.opt_shape = {"x": [1, 1, 2, 3]}
         self.max_shape = {"x": [5, 1, 2, 3]}
 
     def test_trt_result(self):
@@ -128,6 +131,7 @@ class TestPoolingTRTCase3Pattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 1, 2, 3]}
+        self.opt_shape = {"x": [1, 1, 2, 3]}
         self.max_shape = {"x": [5, 1, 2, 3]}
 
     def test_trt_result(self):
@@ -152,6 +156,7 @@ class TestPoolingTRTCase4Pattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 1, 5, 5]}
+        self.opt_shape = {"x": [1, 1, 5, 5]}
         self.max_shape = {"x": [5, 1, 5, 5]}
 
     def test_trt_result(self):
@@ -176,6 +181,7 @@ class TestPoolingTRTCase5Pattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 16, 56, 56]}
+        self.opt_shape = {"x": [1, 16, 56, 56]}
         self.max_shape = {"x": [5, 16, 56, 56]}
 
     def test_trt_result(self):
@@ -200,7 +206,8 @@ class TestPoolingTRTCase6Pattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 3, 5, 5]}
-        self.max_shape = {"x": [2, 3, 5, 5]}  # 动态批次大小，宽度保持为 1
+        self.opt_shape = {"x": [1, 3, 5, 5]}
+        self.max_shape = {"x": [2, 3, 5, 5]}
 
     def test_trt_result(self):
         self.check_trt_result()

@@ -410,7 +410,7 @@ class ProgramHelper:
             if param is None:
                 continue
             if param.name not in dy_param_name_to_pir_param_name:
-                # Release the reduntant params
+                # Release the redundant params
                 param.get_tensor()._clear()
                 continue
             if not param._is_initialized():
@@ -493,7 +493,7 @@ class ProgramHelper:
             if param is None:
                 continue
             if param.name not in main_program.global_block().vars:
-                # Release the reduntant params
+                # Release the redundant params
                 param.get_tensor()._clear()
                 continue
             if not param._is_initialized():

@@ -129,6 +129,9 @@ InferSymbolicShapeContext::GetShapeOrDataForValue(Value val) const {
     return null_shape_or_data;
   }
   if (!HasShapeOrDataForValue(val)) {
+    VLOG(3) << "InferShapeOrDataForValue,  defining_op: "
+            << val.defining_op()->name() << " id:" << val.defining_op()->id()
+            << " value id: " << val.impl()->id();
     PADDLE_THROW(common::errors::Fatal(
         "Fail to GetShapeOrDataForValue on InferSymbolicShape!"));
   }
@@ -151,7 +154,7 @@ void InferSymbolicShapeContext::SetSymbolForValueByStaticShape(Value val) {
     std::vector<symbol::DimExpr> static_shape;
     for (int i = 0; i < type_info.dims().size(); ++i) {
       int dim = type_info.dims()[i];
-      if (dim > 0) {
+      if (dim >= 0) {
         static_shape.emplace_back(dim);
       } else {
         static_shape.emplace_back(GetNextSymName());

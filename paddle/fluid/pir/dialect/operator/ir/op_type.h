@@ -17,6 +17,7 @@
 #include "paddle/fluid/pir/dialect/operator/ir/type_storage.h"
 #include "paddle/pir/include/core/builtin_type.h"
 #include "paddle/pir/include/core/builtin_type_interfaces.h"
+#include "paddle/pir/include/core/dll_decl.h"
 #include "paddle/pir/include/core/type.h"
 #include "paddle/utils/test_macros.h"
 
@@ -63,7 +64,7 @@ class TEST_API SelectedRowsType
   }
 };
 
-class DenseTensorArrayType
+class IR_API DenseTensorArrayType
     : public pir::Type::TypeBase<DenseTensorArrayType,
                                  pir::Type,
                                  DenseTensorArrayTypeStorage> {

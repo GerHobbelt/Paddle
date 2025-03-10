@@ -113,7 +113,7 @@ static Counts &counts() {
 #error Unsupported bitness
 #endif
 
-// endianess
+// endianness
 #ifdef _MSC_VER
 #define ROBIN_HOOD_PRIVATE_DEFINITION_LITTLE_ENDIAN() 1
 #define ROBIN_HOOD_PRIVATE_DEFINITION_BIG_ENDIAN() 0

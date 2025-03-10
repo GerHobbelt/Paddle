@@ -58,11 +58,11 @@ paddle::Tensor& CastPyArg2Tensor(PyObject* obj, Py_ssize_t arg_pos) {
 
 PyObject* ToPyObject(const paddle::Tensor& value,
                      bool return_py_none_if_not_initialize) {
-  if (return_py_none_if_not_initialize && !value.initialized()) {
+  if (return_py_none_if_not_initialize && !value.has_allocation()) {
     RETURN_PY_NONE
   }
   PyObject* obj = nullptr;
-  if (value.initialized() && value.is_string_tensor()) {
+  if (value.has_allocation() && value.is_string_tensor()) {
     // In order to return the core.eager.StringTensor, there is need
     // to use p_string_tensor_type to create a python obj.
     obj = p_string_tensor_type->tp_alloc(p_string_tensor_type, 0);

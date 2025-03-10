@@ -23,7 +23,7 @@ from PIL import Image, ImageOps
 
 from paddle import base
 
-# Use GPU:0 to elimate the influence of other tasks.
+# Use GPU:0 to eliminate the influence of other tasks.
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 from dygraph_to_static_utils import (
@@ -480,7 +480,7 @@ class ImagePool:
                 return image
 
 
-def reader_creater():
+def reader_creator():
     def reader():
         while True:
             fake_image = np.uint8(
@@ -551,8 +551,8 @@ def train(args):
 
         A_pool = ImagePool()
         B_pool = ImagePool()
-        A_reader = paddle.batch(reader_creater(), args.batch_size)()
-        B_reader = paddle.batch(reader_creater(), args.batch_size)()
+        A_reader = paddle.batch(reader_creator(), args.batch_size)()
+        B_reader = paddle.batch(reader_creator(), args.batch_size)()
         cycle_gan = paddle.jit.to_static(
             Cycle_Gan(input_channel=data_shape[1], istrain=True)
         )

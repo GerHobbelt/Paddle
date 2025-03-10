@@ -236,19 +236,9 @@ inline ShapeOrData SliceRawInferSymbolicShape(
     // Currently, we DO NOT support the case that any element in `axes` `starts`
     // or `ends` is a Symbol.
     auto vec_int64 = details::VecExpr2Int64(starts);
-    PADDLE_ENFORCE_EQ(
-        vec_int64.has_value(),
-        true,
-        common::errors::InvalidArgument(
-            "for slice op, all the elements in `starts` must be int64_t"));
     std::vector<int64_t> starts_int = vec_int64.value();
 
     vec_int64 = details::VecExpr2Int64(ends);
-    PADDLE_ENFORCE_EQ(
-        vec_int64.has_value(),
-        true,
-        common::errors::InvalidArgument(
-            "for slice op, all the elements in `ends` must be int64_t"));
     std::vector<int64_t> ends_int = vec_int64.value();
 
     const int64_t start =
@@ -274,10 +264,18 @@ inline ShapeOrData SliceRawInferSymbolicShape(
     return symbol::ShapeOrDataDimExprs{
         symbol::TensorShapeOrDataDimExprs(shape, out_data)};
   };
+  bool starts_ends_all_int =
+      std::all_of(starts_expr.begin(),
+                  starts_expr.end(),
+                  [](const symbol::DimExpr &e) { return e.isa<int64_t>(); }) &&
+      std::all_of(ends_expr.begin(),
+                  ends_expr.end(),
+                  [](const symbol::DimExpr &e) { return e.isa<int64_t>(); });
 
-  const auto &out_shape = in_shapeordata.data().has_value()
-                              ? GetDataDimExprs()
-                              : GetShapeDimExprs();
+  const auto &out_shape =
+      in_shapeordata.data().has_value() && starts_ends_all_int
+          ? GetDataDimExprs()
+          : GetShapeDimExprs();
   if (out_shape.data().has_value() && out_shape.shape().empty()) {  // 0D tensor
     const paddle::dialect::DenseTensorType &tensor_type =
         out.type().dyn_cast<paddle::dialect::DenseTensorType>();

@@ -222,7 +222,7 @@ int TransformerInputConvertPlugin::enqueue(
       B,
       MaxLength,
       vector_length /
-          num_threads);  //  batches, max sequnce length, input0.dims.d[2]/*
+          num_threads);  //  batches, max sequence length, input0.dims.d[2]/*
   remove_padding_kernel<<<num_blocks, num_threads, 0, stream>>>(
       input0, output2, output0);  // input(no_varlen), pos_id, input(varlen)
   return cudaGetLastError() != cudaSuccess;

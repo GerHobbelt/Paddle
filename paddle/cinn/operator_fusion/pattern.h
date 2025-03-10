@@ -82,28 +82,30 @@ struct ReducePattern : public PatternBase {
 };
 
 struct ReduceTreePattern : public PatternBase {
-  explicit ReduceTreePattern(const std::vector<ReduceTreePattern>& childs,
+  explicit ReduceTreePattern(const std::vector<ReduceTreePattern>& children,
                              const ReducePattern& root,
                              const FusionTrackerPtr& tracker)
-      : PatternBase(UniqueId(), tracker), childs_(childs), root_(root) {
+      : PatternBase(UniqueId(), tracker), children_(children), root_(root) {
     cur_id_ = id_;
   }
   DEFINE_PATTERN_STATIC_ATTR(ReduceTree);
 
   std::vector<pir::Operation*> ops() const {
     std::vector<pir::Operation*> result{root_.ops()};
-    for (const auto& child : childs_) {
+    for (const auto& child : children_) {
       result = UniqueConcatVector(result, child.ops());
     }
     return result;
   }
   const ReducePattern& GetRootPattern() const { return root_; }
-  const std::vector<ReduceTreePattern>& childs() const { return childs_; }
-  std::vector<ReduceTreePattern>& childs() { return childs_; }
-  void InsertChild(const ReduceTreePattern& child) { childs_.push_back(child); }
+  const std::vector<ReduceTreePattern>& children() const { return children_; }
+  std::vector<ReduceTreePattern>& children() { return children_; }
+  void InsertChild(const ReduceTreePattern& child) {
+    children_.push_back(child);
+  }
   std::vector<ReducePattern> FlattenReducePattern() const {
     std::vector<ReducePattern> result{root_};
-    for (const auto& child : childs_) {
+    for (const auto& child : children_) {
       result = ConcatVector(result, child.FlattenReducePattern());
     }
     return result;
@@ -128,7 +130,7 @@ struct ReduceTreePattern : public PatternBase {
                          std::vector<std::string>* names) const {
     // Apply a brunch of tracker to get a output_name of ReduceTreePattern.
     // names and trackers collect all the needed fusion nodes.
-    for (const auto& child : root.childs()) {
+    for (const auto& child : root.children()) {
       auto origin_child_id = child.cur_id();
       auto new_child_id = GetNewTmpId(origin_child_id);
       child.reset_cur_id(new_child_id);
@@ -145,7 +147,7 @@ struct ReduceTreePattern : public PatternBase {
   }
 
  private:
-  std::vector<ReduceTreePattern> childs_;
+  std::vector<ReduceTreePattern> children_;
   ReducePattern root_;
 };
 

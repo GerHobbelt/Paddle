@@ -400,10 +400,6 @@ copy(
 
 copy(
   inference_lib_dist
-  SRCS ${PADDLE_SOURCE_DIR}/paddle/pir/include/core/parser/*.h
-  DSTS ${PADDLE_INFERENCE_INSTALL_DIR}/paddle/include/paddle/pir/core/parser/)
-copy(
-  inference_lib_dist
   SRCS ${PADDLE_SOURCE_DIR}/paddle/pir/include/core/*.h
   DSTS ${PADDLE_INFERENCE_INSTALL_DIR}/paddle/include/paddle/pir/core/)
 copy(

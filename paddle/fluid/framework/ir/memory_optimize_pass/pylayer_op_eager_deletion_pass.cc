@@ -74,13 +74,13 @@ class PyLayerOpEagerDeletionPass : public Pass {
           graph->OriginProgram(), pylayer_ops, pylayer_grad_ops);
     }
 
-    for (auto op_hander : all_ops) {
+    for (auto op_handler : all_ops) {
       auto *compute_op =
-          dynamic_cast<details::ComputationOpHandle *>(op_hander);
+          dynamic_cast<details::ComputationOpHandle *>(op_handler);
       if (compute_op == nullptr) continue;
       if (compute_op->Name() == "pylayer" ||
           compute_op->Name() == "pylayer_grad") {
-        ir::Node *op_node = op_hander->Node();
+        ir::Node *op_node = op_handler->Node();
         auto *op_base = compute_op->GetOp();
         if (op_base->Attrs().count("skip_eager_deletion_vars")) {
           op_node->Op()->SetAttr(

@@ -19,6 +19,7 @@ from paddle.tensorrt.converter_utils import (
     append_ones,
     get_axes_for_reduce_op,
     get_dynamic_dims,
+    get_trt_plugin,
     has_dynamic_shape,
 )
 from paddle.tensorrt.register import converter_registry
@@ -128,3 +129,26 @@ def batch_norm_converter(network, paddle_op, inputs):
         batch_norm_layer = reshape_output_layer
 
     return batch_norm_layer.get_output(0)
+
+
+@converter_registry.register(
+    "pd_op.instance_norm", trt_version="trt_version_ge=8.0"
+)
+def instance_norm_converter(network, paddle_op, inputs):
+    eps = paddle_op.attrs().get("epsilon", 1e-8)
+    instance_norm_inputs = [inputs[0], inputs[1], inputs[2]]
+    plugin_fields = [
+        trt.PluginField(
+            "epsilon",
+            np.array(eps, dtype=np.float32),
+            trt.PluginFieldType.FLOAT32,
+        ),
+    ]
+    plugin_field_collection = trt.PluginFieldCollection(plugin_fields)
+    plugin_name = "pir_instance_norm"
+    plugin_version = "1"
+    plugin = get_trt_plugin(
+        plugin_name, plugin_field_collection, plugin_version
+    )
+    instance_norm_layer = network.add_plugin_v2(instance_norm_inputs, plugin)
+    return instance_norm_layer.get_output(0)

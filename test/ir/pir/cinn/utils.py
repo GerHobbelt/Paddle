@@ -77,7 +77,7 @@ def check_jit_kernel_number(static_fn, expected_number):
 
 def get_jit_kernel_structure_helper(block, map_info, if_op_idx='_0'):
     """
-    Recursivly generate JIT_KERNEL map_info for Static/Dynmaic Shape UT.
+    Recursively generate JIT_KERNEL map_info for Static/Dynamic Shape UT.
     """
     if_count = 0
     for op in block.ops:

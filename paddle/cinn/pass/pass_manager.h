@@ -28,6 +28,9 @@ class PassManager {
   virtual LogicalResult Run(ir::LoweredFunc func) {
     return adaptor_.RunPipeline(func, passes_);
   }
+  virtual LogicalResult Run(ir::stmt::BlockRef block) {
+    return adaptor_.RunPipeline(block, passes_);
+  }
   void AddPass(std::unique_ptr<PassT> pass) {
     passes_.emplace_back(std::move(pass));
   }
@@ -38,9 +41,9 @@ class PassManager {
 };
 
 using FuncPassManager = PassManager<FuncPass, detail::FuncPassAdaptor>;
-using BlockPassManager = PassManager<BlockPass, detail::FuncToBlockPassAdaptor>;
-using StmtPassManager = PassManager<StmtPass, detail::FuncToStmtPassAdaptor>;
-using ExprPassManager = PassManager<ExprPass, detail::FuncToExprPassAdaptor>;
+using BlockPassManager = PassManager<BlockPass, detail::BlockPassAdaptor>;
+using StmtPassManager = PassManager<StmtPass, detail::StmtPassAdaptor>;
+using ExprPassManager = PassManager<ExprPass, detail::ExprPassAdaptor>;
 
 }  // namespace optim
 }  // namespace cinn

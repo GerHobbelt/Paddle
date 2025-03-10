@@ -49,20 +49,40 @@ def map_dtype(pd_dtype):
         raise TypeError(f"Unsupported dtype: {pd_dtype}")
 
 
-def run_pir_pass(program, partition_mode=False):
+def run_pir_pass(program, partition_mode=False, disable_passes=[], scope=None):
     pm = pir.PassManager(opt_level=4)
     pm.enable_print_statistics()
     paddle.base.libpaddle.pir.infer_symbolic_shape_pass(pm, program)
+    if scope is None:
+        scope = paddle.static.global_scope()
+    place = paddle.CUDAPlace(0)
     passes = [
         {'trt_op_marker_pass': {}},
+        {
+            'constant_folding_pass': {
+                "__place__": place,
+                "__param_scope__": scope,
+            }
+        },
+        {'conv2d_add_fuse_pass': {}},
+        {'trt_op_marker_pass': {}},  # for fusion op
     ]
     if partition_mode:
         passes = [{'trt_sub_graph_extract_pass': {}}]
 
     for pass_item in passes:
         for pass_name, pass_attr in pass_item.items():
+            if pass_name in disable_passes:
+                continue
             pm.add_pass(pass_name, pass_attr)
     pm.run(program)
+
+    # delete unused op
+    for op in program.global_block().ops:
+        if op.name() == "builtin.constant" or op.name() == "builtin.parameter":
+            if op.results()[0].use_empty():
+                program.global_block().remove_op(op)
+
     return program
 
 
@@ -94,7 +114,9 @@ def predict_program(program, feed_data, fetch_var_list, scope=None):
             return output
 
 
-def warmup_shape_infer(program, min_shape_feed, max_shape_feed, scope=None):
+def warmup_shape_infer(
+    program, min_shape_feed, opt_shape_feed, max_shape_feed, scope=None
+):
     paddle.framework.set_flags({"FLAGS_enable_collect_shape": True})
     with paddle.pir_utils.IrGuard():
         with paddle.static.program_guard(program):
@@ -102,6 +124,9 @@ def warmup_shape_infer(program, min_shape_feed, max_shape_feed, scope=None):
             # Run the program with input_data
             for _ in range(1):
                 executor.run(program, feed=min_shape_feed, scope=scope)
+
+            for _ in range(1):
+                executor.run(program, feed=opt_shape_feed, scope=scope)
 
             # Run the program with input_data_max_shape (fake max_shape input)
             for _ in range(1):
@@ -120,6 +145,7 @@ def warmup_shape_infer(program, min_shape_feed, max_shape_feed, scope=None):
                 )
             )
     paddle.framework.set_flags({"FLAGS_enable_collect_shape": False})
+
     return exe_program
 
 
@@ -192,8 +218,12 @@ def weight_to_tensor(network, paddle_value, trt_tensor, use_op_name):
         "pd_op.batch_norm_",
         "pd_op.layer_norm",
         "pd_op.depthwise_conv2d_transpose",
+        "pd_op.fused_conv2d_add_act",
+        "pd_op.affine_channel",
     ]
     if use_op_name in forbid_cast_op:
+        return trt_tensor
+    if paddle_value.get_defining_op().name() == "builtin.constant":
         return trt_tensor
     input_shape = paddle_value.shape
     if type(trt_tensor) == trt.Weights:

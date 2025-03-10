@@ -55,7 +55,7 @@ class FakeEngineOp
     : public pir::Op<FakeEngineOp, paddle::dialect::OpYamlInfoInterface> {
  public:
   using Op::Op;
-  static const char *name() { return "custom_engine.fack_engine"; }
+  static const char *name() { return "custom_engine.fake_engine"; }
   static const char *attributes_name[2];
   static constexpr uint32_t attributes_num = 2;
   static OpInfoTuple GetOpInfo();

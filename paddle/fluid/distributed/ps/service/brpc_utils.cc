@@ -321,7 +321,7 @@ std::string GetIntTypeEndpoint(const std::string& ip, const uint32_t& port) {
 
   if (nullptr == hp) {
     LOG(ERROR) << "Brpc Start failed, ip_port= " << ip_port
-               << " , Error infomation: " << hstrerror(h_errno);
+               << " , Error information: " << hstrerror(h_errno);
   }
 
   int i = 0;

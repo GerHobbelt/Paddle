@@ -139,7 +139,7 @@ class ElementwiseMulCompositeDoubleGradOpMaker
                       -1,
                       common::errors::InvalidArgument(
                           "We only support axis = -1 in composite "
-                          "add_doubel_grad but we got: ",
+                          "add_double_grad but we got: ",
                           axis));
 
     // get output

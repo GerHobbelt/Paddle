@@ -193,6 +193,7 @@ XPUOpMap& get_kl2_ops() {
                      phi::DataType::BOOL,
                      phi::DataType::INT8,
                      phi::DataType::UINT8,
+                     phi::DataType::INT16,
                      phi::DataType::INT64,
                      phi::DataType::INT32})},
       {"check_finite_and_unscale",

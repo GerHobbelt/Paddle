@@ -56,6 +56,10 @@ class PToSReshardFunction(ReshardFunction):
             chunk_id = src_value.get_defining_op().dist_attr.chunk_id
 
         split_axis = dst_dist_attr.dims_mapping.index(0)
+        num_of_process = len(src_dist_attr.process_mesh.process_ids)
+        remainder_of_padding = src_value.shape[split_axis] % num_of_process
+        is_balanced_split = remainder_of_padding == 0
+
         permute = False
         if split_axis != 0:
             perm = list(range(0, len(src_value.shape)))
@@ -69,10 +73,6 @@ class PToSReshardFunction(ReshardFunction):
             dst_dist_attr = copy_dist_attr_with_new_member(
                 dst_dist_attr, new_dims_mapping=tmp_dims_mapping
             )
-
-        num_of_process = len(src_dist_attr.process_mesh.process_ids)
-        remainder_of_padding = src_value.shape[split_axis] % num_of_process
-        is_balanced_split = remainder_of_padding == 0
 
         if is_balanced_split:
             global_dst_attr = dst_type.as_dist_type().dist_attr()

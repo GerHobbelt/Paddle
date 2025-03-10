@@ -160,7 +160,7 @@ ir::Expr _Buffer_::SymbolicNumel() const {
   for (auto &i : shape) {
     res = res * i;
   }
-  return common::AutoSimplify(res);
+  return optim::ArithSimplify(res);
 }
 
 void _Buffer_::Verify() const {

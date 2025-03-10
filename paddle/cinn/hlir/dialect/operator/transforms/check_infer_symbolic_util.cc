@@ -54,7 +54,7 @@ std::ostream& operator<<(std::ostream& stream,
 }
 
 DimExprs4ValueT MakeDimExprs4Value(
-    pir::Program* program, const PassManagerCreater& CreatePassManager) {
+    pir::Program* program, const PassManagerCreator& CreatePassManager) {
   std::shared_ptr<pir::PassManager> pass_manager = CreatePassManager();
   pass_manager->AddPass(pir::CreateShapeOptimizationPass());
   pass_manager->Run(program);
@@ -404,13 +404,13 @@ struct ShapeSignatureGenerator {
                        const DoEachT& DoEach) {
     if (set_size <= 0) return DoEach(is_subset_flags);
 
-    const auto& RecusiveVisit = [&](bool is_subset) {
+    const auto& RecursiveVisit = [&](bool is_subset) {
       std::vector<IsSubset> current_is_subset_flags(is_subset_flags);
       current_is_subset_flags.push_back(static_cast<int>(is_subset));
       VisitEachSubSet(set_size - 1, current_is_subset_flags, DoEach);
     };
-    RecusiveVisit(true);
-    RecusiveVisit(false);
+    RecursiveVisit(true);
+    RecursiveVisit(false);
   }
 
   std::optional<ConstrainedSymbolNamesList> GetConstrainedSymbolNamesList(
@@ -623,7 +623,7 @@ void CheckProgramDimExprConstraints(
 }  // namespace
 
 void CheckInferSymbolicIfNeed(pir::Program* program,
-                              const PassManagerCreater& CreatePassManager) {
+                              const PassManagerCreator& CreatePassManager) {
   if (!FLAGS_prim_all || !FLAGS_check_infer_symbolic) return;
   const auto& GraphDimExprs4Value =
       MakeDimExprs4Value(program, CreatePassManager);

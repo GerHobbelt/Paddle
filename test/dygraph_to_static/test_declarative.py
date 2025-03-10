@@ -163,7 +163,7 @@ class TestInputSpec(Dy2StTestBase):
         # 6. test input with dict
         out = net.func_with_dict({'x': x, 'y': y})
 
-        # 7. test input with lits contains dict
+        # 7. test input with list contains dict
         int_np = np.ones([1]).astype('float32')
         out = net.func_with_list_dict([int_np, {'x': x, 'y': y}])
 

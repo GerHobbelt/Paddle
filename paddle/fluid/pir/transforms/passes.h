@@ -91,6 +91,7 @@ USE_PIR_PASS(cpu_bfloat16_placement_pass);
 USE_PIR_PASS(cpu_bfloat16_type_placement_pass);
 USE_PIR_PASS(cpu_bfloat16_pass);
 USE_PIR_PASS(cpu_bf16_quantize_squash_pass);
+USE_PIR_PASS(cpu_special_ops_bf16_pass);
 #endif
 
 #ifdef PADDLE_WITH_XPU

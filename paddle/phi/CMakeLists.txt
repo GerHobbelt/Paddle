@@ -141,8 +141,9 @@ if(WITH_AVX
     kernels/fusion/cpu/fused_layer_norm_avx_kernel.cc
     kernels/fusion/cpu/self_dp_attention_kernel.cc
     kernels/fusion/cpu/rms_norm_avx_kernel.cc
-    PROPERTIES COMPILE_FLAGS
-               "${Wno_Maybe_Uninitialized} ${FMA_FLAG} ${AVX512F_FLAG}")
+    PROPERTIES
+      COMPILE_FLAGS
+      "${Wno_Maybe_Uninitialized} ${FMA_FLAG} ${AVX512F_FLAG} ${NO_INLINE}")
 endif()
 
 if(WITH_GPU)

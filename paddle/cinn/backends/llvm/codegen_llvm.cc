@@ -278,11 +278,13 @@ llvm::Value *CodeGenLLVM::Visit(const ir::StringImm *op) {
 }
 
 llvm::Value *CodeGenLLVM::Visit(const ir::Add *op) {
+  ir::TryElevateInt32ToInt64({op->a(), op->b()});
   return EmitBinaryOp(
       Visit(&op->a()), Visit(&op->b()), '+', is_integral_type(op->type()));
 }
 
 llvm::Value *CodeGenLLVM::Visit(const ir::Sub *op) {
+  ir::TryElevateInt32ToInt64({op->a(), op->b()});
   return EmitBinaryOp(
       Visit(&op->a()), Visit(&op->b()), '-', is_integral_type(op->type()));
 }
@@ -295,11 +297,13 @@ llvm::Value *CodeGenLLVM::Visit(const ir::Mul *op) {
 }
 
 llvm::Value *CodeGenLLVM::Visit(const ir::Div *op) {
+  ir::TryElevateInt32ToInt64({op->a(), op->b()});
   return EmitBinaryOp(
       Visit(&op->a()), Visit(&op->b()), '/', is_integral_type(op->type()));
 }
 
 llvm::Value *CodeGenLLVM::Visit(const ir::Mod *op) {
+  ir::TryElevateInt32ToInt64({op->a(), op->b()});
   return EmitBinaryOp(
       Visit(&op->a()), Visit(&op->b()), '%', is_integral_type(op->type()));
 }
@@ -753,7 +757,7 @@ llvm::Value *CodeGenLLVM::Visit(const ir::_Module_ *op) {
   { ir::ir_utils::IrVerify(op); }
 
   for (auto &fn : op->functions) {
-    VLOG(1) << "JIT Linking function [" << fn.As<ir::_LoweredFunc_>()->name
+    VLOG(3) << "JIT Linking function [" << fn.As<ir::_LoweredFunc_>()->name
             << "]";
     auto fnll = Visit(fn.As<ir::_LoweredFunc_>());
 
@@ -924,7 +928,7 @@ llvm::Value *CodeGenLLVM::Visit(const ir::Store *op) {
       // fit the total_lanes in native_lanes(split into multiple native steps)
       for (int offset = 0; offset < total_lanes; offset += total_lanes) {
         int lanes = total_lanes;
-        Expr base = cinn::common::AutoSimplify(ramp->base + offset);
+        Expr base = optim::ArithSimplify(ramp->base + offset);
         optim::VarModSimplify(&base);
         auto *ptr =
             CreateBufferPtr(op->type().ElementOf(), buffer, Visit(&base));
@@ -1238,10 +1242,8 @@ llvm::Value *CodeGenLLVM::DenseVectorLoad(const ir::Load *op) {
 
   for (int i = 0; i < load_lanes; i += load_lanes) {
     int slice_lanes = load_lanes;
-    auto slice_base = cinn::common::AutoSimplify(ramp->base + i);
+    auto slice_base = optim::ArithSimplify(ramp->base + i);
     optim::VarModSimplify(&slice_base);
-    auto slide_stride = Expr(1);
-    auto slide_index = slice_base;
 
 #if LLVM_VERSION_MAJOR >= 11
     const llvm::ElementCount elem_count(slice_lanes, /*scalable*/ false);

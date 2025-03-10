@@ -169,6 +169,7 @@ void analysis::OpenVINOSubgraphPass::ApplyImpl(
   auto *openvino_node = graph->CreateOpNode(&openvino_desc);
   std::vector<std::string> input_names;
   std::vector<std::string> output_names;
+  std::vector<int> origin_fetch_outputs_dtype;
   for (auto *i : input_nodes) {
     i->outputs.push_back(openvino_node);
     input_names.push_back(i->Name());
@@ -176,7 +177,10 @@ void analysis::OpenVINOSubgraphPass::ApplyImpl(
   for (auto *o : output_nodes) {
     o->inputs.push_back(openvino_node);
     output_names.push_back(o->Name());
+    origin_fetch_outputs_dtype.push_back(
+        static_cast<int>(o->Var()->GetDataType()));
   }
+
   openvino_node->inputs = std::move(input_nodes);
   openvino_node->outputs = std::move(output_nodes);
 
@@ -185,6 +189,7 @@ void analysis::OpenVINOSubgraphPass::ApplyImpl(
       "Xs", std::vector<std::string>(input_names.begin(), input_names.end()));
   op_desc->SetOutput(
       "Ys", std::vector<std::string>(output_names.begin(), output_names.end()));
+  op_desc->SetAttr("origin_fetch_outputs_dtype", origin_fetch_outputs_dtype);
 }
 
 }  // namespace analysis

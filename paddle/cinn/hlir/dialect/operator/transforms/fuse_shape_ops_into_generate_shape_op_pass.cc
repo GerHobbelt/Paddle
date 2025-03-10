@@ -76,7 +76,7 @@ std::vector<pir::Value> FindSourceDenseTensorOfDimTensor(
       [](const symbol::NullShapeOrDataDimExpr& null_shape_or_data) {
         return false;
       }};
-  // For TensorListShapeOrDataDimExprs case, we should recursivly visit its
+  // For TensorListShapeOrDataDimExprs case, we should recursively visit its
   // each dim_expr, which is automatically in next step.
   const auto& NeedTrackUpstream = [&](pir::Value value) -> bool {
     const auto& sym_shape = ShapeOrDataDimExprs4Value(value);

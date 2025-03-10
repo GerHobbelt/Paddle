@@ -27,23 +27,23 @@
 namespace phi {
 
 static constexpr int kNumCUDAThreads = 512;
-static constexpr int64_t kNumMaxinumNumBlocks = 4096;
+static constexpr int64_t kNumMaximumNumBlocks = 4096;
 
 static inline int64_t NumBlocks(const int64_t N) {
   return std::min((N + kNumCUDAThreads - 1) / kNumCUDAThreads,
-                  kNumMaxinumNumBlocks);
+                  kNumMaximumNumBlocks);
 }
 
 template <typename T, typename IndexT>
-__global__ void CaculateSoftLogitsGrad(T* logits_grad,
-                                       IndexT* is_ignore,
-                                       const IndexT* labels,
-                                       const IndexT ignore_index,
-                                       const int64_t start_index,
-                                       const int64_t end_index,
-                                       const int64_t N,
-                                       const int64_t D,
-                                       const int64_t C) {
+__global__ void CalculateSoftLogitsGrad(T* logits_grad,
+                                        IndexT* is_ignore,
+                                        const IndexT* labels,
+                                        const IndexT ignore_index,
+                                        const int64_t start_index,
+                                        const int64_t end_index,
+                                        const int64_t N,
+                                        const int64_t D,
+                                        const int64_t C) {
   const T prob = static_cast<T>(1.0 / C);
   CUDA_KERNEL_LOOP_TYPE(i, N, int64_t) {
     is_ignore[i] = labels[i * C];
@@ -121,10 +121,10 @@ void CSoftmaxWithCrossEntropyGradKernel(const Context& dev_ctx,
   if (logit_grad != softmax) {
     phi::Copy(dev_ctx, *softmax, dev_ctx.GetPlace(), false, logit_grad);
   }
-  const auto sofrmax_dims = softmax->dims();
-  const int axis = sofrmax_dims.size() - 1;
-  const int64_t N = phi::funcs::SizeToAxis<int64_t>(axis, sofrmax_dims);
-  const int64_t D = phi::funcs::SizeFromAxis<int64_t>(axis, sofrmax_dims);
+  const auto softmax_dims = softmax->dims();
+  const int axis = softmax_dims.size() - 1;
+  const int64_t N = phi::funcs::SizeToAxis<int64_t>(axis, softmax_dims);
+  const int64_t D = phi::funcs::SizeFromAxis<int64_t>(axis, softmax_dims);
 
   const auto label_dims = labels->dims();
   const int64_t C = label_dims[axis];
@@ -145,7 +145,7 @@ void CSoftmaxWithCrossEntropyGradKernel(const Context& dev_ctx,
       is_ignore.Resize({N, 1});
       dev_ctx.template Alloc<int32_t>(&is_ignore);
 
-      CaculateSoftLogitsGrad<T, int32_t>
+      CalculateSoftLogitsGrad<T, int32_t>
           <<<blocks_cal, threads, 0, dev_ctx.stream()>>>(
               logit_grad_2d.data<T>(),
               is_ignore.data<int32_t>(),
@@ -183,7 +183,7 @@ void CSoftmaxWithCrossEntropyGradKernel(const Context& dev_ctx,
       is_ignore.Resize({N, 1});
       dev_ctx.template Alloc<int32_t>(&is_ignore);
 
-      CaculateSoftLogitsGrad<T, int64_t>
+      CalculateSoftLogitsGrad<T, int64_t>
           <<<blocks_cal, threads, 0, dev_ctx.stream()>>>(
               logit_grad_2d.data<T>(),
               is_ignore.data<int64_t>(),

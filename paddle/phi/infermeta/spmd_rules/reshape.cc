@@ -44,7 +44,7 @@ std::vector<int64_t> InferTargetShape(const std::vector<int64_t>& shape,
   }
 
   int64_t product =
-      std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<>());
+      std::accumulate(shape.begin(), shape.end(), 1LL, std::multiplies<>());
   if (product > 0) {
     PADDLE_ENFORCE_EQ(
         product,
@@ -55,10 +55,14 @@ std::vector<int64_t> InferTargetShape(const std::vector<int64_t>& shape,
     std::vector<int64_t> new_shape(shape);
     product = -product;
     int64_t infer_size = len / product;
-    PADDLE_ENFORCE_EQ(len % infer_size,
-                      0,
-                      common::errors::InvalidArgument(
-                          "The total is not divisible by infer_size."));
+    PADDLE_ENFORCE_EQ(
+        len % infer_size,
+        0,
+        common::errors::InvalidArgument(
+            "The total element number of the src tensor (%lld) is not "
+            "divisible by the infered size (%lld) of the -1 dimension.",
+            len,
+            infer_size));
     new_shape[infer_idx] = infer_size;
     return new_shape;
   }
@@ -71,7 +75,7 @@ std::vector<std::shared_ptr<DimTrans>> MakeReshapeDimTrans(
     const std::vector<int64_t>& tgt_shape) {
   std::vector<std::shared_ptr<DimTrans>> ret;
   int64_t total_elem_num_src = std::accumulate(
-      src_shape.begin(), src_shape.end(), 1, std::multiplies<>());
+      src_shape.begin(), src_shape.end(), 1LL, std::multiplies<>());
   std::vector<int64_t> inferred_tgt_shape =
       InferTargetShape(tgt_shape, total_elem_num_src);
 
@@ -274,7 +278,7 @@ SpmdInfo ReshapeInferSpmdReverse(const DistMetaTensor& x,
   // when inferring the transformation from out_shape to
   // x_shape, so infer the '-1' value before inferring DimTrans
   int64_t nelm =
-      std::accumulate(x_shape.begin(), x_shape.end(), 1, std::multiplies<>());
+      std::accumulate(x_shape.begin(), x_shape.end(), 1LL, std::multiplies<>());
   out_shape = InferTargetShape(out_shape, nelm);
   std::vector<std::shared_ptr<DimTrans>> trans =
       MakeReshapeDimTrans(out_shape, x_shape);

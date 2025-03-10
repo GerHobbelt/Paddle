@@ -16,6 +16,7 @@
 import tensorrt as trt
 
 from paddle.tensorrt.converter_utils import (
+    get_input_constant_value,
     get_shape_tensor_element,
     squeeze_trt,
     trt_cast,
@@ -41,13 +42,7 @@ def argmax_converter(network, paddle_op, inputs):
     x = inputs[0]
     input_dims = x.shape
     rank = len(input_dims)
-    axis = int(
-        paddle_op.operands()[1]
-        .source()
-        .get_defining_op()
-        .attrs()
-        .get("value", -1)
-    )
+    axis = int(get_input_constant_value(paddle_op, inputs, 1)[0])
     keepdims = paddle_op.attrs()["keepdims"]
 
     if axis < 0:
@@ -84,13 +79,7 @@ def argmin_converter(network, paddle_op, inputs):
     x = inputs[0]
     input_dims = x.shape
     rank = len(input_dims)
-    axis = int(
-        paddle_op.operands()[1]
-        .source()
-        .get_defining_op()
-        .attrs()
-        .get("value", -1)
-    )
+    axis = int(get_input_constant_value(paddle_op, inputs, 1)[0])
     keepdims = paddle_op.attrs()["keepdims"]
 
     if axis < 0:
@@ -171,11 +160,10 @@ def topk_converter(network, paddle_op, inputs):
     largest = paddle_op.attrs().get("largest", True)
     flag = trt.TopKOperation.MAX if largest else trt.TopKOperation.MIN
 
-    k_op = paddle_op.operands()[1].source().get_defining_op()
-    if k_op.name() == "pd_op.full":
-        k = k_op.attrs()["value"]
-    else:
+    k_list = get_input_constant_value(paddle_op, inputs, 1)
+    if k_list is None:
         raise NotImplementedError("Dynamic k is not supported in TensorRT.")
+    k = k_list[0]
     input_rank = len(input_shape)
 
     expand_to_2d = input_rank == 1
@@ -201,3 +189,19 @@ def topk_converter(network, paddle_op, inputs):
         values = trt_cast(network, values, trt.DataType.INT32)
 
     return values, indices
+
+
+@converter_registry.register("pd_op.index_select", trt_version="8.x")
+def index_select_converter(network, paddle_op, inputs):
+    input_tensor = inputs[0]
+    index_tensor = inputs[1]
+    axis = paddle_op.attrs().get("axis", 0)
+
+    reshape_layer = network.add_shuffle(index_tensor)
+    reshape_layer.reshape_dims = (-1,)
+
+    gather_layer = network.add_gather(
+        input_tensor, reshape_layer.get_output(0), axis
+    )
+
+    return gather_layer.get_output(0)

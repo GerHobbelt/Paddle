@@ -95,8 +95,8 @@ std::vector<ir::Tensor> ArgSort(const ir::Tensor &A,
             stride = stride * A->shape[i];
           }
         }
-        offset = cinn::common::AutoSimplify(offset);
-        stride = cinn::common::AutoSimplify(stride);
+        offset = optim::ArithSimplify(offset);
+        stride = optim::ArithSimplify(stride);
         auto A_shape_axis = A->shape[pos_axis];
         return lang::CallExtern(index_func_name,
                                 {A, A_shape_axis, A(indices), offset, stride});
@@ -117,8 +117,8 @@ std::vector<ir::Tensor> ArgSort(const ir::Tensor &A,
             stride = stride * A->shape[i];
           }
         }
-        offset = cinn::common::AutoSimplify(offset);
-        stride = cinn::common::AutoSimplify(stride);
+        offset = optim::ArithSimplify(offset);
+        stride = optim::ArithSimplify(stride);
 
         auto A_shape_axis = A->shape[pos_axis];
         auto idx = lang::CallExtern(

@@ -33,8 +33,6 @@ class TEST_API OperatorDialect : public pir::Dialect {
 
   static const char* name() { return "pd_op"; }
 
-  pir::Attribute ParseAttribute(pir::IrParser& parser) override;  // NOLINT
-
   void PrintType(pir::Type type, std::ostream& os) const override;
   void PrintAttribute(pir::Attribute attr, std::ostream& os) const override;
 

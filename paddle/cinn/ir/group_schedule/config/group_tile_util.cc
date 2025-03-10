@@ -27,6 +27,122 @@ using hlir::framework::pir::trivial_fusion_detail::ExprSetFinderUtils::
     ScheduleBlockRealizeIsNotInit;
 
 namespace ir {
+namespace {
+
+struct VarReplacer : public ir::IRMutator<ir::Expr*> {
+  std::unordered_set<ir::Var> iter_vars;
+  ir::Var inspecting_var;
+
+  explicit VarReplacer(const std::vector<ir::Var>& _iter_vars)
+      : iter_vars(_iter_vars.begin(), _iter_vars.end()) {}
+
+  virtual void Visit(const ir::_Var_* op, ir::Expr* expr) {
+    ir::Var var = op->Copy().as_var_ref();
+    if (inspecting_var.defined() && var == inspecting_var) {
+      *expr = ir::Expr(1);
+    } else if (iter_vars.find(var) != iter_vars.end()) {
+      *expr = ir::Expr(0);
+    } else {
+      // We can replace shape variables (e.g. S0) with any constant, and here
+      // we just choose to replace them with 32.
+      *expr = ir::Expr(32);
+    }
+  }
+};
+
+std::vector<int64_t> GetVarStrides(ir::Expr load_offset,
+                                   const std::vector<ir::Var>& iter_vars) {
+  VarReplacer replacer(iter_vars);
+
+  const auto Evaluate = [&](const ir::Var var) {
+    ir::Expr expr = ir::ir_utils::IRCopy(load_offset);
+    replacer.inspecting_var = var;
+    replacer.IRMutator::Visit(&expr, &expr);
+    ir::Expr res = optim::ArithSimplify(expr);
+    if (res.is_constant()) {
+      return res.as_int64();
+    }
+    return int64_t(0);
+  };
+
+  const int64_t base = Evaluate(ir::Var());
+
+  std::vector<int64_t> strides;
+  for (const auto& var : iter_vars) {
+    int64_t stride = Evaluate(var) - base;
+    strides.push_back(stride);
+  }
+  return strides;
+}
+
+ir::Expr GetLargestLoad(const std::vector<ir::Expr>& exprs) {
+  common::cas_intervals_t var_intervals =
+      common::CollectVarIntervalsOfExprs(exprs);
+  common::SymbolicExprAnalyzer symbolic_expr_analyzer(var_intervals);
+
+  const auto GetLoadSize = [](const ir::Expr& expr) {
+    auto* load = expr.As<ir::Load>();
+    auto* tensor = load->tensor.As<ir::_Tensor_>();
+    if (tensor->shape.size() == 0) {
+      return ir::Expr(1);
+    }
+    ir::Expr size = tensor->shape[0];
+    for (size_t i = 1; i < tensor->shape.size(); i++) {
+      size = size * tensor->shape[i];
+    }
+    return optim::ArithSimplify(size);
+  };
+
+  ir::Expr res = exprs[0];
+  ir::Expr res_size = GetLoadSize(res);
+  for (size_t i = 1; i < exprs.size(); i++) {
+    ir::Expr cur_size = GetLoadSize(exprs[i]);
+    std::optional<bool> gt = symbolic_expr_analyzer.ProveGT(cur_size, res_size);
+    if (gt.has_value() && gt.value()) {
+      res = exprs[i];
+      res_size = cur_size;
+    }
+  }
+  return res;
+}
+
+}  // namespace
+
+std::vector<int64_t> GetLoopStrides(const ir::Expr& body) {
+  ir::Expr expr_block =
+      (ChildScheduleBlockRealizes * ScheduleBlockRealizeIsNotInit)
+          .GetSingle(body);
+  auto* block = expr_block.As<ir::ScheduleBlockRealize>();
+  auto& iter_values = block->iter_values;
+  auto& iter_vars = block->schedule_block.As<ir::ScheduleBlock>()->iter_vars;
+  const std::vector<ir::Var> for_iters = GetAllForIters(body);
+
+  const auto GetLoopIndex = [&](size_t var_index) {
+    auto it = std::find(for_iters.begin(),
+                        for_iters.end(),
+                        iter_values[var_index].as_var_ref());
+    PADDLE_ENFORCE_NE(it,
+                      for_iters.end(),
+                      ::common::errors::PreconditionNotMet(
+                          "iter var %s was not found in loop vars: %s",
+                          iter_values[var_index],
+                          body));
+    return std::distance(for_iters.begin(), it);
+  };
+
+  const auto& all_loads = ChildTensorLoads(expr_block);
+  std::vector<int64_t> loop_strides(for_iters.size());
+  if (all_loads.empty()) {
+    return loop_strides;
+  }
+  const ir::Expr largest_load = GetLargestLoad(all_loads);
+  ir::Expr load_offset = largest_load.As<ir::Load>()->index();
+  std::vector<int64_t> var_strides = GetVarStrides(load_offset, iter_vars);
+  for (size_t i = 0; i < iter_vars.size(); i++) {
+    loop_strides[GetLoopIndex(i)] = var_strides[i];
+  }
+  return loop_strides;
+}
 
 bool GetCanApplyGridReduce(const std::vector<ir::Expr>& op_compute_bodies,
                            const std::vector<int64_t>& reduce_axis) {

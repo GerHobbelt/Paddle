@@ -181,7 +181,9 @@ class PSClient {
     return fut;
   }
 
-  virtual std::future<int32_t> PrintTableStat(uint32_t table_id) = 0;
+  virtual std::future<int32_t> PrintTableStat(uint32_t table_id,
+                                              uint16_t pass_id,
+                                              size_t threshold) = 0;
   virtual std::future<int32_t> SaveCacheTable(uint32_t table_id UNUSED,
                                               uint16_t pass_id UNUSED,
                                               size_t threshold UNUSED) {

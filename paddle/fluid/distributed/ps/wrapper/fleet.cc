@@ -815,8 +815,10 @@ void FleetWrapper::RecvAndSaveTable(const uint64_t table_id,
   }
 }
 
-void FleetWrapper::PrintTableStat(const uint64_t table_id) {
-  auto ret = worker_ptr_->PrintTableStat(table_id);
+void FleetWrapper::PrintTableStat(const uint64_t table_id,
+                                  uint32_t pass_id,
+                                  size_t threshold) {
+  auto ret = worker_ptr_->PrintTableStat(table_id, pass_id, threshold);
   ret.wait();
   int32_t err_code = ret.get();
   if (err_code == -1) {

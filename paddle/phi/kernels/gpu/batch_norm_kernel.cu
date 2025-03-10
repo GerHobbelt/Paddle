@@ -178,7 +178,7 @@ static __global__ LAUNCH_BOUNDS(BlockDim) void BNForwardTraining(
 }
 
 template <typename T>
-__device__ __forceinline__ void merge_block_horizonal(
+__device__ __forceinline__ void merge_block_horizontal(
     BatchNormParamType<T> x_sum,
     BatchNormParamType<T> x_square_sum,
     BatchNormParamType<T> *smem_sum,
@@ -387,13 +387,13 @@ static __global__ void BNForwardTraining2DCompStat(
       x_square_sum += x_i * x_i;
     }
 
-    // horizonal block sum
-    merge_block_horizonal<T>(x_sum,
-                             x_square_sum,
-                             &smem_sum[0],
-                             &smem_square_sum[0],
-                             &x_sum,
-                             &x_square_sum);
+    // horizontal block sum
+    merge_block_horizontal<T>(x_sum,
+                              x_square_sum,
+                              &smem_sum[0],
+                              &smem_square_sum[0],
+                              &x_sum,
+                              &x_square_sum);
 
     if (gridDim.x > 1) {
       volatile BatchNormParamType<T> *staging_sum = block_data_ptr;
@@ -427,13 +427,13 @@ static __global__ void BNForwardTraining2DCompStat(
           x_square_sum += staging_square_sum[i + x * C];
         }
 
-        // horizonal block sum
-        merge_block_horizonal<T>(x_sum,
-                                 x_square_sum,
-                                 &smem_sum[0],
-                                 &smem_square_sum[0],
-                                 &x_sum,
-                                 &x_square_sum);
+        // horizontal block sum
+        merge_block_horizontal<T>(x_sum,
+                                  x_square_sum,
+                                  &smem_sum[0],
+                                  &smem_square_sum[0],
+                                  &x_sum,
+                                  &x_square_sum);
 
         // final compute
         if (threadIdx.x == 0) {

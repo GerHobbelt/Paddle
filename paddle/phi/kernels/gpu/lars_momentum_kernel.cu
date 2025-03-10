@@ -193,7 +193,7 @@ __global__ void L2NormKernel(
     g_buffer[blockIdx.x] = g_tmp;
   }
 #if CUDA_VERSION >= 11000
-  cg->sync();  // Grid sync for writring partial result to gloabl memory
+  cg->sync();  // Grid sync for writring partial result to global memory
   MT p_part_sum = threadIdx.x < gridDim.x ? p_buffer[threadIdx.x] : 0;
   MT g_part_sum = threadIdx.x < gridDim.x ? g_buffer[threadIdx.x] : 0;
   MT tmp0 = phi::funcs::BlockReduceSum<MT>(p_part_sum, FINAL_MASK);
@@ -578,7 +578,7 @@ void LarsMomentumKernel(
                           reinterpret_cast<void*>(&epsilon_),
                           reinterpret_cast<void*>(&rescale_grad_),
                           reinterpret_cast<void*>(&multi_precision)};
-    // Lanuch all sm theads, and thead of each block synchronizedly cooperate.
+    // Launch all sm theads, and thead of each block synchronizedly cooperate.
     cudaLaunchCooperativeKernel(
         reinterpret_cast<void*>(MergedMomentumLarsKernel<T, MT>),
         lars_thread_config.grid_for_lars,
@@ -630,7 +630,7 @@ void LarsMomentumKernel(
         reinterpret_cast<void*>(&thresh),  // Just a placeholder
         reinterpret_cast<void*>(&numel),
         reinterpret_cast<void*>(&multi_precision)};
-    // Lanuch all sm theads.
+    // Launch all sm theads.
     cudaLaunchCooperativeKernel(
         reinterpret_cast<void*>(MomentumLarsKernel<T, MT>),
         lars_thread_config.grid_for_lars,

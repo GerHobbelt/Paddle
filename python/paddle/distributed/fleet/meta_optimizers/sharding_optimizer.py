@@ -14,7 +14,6 @@
 
 import os
 
-import paddle
 from paddle.base import core
 from paddle.incubate.optimizer import PipelineOptimizer
 from paddle.static import (
@@ -705,11 +704,6 @@ class ShardingOptimizer(MetaOptimizerBase):
         self._recreate_not_persist_param_as_var()
 
         self._dump_program_for_debug()
-        use_new_comm = paddle.get_flags("FLAGS_dynamic_static_unified_comm")[
-            "FLAGS_dynamic_static_unified_comm"
-        ]
-        if not use_new_comm:
-            self._wait()
         return optimize_ops, params_grads
 
     def _init_pair_comm(self, pair, ring_id):
@@ -1713,7 +1707,7 @@ class ShardingOptimizer(MetaOptimizerBase):
         # offload and optimize_cast will insert broadcast op
         broadcast_params = set()
         for op in startup_block.ops:
-            if op.type == 'c_broadcast':
+            if op.type == 'broadcast':
                 broadcast_params.add(op.desc.output_arg_names()[0])
 
         for param in params_name:
@@ -1729,13 +1723,12 @@ class ShardingOptimizer(MetaOptimizerBase):
 
             for ring in rings:
                 startup_block.append_op(
-                    type='c_broadcast',
-                    inputs={'X': param},
-                    outputs={'Out': param},
+                    type='broadcast',
+                    inputs={'x': param},
+                    outputs={'out': param},
                     attrs={
                         'ring_id': ring,
                         'root': 0,
-                        'use_calc_stream': True,
                         OP_ROLE_KEY: OpRole.Forward,
                     },
                 )

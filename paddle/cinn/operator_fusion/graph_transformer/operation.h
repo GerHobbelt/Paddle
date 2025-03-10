@@ -113,7 +113,7 @@ struct MergeReduceTreeAndTrivialOperation {
     merged_node->set_fusion_iters(
         graph->iters_fusion_policy()->SingleDownstreamItersFusion(node,
                                                                   downstream));
-    // TODO(huangjiyi): Support relationship analysis for defferent iters, for
+    // TODO(huangjiyi): Support relationship analysis for different iters, for
     // example the input iters and output iters of reshape op.
     auto sig = merged_node->fusion_iters();
     const auto upstream_iters = node->fusion_iters();

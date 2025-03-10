@@ -541,7 +541,7 @@ def double_grad_check(
 
 
 # TODO(jiabin): We currently support only triple grad check here, extend this to support
-# higher order differenciation later.
+# higher order differentiation later.
 
 
 # check triple grad and two outputs of the triple Kernel

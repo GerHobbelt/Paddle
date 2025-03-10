@@ -34,7 +34,9 @@ void CollectShapeManager::CollectShapeInfo(
     auto *var = scope->FindVar(var_name);
     if (!var || !var->IsType<phi::DenseTensor>()) continue;
     auto tensor = var->Get<phi::DenseTensor>();
-    if (!tensor.initialized()) continue;
+    if (!tensor.initialized() && !instr->NoNeedBuffer().count(input.first)) {
+      continue;
+    }
     paddle::platform::DeviceContextPool &pool =
         paddle::platform::DeviceContextPool::Instance();
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
@@ -124,36 +126,53 @@ void CollectShapeManager::StatisticShapeRangeInfo() {
         for (auto const &it : shape_data) {
           auto val = it.first;
           auto shapes = it.second;
+
           std::vector<int32_t> min_shape(shapes[0].begin(), shapes[0].end());
           std::vector<int32_t> max_shape(shapes[0].begin(), shapes[0].end());
           std::vector<int32_t> opt_shape(shapes[0].begin(), shapes[0].end());
-
-          auto ShapeMaxFreq =
-              [](const std::map<int32_t, int32_t> &m) -> int32_t {
-            std::vector<std::pair<int32_t, int32_t>> counter;
-            for (auto &it : m) counter.emplace_back(it);
-            std::sort(counter.begin(),
-                      counter.end(),
-                      [](std::pair<int32_t, int32_t> &a,
-                         std::pair<int32_t, int32_t> &b) {
-                        return a.second > b.second;
-                      });
-            return counter[0].first;
-          };
-
-          for (size_t d = 0; d < shapes[0].size(); ++d) {
-            std::map<int32_t, int32_t> counter;
-            for (auto &shape : shapes) {
-              counter[shape[d]] += 1;
-              if (shape[d] < min_shape[d]) min_shape[d] = shape[d];
-              if (shape[d] > max_shape[d]) max_shape[d] = shape[d];
+          // Applicable to scenarios where min/opt/max are specified;
+          if (shapes.size() == 3) {
+            for (size_t d = 0; d < shapes[0].size(); ++d) {
+              std::vector<int32_t> dim_values;
+              for (const auto &shape : shapes) {
+                dim_values.push_back(shape[d]);
+              }
+              std::sort(dim_values.begin(), dim_values.end());
+              min_shape[d] = dim_values[0];
+              opt_shape[d] = dim_values[1];
+              max_shape[d] = dim_values[2];
             }
-            opt_shape[d] = ShapeMaxFreq(counter);
-          }
+            min_data[val] = min_shape;
+            max_data[val] = max_shape;
+            opt_data[val] = opt_shape;
+          } else {
+            // suitable for scenarios where shape is automatically collected.
+            auto ShapeMaxFreq =
+                [](const std::map<int32_t, int32_t> &m) -> int32_t {
+              std::vector<std::pair<int32_t, int32_t>> counter;
+              for (auto &it : m) counter.emplace_back(it);
+              std::sort(counter.begin(),
+                        counter.end(),
+                        [](std::pair<int32_t, int32_t> &a,
+                           std::pair<int32_t, int32_t> &b) {
+                          return a.second > b.second;
+                        });
+              return counter[0].first;
+            };
 
-          min_data[val] = min_shape;
-          max_data[val] = max_shape;
-          opt_data[val] = opt_shape;
+            for (size_t d = 0; d < shapes[0].size(); ++d) {
+              std::map<int32_t, int32_t> counter;
+              for (auto &shape : shapes) {
+                counter[shape[d]] += 1;
+                if (shape[d] < min_shape[d]) min_shape[d] = shape[d];
+                if (shape[d] > max_shape[d]) max_shape[d] = shape[d];
+              }
+              opt_shape[d] = ShapeMaxFreq(counter);
+            }
+            min_data[val] = min_shape;
+            max_data[val] = max_shape;
+            opt_data[val] = opt_shape;
+          }
         }
       };
   extract_min_max_opt(min_shapes_, max_shapes_, opt_shapes_, shape_info_);

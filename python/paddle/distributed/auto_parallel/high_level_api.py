@@ -309,7 +309,7 @@ def to_distributed(
             >>> from paddle.distributed import to_distributed
             >>> from paddle.distributed.auto_parallel.high_level_api import ToDistributedConfig
 
-            >>> EPOCHES = 1
+            >>> EPOCHS = 1
             >>> VOCAB_SIZE = 8000
             >>> BATCH_NUM = 2
             >>> BATCH_SIZE = 4
@@ -670,7 +670,7 @@ def to_distributed(
             ...     config=dist_config,
             ... )
 
-            >>> for epoch in range(EPOCHES):
+            >>> for epoch in range(EPOCHS):
             ...     dist_model.train()
             ...     for i, data in enumerate(dist_loader()):
             ...         inputs, labels = data

@@ -467,7 +467,6 @@ struct MatrixEighFunctor<GPUContext, T> {
                                   "When has_vectors is true,"
                                   "the eigenvectors needs to be calculated,"
                                   "so the eigenvectors must be provided."));
-      //   input_trans = dito.Transpose(input_trans);
       input_trans = phi::TransposeLast2Dim<T>(dev_ctx, input_trans);
       eigen_vectors->ShareDataWith(input_trans);
     }

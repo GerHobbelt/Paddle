@@ -44,6 +44,7 @@ from .exceptions import (  # noqa: F401
 from .info_collector import (  # noqa: F401
     InfoCollector,
     NewSymbolHitRateInfo,
+    SubGraphRelationInfo,
 )
 from .magic_methods import magic_method_builtin_dispatch  # noqa: F401
 from .paddle_api_config import (  # noqa: F401

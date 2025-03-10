@@ -64,6 +64,8 @@ if TYPE_CHECKING:
 
 __all__ = []
 
+_warned_in_to_tensor = False
+
 
 def _complex_to_real_dtype(dtype: DTypeLike) -> DTypeLike:
     if dtype == core.VarDesc.VarType.COMPLEX64:
@@ -497,7 +499,7 @@ def logspace(
     name: str | None = None,
 ) -> paddle.Tensor:
     r"""
-    Return fixed number of logarithmical-evenly spaced values within the interval \
+    Return fixed number of logarithmically-evenly spaced values within the interval \
     :math:`[base^{start}, base^{stop}]`.
 
     Notes:
@@ -521,7 +523,7 @@ def logspace(
 
     Returns:
         Tensor: The output data type will be float32, float64. The 1-D tensor with \
-        fixed number of logarithmical-evenly spaced values, the data shape of this \
+        fixed number of logarithmically-evenly spaced values, the data shape of this \
         tensor is :math:`[num]`. If the :attr:`num` is set 1, the output tensor \
         just has the value with exponential of :attr:`start` with base :attr:`base`.
 
@@ -941,10 +943,14 @@ def to_tensor(
                 )
             return core.tensor_from_cuda_array_interface(data)
         if is_tensor:
-            warnings.warn(
-                "To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach(), "
-                "rather than paddle.to_tensor(sourceTensor)."
-            )
+            global _warned_in_to_tensor
+            if not _warned_in_to_tensor:
+                warnings.warn(
+                    "To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach(), "
+                    "rather than paddle.to_tensor(sourceTensor).",
+                    stacklevel=2,
+                )
+                _warned_in_to_tensor = True
         return _to_tensor_non_static(data, dtype, place, stop_gradient)
 
     # call assign for static graph
@@ -1083,7 +1089,7 @@ def fill_constant(
 
         if out.dtype != dtype:
             raise TypeError(
-                "Required out.dtype == dtype if specifying out, but recevied f{out.dtype} != f{dtype}"
+                "Required out.dtype == dtype if specifying out, but received f{out.dtype} != f{dtype}"
             )
         out = _C_ops.full_(out, shape, value, dtype, place)
         out.stop_gradient = True

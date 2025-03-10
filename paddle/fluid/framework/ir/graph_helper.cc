@@ -714,7 +714,7 @@ static void GraphToBlock(const Graph &graph,
         graph, removed_vars, &vars_in_graph);
   }
 
-  // add vars_in_graph to blcok
+  // add vars_in_graph to block
   block->clear_vars();
   std::unordered_set<std::string> visited_vars;
   for (proto::VarDesc &var : vars_in_graph) {

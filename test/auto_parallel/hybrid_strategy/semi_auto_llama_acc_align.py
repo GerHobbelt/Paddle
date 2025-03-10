@@ -98,7 +98,7 @@ class TestLlamaAuto:
         # amp config
         amp = self.strategy._amp
         if os.getenv("amp"):
-            amp.enbale = os.getenv("amp")
+            amp.enable = os.getenv("amp")
         if os.getenv("amp_dtype"):
             amp.dtype = os.getenv("amp_dtype")
         if os.getenv("amp_level"):

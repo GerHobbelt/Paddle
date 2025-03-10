@@ -200,6 +200,7 @@ void AutoMixedPrecisionPass::SetDefaultBlacklist() const {
       "softmax_with_cross_entropy",
       "sigmoid_cross_entropy_with_logits",
       "c_softmax_with_cross_entropy",
+      "c_softmax_with_multi_label_cross_entropy",
       "cross_entropy",
       "cross_entropy2",
 #ifndef PADDLE_WITH_XPU
@@ -1069,7 +1070,7 @@ void AutoMixedPrecisionPass::InsertCastOp() const {
             cache_kv_outputs.size(),
             common::errors::InvalidArgument(
                 "Cache inputs should be the same size with cache outputs, but "
-                "recieved %d as inputs and %d as outputs.",
+                "received %d as inputs and %d as outputs.",
                 cache_kv_inputs.size(),
                 cache_kv_outputs.size()));
         for (size_t i = 0; i < cache_kv_inputs.size(); ++i) {

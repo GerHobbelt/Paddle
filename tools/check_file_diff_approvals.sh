@@ -64,7 +64,7 @@ fi
 
 changed_deprecated_tests_count=$(expr $(git ls-tree -r --name-only HEAD ${PADDLE_ROOT}/test/deprecated | grep '^test' | wc -l) - $(git ls-tree -r --name-only upstream/$BRANCH ${PADDLE_ROOT}/test/deprecated | grep '^tes' | wc -l))
 if [[ $changed_deprecated_tests_count -gt 0 ]]; then
-    echo_line="You must have one RD (wanghuancoder (Recommend)) approval for add new test in test/deprecated direcotry.\n"
+    echo_line="You must have one RD (wanghuancoder (Recommend)) approval for add new test in test/deprecated directory.\n"
     check_approval 1 wanghuancoder
 fi
 
@@ -96,8 +96,8 @@ done
 DEPS_PHI_IN_IR=`git diff --name-only upstream/$BRANCH | grep -E "paddle/pir/" | grep "CMakeList" |xargs -r git diff -U0 upstream/$BRANCH --| grep "^\+" | grep "phi" || true`
 echo "DEPS_PHI_IN_IR:${DEPS_PHI_IN_IR}"
 if [ "${DEPS_PHI_IN_IR}" ] && [ "${DEPS_PHI_IN_IR}" != "" ]; then
-    echo_line="You must have one RD (phlrain, zhangbo9674, winter-wang) approval for the CMakeLists.txt with DEPS phi* in paddle/pir directory.\n"
-    check_approval 1 phlrain zhangbo9674 winter-wang
+    echo_line="You must have one RD (phlrain, zhangbo9674) approval for the CMakeLists.txt with DEPS phi* in paddle/pir directory.\n"
+    check_approval 1 phlrain zhangbo9674
 fi
 FILTER=`git diff --name-only upstream/develop | grep -v "tools/"`
 HAS_CONST_CAST=`git diff -U0 upstream/$BRANCH $FILTER | grep '^\+' | grep -o -m 1 "const_cast" || true`
@@ -213,8 +213,8 @@ fi
 
 HAS_MODIFIED_PIR_INCLUDE_DIR=`git diff --name-only upstream/$BRANCH | grep "paddle/pir/include" || true`
 if [ "${HAS_MODIFIED_PIR_INCLUDE_DIR}" != "" ] && [ "${GIT_PR_ID}" != "" ]; then
-    echo_line="You must have one RD (yuanlehome, winter-wang, zhangbo9674) approval for file changes in paddle/pir/include.\n"
-    check_approval 1 yuanlehome winter-wang zhangbo9674
+    echo_line="You must have one RD (yuanlehome, zhangbo9674) approval for file changes in paddle/pir/include.\n"
+    check_approval 1 yuanlehome zhangbo9674
 fi
 
 HAS_MODIFIED_API_GENE=`git diff --name-only upstream/$BRANCH | grep "paddle/phi/api/generator" || true`
@@ -252,14 +252,6 @@ if [ "${HAS_MODIFIED_STATIC_BUILD}" != "" ] && [ "${GIT_PR_ID}" != ""]; then
     echo_line="You must have one RD (From00 or zhiqiu) approval for file changes in new_executor/interpreter/static_build.cc.\n"
     check_approval 1 From00 zhiqiu
 fi
-
-
-HAS_MODIFIED_ENFORCE_SYNTAX=`git diff --diff-filter=A upstream/$BRANCH | grep -E "IR_ENFORCE|CHECK|CHECK_EQ|CHECK_NE|CHECK_LT|CHECK_LE|CHECK_GE|CHECK_GT|LOG\(FATAL\)" || true`
-if [ "${HAS_MODIFIED_ENFORCE_SYNTAX}" != "" ] && [ "${GIT_PR_ID}" != "" ]; then
-    echo_line="You must have one RD (rismeup1 or winter-wang) approval for using 'IR_ENFORCE, CHECK, CHECK_EQ, CHECK_NE, CHECK_LT, CHECK_LE, CHECK_GE, CHECK_GT, LOG(FATAL)', it is recommended to use PADDLE_ENFORCE as a replacement,see [ https://github.com/PaddlePaddle/Paddle/wiki/PADDLE_ENFORCE-Rewriting-Specification ] for details.\n"
-    check_approval 1 risemeup1 winter-wang
-fi
-
 
 HAS_MODIFIED_TARGET_FOR_AUTO_PARALLEL_CI=`git diff --name-only upstream/$BRANCH | grep "tools/auto_parallel/target_path_lists.sh" || true`
 if [ "${HAS_MODIFIED_TARGET_FOR_AUTO_PARALLEL_CI}" != "" ] && [ "${GIT_PR_ID}" != "" ]; then

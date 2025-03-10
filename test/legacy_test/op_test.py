@@ -1636,8 +1636,11 @@ class OpTest(unittest.TestCase):
                                     )
                                 )
                                 expect_shape = outs[i].shape
+                                if np.issubdtype(outs[i].dtype, np.integer):
+                                    expect_data = outs[i].flatten().tolist()
+                                else:
+                                    expect_data = []
                                 i += 1
-                                expect_data = []
                                 if not shape_or_data.is_equal(
                                     expect_shape, expect_data
                                 ):
@@ -1649,7 +1652,7 @@ class OpTest(unittest.TestCase):
             pass
 
     def _infer_and_compare_symbol(self, place):
-        """Don't caculate the program, only infer the shape of var"""
+        """Don't calculate the program, only infer the shape of var"""
 
         kernel_sig = self.get_kernel_signature(place)
         program = paddle.static.Program()

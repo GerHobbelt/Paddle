@@ -1162,7 +1162,7 @@ void BindImperative(py::module *m_ptr) {
 
     count (Tensor): The count tensor, and the data type should be `int64` currently.
                     Besides, `count` should be placed on CPUPlace. The shape of `count`
-                    should be one-dimensinal.
+                    should be one-dimensional.
 
   Examples:
         .. code-block:: python
@@ -1395,7 +1395,7 @@ void BindImperative(py::module *m_ptr) {
 
     count (Tensor): The count tensor, and the data type should be `int64` currently.
                     Besides, `count` should be placed on CPUPlace. The shape of `count`
-                    should be one-dimensinal.
+                    should be one-dimensional.
 
   Examples:
         .. code-block:: python

@@ -603,7 +603,7 @@ def check_linalg_vector_static(
         )
         place = base.CPUPlace()
         exe = base.Executor(place)
-        np_input = (np.random.rand(*shape_x) + 1.0).astype(dtype)
+        np_input = np.array(np.random.rand(*shape_x) + 1.0).astype(dtype)
         expected_result = np_linalg_vector_norm(
             np_input, porder=p, axis=axis, keepdims=keep_dim
         ).astype(dtype)
@@ -616,7 +616,7 @@ def check_linalg_vector_static(
 def check_linalg_vector_dygraph(
     self, p, axis, shape_x, dtype, keep_dim, check_dim=False
 ):
-    x_numpy = (np.random.random(shape_x) + 1.0).astype(dtype)
+    x_numpy = np.array(np.random.random(shape_x) + 1.0).astype(dtype)
     expected_result = np_linalg_vector_norm(
         x_numpy, porder=p, axis=axis, keepdims=keep_dim
     )
@@ -906,6 +906,51 @@ class API_NormTest(unittest.TestCase):
                 axis=[0, 1, 2],
                 shape_x=[2, 3, 4],
                 dtype="float64",
+                keep_dim=keep,
+                check_dim=True,
+            )
+            check_linalg_vector_static(
+                self,
+                p=2,
+                axis=None,
+                shape_x=[],
+                dtype="float64",
+                keep_dim=keep,
+                check_dim=True,
+            )
+            check_linalg_vector_static(
+                self,
+                p=np.inf,
+                axis=None,
+                shape_x=[],
+                dtype="complex64",
+                keep_dim=keep,
+                check_dim=True,
+            )
+            check_linalg_vector_static(
+                self,
+                p=-np.inf,
+                axis=[0, 1, 2, 3],
+                shape_x=[1, 14, 5, 14],
+                dtype="complex128",
+                keep_dim=keep,
+                check_dim=True,
+            )
+            check_linalg_vector_static(
+                self,
+                p=np.inf,
+                axis=2,
+                shape_x=[1, 14, 5, 14],
+                dtype="complex128",
+                keep_dim=keep,
+                check_dim=True,
+            )
+            check_linalg_vector_static(
+                self,
+                p=0,
+                axis=[1, 3],
+                shape_x=[1, 14, 5, 14],
+                dtype="complex128",
                 keep_dim=keep,
                 check_dim=True,
             )
@@ -1234,6 +1279,51 @@ class API_NormTest(unittest.TestCase):
                 axis=[0, 1, 2],
                 shape_x=[2, 3, 4],
                 dtype="float64",
+                keep_dim=keep,
+                check_dim=True,
+            )
+            check_linalg_vector_dygraph(
+                self,
+                p=2,
+                axis=None,
+                shape_x=(),
+                dtype="float64",
+                keep_dim=keep,
+                check_dim=True,
+            )
+            check_linalg_vector_dygraph(
+                self,
+                p=np.inf,
+                axis=None,
+                shape_x=[],
+                dtype="complex64",
+                keep_dim=keep,
+                check_dim=True,
+            )
+            check_linalg_vector_dygraph(
+                self,
+                p=-np.inf,
+                axis=[0, 1, 2, 3],
+                shape_x=[1, 14, 5, 14],
+                dtype="complex128",
+                keep_dim=keep,
+                check_dim=True,
+            )
+            check_linalg_vector_dygraph(
+                self,
+                p=np.inf,
+                axis=2,
+                shape_x=[1, 14, 5, 14],
+                dtype="complex128",
+                keep_dim=keep,
+                check_dim=True,
+            )
+            check_linalg_vector_dygraph(
+                self,
+                p=0,
+                axis=[1, 3],
+                shape_x=[1, 14, 5, 14],
+                dtype="complex128",
                 keep_dim=keep,
                 check_dim=True,
             )

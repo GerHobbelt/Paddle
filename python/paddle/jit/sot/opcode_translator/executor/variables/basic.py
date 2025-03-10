@@ -163,6 +163,18 @@ class ConstantVariable(VariableBase):
             not bool(self.get_py_value()), self.graph, DummyTracker([self])
         )
 
+    def getitem(self, key):
+        track_vars: list[VariableBase] = [self]
+        if self.get_py_type() is not str:
+            raise InnerError(
+                f"getitem can only be applied to a str variable, but got {self.get_py_type()}"
+            )
+        if isinstance(key, VariableBase):
+            track_vars.append(key)
+            key = key.get_py_value()
+        retval = self.value[key]
+        return ConstantVariable(retval, self.graph, DummyTracker(track_vars))
+
     def str(self):
         return ConstantVariable(
             str(self.value), self.graph, DummyTracker([self])
@@ -195,6 +207,24 @@ class ConstantVariable(VariableBase):
             self.graph,
             DummyTracker([self]),
         )
+
+    @check_guard
+    def make_stringified_guard(self) -> list[StringifiedExpression]:
+        if self.get_py_type() is not float:
+            return super().make_stringified_guard()
+
+        frame_value_tracer = self.tracker.trace_value_from_frame()
+        epsilon = 1e-13
+        return [
+            FasterStringifiedExpression(
+                f"type({{0}}) is float and abs({self.get_py_value()!r} - {{0}}) < {epsilon}",
+                paddle.framework.core.FloatCloseGuard(
+                    self.get_py_value(), epsilon
+                ),
+                [frame_value_tracer],
+                union_free_vars(frame_value_tracer.free_vars),
+            )
+        ]
 
     @VariableFactory.register_from_value()
     def from_value(value: Any, graph: FunctionGraph, tracker: Tracker):

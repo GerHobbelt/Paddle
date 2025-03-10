@@ -439,7 +439,7 @@ def search_all(tuner_cfg):
                         i += 1
 
                     if tuner_cfg.get("schedule_mode") != "performance":
-                        # momory sort
+                        # memory sort
                         for rr_dim_cfg in rr_dim_cfgs:
                             cfg = (
                                 list(valid_degree)

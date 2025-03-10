@@ -329,7 +329,7 @@ bool Pool3DPluginDynamic::supportsFormatCombination(
   PADDLE_ENFORCE_NOT_NULL(
       in_out,
       common::errors::InvalidArgument(
-          "The input of swish plugin shoule not be nullptr."));
+          "The input of swish plugin should not be nullptr."));
 
   PADDLE_ENFORCE_LT(
       pos,

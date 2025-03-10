@@ -30,7 +30,7 @@
 #include "paddle/pir/include/core/value.h"
 
 COMMON_DECLARE_bool(print_ir);
-
+COMMON_DECLARE_string(disable_logging_op_attr_list);
 namespace pir {
 
 namespace {
@@ -124,21 +124,21 @@ void BasicIrPrinter::PrintAttribute(Attribute attr) {
       os << "false";
     }
   } else if (auto f = attr.dyn_cast<FloatAttribute>()) {
-    os << "(Float)" << f.data();
+    os << f.data();
   } else if (auto d = attr.dyn_cast<DoubleAttribute>()) {
-    os << "(Double)" << d.data();
+    os << d.data();
   } else if (auto i = attr.dyn_cast<Int32Attribute>()) {
-    os << "(Int32)" << i.data();
+    os << i.data();
   } else if (auto i = attr.dyn_cast<Int64Attribute>()) {
-    os << "(Int64)" << i.data();
+    os << i.data();
   } else if (auto i = attr.dyn_cast<IndexAttribute>()) {
-    os << "(Index)" << i.data();
+    os << i.data();
   } else if (auto p = attr.dyn_cast<PointerAttribute>()) {
-    os << "(Pointer)" << p.data();
+    os << p.data();
   } else if (auto p = attr.dyn_cast<Complex64Attribute>()) {
-    os << "(Complex64)" << p.data();
+    os << p.data();
   } else if (auto p = attr.dyn_cast<Complex128Attribute>()) {
-    os << "(Complex128)" << p.data();
+    os << p.data();
   } else if (auto arr = attr.dyn_cast<ArrayAttribute>()) {
     const auto& vec = arr.AsVector();
     os << "[";
@@ -299,6 +299,16 @@ void IrPrinter::PrintOpResult(const Operation& op) {
   os << ")";
 }
 
+std::vector<std::string> ParseFlagsToDisable(std::string Flag) {
+  std::vector<std::string> attrs_to_disable;
+  std::istringstream iss(Flag);
+  std::string attr;
+  while (std::getline(iss, attr, ';')) {
+    attrs_to_disable.push_back(attr);
+  }
+  return attrs_to_disable;
+}
+
 void IrPrinter::PrintAttributeMap(const Operation& op) {
   AttributeMap attributes = op.attributes();
   std::map<std::string, Attribute, std::less<>> order_attributes(
@@ -306,6 +316,18 @@ void IrPrinter::PrintAttributeMap(const Operation& op) {
 
   // Filter out the callstack attribute
   order_attributes.erase("op_callstack");
+  order_attributes.erase("sym_shape_str");
+
+  if (!FLAGS_disable_logging_op_attr_list.empty()) {
+    std::vector<std::string> attrs_to_disable =
+        ParseFlagsToDisable(FLAGS_disable_logging_op_attr_list);
+    // Remove the specified attributes if they exist in order_attributes
+    for (const auto& attr : attrs_to_disable) {
+      if (order_attributes.count(attr) > 0) {
+        order_attributes.erase(attr);
+      }
+    }
+  }
 
   os << " {";
 

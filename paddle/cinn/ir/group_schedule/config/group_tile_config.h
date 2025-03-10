@@ -56,6 +56,8 @@ struct ScheduleConfig {
 };
 
 struct BucketInfo {
+  static constexpr int kMaxNumel = INT32_MAX;
+
   struct Dimension {
     int lower_bound;
     int upper_bound;

@@ -7,7 +7,6 @@ if(WITH_GPU)
   list(
     REMOVE_ITEM
     CINN_PIR_SYMBOLIC_TEST
-    test_simple_llama_dy.py
     test_cinn_reduce_symbolic_demo.py
     test_if_st.py
     test_if_dy.py
@@ -74,17 +73,6 @@ if(WITH_GPU)
       ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_llama_if_dy.py
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
   set_tests_properties(test_llama_if_dy PROPERTIES LABELS "RUN_TYPE=CINN")
-
-  add_test(
-    NAME test_simple_llama_dy
-    COMMAND
-      ${CMAKE_COMMAND} -E env
-      PYTHONPATH=${CMAKE_BINARY_DIR}:${CMAKE_BINARY_DIR}/python/:$ENV{PYTHONPATH}
-      FLAGS_prim_enable_dynamic=true FLAGS_prim_check_ops=true
-      FLAGS_enable_pir_api=true FLAGS_pir_apply_shape_optimization_pass=false
-      ${PYTHON_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_simple_llama_dy.py
-    WORKING_DIRECTORY ${CMAKE_BINARY_DIR})
-  set_tests_properties(test_simple_llama_dy PROPERTIES LABELS "RUN_TYPE=CINN")
 
   add_test(
     NAME test_cinn_reduce_symbolic_demo

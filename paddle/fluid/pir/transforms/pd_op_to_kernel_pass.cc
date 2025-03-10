@@ -58,6 +58,10 @@
 #include "paddle/cinn/hlir/framework/pir/utils.h"
 #endif
 
+#ifdef PADDLE_WITH_CUSTOM_DEVICE
+#include "paddle/fluid/custom_engine/custom_engine_manager.h"
+#endif
+
 #ifdef PADDLE_WITH_DNNL
 #include "paddle/fluid/pir/dialect/operator/ir/onednn_op.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_onednn_dialect.h"
@@ -2444,6 +2448,35 @@ void HandleForTensorRTOp(
   block->push_back(op);
 }
 
+#ifdef PADDLE_WITH_CUSTOM_DEVICE
+void HandleForCustomEngineOp(
+    pir::IrContext* ctx,
+    pir::Operation* op_item,
+    phi::KernelKey* kernel_key,
+    phi::Place place,
+    std::unordered_map<pir::Operation*, pir::Operation*>* map_op_pair,
+    std::unordered_map<pir::Value, pir::Value>* map_value_pair,
+    pir::Block* block,
+    C_CustomEngineInterface* interface) {
+  if (interface->custom_engine_op_lower) {
+    struct C_CustomEngineLowerParams lower_params {
+      reinterpret_cast<C_IrContext>(ctx),
+          reinterpret_cast<C_Operation>(op_item),
+          reinterpret_cast<C_KernelKey>(kernel_key),
+          reinterpret_cast<C_Place>(&place),
+          reinterpret_cast<C_Operation_Map>(map_op_pair),
+          reinterpret_cast<C_Value_Map>(map_value_pair),
+          reinterpret_cast<C_Block>(block)
+    };
+    VLOG(6) << "Handle CustomEngineOp while lowering to kernel pass";
+    interface->custom_engine_op_lower(&lower_params);
+  } else {
+    PADDLE_THROW(common::errors::Unimplemented(
+        "CustomEngineInstruction's "
+        "C_CustomEngineInterface->custom_engine_op_lower not implemented"));
+  }
+}
+#endif
 std::vector<pir::Type> BuildOutputs(
     pir::Operation* op_item,
     const std::string& kernel_fn_str,
@@ -3460,7 +3493,21 @@ void ProcessBlock(
                           new_block);
       continue;
     }
-
+#ifdef PADDLE_WITH_CUSTOM_DEVICE
+    if (paddle::dialect::IsCustomEngineOp(op_item)) {
+      auto* interface = paddle::custom_engine::CustomEngineManager::Instance()
+                            ->GetCustomEngineInterface();
+      HandleForCustomEngineOp(ctx,
+                              op_item,
+                              &kernel_key,
+                              place,
+                              map_op_pair,
+                              map_value_pair,
+                              new_block,
+                              interface);
+      continue;
+    }
+#endif
 #ifdef PADDLE_WITH_DNNL
     if (op_item->HasTrait<OneDNNTrait>() &&
         kernel_key.backend() != phi::Backend::ONEDNN) {

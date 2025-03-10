@@ -94,7 +94,7 @@ bool CAllReducePluginDynamic::supportsFormatCombination(
   PADDLE_ENFORCE_NOT_NULL(
       in_out,
       common::errors::InvalidArgument(
-          "The input of CAllReduce plugin shoule not be nullptr."));
+          "The input of CAllReduce plugin should not be nullptr."));
 
   PADDLE_ENFORCE_LT(
       pos,

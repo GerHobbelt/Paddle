@@ -49,7 +49,7 @@ def symbolic_translate(fn: Callable[P, R], **kwargs) -> Callable[P, R]:
         Callable, The wrapped function.
 
     Examples:
-        >>> # doctest: +SKIP("Cound not get source code of function foo."")
+        >>> # doctest: +SKIP("Could not get source code of function foo."")
         >>> import paddle
         >>> import numpy as np
         >>> from sot.translate import symbolic_translate

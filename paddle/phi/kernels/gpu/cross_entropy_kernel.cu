@@ -1289,7 +1289,7 @@ void CrossEntropyWithSoftmaxCUDAKernel(const GPUContext& dev_ctx,
       return;
     }
 
-    // if axis is not the last, we need a new impliment
+    // if axis is not the last, we need a new implement
     if (soft_label) {
       auto* logits_data = softmax->data<T>();
       auto* labels_data = labels.data<T>();

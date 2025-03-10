@@ -145,7 +145,7 @@ class PrelnEmbEltwiseLayerNormOpConverter : public OpConverter {
         output_fp16,
         1,
         common::errors::InvalidArgument(
-            "Only Precision::KHalf(fp16) is supported when infering "
+            "Only Precision::KHalf(fp16) is supported when inferring "
             "ernie(bert) model with config.EnableVarseqlen(). "
             "But Precision::KFloat32 is setted."));
 

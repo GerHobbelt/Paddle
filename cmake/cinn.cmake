@@ -167,7 +167,6 @@ cinn_cc_library(
   ${cinnapi_src}
   DEPS
   glog
-  python
   ${llvm_libs}
   param_proto
   auto_schedule_proto

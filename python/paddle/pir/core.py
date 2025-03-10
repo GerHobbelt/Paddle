@@ -217,6 +217,8 @@ def switch_main_program(program, insertion_point=None):
     prev_program = _main_program_
     prev_insertion_point = get_current_insertion_point()
     _main_program_ = program
+    if program == prev_program and insertion_point is None:
+        insertion_point = prev_insertion_point
     if insertion_point is None:
         set_insertion_point_to_block_end(_main_program_.global_block())
     else:

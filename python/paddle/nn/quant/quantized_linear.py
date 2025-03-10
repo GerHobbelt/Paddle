@@ -57,7 +57,7 @@ def _get_arch_info():
                 "Paddle is not compiled with CUDA, we cannot get SMVersion from device, please try to compile Paddle with CUDA"
             )
     else:
-        # Defaut arch value for type checking.
+        # Default arch value for type checking.
         return 0
 
 

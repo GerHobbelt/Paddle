@@ -2695,7 +2695,7 @@ class RuleBasedTuner:
         # Quit if just tune
         if not self._is_run:
             self._logger.info(
-                "The process will be quitted when just tune not run."
+                "The process will be quit when just tune not run."
             )
             sys.exit()
 

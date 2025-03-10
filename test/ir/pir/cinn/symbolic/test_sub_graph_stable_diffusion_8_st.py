@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# repo: diffusers_sub_grpah
+# repo: diffusers_sub_graph
 # model: stable_diffusion
 # api:paddle.nn.functional.activation.silu||api:paddle.nn.functional.common.dropout||api:paddle.nn.functional.conv.conv2d||method:__add__||method:__truediv__
 import unittest

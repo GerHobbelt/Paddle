@@ -827,6 +827,7 @@ Tensor is the basic data structure in PaddlePaddle. There are some ways to creat
  *  **/
 int TensorInit(PyObject* self, PyObject* args, PyObject* kwargs) {
   EAGER_TRY
+  SetPythonStack();
   // set a flag to record use kwargs or not
   bool flag_kwargs = false;
   if (kwargs) flag_kwargs = true;

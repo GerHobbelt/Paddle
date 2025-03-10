@@ -14,6 +14,7 @@
 
 #pragma once
 #include "paddle/cinn/common/simplify_special_pattern.h"
+#include <list>
 #include <optional>
 #include <stack>
 #include <unordered_map>
@@ -22,6 +23,166 @@
 #include "paddle/cinn/ir/op/ir_operators.h"
 namespace cinn {
 namespace common {
+
+static void MergeMulModInsertElements(
+    const std::vector<ir::IndexExpr>& elems,
+    std::list<ir::IndexExpr>* mult_exprs,
+    std::list<std::pair<ir::IndexExpr, ir::IndexExpr>>* mod_exprs,
+    ir::IndexExpr* no_opt_sum,
+    bool* has_mult,
+    bool* has_mod) {
+  *has_mult = false;
+  *has_mod = false;
+  for (const ir::IndexExpr ele : elems) {
+    auto mod_ptr = ele.As<ir::Mod>();
+    auto mult_ptr = ele.As<ir::Mul>();
+    if (mod_ptr) {
+      *has_mod = true;
+      mod_exprs->emplace_back(
+          std::make_pair(std::move(mod_ptr->a().as_index()),
+                         std::move(mod_ptr->b().as_index())));
+    } else if (mult_ptr) {
+      *has_mult = true;
+      mult_exprs->emplace_back(ele);
+    } else {
+      *no_opt_sum = no_opt_sum->get() ? *no_opt_sum + ele : ele;
+    }
+  }
+}
+
+static std::optional<ir::IndexExpr> MergeMulModInner(
+    const ir::IndexExpr& mult_expr,
+    const ir::IndexExpr& mod_l_expr,
+    const ir::IndexExpr& mod_r_expr) {
+  const ir::Mul* mult_ptr = mult_expr.As<ir::Mul>();
+  if (!mult_ptr) return std::nullopt;
+  ir::IndexExpr mult_outer = mult_ptr->b().as_index();
+  ir::IndexExpr inner = mult_ptr->a().as_index();
+
+  while (true) {
+    mult_ptr = inner.As<ir::Mul>();
+    if (mult_ptr) {
+      inner = mult_ptr->a().as_index();
+      mult_outer = mult_ptr->b().as_index() * mult_outer;
+    } else {
+      break;
+    }
+  }
+
+  ir::IndexExpr search_ptr = inner;
+  ir::IndexExpr mult_inner;  // The inner multiplication factor
+  ir::IndexExpr no_opt_sum;  // Sum of the exprs that cannot be optimized
+
+  while (true) {
+    auto inner_div_ptr = search_ptr.As<ir::Div>();
+    auto inner_mult_ptr = search_ptr.As<ir::Mul>();
+    auto inner_add_ptr = search_ptr.As<ir::Add>();
+    if (!inner_div_ptr && !inner_mult_ptr && !inner_add_ptr) {
+      return std::nullopt;
+    } else if (inner_div_ptr) {
+      ir::IndexExpr overall_mult =
+          mult_inner.get() ? mult_inner * mult_outer : mult_outer;
+      VLOG(5) << "inner_div_ptr_b: " << inner_div_ptr->b().as_index();
+      VLOG(5) << "overall_mult: " << overall_mult;
+      VLOG(5) << "mod_r_expr: " << mod_r_expr;
+      VLOG(5) << "inner_div_ptr_a - mod_l_expr: "
+              << inner_div_ptr->a().as_index() - mod_l_expr;
+      VLOG(5) << "ProveDivisible: "
+              << ProveDivisible(inner_div_ptr->a().as_index() - mod_l_expr,
+                                mod_r_expr);
+      if (overall_mult == inner_div_ptr->b().as_index() &&
+          overall_mult == mod_r_expr &&
+          ProveDivisible(inner_div_ptr->a().as_index() - mod_l_expr,
+                         mod_r_expr)) {
+        // Found!
+        return no_opt_sum.get()
+                   ? no_opt_sum * mult_outer + inner_div_ptr->a().as_index()
+                   : inner_div_ptr->a().as_index();
+      } else {
+        return std::nullopt;
+      }
+    } else if (inner_mult_ptr) {
+      mult_inner = mult_inner.get()
+                       ? inner_mult_ptr->b().as_index() * mult_inner
+                       : inner_mult_ptr->b().as_index();
+      search_ptr = inner_mult_ptr->a().as_index();
+    } else if (inner_add_ptr) {
+      if (mult_inner.get()) {
+        return std::nullopt;
+      }
+      auto lhs = inner_add_ptr->a().as_index();
+      auto rhs = inner_add_ptr->b().as_index();
+      if (inner_add_ptr->b().as_index().is_constant()) {
+        std::swap(lhs, rhs);
+      } else if (inner_add_ptr->b().as_index().length() < mod_r_expr.length()) {
+        std::swap(lhs, rhs);
+      }
+      no_opt_sum = no_opt_sum.get() ? no_opt_sum + lhs : lhs;
+      search_ptr = rhs;
+    } else {
+      break;
+    }
+  }
+  return std::nullopt;
+}
+
+ir::IndexExpr MergeMulMod(const ir::IndexExpr& base) {
+  std::vector<ir::IndexExpr> elems = GetFlattenExprs<ir::Add>(base);
+  std::list<ir::IndexExpr> mult_exprs;
+  std::list<std::pair<ir::IndexExpr, ir::IndexExpr>> mod_exprs;
+  ir::IndexExpr no_opt_sum;
+  bool has_mult;
+  bool has_mod;
+  MergeMulModInsertElements(
+      elems, &mult_exprs, &mod_exprs, &no_opt_sum, &has_mult, &has_mod);
+  bool find_opt = false;
+  auto search_mod_it = mod_exprs.begin();
+
+  while (search_mod_it != mod_exprs.end()) {
+    auto mult_it = mult_exprs.begin();
+    bool inner_find_opt = false;
+    while (mult_it != mult_exprs.end()) {
+      auto ret = MergeMulModInner(
+          *mult_it, search_mod_it->first, search_mod_it->second);
+      if (!ret.has_value()) {
+        ++mult_it;
+        continue;
+      }
+      inner_find_opt = true;
+      auto temp_mod_it = search_mod_it;
+      ++search_mod_it;
+      mod_exprs.erase(temp_mod_it);
+      mult_exprs.erase(mult_it);
+      std::vector<ir::IndexExpr> ret_elems =
+          GetFlattenExprs<ir::Add>(ret.value());
+      MergeMulModInsertElements(
+          ret_elems, &mult_exprs, &mod_exprs, &no_opt_sum, &has_mult, &has_mod);
+      if (has_mult) {
+        search_mod_it = mod_exprs.begin();
+      } else if (has_mod && search_mod_it == mod_exprs.end()) {
+        search_mod_it--;
+      }
+      break;
+    }
+    find_opt = find_opt || inner_find_opt;
+    if (!inner_find_opt) {
+      ++search_mod_it;
+    }
+  }
+  if (!find_opt) {
+    return base;
+  }
+  for (const auto& it : mult_exprs) {
+    no_opt_sum = no_opt_sum.get() ? no_opt_sum + it : it;
+  }
+
+  for (const auto& it : mod_exprs) {
+    no_opt_sum = no_opt_sum.get() ? no_opt_sum + it.first % it.second
+                                  : it.first % it.second;
+  }
+  return no_opt_sum;
+}
+
 // S0 / (S1 * S2) * S1 * S2 + S4 % (S1 * S2) ==> S0
 // s.t. (S4 - S0) % (S1 * S2) == 0
 std::optional<ir::IndexExpr> DivMulAddModCornerCase(const ir::IndexExpr& lhs,

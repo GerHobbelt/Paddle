@@ -44,11 +44,11 @@ struct CSoftmaxWithCrossEntropyFunctor {
 };
 
 static constexpr int kNumCUDAThreads = 512;
-static constexpr int64_t kNumMaxinumNumBlocks = 4096;
+static constexpr int64_t kNumMaximumNumBlocks = 4096;
 
 static inline int64_t NumBlocks(const int64_t N) {
   return std::min((N + kNumCUDAThreads - 1) / kNumCUDAThreads,
-                  kNumMaxinumNumBlocks);
+                  kNumMaximumNumBlocks);
 }
 
 template <typename T, typename IndexT>
@@ -111,12 +111,12 @@ __global__ void SoftMaskLabelByIndex(T* predicted_logits,
 }
 
 template <typename T, typename IndexT>
-__global__ void CaculateLoss(T* loss,
-                             const T* predict_logits,
-                             const T* sum_exp_logits,
-                             const IndexT* label,
-                             const int64_t ignore_index,
-                             const int64_t N) {
+__global__ void CalculateLoss(T* loss,
+                              const T* predict_logits,
+                              const T* sum_exp_logits,
+                              const IndexT* label,
+                              const int64_t ignore_index,
+                              const int64_t N) {
   CUDA_KERNEL_LOOP_TYPE(i, N, int64_t) {
     auto real_label = static_cast<int64_t>(label[i]);
     loss[i] = ignore_index == real_label
@@ -129,13 +129,13 @@ __global__ void CaculateLoss(T* loss,
 }
 
 template <typename T, typename IndexT>
-__global__ void CaculateSoftLoss(T* loss,
-                                 const T* predict_logits,
-                                 const T* sum_exp_logits,
-                                 const IndexT* label,
-                                 const int64_t ignore_index,
-                                 const int64_t N,
-                                 const int64_t C) {
+__global__ void CalculateSoftLoss(T* loss,
+                                  const T* predict_logits,
+                                  const T* sum_exp_logits,
+                                  const IndexT* label,
+                                  const int64_t ignore_index,
+                                  const int64_t N,
+                                  const int64_t C) {
   const T prob = static_cast<T>(1.0 / C);
 
   CUDA_KERNEL_LOOP_TYPE(i, N, int64_t) {
@@ -323,7 +323,7 @@ struct CSoftmaxWithCrossEntropyFunctor<phi::GPUContext, T> {
 
     if (label_type == phi::DataType::INT32) {
       if (C > 1) {
-        CaculateSoftLoss<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+        CalculateSoftLoss<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
             loss_2d.data<T>(),
             predicted_logits.data<T>(),
             sum_exp_logits.data<T>(),
@@ -332,7 +332,7 @@ struct CSoftmaxWithCrossEntropyFunctor<phi::GPUContext, T> {
             N,
             C);
       } else {
-        CaculateLoss<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+        CalculateLoss<T, int32_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
             loss_2d.data<T>(),
             predicted_logits.data<T>(),
             sum_exp_logits.data<T>(),
@@ -343,7 +343,7 @@ struct CSoftmaxWithCrossEntropyFunctor<phi::GPUContext, T> {
 
     } else {
       if (C > 1) {
-        CaculateSoftLoss<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+        CalculateSoftLoss<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
             loss_2d.data<T>(),
             predicted_logits.data<T>(),
             sum_exp_logits.data<T>(),
@@ -352,7 +352,7 @@ struct CSoftmaxWithCrossEntropyFunctor<phi::GPUContext, T> {
             N,
             C);
       } else {
-        CaculateLoss<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
+        CalculateLoss<T, int64_t><<<blocks, threads, 0, dev_ctx.stream()>>>(
             loss_2d.data<T>(),
             predicted_logits.data<T>(),
             sum_exp_logits.data<T>(),

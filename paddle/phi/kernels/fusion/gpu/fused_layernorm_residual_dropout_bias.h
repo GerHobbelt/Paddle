@@ -40,7 +40,7 @@ using LayerNormScaleBiasT =
     typename std::conditional<ScaleBiasWithSameTypeX, T, U>::type;
 
 /**
- * @brief fused add_bias, dropout, add residual and leyer_norm into one
+ * @brief fused add_bias, dropout, add residual and layer_norm into one
  * operators. Currently only support forward
  */
 

@@ -216,8 +216,13 @@ class UserDefinedFunctionVariable(FunctionVariable):
                 output = inline_executor.inline_call()
         except SotErrorBase as e:
             self.graph.restore_memo(checkpoint)
+            indent = " " * 4
+            filename = self.value.__code__.co_filename
+            lineno = self.value.__code__.co_firstlineno
+            code_name = self.value.__code__.co_name
+            location_info = f'File "{filename}", line {lineno}, in {code_name}'
             raise BreakGraphError(
-                f"({e}) raised while inline call {self.value.__code__}."
+                f"{location_info} encountered breakgraph error caused by\n{indent}{e}"
             )
         return output
 

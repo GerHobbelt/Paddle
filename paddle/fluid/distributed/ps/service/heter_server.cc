@@ -112,7 +112,7 @@ int SendAndRecvVariableHandler::SaveInSwitchWithShard(
   VLOG(4) << "entering SaveInSwitchWithShard";
   int32_t group_id = request->group_id();
   if (group_id >= FLAGS_heter_world_size) {
-    LOG(ERROR) << "group id exceed maxmium";
+    LOG(ERROR) << "group id exceed maximum";
   }
   auto& local_shard = _local_shards[group_id];
   auto& request_io_buffer = cntl->request_attachment();

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# repo: diffusers_sub_grpah
+# repo: diffusers_sub_graph
 # model: stable_diffusion
 # method:transpose||api:paddle.nn.functional.common.linear||api:paddle.nn.functional.common.linear||api:paddle.nn.functional.common.linear||method:reshape||method:transpose||method:reshape||method:transpose||method:reshape||method:transpose||api:paddle.tensor.linalg.matmul||method:__mul__||method:cast||api:paddle.nn.functional.activation.softmax||method:cast||api:paddle.tensor.linalg.matmul||method:transpose||method:reshape||api:paddle.nn.functional.common.linear||api:paddle.nn.functional.common.dropout||method:transpose||method:reshape||method:__add__||method:__truediv__
 import unittest

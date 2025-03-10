@@ -646,6 +646,11 @@ PD_REGISTER_SPMD_RULE(
     c_softmax_with_cross_entropy,
     PD_INFER_SPMD(phi::distributed::CSoftmaxWithCrossEntropyInferSpmd));
 
+PD_REGISTER_SPMD_RULE(
+    c_softmax_with_multi_label_cross_entropy,
+    PD_INFER_SPMD(
+        phi::distributed::CSoftmaxWithMultiLabelCrossEntropyInferSpmd));
+
 // fused_linear_param_grad_add got no reverse infer spmd rule
 PD_REGISTER_SPMD_RULE(
     fused_linear_param_grad_add,

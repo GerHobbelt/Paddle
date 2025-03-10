@@ -129,7 +129,7 @@ class Compiler final {
   std::vector<void*> GetFnPtr() const { return fn_ptr_; }
 
  private:
-  // do not register device symbol until end=true for build fucntion
+  // do not register device symbol until end=true for build function
   void RegisterDeviceModuleSymbol();
 
   void RegisterCudaModuleSymbol();

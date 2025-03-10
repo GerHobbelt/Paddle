@@ -123,9 +123,9 @@ class InputOrOutputCompat {
  *         .AddInput("Bias").IsTensor().IsOptional().End()
  *         .AddOutput("Out").IsTensor().End()
  *
- * All the inference-aware Op defition is as above, all the other attributes not
- * contained in the definition should be set default value or it would be judged
- * incompatible.
+ * All the inference-aware Op definition is as above, all the other attributes
+ * not contained in the definition should be set default value or it would be
+ * judged incompatible.
  */
 class OpCompat {
  public:

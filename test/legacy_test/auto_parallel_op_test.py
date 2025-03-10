@@ -351,7 +351,7 @@ def convert_input_dims_map_to_placements(
     return placements_map
 
 
-# TODO: This method has been implementd in
+# TODO: This method has been implemented in
 # paddle/phi/core/distributed/auto_parallel/placement_types.h, bind it
 # python and it's logic.
 def placements_to_dims_map(placements: list, tensor_ndim: int) -> tuple[int]:

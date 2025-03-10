@@ -39,7 +39,7 @@ class TestCollectiveAllToAllAPI(TestDistBase):
                 "alltoall",
                 "nccl",
                 dtype=dtype,
-                need_envs={"FLAGS_dynamic_static_unified_comm": "true"},
+                need_envs={},
             )
 
     def test_alltoall_nccl_with_new_comm_pir(self):
@@ -57,7 +57,6 @@ class TestCollectiveAllToAllAPI(TestDistBase):
                 "nccl",
                 dtype=dtype,
                 need_envs={
-                    "FLAGS_dynamic_static_unified_comm": "true",
                     "FLAGS_enable_pir_in_executor": "1",
                 },
             )

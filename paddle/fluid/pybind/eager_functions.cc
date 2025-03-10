@@ -305,7 +305,7 @@ PyObject* eager_api_get_grads_types(PyObject* self,
     }
 
     auto& grad = meta->Grad();
-    if (meta && grad.initialized()) {
+    if (meta && grad.has_allocation()) {
       if ((grad.is_dense_tensor() || grad.is_dist_tensor()) &&
           (tensor.dtype() == phi::DataType::FLOAT32 ||
            tensor.dtype() == phi::DataType::FLOAT16 ||
@@ -690,7 +690,7 @@ PyObject* eager_api_run_custom_op(PyObject* self,
         const auto& input_tensor = ctx.InputAt(input_range.first);
         // inplace optional [Tensor or vector<Tensor>], un-initialized tensor.
         if (paddle::framework::detail::IsOptionalVar(output) &&
-            !input_tensor.initialized()) {
+            !input_tensor.has_allocation()) {
           VLOG(7) << "Custom operator add output " << output
                   << " to CustomOpKernelContext. Add un-initialized tensor "
                      "because the inplace optional input is None";

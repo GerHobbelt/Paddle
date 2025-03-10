@@ -51,6 +51,7 @@ limitations under the License. */
 
 COMMON_DECLARE_bool(check_nan_inf);
 COMMON_DECLARE_int32(check_nan_inf_level);
+COMMON_DECLARE_int32(call_stack_level);
 
 using egr::ConvertToDistTensor;
 
@@ -268,6 +269,19 @@ void SetPythonStack() {
     }
     std::string last = str + egr::Controller::Instance().GetPythonStack();
     egr::Controller::Instance().SetPythonStack(last);
+  }
+
+  if (FLAGS_call_stack_level == 3) {
+    VLOG(4) << "this is SetPythonStack";
+    pybind11::gil_scoped_acquire gil;
+    PyObject* mod = PyImport_ImportModule("traceback");
+    PyObject* traceback_list = PyObject_CallMethod(mod, "format_stack", "");
+    std::string str = "";
+    for (Py_ssize_t i = 0; i < PyList_Size(traceback_list); i++) {
+      PyObject* line = PyList_GetItem(traceback_list, i);
+      str += py::str(PyUnicode_AsUTF8(line));
+    }
+    egr::Controller::Instance().SetPythonStack(str);
   }
 }
 
@@ -1003,7 +1017,7 @@ PyObject* ToPyObject(const std::vector<paddle::Tensor>& value,
   PyGILState_Release(gstate);
 
   for (size_t i = 0; i < value.size(); i++) {
-    if (!value[i].initialized() && return_py_none_if_not_initialize) {
+    if (!value[i].has_allocation() && return_py_none_if_not_initialize) {
       Py_INCREF(Py_None);
       PyList_SET_ITEM(result, static_cast<Py_ssize_t>(i), Py_None);
     } else {
@@ -2513,7 +2527,7 @@ paddle::Tensor PyTensorHook::operator()(const paddle::Tensor& var) {
   PyObject* res = nullptr;
   try {
     bool return_py_none_if_not_initialize = true;
-    if (var.defined() && !var.initialized()) {
+    if (var.defined() && !var.has_allocation()) {
       return_py_none_if_not_initialize = !var.is_dist_tensor();
     }
     PyObject* p_tmp_var = ToPyObject(var, return_py_none_if_not_initialize);

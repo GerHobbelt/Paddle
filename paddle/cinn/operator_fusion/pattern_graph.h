@@ -43,7 +43,7 @@ class PatternGraph {
 
   void RemoveNode(const PatternNodePtr& node);
   void AppendNode(const PatternNodePtr& node);
-  std::string GraphInfo() const;
+  void PrintGraphInfo() const;
   PatternNodePtr MergeNode(const PatternNodePtr& upstream,
                            const PatternNodePtr& downstream,
                            MergePatternFn merge_pattern_fn);

@@ -144,18 +144,18 @@ class FileReader:
         self._checkArgsKey("minTimeStamp", int)
 
     def getFileListByGroup(self, groupId):
-        lIndext = 0
-        rIndext = 0
+        lIndex = 0
+        rIndex = 0
 
         if self._organizeForm == FILEORGANIZEFORM_BYTRAINER:
-            lIndext = groupId * self._groupSize
-            rIndext = (groupId + 1) * self._groupSize
+            lIndex = groupId * self._groupSize
+            rIndex = (groupId + 1) * self._groupSize
         elif self._organizeForm == FILEORGANIZEFORM_BYRANK:
-            lIndext = groupId * self._groupSize * self._gpuPerTrainer
-            rIndext = (groupId + 1) * self._groupSize * self._gpuPerTrainer
+            lIndex = groupId * self._groupSize * self._gpuPerTrainer
+            rIndex = (groupId + 1) * self._groupSize * self._gpuPerTrainer
 
         try:
-            return self._fileList[lIndext:rIndext]
+            return self._fileList[lIndex:rIndex]
         except IndexError:
             raise IndexError("invalid index of file list")
 

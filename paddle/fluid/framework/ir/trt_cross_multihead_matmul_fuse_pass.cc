@@ -270,7 +270,7 @@ int TrtCrossMultiHeadMatmulFusePass::BuildCrossFusion(
                                                              name_scope);
 
   multihead_pattern();
-  auto fuse_creater = [&](Node* input0,
+  auto fuse_creator = [&](Node* input0,
                           Node* input1,
                           Node* mul0,
                           Node* mul1,
@@ -430,7 +430,7 @@ int TrtCrossMultiHeadMatmulFusePass::BuildCrossFusion(
     GET_IR_NODE_FROM_SUBGRAPH(
         transpose2_qkv_out, transpose2_qkv_out, multihead_pattern);
 
-    fuse_creater(input0,
+    fuse_creator(input0,
                  input1,
                  mul0,
                  mul1,

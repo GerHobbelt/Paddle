@@ -212,17 +212,17 @@ struct FlowGraph {
       Node op_node(&op);
       auto layout_transform_iface =
           op.dyn_cast<paddle::dialect::LayoutTransformationInterface>();
-      const auto& relevate_inputs =
+      const auto& relevant_inputs =
           layout_transform_iface ? layout_transform_iface.RelevantInputs(&op)
                                  : op.operands_source();
-      const auto& relevate_outputs =
+      const auto& relevant_outputs =
           layout_transform_iface ? layout_transform_iface.RelevantOutputs(&op)
                                  : op.results();
-      VLOG(10) << "[BuildGraph]" << op_node << " isz:" << relevate_inputs.size()
-               << " osz:" << relevate_outputs.size();
+      VLOG(10) << "[BuildGraph]" << op_node << " isz:" << relevant_inputs.size()
+               << " osz:" << relevant_outputs.size();
 
       // add in edge
-      for (auto& operand : relevate_inputs) {
+      for (auto& operand : relevant_inputs) {
         Node operand_node(operand);
         // the capacity should be set as the out_degree of operand node
         float weight = 1.0f;
@@ -235,7 +235,7 @@ struct FlowGraph {
         AddEdge(operand_node, op_node, weight, 0.0f, true);
       }
 
-      for (const auto& op_result : relevate_outputs) {
+      for (const auto& op_result : relevant_outputs) {
         // we have ssa, so the output must not be processed
         Node op_result_node(op_result);
 
@@ -275,19 +275,19 @@ struct FlowGraph {
 
       auto layout_transform_iface =
           op.dyn_cast<paddle::dialect::LayoutTransformationInterface>();
-      const auto& relevate_inputs =
+      const auto& relevant_inputs =
           layout_transform_iface ? layout_transform_iface.RelevantInputs(&op)
                                  : op.operands_source();
-      const auto& relevate_outputs =
+      const auto& relevant_outputs =
           layout_transform_iface ? layout_transform_iface.RelevantOutputs(&op)
                                  : op.results();
 
-      for (const auto& op_operand : relevate_inputs) {
+      for (const auto& op_operand : relevant_inputs) {
         Node operand_node(op_operand);
         AddEdge(src_node(), operand_node, THRESHOLD);
       }
 
-      for (const auto& op_result : relevate_outputs) {
+      for (const auto& op_result : relevant_outputs) {
         Node op_result_node(op_result);
         AddEdge(src_node(), op_result_node, THRESHOLD);
       }
@@ -328,11 +328,11 @@ struct FlowGraph {
     for (auto& op : *(program.block())) {
       auto layout_transform_iface =
           op.dyn_cast<paddle::dialect::LayoutTransformationInterface>();
-      const auto& relevate_outputs =
+      const auto& relevant_outputs =
           layout_transform_iface ? layout_transform_iface.RelevantOutputs(&op)
                                  : op.results();
 
-      for (const auto& op_result : relevate_outputs) {
+      for (const auto& op_result : relevant_outputs) {
         Node op_result_node(op_result);
         for (auto it = op_result.use_begin(); it != op_result.use_end(); ++it) {
           auto user_op = it->owner();

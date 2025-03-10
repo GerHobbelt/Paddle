@@ -11,7 +11,7 @@ function(windows_symbolic TARGET)
     if(NOT EXISTS ${final_path}/${src}.cc OR NOT EXISTS ${final_path}/${src}.cu)
       message(
         FATAL
-        " ${src}.cc and ${src}.cu must exsits, and ${src}.cu must be symbolic file."
+        " ${src}.cc and ${src}.cu must exists, and ${src}.cu must be symbolic file."
       )
     endif()
 

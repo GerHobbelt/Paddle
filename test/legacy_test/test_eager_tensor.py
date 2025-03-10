@@ -1300,15 +1300,7 @@ class TestEagerTensor(unittest.TestCase):
             with warnings.catch_warnings(record=True) as w:
                 x = paddle.to_tensor([1, 2, 3])
                 paddle.to_tensor(x)
-                flag = False
-                for warn in w:
-                    if (
-                        issubclass(warn.category, UserWarning)
-                    ) and "To copy construct from a tensor, it is recommended to use sourceTensor.clone().detach(), rather than paddle.to_tensor(sourceTensor)." in str(
-                        warn.message
-                    ):
-                        flag = True
-                        break
+                flag = paddle.tensor.creation._warned_in_to_tensor
                 self.assertTrue(flag)
 
     def test_dlpack_device(self):

@@ -128,16 +128,13 @@ class TestMoEApi(unittest.TestCase):
         local_dims_mapping,
     ):
         # local_tensors_from_dtensor op
-        self.check_dist_attr(ops[2], local_meshes, local_dims_mapping)
-
+        self.check_dist_attr(ops[4], local_meshes, local_dims_mapping)
         # dtensor_from_local_list op
-        self.check_dist_attr(ops[3], [global_mesh], global_dims_mapping)
-
+        self.check_dist_attr(ops[5], [global_mesh], global_dims_mapping)
         # grad op for dtensor_from_local_list
-        self.check_dist_attr(ops[8], local_meshes, local_dims_mapping)
-
+        self.check_dist_attr(ops[10], local_meshes, local_dims_mapping)
         # grad op for local_tensors_from_dtensor op
-        self.check_dist_attr(ops[9], [global_mesh], global_dims_mapping)
+        self.check_dist_attr(ops[11], [global_mesh], global_dims_mapping)
 
 
 if __name__ == "__main__":

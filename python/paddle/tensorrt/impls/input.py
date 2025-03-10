@@ -47,6 +47,11 @@ def one_hot_converter(network, paddle_op, inputs):
 
     values_tensor = add_1D_constant_layer(network, values_data, dtype=np_dtype)
 
+    if isinstance(num_classes_tensor, trt.Weights):
+        num_classes_tensor = network.add_constant(
+            paddle_op.operands()[1].source().shape, num_classes_tensor
+        ).get_output(0)
+
     reshape_layer = network.add_shuffle(num_classes_tensor)
     reshape_layer.reshape_dims = ()
     depth_tensor = reshape_layer.get_output(0)

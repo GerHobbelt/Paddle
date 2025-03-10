@@ -43,6 +43,7 @@ from .utils import (
     get_pp_stage_by_process_mesh,
     get_sub_process_mesh_by_program,
     partition_skip_op_list,
+    update_pylayer_output,
 )
 
 _logger = get_logger(
@@ -230,7 +231,7 @@ class ReshardPasses:
 
     @staticmethod
     def decompose_reshard_pass(dist_program):
-        # split composed reshard op into atomic reshard ops, which would increase the oppotunity of reshard Re-Use in following fold_reshard_pass.
+        # split composed reshard op into atomic reshard ops, which would increase the opportunity of reshard Re-Use in following fold_reshard_pass.
         del_ops = []
         for op in dist_program.global_block().ops:
             if op.name() != 'dist_op.reshard':
@@ -404,47 +405,78 @@ def replace_moe_sub_mesh_tensors(op):
             [op_dist_attr.result(out_idx).as_tensor_dist_attr()],
         )
     )
-
+    for val in op.results():
+        if not val.use_empty():
+            update_pylayer_output(val)
     assert all(val.use_empty() for val in op.results())
     op.erase()
 
 
+def remove_sub_block_unused_inputs(op):
+    inputs_size = op.operand_source.num_operands()
+    inputs = [op.operand_source(i) for i in range(inputs_size)]
+    # remove unused inputs
+
+
 class RemovePasses:
+
     @staticmethod
     def remove_other_rank_op_pass(dist_program):
         # pruning op and value not belong to cur rank
-        cur_rank = paddle.distributed.get_rank()
+        def prune_op(block):
+            cur_rank = paddle.distributed.get_rank()
+            for op in block.ops[::-1]:
+                if op.name() == "dist_op.moe_sub_mesh_tensors":
+                    replace_moe_sub_mesh_tensors(op)
+                    continue
+                elif op.name() == "dist_op.moe_global_mesh_tensor":
+                    replace_moe_global_mesh_tensor(op)
+                    continue
+                elif op.name() == "cf.tuple_push":
+                    stack_create_op = op.operand_source(0).get_defining_op()
+                    if stack_create_op.result(2).use_empty():
+                        op.erase()
+                    continue
+                elif op.name() == "cf.yield":
+                    continue
+                elif op.name() == "pd_op.pylayer":
+                    # if the pylayer op is not on the current rank, we should delete it
+                    is_cur_rank = False
+                    for pylayer_block in list(op.blocks())[::-1]:
+                        for sub_block_op in pylayer_block.ops:
+                            if (
+                                sub_block_op.dist_attr
+                                and cur_rank
+                                in sub_block_op.dist_attr.process_mesh.process_ids
+                            ):
+                                is_cur_rank = True
+                                break
+                    if not is_cur_rank:
+                        op.erase()
+                        continue
+                    for pylayer_block in list(op.blocks())[::-1]:
+                        prune_op(pylayer_block)
+                    # update pylayer op's inputs
+                    op.as_pylayer_op().update_input()
+                    continue
+                elif op.name() in partition_skip_op_list:
+                    can_delete = True
+                    for val in op.results():
+                        if not val.use_empty():
+                            can_delete = False
+                    if can_delete:
+                        op.erase()
+                    continue
 
-        for op in dist_program.global_block().ops[::-1]:
-            if op.name() == "dist_op.moe_sub_mesh_tensors":
-                replace_moe_sub_mesh_tensors(op)
-                continue
-            elif op.name() == "dist_op.moe_global_mesh_tensor":
-                replace_moe_global_mesh_tensor(op)
-                continue
-            elif op.name() == "cf.tuple_push":
-                stack_create_op = op.operand_source(0).get_defining_op()
-                if stack_create_op.result(2).use_empty():
+                if cur_rank not in op.dist_attr.process_mesh.process_ids:
                     op.erase()
-                continue
-            elif op.name() == "cf.yield":
-                continue
-            elif op.name() in partition_skip_op_list:
-                can_delete = True
-                for val in op.results():
-                    if not val.use_empty():
-                        can_delete = False
-                if can_delete:
+                elif op.name() == "dist_op.reshard":
+                    assert op.result(
+                        0
+                    ).use_empty(), f'There should not have useful dist.reshard op in remove_other_rank_op_pass. but find : {op}'
                     op.erase()
-                continue
 
-            if cur_rank not in op.dist_attr.process_mesh.process_ids:
-                op.erase()
-            elif op.name() == "dist_op.reshard":
-                assert op.result(
-                    0
-                ).use_empty(), f'There should not have useful dist.reshard op in remove_other_rank_op_pass. but find : {op}'
-                op.erase()
+        prune_op(dist_program.global_block())
 
         # merge pd.data ops for
         lr_ops = []
@@ -1034,12 +1066,6 @@ def complete_chunk_id(dist_program, startup_program, pipeline_strategy):
         dist_program.global_block().ops, seg_method
     )
     ops = dist_program.global_block().ops
-
-    assert (len(seg_struct_names) % num_chunks == 0) or (
-        (len(seg_struct_names) + 1) % num_chunks == 0
-        and (len(seg_struct_names) + 1) // num_chunks != 1
-    ), f"The number of layers[{seg_method}] ({len(seg_struct_names)}) should be divisible by part number ({num_chunks}),or ({len(seg_struct_names)} + 1) should be divisible by {num_chunks} and not equal to {num_chunks}."
-
     # Step2: analysis whether the pp_stage is non-decreasing among segments
     # 1. if non_use_custom_mesh is True, the ops' process_mesh will be changed by vpp strategy
     # 2. if non_use_custom_mesh is False, the ops's process_mesh will not be changed.
@@ -1048,20 +1074,41 @@ def complete_chunk_id(dist_program, startup_program, pipeline_strategy):
     # Step3: Get op index boundary, pp_stage, chunk_id, struct_names of each segment
     seg_pp_stages = [i % pp_degree for i in range(num_chunks)]
     seg_chunk_ids = [i // pp_degree for i in range(num_chunks)]
-    seg_layer_num = [0] * num_chunks
-    for j in range(0, len(seg_struct_names)):
-        i = j % num_chunks
-        seg_layer_num[i] = seg_layer_num[i] + 1
     seg_parts = [0]
-
+    last_struct_name = None
+    stage_ids = (
+        []
+    )  # stage_ids[i] represents the stage number assigned to the i-th layer.
     for idx, op in enumerate(ops):
         if len(seg_parts) == len(seg_struct_names):
             break
         struct_name = _extract_seg_method(op, seg_method)
+        if op.dist_attr is not None and last_struct_name != struct_name:
+            pp_stage = get_pp_stage_by_process_mesh(
+                op.dist_attr.process_mesh, pp_degree
+            )
+            if pp_stage is not None:
+                stage_ids.append(pp_stage)
+            last_struct_name = struct_name
         if struct_name == seg_struct_names[len(seg_parts)]:
             seg_parts.append(idx)
     seg_parts.append(len(ops))
-
+    pp_stage_layer_nums = [0] * pp_degree
+    for i in stage_ids:
+        pp_stage_layer_nums[i] = pp_stage_layer_nums[i] + 1
+    assert all(
+        value >= vpp_degree for value in pp_stage_layer_nums
+    ), "The number of layers on each pp_stage must not be less than the vpp_degree in the pp_stage to ensure that each chunk contains at least one layer."
+    seg_layer_num = [0] * num_chunks
+    for pp_stage in range(
+        0, pp_degree
+    ):  # Each pp_stage is assigned a number of layers based on user intent.
+        pp_stage_layer_num = pp_stage_layer_nums[pp_stage]
+        for i in range(0, pp_stage_layer_num):
+            # The pp_stage uses a Round robin scheduling algorithm to allocate layers one by one.
+            virtual_chunk_id = i % vpp_degree
+            real_chunk_id = (virtual_chunk_id) * pp_degree + pp_stage
+            seg_layer_num[real_chunk_id] = seg_layer_num[real_chunk_id] + 1
     # Step4: Set the process_mesh of each op
     seg_id = 0
     reshard_ops = []

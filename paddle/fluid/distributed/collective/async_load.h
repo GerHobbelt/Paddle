@@ -51,6 +51,13 @@ class AsyncLoad {
   std::shared_ptr<AsyncLoad::Task> Offload(phi::DenseTensor* dst,
                                            const phi::DenseTensor& src);
 
+  std::shared_ptr<AsyncLoad::Task> OffloadWithOffset(
+      phi::DenseTensor* dst,
+      const phi::DenseTensor& src,
+      size_t dst_offset,
+      size_t src_offset,
+      size_t offload_size);
+
   void PrepareLoadEnv(const std::string& key, const Place& place);
   void SyncCalcuStream(const Place& place,
                        phi::GPUContext* ctx,

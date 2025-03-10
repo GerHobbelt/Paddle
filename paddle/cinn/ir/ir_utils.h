@@ -24,7 +24,7 @@ static inline std::vector<Expr> GetCompatibleShape(
   return shape.empty() ? std::vector<Expr>({Expr(1)}) : shape;
 }
 
-// FIXME(Aurelius84): Actually we can't distingusih 0D Tensor from 1D Tensor
+// FIXME(Aurelius84): Actually we can't distinguish 0D Tensor from 1D Tensor
 // with shape [1]. So name it with Maybe prefix.
 static inline bool MaybeZeroRankTensor(const Tensor& tensor) {
   return tensor.ndims() == 1 && tensor->shape[0].is_constant() &&

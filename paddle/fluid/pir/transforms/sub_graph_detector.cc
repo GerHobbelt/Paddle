@@ -105,7 +105,7 @@ std::vector<pir::Operation*> InverselyTopologicalSort(pir::Block* block) {
 
 std::vector<pir::Operation*> GetProducerOpsReverseSort(
     pir::Operation* op,
-    const std::unordered_map<pir::Operation*, size_t>& op2index) {
+    const std::unordered_map<pir::Operation*, int>& op2index) {
   std::unordered_set<pir::Operation*> producers;
 
   std::vector<pir::Operation*> vec_res;
@@ -150,7 +150,7 @@ std::vector<pir::Operation*> GetProducerOps(pir::Operation* op) {
 
 std::vector<pir::Operation*> GetConsumerOps(
     pir::Operation* op,
-    const std::unordered_map<pir::Operation*, size_t>& op2index) {
+    const std::unordered_map<pir::Operation*, int>& op2index) {
   std::vector<pir::Operation*> consumers;
 
   for (auto& result : op->results()) {
@@ -181,8 +181,8 @@ static std::string OpsDebugStr(std::vector<pir::Operation*> ops) {
 struct SubGraph : public std::enable_shared_from_this<SubGraph> {
   using SubGraphPtr = std::shared_ptr<SubGraph>;
   SubGraph() = delete;
-  SubGraph(pir::Operation* op, int id, bool subst)
-      : substitute(subst), min_op_index(id), max_op_index(id), id(UniqueId()) {
+  SubGraph(pir::Operation* op, int index, bool subst)
+      : substitute(subst), topo_index(index), id(UniqueId()) {
     ops.push_back(op);
   }
 
@@ -207,8 +207,7 @@ struct SubGraph : public std::enable_shared_from_this<SubGraph> {
     std::stringstream ss;
     ss << "=========================================\n";
     ss << name() << " (substitute=" << substitute << ", "
-       << "min=" << min_op_index << ", "
-       << "max=" << max_op_index << ", "
+       << "index=" << topo_index << ", "
        << "size=" << ops.size() << ")\n";
     if (print_ops) ss << OpsDebugStr(ops);
     ss << "upstream: " << JointName(upstreams);
@@ -231,18 +230,15 @@ struct SubGraph : public std::enable_shared_from_this<SubGraph> {
   std::set<SubGraphPtr, compare> upstreams;
   std::set<SubGraphPtr, compare> downstreams;
 
-  bool substitute;      // whether this subgraph can be merged
-  size_t min_op_index;  // min topo index of ops in this subgraph
-  size_t max_op_index;  // max topo index of ops in this subgraph
+  bool substitute;  // whether this subgraph can be merged
+  int topo_index;
   size_t id;
 };
 using SubGraphPtr = std::shared_ptr<SubGraph>;
 
 void SubGraph::Merge(const SubGraphPtr& other) {
   // Merge other subgraph into this subgraph:
-  // 1. Inherit its upstreams and downstreams
-  VLOG(6) << "Merging : " << other->DebugStr();
-  VLOG(6) << "Into : " << DebugStr();
+  // Inherit its upstreams/downstreams and ops
   SubGraphPtr self = shared_from_this();
   for (const auto& upstream : other->upstreams) {
     if (upstream == self) continue;
@@ -258,11 +254,7 @@ void SubGraph::Merge(const SubGraphPtr& other) {
   }
   upstreams.erase(other);
   downstreams.erase(other);
-  // 2. Merge ops and update min_op_index and max_op_index
   ops.insert(ops.begin(), other->ops.begin(), other->ops.end());
-  min_op_index = std::min(self->min_op_index, other->min_op_index);
-  max_op_index = std::max(self->max_op_index, other->max_op_index);
-  VLOG(6) << "Merged : " << DebugStr();
 }
 
 bool HasSinkRoute(const SubGraphPtr& source, const SubGraphPtr& target) {
@@ -270,15 +262,16 @@ bool HasSinkRoute(const SubGraphPtr& source, const SubGraphPtr& target) {
   std::unordered_set<SubGraphPtr> visited;
   std::queue<SubGraphPtr> queue;
   queue.push(source);
+  visited.insert(source);
   while (!queue.empty()) {
     SubGraphPtr cur = queue.front();
     queue.pop();
-    visited.insert(cur);
     if (cur == target) return true;
-    if (cur->min_op_index > target->max_op_index) continue;
+    if (cur->topo_index > target->topo_index) continue;
     for (const auto& subgraph : cur->downstreams) {
       if (visited.count(subgraph)) continue;
       queue.push(subgraph);
+      visited.insert(subgraph);
     }
   }
   return false;
@@ -289,15 +282,16 @@ bool HasLiftRoute(const SubGraphPtr& source, const SubGraphPtr& target) {
   std::unordered_set<SubGraphPtr> visited;
   std::queue<SubGraphPtr> queue;
   queue.push(source);
+  visited.insert(source);
   while (!queue.empty()) {
     SubGraphPtr cur = queue.front();
     queue.pop();
-    visited.insert(cur);
     if (cur == target) return true;
-    if (source->max_op_index < target->min_op_index) continue;
+    if (source->topo_index < target->topo_index) continue;
     for (const auto& subgraph : cur->upstreams) {
       if (visited.count(subgraph)) continue;
       queue.push(subgraph);
+      visited.insert(subgraph);
     }
   }
   return false;
@@ -383,6 +377,8 @@ class SubgraphDetector {
  private:
   void ReorderIndexOfSubgraphs();
 
+  void MergeSource2Target(const SubGraphPtr& source, const SubGraphPtr& target);
+
   SubGraphPtr GetOpSubgraph(pir::Operation* op) {
     PADDLE_ENFORCE(
         op2subgraph_.count(op),
@@ -391,9 +387,10 @@ class SubgraphDetector {
     return op2subgraph_.at(op);
   }
 
-  std::unordered_map<pir::Operation*, size_t> op2index_;
+  std::unordered_map<pir::Operation*, int> op2index_;
   std::vector<pir::Operation*> sort_ops_;
   std::unordered_map<pir::Operation*, SubGraphPtr> op2subgraph_;
+  std::unordered_set<int> subgraph_index_set_;
 };
 
 void SubgraphDetector::ReorderIndexOfSubgraphs() {
@@ -412,8 +409,7 @@ void SubgraphDetector::ReorderIndexOfSubgraphs() {
   while (!queue.empty()) {
     auto subgraph = queue.front();
     queue.pop();
-    subgraph->min_op_index = index;
-    subgraph->max_op_index = index++;
+    subgraph->topo_index = index++;
     for (const auto& downstream : subgraph->downstreams) {
       in_degree[downstream]--;
       if (in_degree[downstream] == 0) queue.push(downstream);
@@ -421,21 +417,65 @@ void SubgraphDetector::ReorderIndexOfSubgraphs() {
   }
 }
 
+void SubgraphDetector::MergeSource2Target(const SubGraphPtr& source,
+                                          const SubGraphPtr& target) {
+  VLOG(6) << "Merge source: " << source->DebugStr();
+  VLOG(6) << "Merge target: " << target->DebugStr();
+  target->Merge(source);
+  int max_index = std::max(source->topo_index, target->topo_index);
+  int min_index = std::min(source->topo_index, target->topo_index);
+  auto merged = target;
+  // Check if merged subgraph and its related subgraphs
+  // satisfy the topological order condition.
+  int upstream_max_index = -1, downstream_min_index = INT_MAX;
+  for (const auto& upstream : merged->upstreams) {
+    upstream_max_index = std::max(upstream->topo_index, upstream_max_index);
+  }
+  for (const auto& downstream : merged->downstreams) {
+    downstream_min_index =
+        std::min(downstream->topo_index, downstream_min_index);
+  }
+  // 1. If satisfy the topological order after merging, just set max_index
+  VLOG(6) << "Check if satisfy the topological order after merging";
+  if (min_index > upstream_max_index && max_index < downstream_min_index) {
+    merged->topo_index = max_index;
+    subgraph_index_set_.erase(min_index);
+    return;
+  }
+  // 2. If not satisfy the order, find a index between upstream_max_index
+  // and downstream_min_index while not in subgraph_index_set_.
+  VLOG(6) << "Try to find a valid index not in subgraph_index_set_";
+  for (int i = upstream_max_index + 1; i < downstream_min_index; ++i) {
+    if (!subgraph_index_set_.count(i)) {
+      merged->topo_index = i;
+      subgraph_index_set_.erase(min_index);
+      subgraph_index_set_.erase(max_index);
+      subgraph_index_set_.insert(i);
+      return;
+    }
+  }
+  // 3. If can not find a valid index, reorder topo index of all subgraphs.
+  VLOG(6) << "Reorder topo index of all subgraphs";
+  ReorderIndexOfSubgraphs();
+}
+
 SubgraphDetector::SubgraphDetector(pir::Block* block,
                                    const OpClassifier& classifier) {
-  // init sort_ops_ in reverse topo order
-  sort_ops_ = InverselyTopologicalSort(block);
-  // init op2index_ in topo order
-  size_t index = 0;
+  // init sort_ops_ in reverse topo order and op2index_ in topo order
+  int index = 0;
   for (auto& op : *block) {
+    sort_ops_.push_back(&op);
     op2index_[&op] = index++;
   }
+  std::reverse(sort_ops_.begin(), sort_ops_.end());
+
   // construct subgraphs and upstream/downstream relation
   std::vector<SubGraphPtr> subgraph_list;
   for (const auto& op : sort_ops_) {
     bool substitute = classifier(*op);
     auto subgraph = std::make_shared<SubGraph>(op, op2index_[op], substitute);
     op2subgraph_[op] = subgraph;
+    subgraph_index_set_.insert(op2index_[op]);
     subgraph_list.push_back(subgraph);
   }
   for (const auto& op : sort_ops_) {
@@ -474,14 +514,15 @@ void SubgraphDetector::SubgraphFusion() {
       auto upstream = GetOpSubgraph(producer);
       if (upstream == downstream || !upstream->substitute) continue;
       if (CanFuseUpstream2Downstream(upstream, downstream)) {
-        downstream->Merge(upstream);
+        MergeSource2Target(upstream, downstream);
         for (auto upstream_op : upstream->ops) {
           op2subgraph_[upstream_op] = downstream;
         }
-        ReorderIndexOfSubgraphs();
+        VLOG(6) << "Merged subgraph: " << downstream->DebugStr();
       }
     }
   }
+
   VLOG(4) << "Merge brother subgraphs with same upstream";
   for (const auto& op : sort_ops_) {
     auto subgraph = GetOpSubgraph(op);
@@ -492,11 +533,11 @@ void SubgraphDetector::SubgraphFusion() {
         auto brother = GetOpSubgraph(consumer);
         if (brother == subgraph || !brother->substitute) continue;
         if (!HasRoute(subgraph, brother) && !HasRoute(brother, subgraph)) {
-          subgraph->Merge(brother);
+          MergeSource2Target(brother, subgraph);
           for (auto brother_op : brother->ops) {
             op2subgraph_[brother_op] = subgraph;
           }
-          ReorderIndexOfSubgraphs();
+          VLOG(6) << "Merged subgraph: " << subgraph->DebugStr();
         }
       }
     }

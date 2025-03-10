@@ -66,6 +66,13 @@ Tensor GetReadTensor(const Expr& block, int index);
 int GetLoopExtent(const Expr& loop);
 
 /**
+ * \brief Given a For node, return its extent as int.
+ * @param loop The given For node
+ * @return The extent of For node
+ */
+int GetLoopExtent(const ir::stmt::For loop);
+
+/**
  * \brief Given a vector of Exprs, return whether they contain a var with
  * specific name.
  * @param exprs The given vector of Exprs
@@ -205,7 +212,7 @@ Expr MakeCacheBlock(const std::vector<IterRange>& buffer_ranges,
                     DeviceAPI device_api);
 
 /**
- * Fidn cache tensor block's insertion point in the whole AST(root).
+ * Find cache tensor block's insertion point in the whole AST(root).
  * @param root The whole AST.
  * @param info The information of cache block.
  * @param is_write Are we inserting a write cache tensor or a read cache tensor.
@@ -548,7 +555,7 @@ struct RfMutator : public ir::IRMutator<> {
           true,
           ::common::errors::InvalidArgument(
               "The rfactor loop's minimum value should be zero."));
-      auto extent = cinn::common::AutoSimplify(rf_for->extent);
+      auto extent = optim::ArithSimplify(rf_for->extent);
       auto& shape = tensor->shape;
       auto& domain = tensor->domain;
       PADDLE_ENFORCE_LE(
@@ -666,9 +673,9 @@ struct LoopReconstructor : public ir::IRMutator<> {
         Var var(var_name, Int(32));
         loop_vars.push_back(var);
         loop_extents.push_back(range.extent);
-        iter_values.push_back(cinn::common::AutoSimplify(range.min) + var);
+        iter_values.push_back(optim::ArithSimplify(range.min) + var);
       } else {
-        iter_values.push_back(cinn::common::AutoSimplify(range.min));
+        iter_values.push_back(optim::ArithSimplify(range.min));
       }
     }
     auto schedule_block_node =
@@ -1313,9 +1320,9 @@ struct FindBlockParent : public ir::IRMutator<> {
 };
 
 // The struct used to create all stmts after rfactor transformation.
-struct RfCreater : public ir::IRMutator<> {
+struct RfCreator : public ir::IRMutator<> {
  public:
-  RfCreater(const Expr& root, const Expr& rf_loop, const int& rf_axis)
+  RfCreator(const Expr& root, const Expr& rf_loop, const int& rf_axis)
       : root_(root), rf_loop_(rf_loop), rf_axis_(rf_axis) {}
   void operator()(Expr* expr) { IRMutator::Visit(expr, expr); }
 

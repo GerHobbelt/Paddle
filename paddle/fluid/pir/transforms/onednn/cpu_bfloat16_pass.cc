@@ -1,4 +1,4 @@
-// Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -96,9 +96,6 @@ class CpuBfloat16Pattern : public paddle::drr::DrrPatternBase {
       op_attrs.emplace("keepdim", pat.Attr("keepdim"));
       op_attrs.emplace("dtype", pat.Attr("dtype"));
 
-    } else if (bfloat16_ops_ == "onednn_op.concat") {
-      op_attrs.emplace("mkldnn_data_type", pat.Attr("mkldnn_data_type"));
-      op_attrs.emplace("use_quantizer", pat.Attr("use_quantizer"));
     } else if (bfloat16_ops_ == "onednn_op.reshape_" ||
                bfloat16_ops_ == "onednn_op.reshape") {
       op_attrs.emplace("mkldnn_data_type", pat.Attr("mkldnn_data_type"));
@@ -224,11 +221,7 @@ class CpuBfloat16DequantPattern : public paddle::drr::DrrPatternBase {
     paddle::drr::SourcePattern pat = ctx->SourcePattern();
 
     std::unordered_map<std::string, paddle::drr::Attribute> op_attrs;
-    if (bfloat16_ops_ == "onednn_op.concat") {
-      op_attrs.emplace("mkldnn_data_type", pat.Attr("mkldnn_data_type"));
-      op_attrs.emplace("use_quantizer", pat.Attr("use_quantizer"));
-
-    } else if (bfloat16_ops_ == "onednn_op.conv2d") {
+    if (bfloat16_ops_ == "onednn_op.conv2d") {
       op_attrs.emplace("strides", pat.Attr("strides"));
       op_attrs.emplace("paddings", pat.Attr("paddings"));
       op_attrs.emplace("padding_algorithm", pat.Attr("padding_algorithm"));
@@ -272,9 +265,6 @@ class CpuBfloat16DequantPattern : public paddle::drr::DrrPatternBase {
       op_attrs.emplace("keepdim", pat.Attr("keepdim"));
       op_attrs.emplace("dtype", pat.Attr("dtype"));
 
-    } else if (bfloat16_ops_ == "onednn_op.concat") {
-      op_attrs.emplace("mkldnn_data_type", pat.Attr("mkldnn_data_type"));
-      op_attrs.emplace("use_quantizer", pat.Attr("use_quantizer"));
     } else if (bfloat16_ops_ == "onednn_op.reshape_" ||
                bfloat16_ops_ == "onednn_op.reshape") {
       op_attrs.emplace("mkldnn_data_type", pat.Attr("mkldnn_data_type"));

@@ -42,7 +42,7 @@ class TestDygraphDataLoaderWithException(unittest.TestCase):
             ):
                 base.io.DataLoader.from_generator()
 
-    def test_single_process_with_thread_expection(self):
+    def test_single_process_with_thread_exception(self):
         def error_sample_genarator(batch_num):
             def __reader__():
                 for _ in range(batch_num):
@@ -60,13 +60,13 @@ class TestDygraphDataLoaderWithException(unittest.TestCase):
             exception = None
             try:
                 for _ in loader():
-                    print("test_single_process_with_thread_expection")
+                    print("test_single_process_with_thread_exception")
             except core.EnforceNotMet as ex:
                 self.assertIn("Blocking queue is killed", str(ex))
                 exception = ex
             self.assertIsNotNone(exception)
 
-    def test_multi_process_with_process_expection(self):
+    def test_multi_process_with_process_exception(self):
         def error_sample_genarator(batch_num):
             def __reader__():
                 for _ in range(batch_num):
@@ -84,7 +84,7 @@ class TestDygraphDataLoaderWithException(unittest.TestCase):
             exception = None
             try:
                 for _ in loader():
-                    print("test_multi_process_with_thread_expection")
+                    print("test_multi_process_with_thread_exception")
             except core.EnforceNotMet as ex:
                 exception = ex
             self.assertIsNotNone(exception)

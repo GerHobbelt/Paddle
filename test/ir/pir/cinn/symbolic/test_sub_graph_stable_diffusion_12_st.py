@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# repo: diffusers_sub_grpah
+# repo: diffusers_sub_graph
 # model: stable_diffusion
 # method:cast||api:paddle.tensor.attribute.shape||method:__getitem__||method:__getitem__||method:__getitem__||method:__getitem__
 import unittest

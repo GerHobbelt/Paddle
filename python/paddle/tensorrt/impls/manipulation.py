@@ -22,6 +22,7 @@ from paddle.tensorrt.converter_utils import (
     cast_tensor,
     fix_negative_indices,
     get_axes_for_reduce_op,
+    get_input_constant_value,
     get_shape_tensor_element,
     has_dynamic_shape,
     resize_to_1d,
@@ -47,9 +48,8 @@ from ..util import get_trt_version_list
 def reshape_converter(network, paddle_op, inputs):
     x = inputs[0]
     is_constant_shape = False
-    shape_defining_op = paddle_op.operands()[1].source().get_defining_op()
-    if shape_defining_op.name() == "pd_op.full_int_array":
-        shape = shape_defining_op.attrs()["value"]
+    shape = get_input_constant_value(paddle_op, inputs, 1)
+    if shape is not None:
         reshape_dim = shape
         is_constant_shape = True
     elif isinstance(inputs[1], list):
@@ -177,7 +177,7 @@ def concat_converter(network, paddle_op, inputs):
     axis_tensor = inputs[1]
     concat_layer = network.add_concatenation(inputs=input_tensors)
 
-    axis = paddle_op.operands()[1].source().get_defining_op().attrs()["value"]
+    axis = get_input_constant_value(paddle_op, inputs, 1)[0]
     axis = int(axis)
     if axis < 0:
         axis = len(input_tensors[0].shape) + axis
@@ -195,7 +195,7 @@ def concat_converter(network, paddle_op, inputs):
 def unsqueeze_converter(network, paddle_op, inputs):
     x = inputs[0]
     input_dims = x.shape
-    axes = paddle_op.operands()[1].source().get_defining_op().attrs()["value"]
+    axes = get_input_constant_value(paddle_op, inputs, 1)
     assert (
         len(axes) > 0
     ), f"axes size should be > 0 in when convert unsqueeze op in TensorRT, but received len(axes) = {len(axes)}."
@@ -250,15 +250,8 @@ def squeeze_converter(network, paddle_op, inputs):
         input_val = network.add_constant(input_shape, input_val).get_output(0)
 
     # Get axis
-    axis = (
-        paddle_op.operands()[1]
-        .source()
-        .get_defining_op()
-        .attrs()
-        .get("value", [])
-    )
-
-    if not axis:
+    axis = get_input_constant_value(paddle_op, inputs, 1)
+    if len(axis) == 0:
         for i in range(input_shape_size):
             if input_shape[i] == -1:
                 raise RuntimeError(
@@ -307,9 +300,8 @@ def expand_converter(network, paddle_op, inputs):
     rank = len(input_dims)
     paddle_shape_tensor = paddle_op.operands()[1].source()
 
-    shape_tensor_source_op = paddle_shape_tensor.get_defining_op()
-    if shape_tensor_source_op.name() == "pd_op.full_int_array":
-        shape = shape_tensor_source_op.attrs()["value"]
+    shape = get_input_constant_value(paddle_op, inputs, 1)
+    if shape is not None:
         shape_tensor = add_1D_constant_layer(network, shape)
         shape_rank = len(shape)
     elif paddle_shape_tensor.type().as_vec_type():
@@ -376,8 +368,6 @@ def slice_converter(network, paddle_op, inputs):
     axes = paddle_op.attrs()["axes"]
     decrease_axis = paddle_op.attrs().get("decrease_axis")
 
-    starts_op = paddle_op.operands()[1].source().get_defining_op()
-    ends_op = paddle_op.operands()[2].source().get_defining_op()
     input_shape_tensor = trt_shape(network, input_tensor)
     input_rank = len(input_tensor.shape)
 
@@ -389,8 +379,8 @@ def slice_converter(network, paddle_op, inputs):
             get_shape_tensor_element(network, input_shape_tensor, i)
         )
 
-    if starts_op.name() == "pd_op.full_int_array":
-        starts = starts_op.attrs()["value"]
+    starts = get_input_constant_value(paddle_op, inputs, 1)
+    if starts is not None:
         assert len(starts) == len(
             axes
         ), f"The size of this starts: {len(starts)} must be equal to the axes: {len(axes)}."
@@ -422,8 +412,8 @@ def slice_converter(network, paddle_op, inputs):
                 network, starts, idx
             )
 
-    if ends_op.name() == "pd_op.full_int_array":
-        ends = ends_op.attrs()["value"]
+    ends = get_input_constant_value(paddle_op, inputs, 2)
+    if ends is not None:
         assert len(ends) == len(
             axes
         ), f"The size of this ends: {len(ends)} must be equal to the axes: {len(axes)}."
@@ -500,9 +490,8 @@ def split_with_num_converter(network, paddle_op, inputs):
     input_shape_size = len(input_tensor.shape)
 
     # Handle the case where axis is of type pir::Value
-    axis_op = paddle_op.operands()[1].source().get_defining_op()
-    if axis_op.name() == "pd_op.full":
-        axis_value = axis_op.attrs()["value"]
+    axis_value = get_input_constant_value(paddle_op, inputs, 1)
+    if axis_value is not None:
         axis_tensor = add_1D_constant_layer(network, axis_value)
     else:
         axis_tensor = inputs[1]
@@ -576,18 +565,16 @@ def split_converter(network, paddle_op, inputs):
     input_shape = input_tensor.shape
     input_shape_size = len(input_shape)
 
-    axis_op = paddle_op.operands()[2].source().get_defining_op()
-    if axis_op.name() == "pd_op.full":
-        axis_value = axis_op.attrs()["value"]
+    axis_value = get_input_constant_value(paddle_op, inputs, 2)
+    if axis_value is not None:
         axis_tensor = add_1D_constant_layer(network, axis_value)
     else:
         axis_tensor = inputs[2]
         axis_tensor = cast_tensor(network, axis_tensor, trt.int32)
 
     # Retrieve and process sections
-    sections_op = paddle_op.operands()[1].source().get_defining_op()
-    if sections_op.name() == "pd_op.full_int_array":
-        sections_value = sections_op.attrs()["value"]
+    sections_value = get_input_constant_value(paddle_op, inputs, 1)
+    if sections_value is not None:
         section_list = [int(s) for s in sections_value]
         dynamic_sections = False
     else:
@@ -756,9 +743,8 @@ def tile_converter(network, paddle_op, inputs):
     input_shape_tensor = network.add_shape(input).get_output(0)
     rank = len(input_shape)
 
-    repeat_times_op = paddle_op.operands()[1].source().get_defining_op()
-    if repeat_times_op.name() == "pd_op.full_int_array":
-        repeat_times = repeat_times_op.attrs()["value"]
+    repeat_times = get_input_constant_value(paddle_op, inputs, 1)
+    if repeat_times is not None:
         repeat_tensor = add_1D_constant_layer(network, repeat_times)
         repeat_rank = len(repeat_times)
     else:
@@ -809,19 +795,9 @@ def tile_converter(network, paddle_op, inputs):
 def strided_slice_converter(network, paddle_op, inputs):
     input_tensor = inputs[0]
     axes = paddle_op.attrs()["axes"]
-
-    starts_op = paddle_op.operands()[1].source().get_defining_op()
-    ends_op = paddle_op.operands()[2].source().get_defining_op()
-    strides_op = paddle_op.operands()[3].source().get_defining_op()
-
-    if starts_op.name() == "pd_op.full_int_array":
-        starts = starts_op.attrs()["value"]
-
-    if ends_op.name() == "pd_op.full_int_array":
-        ends = ends_op.attrs()["value"]
-
-    if strides_op.name() == "pd_op.full_int_array":
-        strides = strides_op.attrs()["value"]
+    starts = get_input_constant_value(paddle_op, inputs, 1)
+    ends = get_input_constant_value(paddle_op, inputs, 2)
+    strides = get_input_constant_value(paddle_op, inputs, 3)
 
     input_shape = input_tensor.shape
     nchw_input_dims = len(input_shape)
@@ -886,10 +862,8 @@ def roll_converter(network, paddle_op, inputs):
     input_tensor = inputs[0]
     axis = paddle_op.attrs()["axis"]
 
-    shifts_op = paddle_op.operands()[1].source().get_defining_op()
-    if shifts_op.name() == "pd_op.full_int_array":
-        shifts = shifts_op.attrs()["value"]
-    else:
+    shifts = get_input_constant_value(paddle_op, inputs, 1)
+    if shifts is None:
         shifts = inputs[1]
 
     axis_size = len(axis)
@@ -946,4 +920,14 @@ def roll_converter(network, paddle_op, inputs):
                 input=layer.get_output(0), indices=concat_input_tensor, axis=axi
             )
 
+    return layer.get_output(0)
+
+
+@converter_registry.register("pd_op.numel", trt_version="8.x")
+def numel_converter(network, paddle_op, inputs):
+    input_tensor = inputs[0]
+    shape_tensor = network.add_shape(input_tensor).get_output(0)
+    layer = network.add_reduce(
+        shape_tensor, trt.ReduceOperation.PROD, axes=1, keep_dims=False
+    )
     return layer.get_output(0)

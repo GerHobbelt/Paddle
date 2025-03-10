@@ -114,7 +114,7 @@ void DistMultiTrainer::InitTrainerEnv(const ProgramDesc &main_program,
                     thread_num_,
                     common::errors::InvalidArgument(
                         "static_cast<int>(pool.size()) is invalid, "
-                        "expected %d but recieved %d.",
+                        "expected %d but received %d.",
                         thread_num_,
                         static_cast<int>(pool.size())));
   for (int i = 0; i < thread_num_; ++i) {
@@ -163,7 +163,7 @@ void DistMultiTrainer::Run() {
                     thread_num_,
                     common::errors::InvalidArgument(
                         "static_cast<int>(pool.size()) is invalid, "
-                        "expected %d but recieved %d.",
+                        "expected %d but received %d.",
                         thread_num_,
                         static_cast<int>(pool.size())));
   for (int i = 0; i < thread_num_; ++i) {

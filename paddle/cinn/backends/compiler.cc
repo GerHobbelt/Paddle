@@ -430,7 +430,6 @@ void Compiler::CompileCudaModule(const Module& module,
     device_fn_name_.emplace_back(kernel_fn_name);
   }
   engine_->Link<CodeGenGpuHost>(host_module);
-
 #else
   CINN_NOT_IMPLEMENTED
 #endif

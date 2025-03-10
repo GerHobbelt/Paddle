@@ -104,20 +104,18 @@ void ApplyShapeOptimizationPass(
   std::shared_ptr<pir::PassManager> pass_manager = CreatePassManager();
   pir::OriginalAttributesFilter::Instance().SetOriginalAttributesMap(
       paddle::dialect::GetAllOpOriginalAttributes());
-  bool has_dynamic_shape = HasDynamicShape(*program);
-  if (has_dynamic_shape) {
-    if (FLAGS_cinn_specify_input_dynamic_dim) {
-      PADDLE_ENFORCE_NE(
-          FLAGS_cinn_input_dynamic_dim_spec_file,
-          "",
-          ::common::errors::InvalidArgument(
-              "'FLAGS_cinn_input_dynamic_dim_spec_file' should not be empty "
-              "when using FLAGS_cinn_specify_input_dynamic_dim."));
-      SpecifyInputDynamicDimFromFile(program,
-                                     FLAGS_cinn_input_dynamic_dim_spec_file);
-    }
-    pass_manager->AddPass(pir::CreateShapeOptimizationPass());
+
+  if (FLAGS_cinn_specify_input_dynamic_dim) {
+    PADDLE_ENFORCE_NE(
+        FLAGS_cinn_input_dynamic_dim_spec_file,
+        "",
+        ::common::errors::InvalidArgument(
+            "'FLAGS_cinn_input_dynamic_dim_spec_file' should not be empty "
+            "when using FLAGS_cinn_specify_input_dynamic_dim."));
+    SpecifyInputDynamicDimFromFile(program,
+                                   FLAGS_cinn_input_dynamic_dim_spec_file);
   }
+  pass_manager->AddPass(pir::CreateShapeOptimizationPass());
   pass_manager->Run(program);
 }
 

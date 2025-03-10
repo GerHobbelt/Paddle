@@ -129,8 +129,6 @@ DownStreamOp TrivalxOther_Fusion(TrivialOp upstream, DownStreamOp downstream) {
   return DownStreamOp(modified_body);
 }
 
-std::pair<TrivialOp, ReduceOp> SplitReduceOp(const ReduceOp& reduce_op);
-
 std::vector<FusibleOp> TransformReduceLoopRange(
     const ReduceOp& upstream,
     FusibleOp* downstream,

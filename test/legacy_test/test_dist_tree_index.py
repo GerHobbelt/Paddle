@@ -69,7 +69,7 @@ class TestTreeIndex(unittest.TestCase):
                 [node.id() for node in tree.get_nodes(layer_node_codes[-1])]
             )
 
-        all_leaf_ids = [node.id() for node in tree.get_all_leafs()]
+        all_leaf_ids = [node.id() for node in tree.get_all_leaves()]
         self.assertEqual(sum(all_leaf_ids), sum(layer_node_ids[-1]))
 
         # get_travel

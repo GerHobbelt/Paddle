@@ -318,10 +318,9 @@ TEST(SolveInequality, basic) {
   TEST_SOLVE(x * 2 + 3 < x * 10 - 20, "(x > 2)");
   TEST_SOLVE(x * -1 < -1, "(x > 1)");
   TEST_SOLVE(Expr(2) * x * -1 - x < x + 200, "(x > -50)");
-  TEST_SOLVE(Expr(2) * x + 30 - x * 3 + y * 23 < 2,
-             "(x > int32((28 + (23 * y))))");
+  TEST_SOLVE(Expr(2) * x + 30 - x * 3 + y * 23 < 2, "(x > (28 + (23 * y)))");
   TEST_SOLVE(x + ir::Min::Make(Expr(2), Expr(3) * y) < 100,
-             "(x < int32(cinn_max((100 + (-3 * y)), 98)))");
+             "(x < cinn_max((100 + (-3 * y)), 98))");
 }
 
 TEST(CAS, SimplifyCompoundMod) {

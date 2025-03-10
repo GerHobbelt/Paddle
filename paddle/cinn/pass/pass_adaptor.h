@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "paddle/cinn/ir/utils/stmt_converter.h"
 #include "paddle/cinn/pass/pass.h"
 
 namespace cinn {
@@ -24,11 +25,27 @@ template <typename PassT>
 class PassAdaptor {
  public:
   LogicalResult RunPipeline(ir::LoweredFunc func,
-                            const std::vector<std::unique_ptr<PassT>>& passes);
+                            const std::vector<std::unique_ptr<PassT>>& passes) {
+    // TODO(Hongqing-work): Add instrumentation and AnalysisManager. Remove stmt
+    // convert after update all the backend passes.
+    func->body_block = ir::ConvertExprBlockToStmtBlock(func->body);
+    LogicalResult res = Run(func, passes);
+    func->body = ir::ConvertStmtBlockToExprBlock(func->body_block);
+    return res;
+  }
+
+  LogicalResult RunPipeline(ir::stmt::BlockRef block,
+                            const std::vector<std::unique_ptr<PassT>>& passes) {
+    LogicalResult res = Run(block, passes);
+    return res;
+  }
 
  protected:
   virtual LogicalResult Run(
       ir::LoweredFunc func,
+      const std::vector<std::unique_ptr<PassT>>& passes) = 0;
+  virtual LogicalResult Run(
+      ir::stmt::BlockRef block,
       const std::vector<std::unique_ptr<PassT>>& passes) = 0;
 };
 
@@ -37,30 +54,42 @@ class FuncPassAdaptor : public PassAdaptor<FuncPass> {
   LogicalResult Run(
       ir::LoweredFunc func,
       const std::vector<std::unique_ptr<FuncPass>>& passes) override;
+  LogicalResult Run(
+      ir::stmt::BlockRef block,
+      const std::vector<std::unique_ptr<FuncPass>>& passes) override;
 };
 
-class FuncToBlockPassAdaptor : public PassAdaptor<BlockPass> {
+class BlockPassAdaptor : public PassAdaptor<BlockPass> {
  private:
   LogicalResult Run(
       ir::LoweredFunc func,
       const std::vector<std::unique_ptr<BlockPass>>& passes) override;
+  LogicalResult Run(
+      ir::stmt::BlockRef block,
+      const std::vector<std::unique_ptr<BlockPass>>& passes) override;
 };
 
-class FuncToExprPassAdaptor;
+class ExprPassAdaptor;
 
-class FuncToStmtPassAdaptor : public PassAdaptor<StmtPass> {
-  friend class FuncToExprPassAdaptor;
+class StmtPassAdaptor : public PassAdaptor<StmtPass> {
+  friend class ExprPassAdaptor;
 
  private:
   LogicalResult Run(
       ir::LoweredFunc func,
       const std::vector<std::unique_ptr<StmtPass>>& passes) override;
+  LogicalResult Run(
+      ir::stmt::BlockRef block,
+      const std::vector<std::unique_ptr<StmtPass>>& passes) override;
 };
 
-class FuncToExprPassAdaptor : public PassAdaptor<ExprPass> {
+class ExprPassAdaptor : public PassAdaptor<ExprPass> {
  private:
   LogicalResult Run(
       ir::LoweredFunc func,
+      const std::vector<std::unique_ptr<ExprPass>>& passes) override;
+  LogicalResult Run(
+      ir::stmt::BlockRef block,
       const std::vector<std::unique_ptr<ExprPass>>& passes) override;
 };
 

@@ -186,7 +186,7 @@ void RunReturnInstr(const std::shared_ptr<ReturnInstr>& instr,
                     FusionInterpreter* interpreter) {
   using namespace cinn::hlir::framework::pir::trivial_fusion_detail;  // NOLINT
   for (auto fusion_op : interpreter->scope[instr->target_]->fusion_ops) {
-    auto exprs = std::visit(GetSplitedExprFromFusionOp(), fusion_op);
+    auto exprs = std::visit(FusibleOp2Expr(), fusion_op);
     // Insert if for append loops
     for (const auto& expr : exprs) {
       // interpreter->ret_expr.push_back(expr);
@@ -249,7 +249,7 @@ std::vector<ir::Expr> FusionInterpreter::Run() {
         break;
       default:
         PADDLE_THROW(
-            ::common::errors::Unavailable("Unsupported Fusion Instrution"));
+            ::common::errors::Unavailable("Unsupported Fusion Instruction"));
     }
   }
 

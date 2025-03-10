@@ -30,7 +30,7 @@ namespace {
 
 ir::Expr CalcBufferSizeInBytes(const ir::Buffer& buffer) {
   const ir::Expr numel = buffer->SymbolicNumel();
-  return common::AutoSimplify(numel * buffer->dtype.bytes());
+  return optim::ArithSimplify(numel * buffer->dtype.bytes());
 }
 
 std::unordered_set<std::string> GetReduceVarNames(

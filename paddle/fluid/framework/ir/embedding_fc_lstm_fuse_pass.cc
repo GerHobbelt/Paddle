@@ -93,7 +93,7 @@ static int BuildFusion(Graph* graph,
     embeddings_tensor->Resize(
         {embedding_tensor.dims()[0], weightx_tensor.dims()[1]});
 
-    // Multiplie embeddings via WeightsX and add bias
+    // Multiply embeddings via WeightsX and add bias
     auto embedding_data = embedding_tensor.data<float>();
     auto weightx_data = weightx_tensor.data<float>();
     auto embeddings_data =

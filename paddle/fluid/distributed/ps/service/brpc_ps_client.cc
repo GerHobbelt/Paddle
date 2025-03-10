@@ -439,7 +439,9 @@ int FlClientBrpcClosure::check_response(size_t request_idx, int cmd_id) {
   return 0;
 }
 
-std::future<int32_t> BrpcPsClient::PrintTableStat(uint32_t table_id) {
+std::future<int32_t> BrpcPsClient::PrintTableStat(uint32_t table_id,
+                                                  uint16_t pass_id,
+                                                  size_t threshold) {
   size_t request_call_num = _server_channels.size();
   DownpourBrpcClosure *closure = new DownpourBrpcClosure(
       request_call_num, [request_call_num, table_id](void *done) {
@@ -1918,7 +1920,7 @@ std::future<int32_t> BrpcPsClient::PushDense(const Region *regions,
                           "Invalid dense size."
                           "Expect the sum of current position and data number "
                           "to be equal to or smaller than the size."
-                          "But recieved current position = %lu, data number = "
+                          "But received current position = %lu, data number = "
                           "%lu, size = %lu.",
                           pos,
                           data_num,

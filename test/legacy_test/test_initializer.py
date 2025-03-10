@@ -669,6 +669,38 @@ class TestXavierInitializerPir(unittest.TestCase):
                 self.assertAlmostEqual(max, limit, delta=DELTA)
                 self.assertEqual(init_op.attrs()['seed'], 0)
 
+    def test_uniform_xavier_initializer_zero_size(self):
+        """Test Xavier initializer with uniform distribution on
+        for matrix multiply.
+        """
+        with paddle.pir_utils.IrGuard():
+            main = paddle.static.Program()
+            startup = paddle.static.Program()
+            with paddle.static.program_guard(main, startup):
+                param = paddle.pir.core.create_parameter(
+                    dtype="float32",
+                    shape=[0, 0],
+                    name="param",
+                    initializer=paddle.nn.initializer.XavierUniform(),
+                )
+
+                block = startup.global_block()
+                checked_ops = self.get_init_ops_by_op_name(
+                    block, self.init_uniform_op_name
+                )
+                self.assertEqual(len(checked_ops), 1)
+                init_op = checked_ops[0]
+                limit = 0.0
+                min = self.get_operand_definition_op_attrs(
+                    init_op, "min", "value"
+                )
+                max = self.get_operand_definition_op_attrs(
+                    init_op, "max", "value"
+                )
+                self.assertAlmostEqual(min, -limit, delta=DELTA)
+                self.assertAlmostEqual(max, limit, delta=DELTA)
+                self.assertEqual(init_op.attrs()['seed'], 0)
+
     def test_uniform_xavier_initializer_conv(self):
         """Test Xavier initializer with uniform distribution on
         for convolutions.
@@ -725,6 +757,33 @@ class TestXavierInitializerPir(unittest.TestCase):
                 self.assertEqual(len(checked_ops), 1)
                 init_op = checked_ops[0]
                 std = np.sqrt(2.0 / (param.shape[0] + param.shape[1]))
+                self.assertAlmostEqual(
+                    init_op.attrs()["mean"], 0.0, delta=DELTA
+                )
+                self.assertAlmostEqual(init_op.attrs()["std"], std, delta=DELTA)
+                self.assertEqual(init_op.attrs()['seed'], 0)
+
+    def test_normal_xavier_initializer_zero_size(self):
+        """Test Xavier initializer with normal distribution on
+        for matrix multiply.
+        """
+        with paddle.pir_utils.IrGuard():
+            main = paddle.static.Program()
+            startup = paddle.static.Program()
+            with paddle.static.program_guard(main, startup):
+                param = paddle.pir.core.create_parameter(
+                    dtype="float32",
+                    shape=[0, 0],
+                    name="param",
+                    initializer=paddle.nn.initializer.XavierNormal(),
+                )
+                block = startup.global_block()
+                checked_ops = self.get_init_ops_by_op_name(
+                    block, self.init_normal_op_name
+                )
+                self.assertEqual(len(checked_ops), 1)
+                init_op = checked_ops[0]
+                std = 0.0
                 self.assertAlmostEqual(
                     init_op.attrs()["mean"], 0.0, delta=DELTA
                 )
@@ -1529,6 +1588,38 @@ class TestXavierInitializerDygraph(unittest.TestCase):
         )
 
         np.testing.assert_allclose(hist, hist2, rtol=0, atol=0.01)
+        paddle.enable_static()
+
+    def test_xavier_normal_initializer_zero_size(self, dtype="float32"):
+        """
+        In dygraph mode, we can use initializer directly to initialize a tensor.
+        """
+        paddle.disable_static()
+
+        tensor = paddle.zeros([0, 0, 0])
+        tensor.stop_gradient = False
+
+        xavier_ = paddle.nn.initializer.XavierNormal(fan_in=0, fan_out=0)
+        xavier_(tensor)
+        self.assertEqual(tensor.stop_gradient, False)
+        self.assertEqual(tensor.shape, [0, 0, 0])
+
+        paddle.enable_static()
+
+    def test_xavier_uniform_initializer_zero_size(self, dtype="float32"):
+        """
+        In dygraph mode, we can use initializer directly to initialize a tensor.
+        """
+        paddle.disable_static()
+
+        tensor = paddle.zeros([0, 0, 0])
+        tensor.stop_gradient = False
+
+        xavier_ = paddle.nn.initializer.XavierUniform(fan_in=0, fan_out=0)
+        xavier_(tensor)
+        self.assertEqual(tensor.stop_gradient, False)
+        self.assertEqual(tensor.shape, [0, 0, 0])
+
         paddle.enable_static()
 
 

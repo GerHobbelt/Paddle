@@ -603,7 +603,7 @@ void EinsumKernelImpl(const Context& dev_ctx,
     VLOG(5) << "      inputs [ " << i << " ].shape=" << i->dims();
   }
   ValidationCheck(equation);
-  // collect the following informations to prepare einsum.
+  // collect the following information to prepare einsum.
   LabelMap labelshape(0);
   LabelMap labeltype(LabelType::Reduction);
   std::vector<LabelMap> label2perms(inputs.size(), LabelMap(-1));

@@ -24,13 +24,23 @@
 
 namespace cinn {
 namespace optim {
-
+/**
+ * Optimizes GPU expressions by transforming variables, buffer indices, and
+ * memory access patterns for efficient GPU execution.
+ *
+ * This pass is applicable in scenarios where GPU-specific expressions need to
+ * be optimized for execution on GPU backends. This pass is essential in
+ * compiler pipelines that generate or transform GPU code, ensuring that
+ * variables and memory accesses are correctly mapped and optimized for GPU
+ * architecture.
+ *
+ * When applied, this pass performs a series of transformations on the IR to
+ * optimize expressions for GPU execution:
+ *   1) Variable and Loop Transformation
+ *   2) Buffer and Memory Access Optimization
+ *   3) Expression Simplification and Type Casting
+ */
 void OptimizeExprGPU(Expr* expr);
-/*
-  // replace 'for' loop to gpu 'block/thread'
-  // update buffer index to save memory size.
-  // re-compute buffer size.
-*/
 
 /**
  * Remove the GPU block/thread-bound For loops, add IfThenElse guards if needed.
@@ -63,7 +73,33 @@ void OptimizeExprGPU(Expr* expr);
 void RemoveGpuForLoops(ir::LoweredFunc fn);
 
 /**
- * Add __syncthreads() to shared memory producer.
+ * Removes conditional wrappers around CUDA thread synchronization calls.
+ *
+ * This pass is applicable in scenarios where CUDA synchronization functions,
+ * such as `cuda_sync_threads`, are enclosed within conditional statements
+ * (`IfThenElse`) that check if a certain variable equals zero. Such scenarios
+ * are common in auto-generated code or optimized code paths where
+ * synchronization is conditionally performed based on loop iterations or
+ * specific flags.
+ *
+ * When applied, this pass traverses the Intermediate Representation (IR) of a
+ * lowered function to identify `IfThenElse` nodes that contain
+ * `cuda_sync_threads` calls with conditions checking for equality to zero. For
+ * each identified conditional synchronization:
+ *   1) It verifies that the `IfThenElse` condition is an equality (`EQ`)
+ *      comparison where the second operand is zero.
+ *   2) It replaces the entire `IfThenElse` node with the `cuda_sync_threads`
+ *      call, effectively removing the conditional check.
+ *
+ * Example 1:
+ *   if (xxxx == 0) { __syncthreads(); }
+ * =>
+ *   __syncthreads();
+ *
+ * Example 2:
+ *   if (xxxx > 0) { __syncthreads(); }
+ * =>
+ *   if (xxxx > 0) { __syncthreads(); }
  */
 void CudaSyncThreadsDropIfThenElse(ir::LoweredFunc fn);
 

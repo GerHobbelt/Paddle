@@ -393,11 +393,11 @@ void AddNInferMeta(const std::vector<const MetaTensor*>& x,
       N,
       0,
       common::errors::InvalidArgument(
-          "The input tensor X's dimensions of SumOp "
+          "The input tensor X's dimensions of AddNOp "
           "should be larger than 0. But received X's dimensions %d.",
           N));
   if (N == 1) {
-    VLOG(3) << "Warning: SumOp have only one input, may waste memory";
+    VLOG(3) << "Warning: AddNOp have only one input, may waste memory";
   }
   bool is_all_0d_tensor = true;
   phi::DDim in_dim({0});
@@ -405,10 +405,6 @@ void AddNInferMeta(const std::vector<const MetaTensor*>& x,
     auto x_dim = x[i]->dims();
     // x_dim.size() == 1 means the real dim of selected rows is [0]
     if (x[i]->is_selected_rows() && x_dim.size() == 1) {
-      continue;
-    }
-    // for zero-sized tensor
-    if (common::product(x_dim) == 0) {
       continue;
     }
     // for 0D tensor
@@ -423,7 +419,7 @@ void AddNInferMeta(const std::vector<const MetaTensor*>& x,
         PADDLE_ENFORCE_EQ(in_dim,
                           x_dim,
                           common::errors::InvalidArgument(
-                              "The input tensor X of SumOp must"
+                              "The input tensor X of AddNOp must"
                               " have same shape. But received X[0]'s shape = "
                               "[%s], X[%d]'s shape = [%s].",
                               in_dim,
@@ -434,7 +430,7 @@ void AddNInferMeta(const std::vector<const MetaTensor*>& x,
             in_dim.size(),
             x_dim.size(),
             common::errors::InvalidArgument(
-                "The input tensor X of SumOp must have same "
+                "The input tensor X of AddNOp must have same "
                 "dimensions. But received X[0]'s dimensions = %d, X[0]'s "
                 "shape = "
                 "[%s], X[%d]'s dimensions = %d, X[%d]'s shape = [%s].",
@@ -453,7 +449,7 @@ void AddNInferMeta(const std::vector<const MetaTensor*>& x,
               in_dim[j],
               x_dim[j],
               common::errors::InvalidArgument(
-                  "The input tensor X of SumOp must have same shape "
+                  "The input tensor X of AddNOp must have same shape "
                   "if not -1."
                   "But received X[0]'s shape = [%s], X[%d]'s shape = [%s].",
                   in_dim,
@@ -973,6 +969,7 @@ void BatchNormInferMeta(const MetaTensor& x,
   }
   y->share_lod(x);
   y->set_dtype(x.dtype());
+  y->set_layout(x.layout());
 }
 
 void BatchNormInferInferMeta(const MetaTensor& x,
@@ -4734,18 +4731,13 @@ void RmsNormInferMeta(const MetaTensor& x,
                       MetaTensor* out,
                       MetaTensor* residual_out,
                       MetaTensor* inv_var) {
-  std::vector<int64_t> x_dims_vec = common::vectorize(x.dims());
-  auto x_dims_size = x_dims_vec.size();
+  size_t x_dims_size = x.dims().size();
 
   size_t normalized_dims = 1;
   for (size_t i = begin_norm_axis; i < x_dims_size; ++i) {
-    normalized_dims *= x_dims_vec[i];
+    normalized_dims *= x.dims().at(i);
   }
 
-  std::vector<int64_t> inv_var_dims;
-  for (size_t i = size_t(0); i < static_cast<size_t>(begin_norm_axis); i++) {
-    inv_var_dims.push_back(x_dims_vec[i]);
-  }
   PADDLE_ENFORCE_EQ(normalized_dims,
                     norm_weight.dims()[0],
                     common::errors::InvalidArgument(
@@ -4756,9 +4748,7 @@ void RmsNormInferMeta(const MetaTensor& x,
                         normalized_dims,
                         norm_weight.dims()[0]));
 
-  auto out_dims = common::make_ddim(x_dims_vec);
-
-  out->set_dims(out_dims);
+  out->set_dims(x.dims());
 
   if (quant_scale > 0) {
     if (fabs(quant_max_bound - 127.0f) < 0.000001) {
@@ -4774,12 +4764,16 @@ void RmsNormInferMeta(const MetaTensor& x,
 
   if (inv_var != nullptr) {
     inv_var->set_dtype(phi::DataType::FLOAT32);
+    std::vector<int64_t> inv_var_dims;
+    for (size_t i = size_t(0); i < static_cast<size_t>(begin_norm_axis); i++) {
+      inv_var_dims.push_back(x.dims().at(i));
+    }
     inv_var->set_dims(common::make_ddim(inv_var_dims));
     inv_var->set_layout(x.layout());
   }
 
   if (residual != nullptr) {
-    residual_out->set_dims(out_dims);
+    residual_out->set_dims(x.dims());
     residual_out->set_dtype(x.dtype());
     residual_out->set_layout(x.layout());
     residual_out->share_lod(x);
@@ -6061,7 +6055,7 @@ void MaskedMultiheadAttentionInferMeta(const MetaTensor& x,
       0,
       errors::InvalidArgument(
           "The num_head of query must be divisible by the num_head of key, but "
-          "recived num_head of query is %d, and the num_head of key is %d",
+          "received num_head of query is %d, and the num_head of key is %d",
           num_head,
           k_num_head));
   PADDLE_ENFORCE_EQ(

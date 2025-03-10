@@ -1267,6 +1267,7 @@ std::shared_ptr<framework::OpStrategy> StrategyForGenerateShapeSymbolic(
                                            symbol_bindings,
                                            output_dim_exprs,
                                            output_shapes[0],
+                                           out_type,
                                            tensor_name);
         std::vector<CINNValue> res;
         res.push_back(CINNValue(out));

@@ -1506,7 +1506,7 @@ void Blas<phi::GPUContext>::BatchedGETRI(int n,
       a_inv,
       a,
       common::errors::InvalidArgument(
-          "cuBLAS fuction 'cublas<S/D>getrfBatched' cannot be executed "
+          "cuBLAS function 'cublas<S/D>getrfBatched' cannot be executed "
           "in-place. The memory space of output matrix (address: %p) cannot "
           "overlap memory space of input matrix (address: %p).",
           a_inv,

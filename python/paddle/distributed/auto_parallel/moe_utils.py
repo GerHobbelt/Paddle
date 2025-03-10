@@ -261,13 +261,26 @@ def _dist_reshape(
 ):
     """
     Reshape the local tensors of the dist tensor on each rank,
-    and mannualy set the process_mesh and placements of the output.
+    and manually set the process_mesh and placements of the output.
     """
     tgt_global_shape = infer_positive_shape(dist_tensor.shape, global_shape)
     tgt_local_shape = _cal_local_shape(tgt_global_shape, mesh, placements)
-    src_local_shape = dist_tensor._local_value().shape
-    if not dist_tensor._local_value()._is_initialized():
-        tgt_local_shape = dist_tensor._local_value().shape
+    if paddle.in_dynamic_mode():
+        src_local_shape = dist_tensor._local_value().shape
+        if not dist_tensor._local_value()._is_initialized():
+            tgt_local_shape = dist_tensor._local_value().shape
+    elif paddle.framework.in_pir_mode():
+        # src_local_shape = dist_tensor._local_shape
+        src_local_shape = _cal_local_shape(
+            dist_tensor.shape,
+            dist_tensor.dist_attr().process_mesh,
+            dist_tensor.dist_attr().placements_attr,
+        )
+    else:
+        raise NotImplementedError(
+            "dist_reshape is only supported in dynamic and pir mode."
+        )
+
     assert np.prod(tgt_local_shape) == np.prod(
         src_local_shape
     ), f"The local shapes {src_local_shape} and {tgt_local_shape} are mismatched."
@@ -276,9 +289,14 @@ def _dist_reshape(
         return _local_reshape.apply(
             dist_tensor, tgt_global_shape, tgt_local_shape, mesh, placements
         )
-    else:
-        raise NotImplementedError(
-            "dist_reshape is only supported in dynamic mode."
+    elif paddle.framework.in_pir_mode():
+        return paddle._C_ops.dist_reshape(
+            dist_tensor,
+            dist_tensor.placements,
+            tgt_global_shape,
+            tgt_local_shape,
+            mesh,
+            placements,
         )
 
 

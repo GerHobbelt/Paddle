@@ -1948,11 +1948,11 @@ class Fold(Layer):
 
     Parameters:
         output_sizes(list):  The size of output size, should be [output_size_h, output_size_w]
-                                  or an interger o treated as [o, o].
+                                  or an integer o treated as [o, o].
         kernel_sizes(int|list|tuple):   The size of convolution kernel, should be [k_h, k_w]
                                   or an integer k treated as [k, k].
         strides(int|list|tuple, optional):  The strides, should be [stride_h, stride_w]
-                                  or an integer stride treated as [sride, stride].
+                                  or an integer stride treated as [stride, stride].
                                   For default, strides will be [1, 1].
         paddings(int|list|tuple, optional):  The paddings of each dimension, should be
                                   [padding_top, padding_left, padding_bottom, padding_right]

@@ -63,19 +63,25 @@ TEST(CrossThreadReductionReplacer, basic) {
   EXPECT_EQ(utils::GetStreamCnt(new_func->body), utils::Trim(R"ROC({
   ScheduleBlock(root)
   {
-    thread_bind[blockIdx.x] for (i, 0, 64)
     {
-      ScheduleBlock(B__reduce_init)
+      thread_bind[blockIdx.x] for (i, 0, 64)
       {
-        i0 = axis.bind(i)
-        B__reduce_init[i0] = 0.00000000f
-      }
-      thread_bind[threadIdx.x] for (reduce_j, 0, 128)
-      {
-        ScheduleBlock(B)
+        ScheduleBlock(B__reduce_init)
         {
-          i0_0, i1 = axis.bind(i, reduce_j)
-          B[i0_0] = cinn_partial_block_reduce_sum_fp32_internal_shm(A[i0_0, i1], _Buffer_<cinn_buffer_t*: 32>(shm32__fp32_reduce), false)
+          i0 = axis.bind(i)
+          {
+            B__reduce_init[i0] = 0.00000000f
+          }
+        }
+        thread_bind[threadIdx.x] for (reduce_j, 0, 128)
+        {
+          ScheduleBlock(B)
+          {
+            i0_0, i1 = axis.bind(i, reduce_j)
+            {
+              B[i0_0] = cinn_partial_block_reduce_sum_fp32_internal_shm(A[i0_0, i1], _Buffer_<cinn_buffer_t*: 32>(shm32__fp32_reduce), false)
+            }
+          }
         }
       }
     }

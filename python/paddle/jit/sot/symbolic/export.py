@@ -211,7 +211,7 @@ class PyFileGen:
     def create_inputs(self):
         create_paddle_inputs = self.new_root("def create_paddle_inputs():")
         self.new_root("\n")
-        craete_numpy_inputs = self.new_root("def create_numpy_inputs():")
+        create_numpy_inputs = self.new_root("def create_numpy_inputs():")
 
         paddle_inputs = ["inputs = ("]
         numpy_inputs = ["inputs = ("]
@@ -257,7 +257,7 @@ class PyFileGen:
         numpy_inputs.append("return inputs")
 
         create_paddle_inputs.add_sub(*paddle_inputs)
-        craete_numpy_inputs.add_sub(*numpy_inputs)
+        create_numpy_inputs.add_sub(*numpy_inputs)
 
     def create_test(self):
         test_class = self.new_root("class TestLayer(unittest.TestCase):")

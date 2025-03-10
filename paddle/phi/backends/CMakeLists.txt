@@ -28,7 +28,6 @@ if(WITH_XPU)
     xpu/xpu2_op_list.cc
     xpu/xpu3_op_list.cc
     xpu/xpu_l3_strategy.cc)
-  list(APPEND BACKENDS_DEPS phi_dynload_xpti)
 endif()
 
 if(WITH_ONEDNN)

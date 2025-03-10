@@ -743,7 +743,7 @@ class ClipGradByGlobalNorm(ClipGradBase):
             else:
                 sum_square_list.append(sum_square)
 
-        # all parameters have been filterd out
+        # all parameters have been filtered out
         if (
             len(sum_square_list)
             + len(sum_square_list_fp16)
@@ -935,7 +935,7 @@ class ClipGradByGlobalNorm(ClipGradBase):
                 else:
                     sum_square_not_dist.append(sum_square)
 
-        # all parameters have been filterd out
+        # all parameters have been filtered out
         if (
             len(no_fusion_sum_square)
             + len(no_fusion_sum_square_fp16)
@@ -1018,11 +1018,11 @@ class ClipGradByGlobalNorm(ClipGradBase):
             )
 
         if self.should_comm_on_shard_dim and self.has_dist_param:
-            global_norm_dist_var = paddle._C_ops.c_allreduce_sum(
-                global_norm_dist_var, self.sharding_group.id, True, False
+            global_norm_dist_var = paddle._C_ops.all_reduce(
+                global_norm_dist_var, self.sharding_group.id, dist.ReduceOp.SUM
             )
-            global_norm_dist_var = paddle._C_ops.c_allreduce_sum(
-                global_norm_dist_var, self.mp_group.id, True, False
+            global_norm_dist_var = paddle._C_ops.all_reduce(
+                global_norm_dist_var, self.mp_group.id, dist.ReduceOp.SUM
             )
             if global_norm_var is None:
                 global_norm_var = global_norm_dist_var
@@ -1036,8 +1036,10 @@ class ClipGradByGlobalNorm(ClipGradBase):
                 shape=[1], dtype=sum_dtype, fill_value=0.0
             )
         if self.should_comm_on_shard_dim and self.has_not_dist_param:
-            global_norm_not_dist_var = paddle._C_ops.c_allreduce_sum(
-                global_norm_not_dist_var, self.sharding_group.id, True, False
+            global_norm_not_dist_var = paddle._C_ops.all_reduce(
+                global_norm_not_dist_var,
+                self.sharding_group.id,
+                dist.ReduceOp.SUM,
             )
             if global_norm_var is None:
                 global_norm_var = global_norm_not_dist_var
@@ -1135,7 +1137,7 @@ class ClipGradByGlobalNorm(ClipGradBase):
                     'FP16 and BF16 are not supported at the same time.'
                 )
 
-            # all parameters have been filterd out
+            # all parameters have been filtered out
             if (
                 len(sum_square_list)
                 + len(sum_square_list_fp16)
@@ -1407,7 +1409,7 @@ def set_gradient_clip(clip, param_list=None, program=None):
         "We recommend a new strategy: set 'grad_clip' "
         "when initializing the 'optimizer'. "
         "This method can reduce the mistakes, please "
-        "refer to documention of 'optimizer'."
+        "refer to documentation of 'optimizer'."
     )
 
     if not isinstance(clip, ClipGradBase):

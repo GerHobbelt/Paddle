@@ -45,6 +45,14 @@ def activation_converter(network, paddle_op, inputs):
     return layer.get_output(0)
 
 
+@converter_registry.register("pd_op.relu6", trt_version="trt_version_ge=8.0")
+def relu6_converter(network, paddle_op, inputs):
+    layer = network.add_activation(inputs[0], trt.ActivationType.CLIP)
+    layer.alpha = 0.0
+    layer.beta = 6.0
+    return layer.get_output(0)
+
+
 @converter_registry.register("pd_op.softmax", trt_version="trt_version_ge=8.0")
 def softmax_converter(network, paddle_op, inputs):
     axis = paddle_op.attrs().get("axis", 0)
@@ -180,6 +188,16 @@ def swish_silu_converter(network, paddle_op, inputs):
     return trt_prod(network, inputs[0], layer_output)
 
 
+@converter_registry.register("pd_op.tanh_shrink", trt_version="8.x")
+def tanh_shrink_converter(network, paddle_op, inputs):
+    x = inputs[0]
+    tanh_layer = network.add_activation(x, trt.ActivationType.TANH)
+    subtract_layer = network.add_elementwise(
+        x, tanh_layer.get_output(0), trt.ElementWiseOperation.SUB
+    )
+    return subtract_layer.get_output(0)
+
+
 @converter_registry.register("pd_op.stanh", trt_version="8.x")
 def stanh_converter(network, paddle_op, inputs):
     x = inputs[0]
@@ -243,3 +261,14 @@ def thresholded_relu_converter(network, paddle_op, inputs):
     )
     thresholded_relu_layer.alpha = threshold
     return thresholded_relu_layer.get_output(0)
+
+
+@converter_registry.register("pd_op.selu", trt_version="8.x")
+def selu_converter(network, paddle_op, inputs):
+    x = inputs[0]
+    alpha = paddle_op.attrs()["alpha"]
+    scale = paddle_op.attrs()["scale"]
+    selu_layer = network.add_activation(x, trt.ActivationType.SELU)
+    selu_layer.alpha = alpha
+    selu_layer.beta = scale
+    return selu_layer.get_output(0)

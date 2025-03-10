@@ -578,7 +578,7 @@ class TestListIndex(unittest.TestCase):
             array = array[0]
             index = index[0]
 
-    def test_static_graph_list_index_muti_dim(self):
+    def test_static_graph_list_index_multi_dim(self):
         paddle.enable_static()
         inps_shape = [3, 4, 5]
         array = np.arange(self.numel(inps_shape), dtype='float32').reshape(
@@ -643,7 +643,7 @@ class TestListIndex(unittest.TestCase):
                 err_msg=f'\n numpy:{y2},\n paddle:{getitem_pp[0]}',
             )
 
-    def test_dygraph_list_index_muti_dim(self):
+    def test_dygraph_list_index_multi_dim(self):
         paddle.disable_static()
         inps_shape = [3, 4, 5]
         array = np.arange(self.numel(inps_shape), dtype='float32').reshape(
@@ -878,7 +878,7 @@ class TestListIndex(unittest.TestCase):
         with paddle.static.program_guard(program):
             self.run_setitem_list_index(array, index, value_np)
 
-    def test_static_graph_tensor_index_setitem_muti_dim(self):
+    def test_static_graph_tensor_index_setitem_multi_dim(self):
         paddle.enable_static()
         inps_shape = [3, 4, 5, 4]
         array = np.arange(self.numel(inps_shape), dtype='float32').reshape(
@@ -970,7 +970,7 @@ class TestListIndex(unittest.TestCase):
             index1 = index1[0]
             index2 = index2[0]
 
-    def test_static_graph_array_index_muti_dim(self):
+    def test_static_graph_array_index_multi_dim(self):
         paddle.enable_static()
         inps_shape = [3, 4, 5, 4]
         array = np.arange(self.numel(inps_shape), dtype='float32').reshape(
@@ -1053,7 +1053,7 @@ class TestListIndex(unittest.TestCase):
             index1 = index1[0]
             index2 = index2[0]
 
-    def test_dygraph_array_index_muti_dim(self):
+    def test_dygraph_array_index_multi_dim(self):
         paddle.disable_static()
         inps_shape = [3, 4, 5, 4]
         array = np.arange(self.numel(inps_shape), dtype='float32').reshape(

@@ -30,7 +30,9 @@ limitations under the License. */
 #include "paddle/phi/core/os_info.h"
 #include "paddle/phi/core/platform/device/device_wrapper.h"
 #include "paddle/phi/core/platform/device_context.h"
-
+#ifdef PADDLE_WITH_CUSTOM_DEVICE
+#include "paddle/fluid/custom_engine/custom_device_load.h"
+#endif
 #ifdef PADDLE_WITH_XPU
 #include "paddle/phi/backends/xpu/xpu_header.h"
 #include "paddle/phi/core/platform/device/xpu/xpu_info.h"
@@ -150,7 +152,7 @@ void LoadCustomDevice(const std::string &library_dir) {
         common::errors::InvalidArgument(
             "Fail to open library: %s with error: %s", lib_path, dlerror()));
 
-    phi::LoadCustomRuntimeLib(lib_path, dso_handle);
+    paddle::LoadCustomLib(lib_path, dso_handle);
   }
   phi::CustomKernelMap::Instance().RegisterCustomKernels();
   LOG(INFO) << "Finished in LoadCustomDevice with libs_path: [" << library_dir

@@ -51,6 +51,7 @@ class BuildCinnPass : public pir::Pass {
  private:
   void ProcessBlock(pir::Block* block) {
     auto start_t = std::chrono::high_resolution_clock::now();
+    auto num_ops = block->size();
     std::vector<GroupOpsVec> groups =
         ::pir::DetectSubGraphs(block, CompatibleInfo::IsSupportForCinn);
     AddStatistics(groups.size());
@@ -64,8 +65,8 @@ class BuildCinnPass : public pir::Pass {
     auto end_t = std::chrono::high_resolution_clock::now();
     auto duration =
         std::chrono::duration_cast<std::chrono::milliseconds>(end_t - start_t);
-    VLOG(1) << "Time of building group ops (size=" << block->size()
-            << "): " << FormatDuration(duration);
+    LOG(INFO) << "Time of building group ops (size=" << num_ops
+              << "): " << FormatDuration(duration);
   }
 };
 

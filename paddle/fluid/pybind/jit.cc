@@ -82,6 +82,11 @@ void BindGuard(pybind11::module *m) {
   py::class_<LengthMatchGuard, GuardBase, std::shared_ptr<LengthMatchGuard>>(
       *m, "LengthMatchGuard", R"DOC(LengthMatchGuard Class.)DOC")
       .def(py::init<const Py_ssize_t &>(), py::arg("length"));
+  py::class_<FloatCloseGuard, GuardBase, std::shared_ptr<FloatCloseGuard>>(
+      *m, "FloatCloseGuard", R"DOC(FloatCloseGuard Class.)DOC")
+      .def(py::init<const double, const double>(),
+           py::arg("value"),
+           py::arg("epsilon"));
   py::class_<ValueMatchGuard, GuardBase, std::shared_ptr<ValueMatchGuard>>(
       *m, "ValueMatchGuard", R"DOC(ValueMatchGuard Class.)DOC")
       .def(py::init<const py::object &>(), py::arg("py_value"));

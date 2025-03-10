@@ -55,10 +55,44 @@ Expr Cast::Make(Type t, Expr v) {
                         "The expression is not defined. "
                         "A defined expression is required for casting."));
 
-  if (v.node_type() != ir::IrNodeTy::_Var_ && v.is_index() && t == Int(64)) {
+#define __CAST_TO_TYPE(type__)                  \
+  if (auto *i = v.As<ir::IntImm>()) {           \
+    return Expr(static_cast<type__>(i->value)); \
+  } else if (auto *u = v.As<ir::UIntImm>()) {   \
+    return Expr(static_cast<type__>(u->value)); \
+  }
+
+  if (v.is_constant()) {
+    if (t == type_of<int8_t>()) {
+      __CAST_TO_TYPE(int8_t)
+    } else if (t == type_of<int16_t>()) {
+      __CAST_TO_TYPE(int16_t)
+    } else if (t == type_of<int32_t>()) {
+      __CAST_TO_TYPE(int32_t)
+    } else if (t == type_of<int64_t>()) {
+      __CAST_TO_TYPE(int64_t)
+    } else if (t == type_of<uint8_t>()) {
+      __CAST_TO_TYPE(uint8_t)
+    } else if (t == type_of<uint16_t>()) {
+      __CAST_TO_TYPE(uint16_t)
+    } else if (t == type_of<uint32_t>()) {
+      __CAST_TO_TYPE(uint32_t)
+    } else if (t == type_of<uint64_t>()) {
+      __CAST_TO_TYPE(uint64_t)
+    }
+  }
+#undef __CAST_TO_TYPE
+
+  // Cast indexExpr without `cast` and `load`
+  if (common::VerifyIndex(v) == common::IndexType::kValid && t == Int(64)) {
     v->convert_int32_to_int64();
     return v;
   }
+  if (common::VerifyIndex(v) == common::IndexType::kValid && t == Int(32)) {
+    v->convert_int64_to_int32();
+    return v;
+  }
+
   auto node = make_shared<Cast>();
   node->v() = v;
   node->set_type(t);
@@ -85,8 +119,6 @@ IndexExpr Add::Make(IndexExpr a, IndexExpr b) {
   node->set_index(true);
   return IndexExpr(node);
 }
-
-Add::Add(Expr a, Expr b) : BinaryOpNode<Add>(a.type(), a, b) {}
 
 void BinaryNodeVerify(const Expr &a, const Expr &b, absl::string_view ir_name) {
   PADDLE_ENFORCE_EQ(
@@ -116,6 +148,12 @@ Expr Sub::Make(Expr a, Expr b) {
   auto node = make_shared<Sub>(a, b);
   if (a.is_index() && b.is_index()) node->set_index(true);
   return Expr(node);
+}
+
+IndexExpr Sub::Make(IndexExpr a, IndexExpr b) {
+  auto node = make_shared<Sub>(a, b);
+  node->set_index(true);
+  return IndexExpr(node);
 }
 
 void Sub::Verify() const { BinaryNodeVerify(a(), b(), "Sub"); }
@@ -1348,6 +1386,26 @@ void Reduce::Verify() const {
                         "Received init type: %s, body type: %s",
                         init.type().to_string().c_str(),
                         body.type().to_string().c_str()));
+}
+
+Select::Select(Expr condition, Expr true_value, Expr false_value)
+    : ExprNode<Select>(true_value.type()),
+      condition(condition),
+      true_value(true_value),
+      false_value(false_value) {
+  TryElevateInt32ToInt64({true_value, false_value});
+  PADDLE_ENFORCE_EQ(true_value.type(),
+                    false_value.type(),
+                    ::common::errors::InvalidArgument(
+                        "The type of true_value and false_value should be the "
+                        "same. T: %s, F: %s",
+                        true_value,
+                        false_value));
+  PADDLE_ENFORCE_EQ(condition.type().is_bool(),
+                    true,
+                    ::common::errors::PreconditionNotMet(
+                        "The condition must be of boolean type."));
+  type_ = true_value.type();
 }
 
 Type Select::type() const {

@@ -97,15 +97,36 @@ bool operator==(IndexExpr a, IndexExpr b) {
     case ir::IrNodeTy::_Var_: {
       return a.as_var()->name == b.as_var()->name;
     }
+    case ir::IrNodeTy::Cast: {
+      auto lhs = a.As<ir::Cast>();
+      auto rhs = b.As<ir::Cast>();
+      return lhs->type() == rhs->type() && lhs->v() == rhs->v();
+    }
+    case ir::IrNodeTy::Load: {
+      auto lhs = a.As<ir::Load>();
+      auto rhs = b.As<ir::Load>();
+      if (lhs->indices.size() != rhs->indices.size()) return false;
+      if (lhs->tensor != rhs->tensor) return false;
+      // compare indices
+      for (int32_t i = 0; i < lhs->indices.size(); ++i) {
+        if (lhs->indices[i] != rhs->indices[i]) return false;
+      }
+      return true;
+    }
     case ir::IrNodeTy::Div:
     case ir::IrNodeTy::Mod: {
-      return a->operand(0) == b->operand(0) && a->operand(1) == b->operand(1);
+      return a.operand(0) == b.operand(0) && a.operand(1) == b.operand(1);
     }
     case ir::IrNodeTy::Add:
       return CompareExpressions<ir::Add>(a, b);
     case ir::IrNodeTy::Mul:
       return CompareExpressions<ir::Mul>(a, b);
+    case ir::IrNodeTy::Min:
+      return CompareExpressions<ir::Min>(a, b);
+    case ir::IrNodeTy::Max:
+      return CompareExpressions<ir::Max>(a, b);
   }
+  return false;
 }
 
 bool operator!=(IndexExpr a, IndexExpr b) { return !(a == b); }

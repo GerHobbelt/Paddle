@@ -41,21 +41,21 @@ using paddle::dialect::FullOp;
 
 namespace {
 
-template <typename TagetOpT, typename SourceOpT>
+template <typename TargetOpT, typename SourceOpT>
 bool IsDefinedBy(const SourceOpT &op, const size_t idx) {
   const pir::Operation *defined_op = op->operand_source(idx).defining_op();
-  return defined_op && defined_op->isa<TagetOpT>();
+  return defined_op && defined_op->isa<TargetOpT>();
 }
 
-template <typename TagetOpT, typename SourceOpT>
-TagetOpT CastDefinedTo(const SourceOpT &op, const size_t idx) {
-  PADDLE_ENFORCE_EQ(IsDefinedBy<TagetOpT>(op, idx),
+template <typename TargetOpT, typename SourceOpT>
+TargetOpT CastDefinedTo(const SourceOpT &op, const size_t idx) {
+  PADDLE_ENFORCE_EQ(IsDefinedBy<TargetOpT>(op, idx),
                     true,
                     ::common::errors::PreconditionNotMet(
                         "Required defined op shall not be nullptr and can cast "
                         "to target type."));
   pir::Operation *defined_op = op->operand_source(idx).defining_op();
-  return defined_op->dyn_cast<TagetOpT>();
+  return defined_op->dyn_cast<TargetOpT>();
 }
 
 template <typename T = int>
@@ -117,11 +117,16 @@ class SumOpPattern : public pir::OpRewritePattern<paddle::dialect::SumOp> {
 
     auto in = op->operand_source(0);
     auto in_data_type = in.type().dyn_cast<pir::DenseTensorType>().dtype();
-    if (in_data_type.isa<pir::Int32Type>() ||
-        in_data_type.isa<pir::BoolType>()) {
+
+    if (dtype != phi::DataType::UNDEFINED &&
+        dtype != paddle::dialect::TransToPhiDataType(in_data_type)) {
+      in = rewriter.Build<paddle::dialect::CastOp>(in, dtype).result(0);
+    } else if (in_data_type.isa<pir::Int32Type>() ||
+               in_data_type.isa<pir::BoolType>()) {
       in = rewriter.Build<paddle::dialect::CastOp>(in, phi::DataType::INT64)
                .result(0);
     }
+
     auto cinn_reduce =
         rewriter.Build<cinn::dialect::ReduceSumOp>(in, axis, keepdim, dtype);
 
@@ -1005,25 +1010,30 @@ class SqueezeOpPattern
     if (IsDefinedBy<FullIntArrayOp>(op, 1) && !is_dyshape) {
       const FullIntArrayOp axis_full_op = CastDefinedTo<FullIntArrayOp>(op, 1);
       auto axis_vec = cinn::dialect::ir::GetVectorAttr(axis_full_op, "value");
-      std::set<int64_t> axis_set(axis_vec.begin(), axis_vec.end());
-
       auto in_shape =
           phi::vectorize(op.operand_source(0)
                              .type()
                              .dyn_cast<paddle::dialect::DenseTensorType>()
                              .dims());
+      const std::set<int64_t> axis_set = [&] {
+        std::set<int64_t> axis_set;
+        for (int64_t axis : axis_vec) {
+          axis_set.insert(axis < 0 ? axis + in_shape.size() : axis);
+        }
+        return axis_set;
+      }();
 
       std::vector<int> output_shape;
 
       for (size_t i = 0; i < in_shape.size(); ++i) {
-        if (!axis_set.count(i)) {
+        if (!axis_set.count(i) || in_shape[i] != 1) {
           output_shape.push_back(in_shape[i]);
         } else {
           PADDLE_ENFORCE_EQ(
               in_shape[i],
               1,
               ::common::errors::PreconditionNotMet(
-                  "sequeze dim MUST be 1, but recive axis [%d] is [%d]",
+                  "squeeze dim MUST be 1, but receive axis [%d] is [%d]",
                   i,
                   in_shape[i]));
         }

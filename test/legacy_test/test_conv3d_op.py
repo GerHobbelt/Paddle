@@ -246,13 +246,13 @@ def create_test_cudnn_bf16_class(parent):
         def test_check_grad(self):
             place = core.CUDAPlace(0)
             numeric_input_grads = self.get_numeric_grad(place, 'Input')
-            numeric_fliter_grads = self.get_numeric_grad(place, 'Filter')
+            numeric_filter_grads = self.get_numeric_grad(place, 'Filter')
 
             self.check_grad_with_place(
                 place,
                 ['Input', 'Filter'],
                 'Output',
-                user_defined_grads=[numeric_input_grads, numeric_fliter_grads],
+                user_defined_grads=[numeric_input_grads, numeric_filter_grads],
                 check_dygraph=(not self.use_mkldnn),
                 check_pir=True,
                 check_pir_onednn=self.check_pir_onednn,

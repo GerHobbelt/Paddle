@@ -23,6 +23,7 @@
 #include "paddle/fluid/pir/dialect/distributed/ir/dist_attribute.h"
 #include "paddle/fluid/pir/dialect/distributed/ir/dist_dialect.h"
 #include "paddle/fluid/pir/dialect/distributed/ir/dist_interface.h"
+#include "paddle/fluid/pir/dialect/distributed/ir/dist_op.h"
 #include "paddle/fluid/pir/dialect/distributed/ir/dist_type.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_attribute.h"
 #include "paddle/fluid/pir/dialect/operator/ir/op_dialect.h"
@@ -71,9 +72,17 @@ void ProcessDistBlock(pir::Block* block) {
       arg.set_type(CastToLocalType(arg.type()));
     }
   }
+  std::vector<pir::Operation*> del_ops;
   for (auto& val : *block) {
     pir::Operation* op_item = &val;
     VLOG(6) << "dist_to_dense main loop over op [" << op_item->name() << "].";
+
+    if (op_item->isa<DtensorFromLocalOp>() ||
+        op_item->isa<DtensorToLocalOp>()) {
+      op_item->result(0).ReplaceAllUsesWith(op_item->operand_source(0));
+      del_ops.push_back(op_item);
+      continue;
+    }
 
     for (auto& sub_block : val.blocks()) {
       ProcessDistBlock(&sub_block);
@@ -163,6 +172,9 @@ void ProcessDistBlock(pir::Block* block) {
     op_item->set_attribute("chunk_id", pir::Int32Attribute::get(ctx, chunk_id));
 
     // TODO(2024-Q2) Handle other special dist op in future.
+  }
+  for (auto op : del_ops) {
+    op->Erase();
   }
 }
 

@@ -377,14 +377,16 @@ static IndexExpr SimplifyAdd(const IndexExpr &lhs, const IndexExpr &rhs) {
   auto lhsAdd = lhs.As<Add>();
   if (lhsAdd && rhsConst) {
     if (auto lrhs = lhsAdd->b().as_index().As<IntImm>()) {
-      return lhsAdd->a().as_index() + (lrhs->value + rhsConst->value);
+      return lhsAdd->a().as_index() +
+             IndexExpr(lrhs->type(), lrhs->value + rhsConst->value);
     }
   }
 
   // (d0 + 2) + d1 ===> d0 + d1 + 2.
   if (lhsAdd) {
     if (auto lrhs = lhsAdd->b().as_index().As<IntImm>()) {
-      return lhsAdd->a().as_index() + rhs + lrhs->value;
+      return lhsAdd->a().as_index() + rhs +
+             IndexExpr(lrhs->type(), lrhs->value);
     }
   }
   // expr * c1 + expr * c2 ===> expr * (c1 + c2)
@@ -409,12 +411,14 @@ static IndexExpr SimplifyAdd(const IndexExpr &lhs, const IndexExpr &rhs) {
   }
 
   if (first == second) {
-    return first * (lconst + rconst);
+    return first * IndexExpr(lhs->type(), lconst + rconst);
   }
 
   if (lconst != 1 && rconst != 1) {
-    if (lconst == rconst) return (first + second) * lconst;
-    if (lconst == -rconst) return (first - second) * lconst;
+    if (lconst == rconst)
+      return (first + second) * IndexExpr(lhs->type(), lconst);
+    if (lconst == -rconst)
+      return (first - second) * IndexExpr(lhs->type(), lconst);
   }
 
   // deal corner case!
@@ -460,7 +464,8 @@ static IndexExpr SimplifyMul(const IndexExpr &lhs, const IndexExpr &rhs) {
   auto lhsMul = lhs.As<Mul>();
   if (lhsMul && rhsConst) {
     if (auto lrhs = lhsMul->b().as_index().As<IntImm>()) {
-      return lhsMul->a().as_index() * (lrhs->value * rhsConst->value);
+      return lhsMul->a().as_index() *
+             IndexExpr(lrhs->type(), lrhs->value * rhsConst->value);
     }
   }
 
@@ -468,14 +473,16 @@ static IndexExpr SimplifyMul(const IndexExpr &lhs, const IndexExpr &rhs) {
   auto lhsAdd = lhs.As<Add>();
   if (lhsAdd && rhsConst) {
     if (auto lrhs = lhsAdd->b().as_index().As<IntImm>()) {
-      return lhsAdd->a().as_index() * rhs + (lrhs->value * rhsConst->value);
+      return lhsAdd->a().as_index() * rhs +
+             IndexExpr(lrhs->type(), lrhs->value * rhsConst->value);
     }
   }
 
   // (d0 * 2) * d1 ===> d0 * d1 * 2.
   if (lhsMul) {
     if (auto lrhs = lhsMul->b().as_index().As<IntImm>()) {
-      return lhsMul->a().as_index() * rhs * lrhs->value;
+      return lhsMul->a().as_index() * rhs *
+             IndexExpr(lrhs->type(), lrhs->value);
     }
   }
 
@@ -509,12 +516,11 @@ static IndexExpr SimplifyDiv(const IndexExpr &lhs, const IndexExpr &rhs) {
 
     // (expr1 * c1 * c2 + expr2 * c1 * c3) / c1 ===> expr1 * c2 + expr2 * c3.
     if (lhsAdd) {
-      int64_t llhsFactor = lhsAdd->a().as_index().GetLargestMutiplyPart();
-      int64_t lrhsFactor = lhsAdd->b().as_index().GetLargestMutiplyPart();
+      int64_t llhsFactor = lhsAdd->a().as_index().GetLargestMultiplyPart();
+      int64_t lrhsFactor = lhsAdd->b().as_index().GetLargestMultiplyPart();
       if (llhsFactor % rhsConst->value == 0 &&
           lrhsFactor % rhsConst->value == 0) {
-        return lhsAdd->a().as_index() / rhsConst->value +
-               lhsAdd->b().as_index() / rhsConst->value;
+        return lhsAdd->a().as_index() / rhs + lhsAdd->b().as_index() / rhs;
       }
     }
 
@@ -522,7 +528,8 @@ static IndexExpr SimplifyDiv(const IndexExpr &lhs, const IndexExpr &rhs) {
     if (lhsMul) {
       if (auto lrhs = lhsMul->b().as_index().As<IntImm>()) {
         if (lrhs->value % rhsConst->value == 0) {
-          return lhsMul->a().as_index() * (lrhs->value / rhsConst->value);
+          return lhsMul->a().as_index() *
+                 IndexExpr(lrhs->type(), lrhs->value / rhsConst->value);
         }
       }
     }
@@ -530,7 +537,8 @@ static IndexExpr SimplifyDiv(const IndexExpr &lhs, const IndexExpr &rhs) {
     // S0 / 2 / 5 ===> S0 / 10.
     if (lhsDiv) {
       if (auto lrhs = lhsDiv->b().as_index().As<IntImm>()) {
-        return lhsDiv->a().as_index() / (lrhs->value * rhsConst->value);
+        return lhsDiv->a().as_index() /
+               IndexExpr(lrhs->type(), lrhs->value * rhsConst->value);
       }
     }
   } else {
@@ -565,22 +573,23 @@ static IndexExpr SimplifyMod(const IndexExpr &lhs, const IndexExpr &rhs) {
 
     // (expr1 * c1 * c2+ expr2 * c3) % c1 ===> expr2 * c3 % c1.
     if (lhsAdd) {
-      int64_t llhsFactor = lhsAdd->a().as_index().GetLargestMutiplyPart();
-      int64_t lrhsFactor = lhsAdd->b().as_index().GetLargestMutiplyPart();
+      int64_t llhsFactor = lhsAdd->a().as_index().GetLargestMultiplyPart();
+      int64_t lrhsFactor = lhsAdd->b().as_index().GetLargestMultiplyPart();
       if (llhsFactor % rhsConst->value == 0)
-        return lhsAdd->b().as_index() % rhsConst->value;
+        return lhsAdd->b().as_index() % rhs;
       if (lrhsFactor % rhsConst->value == 0)
-        return lhsAdd->a().as_index() % rhsConst->value;
+        return lhsAdd->a().as_index() % rhs;
     }
 
     // expr1 * (c1 * c2) % c1 ===> 0.
-    if (lhs.GetLargestMutiplyPart() % rhsConst->value == 0) return IndexExpr(0);
+    if (lhs.GetLargestMultiplyPart() % rhsConst->value == 0)
+      return IndexExpr(0);
 
     // expr1 % (c1 * c2) % c1 ===> expr1 % c1.
     if (lhsMod) {
-      int64_t llhsFactor = lhsMod->b().as_index().GetLargestMutiplyPart();
+      int64_t llhsFactor = lhsMod->b().as_index().GetLargestMultiplyPart();
       if (llhsFactor % rhsConst->value == 0)
-        return lhsMod->a().as_index() % rhsConst->value;
+        return lhsMod->a().as_index() % rhs;
     }
   } else {
     // dynamic branch!

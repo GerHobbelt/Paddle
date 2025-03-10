@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# repo: diffusers_sub_grpah
+# repo: diffusers_sub_graph
 # model: stable_diffusion
 # api:paddle.tensor.creation.arange||method:__rmul__||method:__truediv__||api:paddle.tensor.ops.exp||method:__getitem__||method:cast||method:__getitem__||method:__mul__||method:__rmul__||api:paddle.tensor.ops.sin||api:paddle.tensor.ops.cos||api:paddle.tensor.manipulation.concat||method:__getitem__||method:__getitem__||api:paddle.tensor.manipulation.concat
 import unittest

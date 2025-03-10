@@ -26,6 +26,9 @@ class DistDenseTensorTypeStorage;
 
 common::DDim InferLocalDDim(const common::DDim& global_ddim,
                             TensorDistAttribute dist_attr);
+
+common::DDim InferGlobalDDim(const common::DDim& local_ddim,
+                             TensorDistAttribute dist_attr);
 class DistDenseTensorType
     : public pir::Type::TypeBase<DistDenseTensorType,
                                  pir::Type,

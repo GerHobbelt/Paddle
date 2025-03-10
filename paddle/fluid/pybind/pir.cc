@@ -70,7 +70,6 @@
 #include "paddle/pir/include/core/builtin_attribute.h"
 #include "paddle/pir/include/core/builtin_op.h"
 #include "paddle/pir/include/core/ir_mapping.h"
-#include "paddle/pir/include/core/parser/ir_parser.h"
 #include "paddle/pir/include/core/program.h"
 #include "paddle/pir/include/core/type.h"
 #include "paddle/pir/include/core/value.h"
@@ -122,7 +121,6 @@ using pir::Int32Attribute;
 using pir::Int64Attribute;
 using pir::IrContext;
 using pir::IrMapping;
-using pir::IrParser;
 using pir::Operation;
 using pir::OpOperand;
 using pir::OpResult;
@@ -594,7 +592,7 @@ void BindProgram(py::module *m) {
            })
       .def("num_ops", [](Program &self) { return self.num_ops(); })
       .def(
-          "state_dict",
+          "_state_dict",
           [](std::shared_ptr<Program> self,
              const std::string &mode = "all",
              const framework::Scope &scope = framework::Scope()) {
@@ -683,18 +681,9 @@ void BindProgram(py::module *m) {
           py::arg("targets"))
       .def("_sync_with_cpp", [](const std::shared_ptr<Program> &self) {
         // It's not need _sync_with_cpp in pir, but it's necessary in old static
-        // graph. Add empyt function to avoid python call error.
+        // graph. Add empty function to avoid python call error.
       });
 }
-
-std::shared_ptr<Program> ParseProgram(const std::string &program_str) {
-  std::stringstream ss(program_str);
-  pir::IrContext *ctx = pir::IrContext::Instance();
-  auto program = IrParser(ctx, ss).ParseProgram();
-  return program;
-}
-
-void BindIrParser(py::module *m) { m->def("parse_program", &ParseProgram); }
 
 void RefreshOpStopgradients(Operation *op) {
   if (op->num_operands() == 0 || op->isa<pir::ParameterOp>() ||
@@ -843,7 +832,7 @@ void BindBlock(py::module *m) {
            })
       .def("_sync_with_cpp", [](const Block &self) {
         // It's not need _sync_with_cpp in pir, but it's necessary in old static
-        // graph. Add empyt function to avoid python call error.
+        // graph. Add empty function to avoid python call error.
       });
 }
 
@@ -946,6 +935,19 @@ void BindOperation(py::module *m) {
                                                 phi::IntArray(val));
              self.set_attribute(attr_name, attr);
            })
+      .def("set_str_array_attr",
+           [](Operation &self,
+              std::string &attr_name,
+              const std::vector<std::string> &val) {
+             std::vector<Attribute> val_attr;
+             for (auto &str : val) {
+               val_attr.emplace_back(
+                   StrAttribute::get(pir::IrContext::Instance(), str));
+             }
+             auto attr =
+                 pir::ArrayAttribute::get(pir::IrContext::Instance(), val_attr);
+             self.set_attribute(attr_name, attr);
+           })
       .def("set_str_attr",
            [](Operation &self, std::string &attr_name, std::string &val) {
              self.set_attribute(
@@ -956,6 +958,10 @@ void BindOperation(py::module *m) {
              self.set_attribute(
                  attr_name,
                  pir::Int32Attribute::get(pir::IrContext::Instance(), val));
+           })
+      .def("erase_attr",
+           [](Operation &self, std::string &attr_name) {
+             self.erase_attribute(attr_name);
            })
       .def("attrs",
            [](Operation &self) -> py::dict {
@@ -1470,6 +1476,19 @@ void BindValue(py::module *m) {
              py::list op_list;
              for (auto it = self.use_begin(); it != self.use_end(); ++it) {
                op_list.append(it.owner());
+             }
+             return op_list;
+           })
+      .def("all_used_ops_in_same_block",
+           [](Value &self) -> py::list {
+             py::list op_list;
+             for (auto it = self.use_begin(); it != self.use_end(); ++it) {
+               pir::Operation *used_op = it.owner();
+               while (used_op->GetParent() != self.defining_op()->GetParent() &&
+                      used_op->GetParent()->GetParentOp()) {
+                 used_op = used_op->GetParent()->GetParentOp();
+               }
+               op_list.append(used_op);
              }
              return op_list;
            })
@@ -2657,6 +2676,12 @@ void BindPassManager(pybind11::module *m) {
                  pass->Set(attr.first, new int(attr.second.cast<int>()));
                } else if (py::isinstance<py::float_>(attr.second)) {
                  pass->Set(attr.first, new float(attr.second.cast<float>()));
+               } else if (py::isinstance<framework::Scope>(attr.second)) {
+                 pass->SetNotOwned(attr.first,
+                                   attr.second.cast<framework::Scope *>());
+               } else if (py::isinstance<phi::GPUPlace>(attr.second)) {
+                 pass->Set(attr.first,
+                           new phi::Place(attr.second.cast<phi::GPUPlace>()));
                } else {
                  PADDLE_THROW(common::errors::InvalidArgument(
                      "The pass attr is not supported this type."));
@@ -3057,64 +3082,82 @@ void BindShapeOrDataDimExprs(pybind11::module *m) {
       .def("data",
            &symbol::ShapeOrDataDimExprs::data,
            return_value_policy::reference)
-      .def("is_equal",
-           [](symbol::ShapeOrDataDimExprs &self,
-              std::vector<int64_t> expect_shape,
-              std::vector<int64_t> expect_data = {}) -> bool {
-             VLOG(3) << "Start compare shape and data.";
+      .def(
+          "is_equal",
+          [](symbol::ShapeOrDataDimExprs &self,
+             std::vector<int64_t> expect_shape,
+             std::vector<int64_t> expect_data = {}) -> bool {
+            VLOG(3) << "Start compare shape and data.";
 
-             const auto &compare_func =
-                 [&](const std::vector<int64_t> &expect,
-                     const std::vector<symbol::DimExpr> &actual) -> bool {
-               const auto print_expect_and_actual = [&]() {
-                 std::ostringstream sout;
-                 sout << "expect: [";
-                 std::copy(expect.begin(),
-                           expect.end(),
-                           std::ostream_iterator<int64_t>(sout, ","));
-                 sout << "]" << std::endl;
+            const auto &CompareFunc =
+                [&](const std::vector<int64_t> &expect,
+                    const std::vector<symbol::DimExpr> &actual,
+                    const std::string &compare_type) -> bool {
+              const auto PrintExpectAndActual = [&](const std::string &prefix) {
+                std::ostringstream sout;
+                sout << prefix << " expect: [";
+                std::copy(expect.begin(),
+                          expect.end(),
+                          std::ostream_iterator<int64_t>(sout, ","));
+                sout << "]" << std::endl;
 
-                 sout << "actual:" << actual << std::endl;
-                 LOG(ERROR) << sout.str();
-               };
+                sout << prefix << " actual:" << actual << std::endl;
+                LOG(ERROR) << sout.str();
+              };
 
-               if (actual.size() != expect.size()) {
-                 LOG(ERROR) << "expect size " << expect.size()
-                            << " is not equal to actual size " << actual.size()
-                            << " . The detailed infermation is as follows:";
-                 print_expect_and_actual();
-                 return false;
-               } else if (actual.empty()) {
-                 return true;
-               }
+              if (actual.size() != expect.size()) {
+                LOG(ERROR) << compare_type << " expect size " << expect.size()
+                           << " is not equal to actual size " << actual.size()
+                           << " . The detailed infermation is as follows:";
+                PrintExpectAndActual(compare_type);
+                return false;
+              } else if (actual.empty()) {
+                return true;
+              }
 
-               for (size_t i = 0; i < actual.size(); i++) {
-                 if (!actual.at(i).isa<int64_t>()) {
-                   print_expect_and_actual();
-                   PADDLE_THROW(common::errors::InvalidArgument(
-                       "In OpTest, only supports cases where the type of "
-                       "DimExpr "
-                       "is int64_t."));
-                   return false;
-                 }
-                 if (actual.at(i) != expect.at(i)) {
-                   LOG(ERROR) << "expect[" << i << "]: " << expect.at(i)
-                              << " is not equal to actual[" << i
-                              << "]: " << actual.at(i)
-                              << " . The detailed infermation is as follows:";
-                   print_expect_and_actual();
-                   return false;
-                 }
-               }
-               return true;
-             };
+              for (size_t i = 0; i < actual.size(); i++) {
+                if (!actual.at(i).isa<int64_t>()) {
+                  PrintExpectAndActual(compare_type);
+                  PADDLE_THROW(common::errors::InvalidArgument(
+                      "In OpTest, only supports cases where the type of "
+                      "DimExpr "
+                      "is int64_t."));
+                  return false;
+                }
+                if (actual.at(i) != expect.at(i)) {
+                  LOG(ERROR)
+                      << compare_type << " expect[" << i
+                      << "]: " << expect.at(i) << " is not equal to actual["
+                      << i << "]: " << actual.at(i)
+                      << " . The detailed infermation is as follows:";
+                  PrintExpectAndActual(compare_type);
+                  return false;
+                }
+              }
+              return true;
+            };
 
-             // compare shape
-             const std::vector<symbol::DimExpr> &actual_shape = self.shape();
-
-             // TODO(gongshaotian): compare data
-             return compare_func(expect_shape, actual_shape);
-           });
+            // compare shape
+            const std::vector<symbol::DimExpr> &actual_shape = self.shape();
+            const bool shape_status =
+                CompareFunc(expect_shape, actual_shape, "shape");
+            // compare data
+            const std::optional<std::vector<symbol::DimExpr>> &actual_data_ =
+                self.data();
+            if (actual_data_.has_value()) {
+              PADDLE_ENFORCE_LE(actual_shape.size(),
+                                1,
+                                common::errors::Unimplemented(
+                                    "Now data dim expr is not supported for "
+                                    "multi-dim shape."));
+              const std::vector<symbol::DimExpr> actual_data =
+                  actual_data_.value();
+              const bool data_status =
+                  CompareFunc(expect_data, actual_data, "data");
+              return shape_status && data_status;
+            }
+            return shape_status;
+          });
 }
 
 void BindShapeConstraintIRAnalysis(pybind11::module *m) {
@@ -3177,7 +3220,6 @@ void BindPir(pybind11::module *module) {
   BindShapeConstraintIRAnalysis(&ir_module);
   auto ops_modules = ir_module.def_submodule("ops");
   BindOpsAPI(&ops_modules);
-  BindIrParser(&ir_module);
   BindDrrPatternContext(&ir_module);
 }
 

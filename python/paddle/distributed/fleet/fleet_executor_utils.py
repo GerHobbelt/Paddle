@@ -171,7 +171,7 @@ class CoordSys:
         self.sharding_degree = dist_opt.get('sharding_degree', 1)
         self.mp_degree = dist_opt.get('mp_degree', 1)
 
-    def _invalide_coord(self, coord):
+    def _invalid_coord(self, coord):
         """
         Test the input coord is valid or not.
         :param coord: The coord to be tested
@@ -194,7 +194,7 @@ class CoordSys:
         :param coord:  The coord to be converted
         :return: The rank corresponding with the coord
         """
-        if self._invalide_coord(coord):
+        if self._invalid_coord(coord):
             return -1
         return int(
             coord['dp_idx']

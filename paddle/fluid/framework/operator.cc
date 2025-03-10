@@ -1815,7 +1815,7 @@ void OperatorWithKernel::RunImpl(const Scope& scope,
         if (is_xpu_kp_support) {
           auto expected_kernel_key_library_type = kernel_type_->library_type_;
           kernel_type_->library_type_ = LibraryType::kKP;
-          VLOG(3) << "modifing XPU KP kernel in static graph: "
+          VLOG(3) << "modifying XPU KP kernel in static graph: "
                   << phi_kernel_name
                   << ", using_kernel_key:" << *kernel_type_.get();
           auto try_phi_kernel_key =
@@ -1899,7 +1899,7 @@ void OperatorWithKernel::RunImpl(const Scope& scope,
         if (is_xpu_kp_support) {
           auto expected_kernel_key_library_type = kernel_type_->library_type_;
           kernel_type_->library_type_ = LibraryType::kKP;
-          VLOG(3) << "modifing XPU KP kernel in static graph: "
+          VLOG(3) << "modifying XPU KP kernel in static graph: "
                   << phi_kernel_name
                   << ", using_kernel_key:" << *kernel_type_.get();
           auto try_phi_kernel_key =

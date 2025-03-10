@@ -1238,6 +1238,17 @@ class _ExecutorCache:
                     op.result(0).persistable,
                 )
                 data_op_infos.append(tup)
+            if op.name() == 'pd_op.feed':
+                feed_target_name = op.attrs()["name"]
+                var_type = paddle_type_to_proto_type[op.results()[0].dtype]
+                var_shape = op.results()[0].shape
+                tup = (
+                    feed_target_name,
+                    var_type,
+                    var_shape,
+                    op.result(0).persistable,
+                )
+                data_op_infos.append(tup)
 
         return program, new_exe, data_op_infos
 

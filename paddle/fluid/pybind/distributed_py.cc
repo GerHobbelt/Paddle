@@ -1316,6 +1316,33 @@ void BindDistributed(py::module *m) {
               py::arg("dst"),
               py::arg("src"))
           .def(
+              "offload_with_offset",
+              [](distributed::AsyncLoad &self,
+                 py::handle py_dst_tensor,
+                 py::handle py_src_tensor,
+                 size_t dst_offset,
+                 size_t src_offset,
+                 size_t offload_size) {
+                auto dst_tensor = CastPyArg2Tensor(py_dst_tensor.ptr(), 0);
+                auto p_dst_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
+                    dst_tensor.impl());
+                auto *dst_dense = p_dst_tensor.get();
+
+                auto src_tensor = CastPyArg2Tensor(py_src_tensor.ptr(), 0);
+                auto p_src_tensor = std::dynamic_pointer_cast<phi::DenseTensor>(
+                    src_tensor.impl());
+                auto src_dense = *p_src_tensor;
+
+                return self.OffloadWithOffset(
+                    dst_dense, src_dense, dst_offset, src_offset, offload_size);
+              },
+              py::arg("dst"),
+              py::arg("src"),
+              py::arg("dst_offset"),
+              py::arg("src_offset"),
+              py::arg("offload_size"),
+              py::call_guard<py::gil_scoped_release>())
+          .def(
               "reload",
               [](distributed::AsyncLoad &self,
                  py::handle py_dst_tensor,

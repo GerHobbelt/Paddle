@@ -17,6 +17,8 @@ if(WITH_DISTRIBUTE AND WITH_GPU)
   py_test_modules(test_pir_reshard_s_to_r MODULES test_pir_reshard_s_to_r)
   set_tests_properties(test_pir_reshard_s_to_r PROPERTIES TIMEOUT 120)
   py_test_modules(test_mlp MODULES test_mlp ENVS FLAGS_enable_pir_api=1)
+  py_test_modules(test_local_layer MODULES test_local_layer ENVS
+                  FLAGS_enable_pir_api=1)
   py_test_modules(
     test_semi_auto_parallel_dist_to_static_pir MODULES
     test_semi_auto_parallel_dist_to_static_pir ENVS FLAGS_enable_pir_api=1)
@@ -51,7 +53,7 @@ if(WITH_DISTRIBUTE AND WITH_GPU)
     test_auto_parallel_replace_with_parallel_cross_entropy_pass
     PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 60)
   set_tests_properties(test_auto_parallel_recompute_pir_pass
-                       PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 60)
+                       PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 200)
   py_test_modules(
     test_eliminate_transpose_pass MODULES test_eliminate_transpose_pass ENVS
     FLAGS_enable_pir_in_executor=1)
@@ -76,8 +78,12 @@ if(WITH_DISTRIBUTE AND WITH_GPU)
   py_test_modules(
     test_sharding_tensor_fusion_save_load MODULES
     test_sharding_tensor_fusion_save_load ENVS FLAGS_enable_pir_api=1)
+  py_test_modules(test_while_pir MODULES test_while_pir ENVS
+                  FLAGS_enable_pir_api=1)
   set_tests_properties(test_sharding_tensor_fusion_save_load
                        PROPERTIES LABELS "RUN_TYPE=EXCLUSIVE" TIMEOUT 300)
+  py_test_modules(test_pir_moe_utils_api MODULES test_pir_moe_utils_api ENVS
+                  FLAGS_enable_pir_api=1)
 endif()
 py_test_modules(test_pir_1f1b_plan MODULES test_pir_1f1b_plan ENVS
                 FLAGS_enable_pir_api=1)

@@ -304,7 +304,7 @@ void TransferLayoutPass::ApplyImpl(ir::Graph *graph) const {
         vars_shape_nhwc.insert(out_var_node);
       }
 
-      // Insert transfer_layout for intermidiate var.
+      // Insert transfer_layout for intermediate var.
       auto op_inputs = op_node->inputs;
       for (auto *in_var_node : op_inputs) {
         PADDLE_ENFORCE_EQ(in_var_node->IsVar(),

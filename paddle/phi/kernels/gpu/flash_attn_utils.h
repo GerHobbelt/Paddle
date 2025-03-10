@@ -94,14 +94,14 @@ static std::vector<int64_t> GetAttnSparseMaskDims(
         dtype,
         DataType::INT32,
         common::errors::InvalidArgument("dtype of startend_row_indices must be "
-                                        "int32, but recieved %d",
+                                        "int32, but received %d",
                                         dtype));
     PADDLE_ENFORCE_GE(
         rank,
         4,
         common::errors::InvalidArgument(
-            "The number of dimenstions of startend_row_indices is expected to "
-            "be greater or equal to 4, but recieved %d. The shape of "
+            "The number of dimensions of startend_row_indices is expected to "
+            "be greater or equal to 4, but received %d. The shape of "
             "startend_row_indices is [%s]",
             rank,
             origin_dims));
@@ -110,7 +110,7 @@ static std::vector<int64_t> GetAttnSparseMaskDims(
                       common::errors::InvalidArgument(
                           "The sparse_mask_dims[%d] of "
                           "attn_mask_start_row_indices is expected to be "
-                          "equal to %d, but recieved %d.",
+                          "equal to %d, but received %d.",
                           rank - 2,
                           max_seqlen_q,
                           origin_dims[2]));

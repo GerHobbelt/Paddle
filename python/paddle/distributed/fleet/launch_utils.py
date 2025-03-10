@@ -508,7 +508,7 @@ def start_local_trainers(
             "PADDLE_WORLD_DEVICE_IDS": ",".join(res),
         }
 
-        # The following three environnement variables are used for auto mapping
+        # The following three environment variables are used for auto mapping
         if current_env.get("PADDLE_CLUSTER_TOPO_PATH", None) is not None:
             proc_env["PADDLE_CLUSTER_TOPO_PATH"] = current_env[
                 "PADDLE_CLUSTER_TOPO_PATH"

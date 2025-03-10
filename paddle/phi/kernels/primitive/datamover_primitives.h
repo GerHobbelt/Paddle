@@ -597,9 +597,9 @@ __device__ __forceinline__ void ReadDataReduce(Ty* dst,
 template <typename T, int NX, int NY, bool IsBoundary = false>
 __device__ __forceinline__ void WriteData(T* dst,
                                           T* __restrict__ src,
-                                          int num) {
+                                          int64_t num) {
   if (IsBoundary) {
-    int thread_offset = threadIdx.x * NX;
+    int64_t thread_offset = threadIdx.x * NX;
 #pragma unroll
     for (int idx = 0; idx < NX; ++idx) {
       if ((thread_offset + idx) < num) {
@@ -611,7 +611,7 @@ __device__ __forceinline__ void WriteData(T* dst,
     constexpr int kVectorSize = (NX % 4 == 0) ? 4 : (NX % 2 == 0) ? 2 : 1;
     constexpr int kVectorsPerThread = NX / kVectorSize;
 
-    int thread_offset = threadIdx.x * kVectorsPerThread;
+    int64_t thread_offset = threadIdx.x * kVectorsPerThread;
     using VecType = details::VectorType<T, kVectorSize>;
     VecType* vec_dst = reinterpret_cast<VecType*>(dst);
     VecType vec_temp[kVectorsPerThread];
@@ -681,12 +681,12 @@ __device__ __forceinline__ void WriteData(T* dst,
 template <typename Tx, typename Ty, int NX, int NY, bool IsBoundary = false>
 __device__ __forceinline__ void WriteData(Ty* dst,
                                           const Tx* __restrict__ src,
-                                          int size_nx,
+                                          int64_t size_nx,
                                           int size_ny,
                                           int stride_nx,
                                           int stride_ny) {
   int thread_offset = threadIdx.x;
-  int left_size_nx = size_nx - thread_offset;
+  int64_t left_size_nx = size_nx - thread_offset;
 
   // Each branch is added for better performance
   if (NX == 1 && NY == 1) {  // for NX == 1 and NY == 1

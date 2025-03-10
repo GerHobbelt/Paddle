@@ -324,12 +324,9 @@ void PrintTypeImpl(pir::Type type, std::ostream& os) {
   }
 }
 void PrintAttributeImpl(pir::Attribute attr, std::ostream& os) {
-  os << "(" << attr.dialect().name();
-  os << '.';
   if (auto int_array_attr = attr.dyn_cast<IntArrayAttribute>()) {
     phi::IntArray data = int_array_attr.data();
-    os << "IntArray)"
-       << "[";
+    os << "[";
     const auto& inner_data = data.GetData();
     pir::detail::PrintInterleave(
         inner_data.begin(),
@@ -338,11 +335,11 @@ void PrintAttributeImpl(pir::Attribute attr, std::ostream& os) {
         [&os]() { os << ","; });
     os << "]";
   } else if (auto data_type_attr = attr.dyn_cast<DataTypeAttribute>()) {
-    os << "DataType)" << data_type_attr.data();
+    os << data_type_attr.data();
   } else if (auto place_type_attr = attr.dyn_cast<PlaceAttribute>()) {
-    os << "Place)" << place_type_attr.data();
+    os << place_type_attr.data();
   } else if (auto data_layout_attr = attr.dyn_cast<DataLayoutAttribute>()) {
-    os << "DataLayout)" << data_layout_attr.data();
+    os << data_layout_attr.data();
   } else {
     os << "<#AttrNotImplemented>";
   }
@@ -442,26 +439,6 @@ void OperatorDialect::PrintType(pir::Type type, std::ostream& os) const {
 void OperatorDialect::PrintAttribute(pir::Attribute attr,
                                      std::ostream& os) const {
   PrintAttributeImpl(attr, os);
-}
-
-pir::Attribute OperatorDialect::ParseAttribute(
-    pir::IrParser& parser) {  // NOLINT
-  std::string type_name = parser.ConsumeToken().val_;
-  std::string attribute_name =
-      type_name.substr(type_name.find('.') + 1, std::string::npos);
-  parser.ConsumeAToken(")");
-  if (attribute_name == "IntArray") {
-    return IntArrayAttribute::Parse(parser);
-  } else if (attribute_name == "DataType") {
-    return DataTypeAttribute::Parse(parser);
-  } else if (attribute_name == "Place") {
-    return PlaceAttribute::Parse(parser);
-  } else if (attribute_name == "DataLayout") {
-    return DataLayoutAttribute::Parse(parser);
-  } else {
-    IR_THROW("No function to parse " + attribute_name + " exists!" +
-             parser.GetErrorLocationInfo());
-  }
 }
 
 pir::OpPrintFn OperatorDialect::PrintOperation(const pir::Operation& op) const {

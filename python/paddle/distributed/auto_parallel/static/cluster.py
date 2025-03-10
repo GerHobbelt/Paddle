@@ -287,7 +287,7 @@ class Link:
         self._bandwidth = None
         # latency is stored by millisecond
         self._latency = None
-        # linke between mesh, machine, device
+        # linked between mesh, machine, device
         self._link_level = None
         self._hop = None
         self._topo = topo

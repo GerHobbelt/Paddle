@@ -73,7 +73,7 @@ class SubToGlobalMeshFunction(ReshardFunction):
                 src_mesh, [src_dist_attr], [src_dist_attr], chunk_id
             )
         else:
-            # create the buffer on other ranks for receving the data
+            # create the buffer on other ranks for receiving the data
             tmp_value = paddle.zeros(dst_type.shape, dst_type.dtype)
             op = tmp_value.get_defining_op()
             mesh = paddle.distributed.ProcessMesh(other_ranks)

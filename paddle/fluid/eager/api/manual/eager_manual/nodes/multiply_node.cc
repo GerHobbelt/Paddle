@@ -347,7 +347,7 @@ MultiplyDoubleGradNode::operator()(
   // Inplace Strategy
 
   if (trace_backward) {
-    VLOG(6) << "No Inplace should happend for wrappered input: "
+    VLOG(6) << "No Inplace should happened for wrappered input: "
                "{inplace_grad_input_str}";
   } else {
     if (api_output_2 != nullptr && can_be_inplaced) {

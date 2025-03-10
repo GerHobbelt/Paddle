@@ -15,6 +15,7 @@
 
 import os
 import unittest
+from contextlib import contextmanager
 
 import numpy as np
 from get_test_cover_info import (
@@ -30,6 +31,15 @@ import paddle
 import paddle.nn.functional as F
 
 paddle.enable_static()
+
+
+@contextmanager
+def dynamic_guard():
+    paddle.disable_static()
+    try:
+        yield
+    finally:
+        paddle.enable_static()
 
 
 class TestActivationOPBase(XPUOpTest):
@@ -88,6 +98,75 @@ class XPUTestExpOP(XPUOpTestWrapper):
 support_types = get_xpu_op_support_types('exp')
 for stype in support_types:
     create_test_class(globals(), XPUTestExpOP, stype)
+
+
+class XPUTestRoundOP(XPUOpTestWrapper):
+    def __init__(self):
+        self.op_name = 'round'
+        self.use_dynamic_create_class = False
+
+    class XPUTestRound(TestActivationOPBase):
+        def set_case(self):
+            self.op_type = 'round'
+
+            self.init_dtype()
+            self.set_shape()
+            self.set_decimals()
+
+            np.random.seed(1024)
+            x = np.random.uniform(-1, 1, self.shape).astype(self.dtype) * 100
+            out = np.round(x, decimals=self.decimals)
+
+            self.inputs = {'X': OpTest.np_dtype_to_base_dtype(x)}
+            self.outputs = {'Out': out}
+            self.attrs = {'decimals': self.decimals}
+            self.convert_input_output()
+
+        def set_shape(self):
+            self.shape = [10, 12]
+
+        def set_decimals(self):
+            self.decimals = 0
+
+        def test_check_grad(self):
+            pass
+
+        def convert_input_output(self):
+            if self.dtype == np.uint16:
+                self.inputs = {'X': convert_float_to_uint16(self.inputs['X'])}
+                self.outputs = {
+                    'Out': convert_float_to_uint16(self.outputs['Out'])
+                }
+
+    class XPUTestRound_ZeroDIm(XPUTestRound):
+        def set_shape(self):
+            self.shape = []
+
+    class XPUTestRound_decimals1(XPUTestRound):
+        def init_decimals(self):
+            self.decimals = 2
+
+        def test_round_api(self):
+            with dynamic_guard():
+                x_np = (
+                    np.random.uniform(-1, 1, self.shape).astype(self.dtype)
+                    * 100
+                )
+                out_expect = np.round(x_np, decimals=self.decimals)
+                x_paddle = paddle.to_tensor(
+                    x_np, dtype=self.dtype, place=self.place
+                )
+                y = paddle.round(x_paddle, decimals=self.decimals)
+                np.testing.assert_allclose(y.numpy(), out_expect, rtol=1e-3)
+
+    class TestRound_decimals2(XPUTestRound_decimals1):
+        def init_decimals(self):
+            self.decimals = -1
+
+
+support_types = get_xpu_op_support_types('round')
+for stype in support_types:
+    create_test_class(globals(), XPUTestRoundOP, stype)
 
 
 class XPUTestSiluOP(XPUOpTestWrapper):
@@ -261,10 +340,16 @@ class XPUTestTanhOP(XPUOpTestWrapper):
             self.op_type = "tanh"
             self.dtype = self.in_type
 
-            x = np.random.uniform(-1, 1, [11, 17]).astype(self.dtype)
+            x = np.random.uniform(-1, 1, [11, 17])
+            if self.dtype == np.uint16:
+                # bfloat16 actually
+                new_x = convert_float_to_uint16(x)
+            else:
+                new_x = x.astype(self.dtype)
+
             out = np.tanh(x)
             self.attrs = {'use_xpu': True}
-            self.inputs = {'X': OpTest.np_dtype_to_base_dtype(x)}
+            self.inputs = {'X': new_x}
             self.outputs = {'Out': out}
 
 

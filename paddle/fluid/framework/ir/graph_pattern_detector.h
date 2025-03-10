@@ -280,7 +280,7 @@ class PDPattern {
  *    detector.mutable_pattern().AddEdge(node0, node1);
  *    // Create an handler, to define the behavior of treating the filtered
  *    // subgraphs that comply with the patterns.
- *    GraphPatternDetector::handle_t handler = some labmda
+ *    GraphPatternDetector::handle_t handler = some lambda
  *    // Execute the detector.
  *    detector(&graph, handler);
  */
@@ -776,7 +776,7 @@ struct BatchNormActGrad : public PatternBase {
   PATTERN_DECL_NODE(batch_norm_grad);
   // declare variable node's name
   PATTERN_DECL_NODE(act_out);
-  PATTERN_DECL_NODE(d_itermediate_out);
+  PATTERN_DECL_NODE(d_intermediate_out);
   PATTERN_DECL_NODE(bn_x);
   PATTERN_DECL_NODE(bn_scale);
   PATTERN_DECL_NODE(bn_bias);
@@ -918,7 +918,7 @@ struct ActElewiseAdd : public PatternBase {
 // the act is inplace.
 // op: elementwise_add_grad + act_grad
 // named nodes: elementwise_add_grad, act_grad
-//              act_out, act_out_g, ele_y, d_itermediate_out, d_ele_x, d_ele_y
+//              act_out, act_out_g, ele_y, d_intermediate_out, d_ele_x, d_ele_y
 struct ElewiseAddActInplaceGrad : public PatternBase {
   ElewiseAddActInplaceGrad(PDPattern* pattern, const std::string& name_scope)
       : PatternBase(pattern, name_scope, "elewise_add_act_grad1") {}
@@ -932,7 +932,7 @@ struct ElewiseAddActInplaceGrad : public PatternBase {
   PATTERN_DECL_NODE(ele_add_grad);
   // declare variable node's name
   PATTERN_DECL_NODE(act_out);
-  PATTERN_DECL_NODE(d_itermediate_out);
+  PATTERN_DECL_NODE(d_intermediate_out);
   PATTERN_DECL_NODE(d_ele_x);
   PATTERN_DECL_NODE(d_ele_y);
   PATTERN_DECL_NODE(ele_y);

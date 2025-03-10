@@ -15,12 +15,22 @@
 from __future__ import annotations
 
 from abc import ABC, abstractclassmethod
-from typing import ClassVar
+from pathlib import Path
+from typing import ClassVar, NamedTuple
 
 from typing_extensions import Self
 
 from .envs import ENV_SOT_COLLECT_INFO
 from .utils import Singleton
+
+
+def try_import_graphviz():
+    try:
+        import graphviz
+
+        return graphviz
+    except ImportError:
+        return None
 
 
 class InfoCollector(metaclass=Singleton):
@@ -98,3 +108,89 @@ class NewSymbolHitRateInfo(StepInfoBase):
         summary = f"All tensor count: {all_count}, hit count: {hit_count}\n"
         summary += f"Hit rate: {hit_count / all_count:.2f}"
         return summary
+
+
+class SubGraphRelationInfo(StepInfoBase):
+    SHORT_NAME = "subgraph_relation"
+    STEP_UNIQUE_ID = 0
+
+    class ConcreteShapeInfo(NamedTuple):
+        id: int
+        ir_shape: list[int]
+        real_shape: list[int]
+
+    def __init__(
+        self,
+        subgraph_name: str,
+        input_shape_infos: list[SubGraphRelationInfo.ConcreteShapeInfo],
+        output_shape_infos: list[SubGraphRelationInfo.ConcreteShapeInfo],
+        is_first_call: bool,
+        graph_size: int,
+    ):
+        super().__init__()
+        self.subgraph_name = subgraph_name
+        self.input_shape_infos = input_shape_infos
+        self.output_shape_infos = output_shape_infos
+        self.is_first_call = is_first_call
+        self.graph_size = graph_size
+
+    @classmethod
+    def summary(cls, history: list[Self]) -> str:
+        # TODO: attach input shape (with dynamic shape info)
+        cls.STEP_UNIQUE_ID += 1
+        if len(history) == 0:
+            return f"No {cls.SHORT_NAME} info"
+        if all(not subgraph_info.is_first_call for subgraph_info in history):
+            return "All subgraph are not the first call"
+        graphviz = try_import_graphviz()
+        if graphviz is None:
+            return "Please install graphviz to show the subgraph relation"
+        dot = graphviz.Digraph()
+        shape_infos = [
+            shape_info
+            for info in history
+            for shape_info in info.input_shape_infos + info.output_shape_infos
+        ]
+
+        def to_tensor_node_name(
+            shape_info: SubGraphRelationInfo.ConcreteShapeInfo,
+        ):
+            return f"tensor_{shape_info.id}"
+
+        visited_shape = set()
+        for shape_info in shape_infos:
+            if shape_info.id in visited_shape:
+                continue
+            visited_shape.add(shape_info.id)
+            dot.node(
+                to_tensor_node_name(shape_info),
+                f"Tensor {shape_info.id} shape={shape_info.real_shape}",
+                shape="rect",
+            )
+        for i, info in enumerate(history):
+            subgraph_id = f"subgraph_{i}"
+            dot.node(
+                subgraph_id,
+                f"Subgraph {i} ({info.subgraph_name}, size={info.graph_size})",
+                shape='oval',
+                fillcolor='cyan' if info.is_first_call else None,
+                style='filled' if info.is_first_call else None,
+            )
+            for shape_info in info.input_shape_infos:
+                dot.edge(
+                    to_tensor_node_name(shape_info),
+                    subgraph_id,
+                    label=str(shape_info.ir_shape),
+                )
+            for shape_info in info.output_shape_infos:
+                dot.edge(
+                    subgraph_id,
+                    to_tensor_node_name(shape_info),
+                    label=str(shape_info.ir_shape),
+                )
+
+        directory = Path(".") / "subgraph_relation"
+        directory.mkdir(exist_ok=True, parents=True)
+        filename = f"subgraph_relation_{cls.STEP_UNIQUE_ID}"
+        dot.render(directory / filename, format="png", cleanup=True)
+        return f"Please check {directory / filename}.png for subgraph relation"

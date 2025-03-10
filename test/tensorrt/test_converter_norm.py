@@ -33,10 +33,66 @@ class TestBatchNormTRTPattern(TensorRTBaseTest):
         }
         self.program_config = {"feed_list": ["x"]}
         self.min_shape = {"x": [1, 1, 2, 3]}
+        self.opt_shape = {"x": [2, 1, 2, 3]}
         self.max_shape = {"x": [5, 1, 2, 3]}
 
     def test_trt_result(self):
         self.check_trt_result()
+
+
+def instance_norm_wrapper(x, weight, bias):
+    return paddle.nn.functional.instance_norm(x, None, None, weight, bias)
+
+
+class TestInstanceNormTRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = instance_norm_wrapper
+        self.api_args = {
+            "x": np.arange(12).reshape([2, 2, 1, 3]).astype("float32"),
+            "weight": np.random.random([2]).astype("float32"),
+            "bias": np.random.random([2]).astype("float32"),
+        }
+        self.program_config = {"feed_list": ["x", "weight", "bias"]}
+        self.min_shape = {"x": [1, 2, 1, 3]}
+        self.opt_shape = {"x": [2, 2, 1, 3]}
+        self.max_shape = {"x": [5, 2, 1, 3]}
+
+    def test_trt_result(self):
+        self.check_trt_result()
+
+
+class TestInstanceNormWith3DInputTRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = instance_norm_wrapper
+        self.api_args = {
+            "x": np.arange(4).reshape([2, 2, 1]).astype("float32"),
+            "weight": np.random.random([2]).astype("float32"),
+            "bias": np.random.random([2]).astype("float32"),
+        }
+        self.program_config = {"feed_list": ["x", "weight", "bias"]}
+        self.min_shape = {"x": [1, 2, 1]}
+        self.opt_shape = {"x": [2, 2, 1]}
+        self.max_shape = {"x": [5, 2, 1]}
+
+    def test_trt_result(self):
+        self.check_marker(expected_result=False)
+
+
+class TestInstanceNormWithNoneInputTRTPattern(TensorRTBaseTest):
+    def setUp(self):
+        self.python_api = instance_norm_wrapper
+        self.api_args = {
+            "x": np.arange(12).reshape([2, 2, 1, 3]).astype("float32"),
+            "weight": None,
+            "bias": None,
+        }
+        self.program_config = {"feed_list": ["x", "weight", "bias"]}
+        self.min_shape = {"x": [1, 2, 1, 3]}
+        self.opt_shape = {"x": [2, 2, 1, 3]}
+        self.max_shape = {"x": [5, 2, 1, 3]}
+
+    def test_trt_result(self):
+        self.check_marker(expected_result=False)
 
 
 if __name__ == '__main__':

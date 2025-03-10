@@ -23,52 +23,61 @@
 namespace cinn::fusion {
 
 std::vector<PatternNodePtr> PatternGraph::ClusterOps() {
-  VLOG(4) << "[Group Cluster] Initial Condition: " << GraphInfo();
+  VLOG(4) << "[Group Cluster] Initial Condition: ";
+  PrintGraphInfo();
 
   VLOG(4) << "[Group Cluster] Start SinkTrivialPattern";
   SinkTrivialPattern();
-  VLOG(4) << "[Group Cluster] After SinkTrivialPattern: " << GraphInfo();
+  VLOG(4) << "[Group Cluster] After SinkTrivialPattern: ";
+  PrintGraphInfo();
 
   // ReducePattern -> ReduceTreePattern
   VLOG(4) << "[Group Cluster] Start ReduceLiftReduceTree";
   ReduceLiftReduceTree();
-  VLOG(4) << "[Group Cluster] After ReduceLiftReduceTree: " << GraphInfo();
+  VLOG(4) << "[Group Cluster] After ReduceLiftReduceTree: ";
+  PrintGraphInfo();
 
   // ReduceTreePattern + ReduceTreePattern fusion
   VLOG(4) << "[Group Cluster] Start ReduceTreeGrown";
   ReduceTreeGrown();
-  VLOG(4) << "[Group Cluster] After ReduceTreeGrown: " << GraphInfo();
+  VLOG(4) << "[Group Cluster] After ReduceTreeGrown: ";
+  PrintGraphInfo();
 
   // ReduceTreePattern + TrivialPattern fusion.
   VLOG(4) << "[Group Cluster] Start ReduceTree_Trivial_Fusion";
   ReduceTree_Trivial_Fusion();
-  VLOG(4) << "[Group Cluster] After ReduceTree_Trivial_Fusion: " << GraphInfo();
+  VLOG(4) << "[Group Cluster] After ReduceTree_Trivial_Fusion: ";
+  PrintGraphInfo();
 
   // All -> ItersPermutationPattern
   VLOG(4) << "[Group Cluster] Start LiftToItersPermutationPattern";
   LiftToItersPermutationPattern();
-  VLOG(4) << "[Group Cluster] After LiftToItersPermutationPattern: "
-          << GraphInfo();
+  VLOG(4) << "[Group Cluster] After LiftToItersPermutationPattern: ";
+  PrintGraphInfo();
 
   // ItersPermutationPattern x ItersPermutationPattern Fusion
   VLOG(4) << "[Group Cluster] Start IdentityAnchorFusion";
   LimitedAnchorFusion();
-  VLOG(4) << "[Group Cluster] After IdentityAnchorFusion: " << GraphInfo();
+  VLOG(4) << "[Group Cluster] After IdentityAnchorFusion: ";
+  PrintGraphInfo();
 
   // Sink single trivial op pattern
   VLOG(4) << "[Group Cluster] Start SplitRecomputePattern";
   SplitRecomputePattern();
-  VLOG(4) << "[Group Cluster] After SplitRecomputePattern: " << GraphInfo();
+  VLOG(4) << "[Group Cluster] After SplitRecomputePattern: ";
+  PrintGraphInfo();
 
   // ItersPermutationPattern x ItersPermutationPattern Fusion
   VLOG(4) << "[Group Cluster] Start ItersPermutationFusion";
   ItersPermutationFusion();
-  VLOG(4) << "[Group Cluster] After ItersPermutationFusion: " << GraphInfo();
+  VLOG(4) << "[Group Cluster] After ItersPermutationFusion: ";
+  PrintGraphInfo();
 
   // Horizontal fusion.
   VLOG(4) << "[Group Cluster] Start HorizontalFusion";
   HorizontalFusion();
-  VLOG(4) << "[Group Cluster] After HorizontalFusion: " << GraphInfo();
+  VLOG(4) << "[Group Cluster] After HorizontalFusion: ";
+  PrintGraphInfo();
 
   return ReturnFusionResults();
 }
@@ -324,19 +333,16 @@ void PatternGraph::AppendNode(const PatternNodePtr& node) {
   all_pattern_nodes_.emplace(node);
 }
 
-std::string PatternGraph::GraphInfo() const {
-  std::stringstream ss;
-  ss << "\n========= GraphInfo ===========";
+void PatternGraph::PrintGraphInfo() const {
+  VLOG(4) << "========= GraphInfo ===========";
   for (const auto& v : all_pattern_nodes_) {
+    std::stringstream ss;
     ss << "\n##############################";
     ss << "\n" << v->DebugStr();
-    ss << "    IsOutput: " << IsOutputNodeMatcher()(*this, v);
-    ss << "\n    Loop Framework is: "
-       << GetLoopFramework(v->stmt_pattern()).loop;
-    ss << std::endl;
+    ss << "\n    IsOutput: " << IsOutputNodeMatcher()(*this, v);
+    VLOG(4) << ss.str();
   }
-  ss << "\n===============================";
-  return ss.str();
+  VLOG(4) << "===============================";
 }
 
 PatternNodePtr PatternGraph::MergeNode(const PatternNodePtr& upstream,

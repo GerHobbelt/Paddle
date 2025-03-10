@@ -187,7 +187,7 @@ std::vector<uint64_t> TreeIndex::GetTravelCodes(uint64_t id, int start_level) {
   return res;
 }
 
-std::vector<IndexNode> TreeIndex::GetAllLeafs() {
+std::vector<IndexNode> TreeIndex::GetAllLeaves() {
   std::vector<IndexNode> res;
   res.reserve(id_codes_map_.size());
   for (auto& ite : id_codes_map_) {

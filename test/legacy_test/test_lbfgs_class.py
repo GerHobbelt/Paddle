@@ -103,18 +103,18 @@ class TestLbfgs(unittest.TestCase):
         targets = [outputs1(input), outputs2(input)]
         input = paddle.to_tensor(input)
 
-        def func1(extream_point, x):
+        def func1(extreme_point, x):
             return (
                 x * x * x
                 - 3 * x * x
-                + 3 * extream_point[0] * extream_point[1] * x
+                + 3 * extreme_point[0] * extreme_point[1] * x
             )
 
-        def func2(extream_point, x):
-            return pow(x, extream_point[0]) + 5 * pow(x, extream_point[1])
+        def func2(extreme_point, x):
+            return pow(x, extreme_point[0]) + 5 * pow(x, extreme_point[1])
 
-        extream_point = np.array([-2.34, 1.45]).astype('float32')
-        net1 = Net(extream_point, func1)
+        extreme_point = np.array([-2.34, 1.45]).astype('float32')
+        net1 = Net(extreme_point, func1)
         # converge of old_sk.pop()
         opt1 = incubate_lbfgs.LBFGS(
             learning_rate=1,
@@ -127,7 +127,7 @@ class TestLbfgs(unittest.TestCase):
             parameters=net1.parameters(),
         )
 
-        net2 = Net(extream_point, func2)
+        net2 = Net(extreme_point, func2)
         # converge of line_search = None
         opt2 = incubate_lbfgs.LBFGS(
             learning_rate=1,
@@ -153,8 +153,8 @@ class TestLbfgs(unittest.TestCase):
     def test_error_incubate(self):
         # test parameter is not Paddle Tensor
         def error_func1():
-            extream_point = np.array([-1, 2]).astype('float32')
-            extream_point = paddle.to_tensor(extream_point)
+            extreme_point = np.array([-1, 2]).astype('float32')
+            extreme_point = paddle.to_tensor(extreme_point)
             return incubate_lbfgs.LBFGS(
                 learning_rate=1,
                 max_iter=10,
@@ -163,7 +163,7 @@ class TestLbfgs(unittest.TestCase):
                 tolerance_change=1e-09,
                 history_size=3,
                 line_search_fn='strong_wolfe',
-                parameters=extream_point,
+                parameters=extreme_point,
             )
 
         self.assertRaises(TypeError, error_func1)
@@ -179,11 +179,11 @@ class TestLbfgs(unittest.TestCase):
         targets = [outputs2(input)]
         input = paddle.to_tensor(input)
 
-        def func2(extream_point, x):
-            return pow(x, extream_point[0]) + 5 * pow(x, extream_point[1])
+        def func2(extreme_point, x):
+            return pow(x, extreme_point[0]) + 5 * pow(x, extreme_point[1])
 
-        extream_point = np.array([-2.34, 1.45]).astype('float32')
-        net2 = Net(extream_point, func2)
+        extreme_point = np.array([-2.34, 1.45]).astype('float32')
+        net2 = Net(extreme_point, func2)
         # converge of line_search = None
         opt2 = incubate_lbfgs.LBFGS(
             learning_rate=1,
@@ -283,13 +283,13 @@ class TestLbfgs(unittest.TestCase):
     def test_error3_incubate(self):
         # test parameter shape size <= 0
         def error_func3():
-            extream_point = np.array([-1, 2]).astype('float32')
-            extream_point = paddle.to_tensor(extream_point)
+            extreme_point = np.array([-1, 2]).astype('float32')
+            extreme_point = paddle.to_tensor(extreme_point)
 
             def func(w, x):
                 return w * x
 
-            net = Net(extream_point, func)
+            net = Net(extreme_point, func)
             net.w = paddle.create_parameter(
                 shape=[-1, 2],
                 dtype=net.w.dtype,
@@ -353,18 +353,18 @@ class TestLbfgs(unittest.TestCase):
         targets = [outputs1(input), outputs2(input)]
         input = paddle.to_tensor(input)
 
-        def func1(extream_point, x):
+        def func1(extreme_point, x):
             return (
                 x * x * x
                 - 3 * x * x
-                + 3 * extream_point[0] * extream_point[1] * x
+                + 3 * extreme_point[0] * extreme_point[1] * x
             )
 
-        def func2(extream_point, x):
-            return pow(x, extream_point[0]) + 5 * pow(x, extream_point[1])
+        def func2(extreme_point, x):
+            return pow(x, extreme_point[0]) + 5 * pow(x, extreme_point[1])
 
-        extream_point = np.array([-2.34, 1.45]).astype('float32')
-        net1 = Net(extream_point, func1)
+        extreme_point = np.array([-2.34, 1.45]).astype('float32')
+        net1 = Net(extreme_point, func1)
         # converge of old_sk.pop()
         opt1 = lbfgs.LBFGS(
             learning_rate=1,
@@ -377,7 +377,7 @@ class TestLbfgs(unittest.TestCase):
             parameters=net1.parameters(),
         )
 
-        net2 = Net(extream_point, func2)
+        net2 = Net(extreme_point, func2)
         # converge of line_search = None
         opt2 = lbfgs.LBFGS(
             learning_rate=1,
@@ -403,8 +403,8 @@ class TestLbfgs(unittest.TestCase):
     def test_error(self):
         # test parameter is not Paddle Tensor
         def error_func1():
-            extream_point = np.array([-1, 2]).astype('float32')
-            extream_point = paddle.to_tensor(extream_point)
+            extreme_point = np.array([-1, 2]).astype('float32')
+            extreme_point = paddle.to_tensor(extreme_point)
             return lbfgs.LBFGS(
                 learning_rate=1,
                 max_iter=10,
@@ -413,7 +413,7 @@ class TestLbfgs(unittest.TestCase):
                 tolerance_change=1e-09,
                 history_size=3,
                 line_search_fn='strong_wolfe',
-                parameters=extream_point,
+                parameters=extreme_point,
             )
 
         self.assertRaises(TypeError, error_func1)
@@ -429,11 +429,11 @@ class TestLbfgs(unittest.TestCase):
         targets = [outputs2(input)]
         input = paddle.to_tensor(input)
 
-        def func2(extream_point, x):
-            return pow(x, extream_point[0]) + 5 * pow(x, extream_point[1])
+        def func2(extreme_point, x):
+            return pow(x, extreme_point[0]) + 5 * pow(x, extreme_point[1])
 
-        extream_point = np.array([-2.34, 1.45]).astype('float32')
-        net2 = Net(extream_point, func2)
+        extreme_point = np.array([-2.34, 1.45]).astype('float32')
+        net2 = Net(extreme_point, func2)
         # converge of line_search = None
         opt2 = lbfgs.LBFGS(
             learning_rate=1,
@@ -543,13 +543,13 @@ class TestLbfgs(unittest.TestCase):
     def test_error3(self):
         # test parameter shape size <= 0
         def error_func3():
-            extream_point = np.array([-1, 2]).astype('float32')
-            extream_point = paddle.to_tensor(extream_point)
+            extreme_point = np.array([-1, 2]).astype('float32')
+            extreme_point = paddle.to_tensor(extreme_point)
 
             def func(w, x):
                 return w * x
 
-            net = Net(extream_point, func)
+            net = Net(extreme_point, func)
             net.w = paddle.create_parameter(
                 shape=[-1, 2],
                 dtype=net.w.dtype,
@@ -576,12 +576,12 @@ class TestLbfgs(unittest.TestCase):
             targets = paddle.to_tensor([inputs * 2])
             inputs = paddle.to_tensor(inputs)
 
-            extream_point = np.array([-1, 1]).astype('float32')
+            extreme_point = np.array([-1, 1]).astype('float32')
 
-            def func(extream_point, x):
-                return x * extream_point[0] + 5 * x * extream_point[1]
+            def func(extreme_point, x):
+                return x * extreme_point[0] + 5 * x * extreme_point[1]
 
-            net = Net(extream_point, func)
+            net = Net(extreme_point, func)
             opt = lbfgs.LBFGS(
                 learning_rate=1,
                 max_iter=10,

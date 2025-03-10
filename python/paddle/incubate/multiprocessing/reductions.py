@@ -224,7 +224,15 @@ def _reduce_lodtensor(lodtensor):
         lodtensor._shared_incref()
         # TODO, maintain reference for lodtensor
     elif lodtensor._place().is_gpu_place():
-        metadata = lodtensor._share_cuda()
+        prev_id = paddle.base.core.get_cuda_current_device_id()
+        cur_id = lodtensor._place().gpu_device_id()
+        if prev_id != cur_id:
+            paddle.base.core.set_cuda_current_device_id(cur_id)
+        try:
+            metadata = lodtensor._share_cuda()
+        finally:
+            if prev_id != cur_id:
+                paddle.base.core.set_cuda_current_device_id(prev_id)
         rebuild = _rebuild_cuda_tensor
     else:
         raise RuntimeError("We only support pass cpu/gpu lodtensor for now!")

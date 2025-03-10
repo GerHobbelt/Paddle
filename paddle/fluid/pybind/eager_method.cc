@@ -779,7 +779,7 @@ static PyObject* tensor_method_clone(TensorObject* self,
     EagerSetDeviceId();
 
     PADDLE_ENFORCE_EQ(
-        self->tensor.initialized(),
+        self->tensor.has_allocation(),
         true,
         common::errors::InvalidArgument(
             "We can only support initialized tensor in clone, however we got "
@@ -1142,7 +1142,7 @@ static PyObject* tensor__is_shared_buffer_with(TensorObject* self,
   EAGER_TRY
   paddle::Tensor* dst_ptr =
       &(reinterpret_cast<TensorObject*>(PyTuple_GET_ITEM(args, 0))->tensor);
-  PADDLE_ENFORCE_EQ(self->tensor.initialized(),
+  PADDLE_ENFORCE_EQ(self->tensor.has_allocation(),
                     true,
                     common::errors::InvalidArgument(
                         "Tensor %s has not been initialized! please initialize "
@@ -1176,7 +1176,7 @@ static PyObject* tensor__share_underline_tensor_to(TensorObject* self,
   EAGER_TRY
   paddle::Tensor* src_ptr =
       &(reinterpret_cast<TensorObject*>(PyTuple_GET_ITEM(args, 0))->tensor);
-  if (!(self->tensor.defined() && self->tensor.has_allocation())) {
+  if (!self->tensor.has_allocation()) {
     PADDLE_ENFORCE(
         self->tensor.is_dist_tensor() &&
             !phi::distributed::IsCurRankInMesh(
@@ -1199,7 +1199,7 @@ static PyObject* tensor__is_shared_underline_tensor_with(TensorObject* self,
                                                          PyObject* kwargs) {
   EAGER_TRY
   paddle::Tensor src_tensor = CastPyArg2Tensor(PyTuple_GET_ITEM(args, 0), 0);
-  PADDLE_ENFORCE_EQ(src_tensor.initialized(),
+  PADDLE_ENFORCE_EQ(self->tensor.has_allocation(),
                     true,
                     common::errors::InvalidArgument(
                         "Tensor %s has not been initialized! please initialize "
@@ -1421,6 +1421,7 @@ static PyObject* tensor__getitem_dygraph(TensorObject* self,
                                          PyObject* args,
                                          PyObject* kwargs) {
   EAGER_TRY
+  SetPythonStack();
   PyObject* _index = PyTuple_GET_ITEM(args, 0);
   VLOG(4) << "Call new indexing strategy _getitem_dygraph";
 
@@ -1691,6 +1692,7 @@ static PyObject* tensor__setitem_dygraph(TensorObject* self,
                                          PyObject* args,
                                          PyObject* kwargs) {
   EAGER_TRY
+  SetPythonStack();
   VLOG(4) << "Call new indexing strategy _setitem_dygraph";
 
   PyObject* _index = PyTuple_GET_ITEM(args, 0);
@@ -2006,6 +2008,7 @@ static PyObject* tensor_register_grad_hook(TensorObject* self,
                                            PyObject* args,
                                            PyObject* kwargs) {
   EAGER_TRY
+  SetPythonStack();
   int64_t hook_id = 0;
   if (egr::EagerUtils::IsLeafTensor(self->tensor)) {
     VLOG(6) << "Register hook for leaf tensor: " << self->tensor.name();

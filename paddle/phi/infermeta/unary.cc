@@ -1242,7 +1242,7 @@ void EigvalshInferMeta(const MetaTensor& x,
 void EinsumInferMeta(const std::vector<const MetaTensor*>& inputs,
                      const std::string& equation,
                      MetaTensor* out) {
-  // collect the following informations to prepare einsum.
+  // collect the following information to prepare einsum.
   LabelMap labelshape(0);
   LabelMap labeltype(LabelType::Reduction);
   std::vector<LabelMap> label2perms(inputs.size(), LabelMap(-1));
@@ -1832,20 +1832,20 @@ void FoldInferMeta(const MetaTensor& x,
                         "but received strides_height: %d strides_width: %d.",
                         strides[0],
                         strides[1]));
-  // check dilations
+  // check output size
   PADDLE_ENFORCE_GT(output_height,
-                    1,
+                    0,
                     common::errors::InvalidArgument(
-                        "The `output_height` should be greater than one, "
+                        "The `output_height` should be greater than zero, "
                         "but received output_height: %d .",
                         output_height));
   PADDLE_ENFORCE_GT(output_width,
-                    1,
+                    0,
                     common::errors::InvalidArgument(
-                        "The `output_width` should be greater than one, "
+                        "The `output_width` should be greater than zero, "
                         "but received output_width: %d .",
                         output_width));
-  // check output size
+  // check dilations
   PADDLE_ENFORCE_GT(
       dilation_height,
       0,
@@ -3320,17 +3320,8 @@ void PNormInferMeta(const MetaTensor& x,
   auto x_dim = x.dims();
   auto x_rank = x_dim.size();
 
-  PADDLE_ENFORCE_GE(axis,
-                    -x_rank,
-                    errors::InvalidArgument(
-                        "Attr(axis) value should be in range [-R, R-1], R is "
-                        "the rank of Input(X). But received axis: %d, R: %d. "
-                        "Current Input(X)'s shape is=[%s].",
-                        axis,
-                        x_rank,
-                        x_dim));
-  PADDLE_ENFORCE_LT(axis,
-                    x_rank,
+  PADDLE_ENFORCE_EQ((axis >= -x_rank && axis < x_rank) || x_rank == 0,
+                    true,
                     errors::InvalidArgument(
                         "Attr(axis) value should be in range [-R, R-1], R is "
                         "the rank of Input(X). But received axis: %d, R: %d. "
@@ -3707,12 +3698,13 @@ void ReduceInferMetaBase(const MetaTensor& x,
 void ReduceSumInferMeta(const MetaTensor& x,
                         const std::vector<int64_t>& axis,
                         bool keep_dim,
+                        DataType dtype,
                         MetaTensor* out) {
   bool reduce_all = false;
   if (axis.empty()) {
     reduce_all = true;
   }
-  SumRawInferMeta(x, axis, keep_dim, reduce_all, DataType::UNDEFINED, out);
+  SumRawInferMeta(x, axis, keep_dim, reduce_all, dtype, out);
 }
 
 void ReduceInferMeta(const MetaTensor& x,
@@ -4773,7 +4765,7 @@ void SumInferMeta(const MetaTensor& x,
 }
 
 void DetInferMeta(const MetaTensor& x, MetaTensor* out, MetaConfig config) {
-  // remove the last two demension
+  // remove the last two dimension
   auto out_dim = common::vectorize<int>(x.dims());
   out_dim.pop_back();
   out_dim.pop_back();

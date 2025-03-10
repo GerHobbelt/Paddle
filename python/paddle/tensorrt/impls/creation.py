@@ -20,6 +20,7 @@ from paddle.pir.core import _PADDLE_PIR_DTYPE_2_NUMPY_DTYPE
 from paddle.tensorrt.converter_utils import (
     add_1D_constant_layer,
     cast_tensor,
+    get_input_constant_value,
     resize_to_1d,
     trt_cast,
     trt_floor_div,
@@ -148,9 +149,8 @@ def full_like_converter(network, paddle_op, inputs):
             f"cast converter currently doesn't support dtype: {out_dtype}"
         )
 
-    value_op = paddle_op.operands()[1].source().get_defining_op()
-    if value_op.name() == "pd_op.full":
-        fill_value = value_op.attrs()["value"]
+    fill_value = get_input_constant_value(paddle_op, inputs, 1)
+    if fill_value is not None:
         value = network.add_constant(
             (1,),
             np.array(
@@ -206,9 +206,9 @@ def full_with_tensor_converter(network, paddle_op, inputs):
         else:
             shape_tensor_list = [shape_tensor]
 
-    shape_op = paddle_op.operands()[1].source().get_defining_op()
-    if shape_op.name() == "pd_op.full_int_array":
-        shape_tensor = shape_op.attrs()["value"]
+    shape_val = get_input_constant_value(paddle_op, inputs, 1)
+    if shape_val is not None:
+        shape_tensor = shape_val
         is_static_shape = True
     else:
         shape_tensor = inputs[1]

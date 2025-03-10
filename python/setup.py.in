@@ -1151,6 +1151,7 @@ headers = (
     list(find_files('*.h', '@PADDLE_SOURCE_DIR@/paddle/fluid/pir/drr/include')) +  # drr init headers
     list(find_files('*.h','@PADDLE_SOURCE_DIR@/paddle/fluid/pir/dialect/operator/interface/infer_symbolic_shape'))+
     list(find_files('*.h', '@PADDLE_SOURCE_DIR@/paddle/fluid/pir/dialect/operator/ir')) +  # operator init headers
+    list(find_files('sub_graph_detector.h', '@PADDLE_SOURCE_DIR@/paddle/fluid/pir/transforms/')) +
     list(find_files('general_functions.h', '@PADDLE_SOURCE_DIR@/paddle/fluid/pir/utils'))+
     list(find_files('interface.h', '@PADDLE_SOURCE_DIR@/paddle/fluid/pir/serialize_deserialize/include'))+
     list(find_files('dense_tensor.inl','@PADDLE_SOURCE_DIR@/paddle/phi/core'))+
@@ -1164,8 +1165,12 @@ headers = (
     list(find_files('infer_symbolic_shape.h','@PADDLE_SOURCE_DIR@/paddle/fluid/pir/dialect/operator/interface/infer_symbolic_shape/'))+
     #pir headers
     list(find_files('lexer.h','@PADDLE_SOURCE_DIR@/paddle/pir/src/core/parser/'))+
-    list(find_files('token.h','@PADDLE_SOURCE_DIR@/paddle/pir/src/core/parser/')))
-
+    list(find_files('token.h','@PADDLE_SOURCE_DIR@/paddle/pir/src/core/parser/'))+
+    #custom_engine
+    list(find_files('custom_engine_ext.h','@PADDLE_SOURCE_DIR@/paddle/fluid/custom_engine/'))+
+    #new_executor headers
+    list(find_files('pir_adaptor_util.h','@PADDLE_SOURCE_DIR@/paddle/fluid/framework/new_executor/pir_adaptor/'))+
+    list(find_files('custom_engine_instruction.h','@PADDLE_SOURCE_DIR@/paddle/fluid/framework/new_executor/instruction/')))
 jit_layer_headers = ['layer.h', 'serializer.h', 'serializer_utils.h', 'all.h', 'function.h']
 for f in jit_layer_headers:
     headers += list(find_files(f, '@PADDLE_SOURCE_DIR@/paddle/fluid/jit', recursive=True))

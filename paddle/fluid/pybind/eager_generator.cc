@@ -1600,7 +1600,7 @@ static std::pair<std::string, std::string> GenerateForwardFunctionContents(
                                     LegalizeVarName(input_name));
       } else {
         const char* FWD_INS_CONTENT_TEMPLATE =
-            "  if(%s.initialized()) "
+            "  if(%s.has_allocation()) "
             "ins[\"%s\"] = egr::EagerUtils::TrySyncToVars(%s);\n";
         dispensable_ins_contents_str +=
             paddle::string::Sprintf(FWD_INS_CONTENT_TEMPLATE,
@@ -1608,14 +1608,15 @@ static std::pair<std::string, std::string> GenerateForwardFunctionContents(
                                     input_name,
                                     LegalizeVarName(input_name));
         const char* FWD_AMP_TENSORS_VECTOR_TEMPLATE =
-            "    if(%s.initialized()) "
+            "    if(%s.has_allocation()) "
             "amp_tensors_vector.push_back({ %s });\n";
         dispensable_amp_tensors_vector_str +=
             paddle::string::Sprintf(FWD_AMP_TENSORS_VECTOR_TEMPLATE,
                                     LegalizeVarName(input_name),
                                     LegalizeVarName(input_name));
         const char* DISPENSABLE_AMP_AUTO_CAST_TEMPLATE =
-            "    auto NEW_%s = ((%s.initialized()) ? egr::AmpAutoCast(\"%s\", "
+            "    auto NEW_%s = ((%s.has_allocation()) ? "
+            "egr::AmpAutoCast(\"%s\", "
             "%s, amp_dst_dtype, \"%s\") : %s);\n";
         dispensable_amp_auto_cast_str +=
             paddle::string::Sprintf(DISPENSABLE_AMP_AUTO_CAST_TEMPLATE,
@@ -2189,7 +2190,7 @@ static std::string GenerateSingleOpBase(
       "  // Check backward inplace info\n"
       "  bool %s = false;\n"
       "  %s\n"
-      "  if (%s.initialized()) {\n"
+      "  if (%s.has_allocation()) {\n"
       "    VLOG(10) << %s.name() << \"(%s) use_count: \" << "
       "%s.impl().use_count();\n"
       "    if (%s.impl().use_count() == 1 || (%s.impl().use_count() == 2 && "
@@ -2234,8 +2235,8 @@ static std::string GenerateSingleOpBase(
                                     bwd_inplace_input_name,
                                     struct_fwd_input_name);
         const char* GRAD_INS_FWD_TENSOR_TEMPLATE =
-            "(&this->%s)->get_intermidiate_tensor()";
-        std::string tensor_wrapper_intermidiate_tensor_str =
+            "(&this->%s)->get_intermediate_tensor()";
+        std::string tensor_wrapper_intermediate_tensor_str =
             paddle::string::Sprintf(GRAD_INS_FWD_TENSOR_TEMPLATE,
                                     struct_fwd_input_name);
         generated_grad_function_body +=
@@ -2249,7 +2250,7 @@ static std::string GenerateSingleOpBase(
                                     bwd_inplace_input_name,
                                     bwd_inplace_input_name,
                                     bwd_inplace_input_name,
-                                    tensor_wrapper_intermidiate_tensor_str,
+                                    tensor_wrapper_intermediate_tensor_str,
                                     can_be_inplaced_name);
       }
     } else if (grad_ins_grad_slotname_map.count(grad_input_name)) {

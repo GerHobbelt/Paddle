@@ -24,7 +24,7 @@ from paddle.base import Program, program_guard
 paddle.enable_static()
 
 
-class TestDataNormOpErrorr(unittest.TestCase):
+class TestDataNormOpError(unittest.TestCase):
     def test_errors(self):
         with program_guard(Program(), Program()):
             x2 = paddle.static.data(name='x2', shape=[-1, 3, 4], dtype="int32")

@@ -487,7 +487,7 @@ struct PirToPyCodeConverterHelper {
       const auto& args = block.args();
       return std::find(args.begin(), args.end(), value) != args.end();
     };
-    const auto IsBlockKeywardArg = [&](pir::Value value) {
+    const auto IsBlockKeywordArg = [&](pir::Value value) {
       const auto& kwargs = block.kwargs();
       for (const auto& [_, kwarg] : kwargs) {
         if (kwarg == value) return true;
@@ -499,7 +499,7 @@ struct PirToPyCodeConverterHelper {
       if (std::find(inputs.begin(), inputs.end(), value) != inputs.end())
         continue;
       if (IsBlockPositionalArg(value)) continue;
-      if (IsBlockKeywardArg(value)) continue;
+      if (IsBlockKeywordArg(value)) continue;
       inputs.push_back(value);
     }
     return inputs;
@@ -1550,7 +1550,7 @@ std::optional<pir::ShapeConstraintIRAnalysis*> GetNullShapeAnalysis(
   return std::nullopt;
 }
 
-void TryTruncateLogginFile(const std::string& file_path) {
+void TryTruncateLoggingFile(const std::string& file_path) {
   if (!FLAGS_logging_trunc_pir_py_code) return;
   static std::mutex mutex;
   std::unique_lock<std::mutex> lock(mutex);
@@ -1570,7 +1570,7 @@ void PirToPyCodeConverter::SaveIfFlagEnabled() const {
   if (FLAGS_logging_pir_py_code_dir.empty()) return;
   const std::string file_path =
       FLAGS_logging_pir_py_code_dir + "/" + file_name_;
-  TryTruncateLogginFile(file_path);
+  TryTruncateLoggingFile(file_path);
   const auto MutOnceFlag = [&]() -> std::once_flag* {
     static std::mutex mutex;
     std::unique_lock<std::mutex> lock(mutex);

@@ -265,7 +265,7 @@ int32_t SSDSparseTable::PullSparsePtr(int shard_id,
               }
 
               _value_accessor->UpdateTimeDecay(ret->data(), true);
-#ifdef PADDLE_WITH_PSLIB
+#if defined(PADDLE_WITH_PSLIB) || defined(PADDLE_WITH_HETERPS)
               _value_accessor->UpdatePassId(ret->data(), pass_id);
 #endif
               int pull_data_idx = cur_ctx->batch_index[idx];
@@ -280,7 +280,7 @@ int32_t SSDSparseTable::PullSparsePtr(int shard_id,
         ret = itr.value_ptr();
         // int pull_data_idx = keys[i].second;
         _value_accessor->UpdateTimeDecay(ret->data(), true);
-#ifdef PADDLE_WITH_PSLIB
+#if defined(PADDLE_WITH_PSLIB) || defined(PADDLE_WITH_HETERPS)
         _value_accessor->UpdatePassId(ret->data(), pass_id);
 #endif
         pull_values[i] = reinterpret_cast<char*>(ret);
@@ -332,7 +332,7 @@ int32_t SSDSparseTable::PullSparsePtr(int shard_id,
           ret = &feature_value;
         }
         _value_accessor->UpdateTimeDecay(ret->data(), true);
-#ifdef PADDLE_WITH_PSLIB
+#if defined(PADDLE_WITH_PSLIB) || defined(PADDLE_WITH_HETERPS)
         _value_accessor->UpdatePassId(ret->data(), pass_id);
 #endif
         int pull_data_idx = cur_ctx->batch_index[idx];
@@ -2945,7 +2945,7 @@ int32_t SSDSparseTable::LoadWithBinary(const std::string& path, int param) {
                     abort();
                   }
                   last_k = k;
-#ifdef PADDLE_WITH_PSLIB
+#if defined(PADDLE_WITH_PSLIB) || defined(PADDLE_WITH_HETERPS)
                   _value_accessor->UpdatePassId(convert_value, 0);
 #endif
                   rocksdb::Status status = sst_writer.Put(
@@ -2963,7 +2963,7 @@ int32_t SSDSparseTable::LoadWithBinary(const std::string& path, int param) {
                   }
                 } else {
                   auto& feature_value = shard[k];
-#ifdef PADDLE_WITH_PSLIB
+#if defined(PADDLE_WITH_PSLIB) || defined(PADDLE_WITH_HETERPS)
                   _value_accessor->UpdatePassId(convert_value, 0);
 #endif
                   feature_value.resize(dim);
@@ -3051,7 +3051,7 @@ std::pair<int64_t, int64_t> SSDSparseTable::PrintTableStat() {
 
 int32_t SSDSparseTable::CacheTable(uint16_t pass_id) {
   std::lock_guard<std::mutex> guard(_table_mutex);
-  VLOG(0) << "cache_table";
+  VLOG(0) << "cache_table, pass_id:" << pass_id;
   std::atomic<uint32_t> count{0};
   std::vector<std::future<int>> tasks;
 

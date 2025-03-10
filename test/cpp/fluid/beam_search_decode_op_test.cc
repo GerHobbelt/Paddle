@@ -40,7 +40,7 @@ void GenerateExample(const std::vector<size_t>& level_0,
                     level_1.size() - 1,
                     common::errors::InvalidArgument(
                         "source level is used to describe candidate set"
-                        ", so it's element should less than levle_1 length. "
+                        ", so it's element should less than level_1 length. "
                         "And the value of source"
                         "level is %d. ",
                         level_1.size() - 1));
@@ -112,7 +112,7 @@ void BeamSearchDecodeTestFrame() {
                      &scores);
   GenerateExample<T>(
       std::vector<size_t>{0, 2, 4},
-      std::vector<size_t>{0, 0, 0, 2, 2},  // the branchs of the first source
+      std::vector<size_t>{0, 0, 0, 2, 2},  // the branches of the first source
                                            // sentence are pruned since finished
       std::vector<int>{5, 1},
       &ids,

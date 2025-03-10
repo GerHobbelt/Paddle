@@ -589,6 +589,7 @@ void RealAndImagInferMeta(const MetaTensor& x, MetaTensor* out);
 void ReduceSumInferMeta(const MetaTensor& x,
                         const std::vector<int64_t>& axis,
                         bool keep_dim,
+                        DataType dtype,
                         MetaTensor* out);
 
 void ReduceInferMeta(const MetaTensor& x,

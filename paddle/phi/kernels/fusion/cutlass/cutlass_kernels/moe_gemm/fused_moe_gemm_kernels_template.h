@@ -22,6 +22,7 @@
 #include <cuda.h>
 #include <cuda_fp16.h>
 #include <math.h>
+#include <optional>
 #include <sstream>
 #include "cutlass/array.h"
 #include "cutlass/numeric_conversion.h"
@@ -44,6 +45,7 @@
 #pragma GCC diagnostic pop
 
 #include "paddle/phi/kernels/fusion/cutlass/cutlass_kernels/cutlass_heuristic.h"
+#include "paddle/phi/kernels/fusion/cutlass/cutlass_kernels/gemm_config_manager.h"
 #include "paddle/phi/kernels/fusion/cutlass/utils/cuda_utils.h"
 
 namespace phi {
@@ -941,41 +943,88 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
     cudaStream_t stream) {
   static constexpr bool is_weight_only = !std::is_same<T, WeightType>::value;
   static constexpr bool only_simt_configs = std::is_same<T, float>::value;
-  std::vector<CutlassGemmConfig> candidate_configs =
-      get_candidate_configs(sm_, -1, is_weight_only, false, only_simt_configs);
-  std::vector<int> occupancies(candidate_configs.size());
+  std::vector<CutlassGemmConfig> candidate_configs = get_candidate_configs(
+      sm_, -1, is_weight_only, false, only_simt_configs, true);
+  static constexpr int warm_time = 5;
+  static constexpr int test_time = 10;
+  auto& gemmConfigManager = phi::GemmConfigManager::Instance();
+  constexpr GemmDataType dtype = getGemmDataType<T>();
+  constexpr GemmDataType wdtype = getGemmDataType<WeightType>();
+  GemmIDType gemmId{
+      gemm_n, gemm_k, GemmType::MOEGEMM, dtype, wdtype, num_experts};
+  CutlassGemmConfig chosen_config;
+  auto chosen_config_optional =
+      gemmConfigManager.getBestConfig(gemmId, total_rows);
+  if (chosen_config_optional != std::nullopt) {
+    chosen_config = chosen_config_optional.value();
+  } else {
+    float best_time = std::numeric_limits<float>::max();
+    CutlassGemmConfig best_config;
+    int profile_total_rows = gemmConfigManager.nextPowerOfTwo(total_rows);
+    bool found_one = false;
 
-  for (size_t ii = 0; ii < candidate_configs.size(); ++ii) {
-    dispatch_to_arch<EpilogueTag>(A,
-                                  B,
-                                  weight_scales,
-                                  biases,
-                                  C,
-                                  total_rows_before_expert,
-                                  total_rows,
-                                  gemm_n,
-                                  gemm_k,
-                                  num_experts,
-                                  candidate_configs[ii],
-                                  stream,
-                                  &occupancies[ii]);
+    for (size_t ii = 0; ii < candidate_configs.size(); ++ii) {
+      for (int i = 0; i < warm_time; i++) {
+        dispatch_to_arch<EpilogueTag>(A,
+                                      B,
+                                      weight_scales,
+                                      biases,
+                                      C,
+                                      total_rows_before_expert,
+                                      total_rows,
+                                      gemm_n,
+                                      gemm_k,
+                                      num_experts,
+                                      candidate_configs[ii],
+                                      stream);
+      }
+      cudaEvent_t start;
+      cudaEvent_t stop;
+      check_cuda_error(cudaEventCreate(&start));
+      check_cuda_error(cudaEventCreate(&stop));
+      check_cuda_error(cudaStreamSynchronize(stream));
+      check_cuda_error(cudaEventRecord(start, stream));
+      for (int i = 0; i < test_time; i++) {
+        dispatch_to_arch<EpilogueTag>(A,
+                                      B,
+                                      weight_scales,
+                                      biases,
+                                      C,
+                                      total_rows_before_expert,
+                                      total_rows,
+                                      gemm_n,
+                                      gemm_k,
+                                      num_experts,
+                                      candidate_configs[ii],
+                                      stream);
+      }
+      check_cuda_error(cudaEventRecord(stop, stream));
+      check_cuda_error(cudaEventSynchronize(stop));
+      found_one = true;
+      float elapsed;
+      check_cuda_error(cudaEventElapsedTime(&elapsed, start, stop));
+      check_cuda_error(cudaEventDestroy(start));
+      check_cuda_error(cudaEventDestroy(stop));
+      if (elapsed < best_time) {
+        best_time = elapsed;
+        best_config = candidate_configs[ii];
+      }
+      VLOG(4) << "profile_total_rows" << profile_total_rows;
+      VLOG(4) << "candidate_config tile_config"
+              << static_cast<int>(candidate_configs[ii].tile_config);
+      VLOG(4) << "candidate_config split_k_style"
+              << static_cast<int>(candidate_configs[ii].split_k_style);
+      VLOG(4) << "candidate_config split_k_factor "
+              << candidate_configs[ii].split_k_factor;
+      VLOG(4) << "candidate_config stages " << candidate_configs[ii].stages;
+      VLOG(4) << "elapsed time: " << elapsed;
+      VLOG(4) << "best_time: " << best_time;
+    }
+    if (found_one) {
+      gemmConfigManager.addBestConfig(gemmId, profile_total_rows, best_config);
+      chosen_config = best_config;
+    }
   }
-
-  static constexpr int workspace_bytes = 0;  // No workspace for MoE GEMMs.
-  static constexpr int split_k_limit = 1;  // MoE GEMM does not support split-k.
-  CutlassGemmConfig chosen_config =
-      estimate_best_config_from_occupancies(candidate_configs,
-                                            occupancies,
-                                            total_rows,
-                                            gemm_n,
-                                            gemm_k,
-                                            -1,
-                                            num_experts,
-                                            split_k_limit,
-                                            workspace_bytes,
-                                            multi_processor_count_,
-                                            is_weight_only,
-                                            sm_);
 
   VLOG(4) << "chosen_config tile_config"
           << static_cast<int>(chosen_config.tile_config);
@@ -983,7 +1032,6 @@ void MoeGemmRunner<T, WeightType>::run_gemm<EpilogueTag>(
           << static_cast<int>(chosen_config.split_k_style);
   VLOG(4) << "chosen_config split_k_factor " << chosen_config.split_k_factor;
   VLOG(4) << "chosen_config stages " << chosen_config.stages;
-
   VLOG(4) << "total_rows  " << total_rows << "gemm_n  " << gemm_n << "gemm_k  "
           << gemm_k;
 

@@ -326,7 +326,7 @@ def add_extra_synchronization(
         if params_filter_fn(param):
             params_to_sync.append(param)
     logger.info(
-        "The following param are going to be synchronization everytime the optimizer update phase of the program is runned: "
+        "The following param are going to be synchronization everytime the optimizer update phase of the program is run: "
     )
     logger.info([p.name for p in params_to_sync])
 

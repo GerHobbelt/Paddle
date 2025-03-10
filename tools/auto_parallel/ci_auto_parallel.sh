@@ -145,6 +145,33 @@ function execute_func_list(){
     echo -e "\033[31m $(printf '\t')  exit 250 tests(intermittent issue) :  $exit_250_count \033"
 }
 
+function clean_file(){
+    target_path=$1
+    matching_data_dirs=$(find "$target_path" -maxdepth 1 -type d -name "*data*")
+    if [ -n "$matching_data_dirs" ]; then
+        echo "cleaning data dirs:"
+        echo $matching_data_dirs
+        for dir in $matching_data_dirs; do
+            rm -rf "$dir"
+            echo "deleted $dir"
+        done
+    else
+        echo "$target_path no data dirs found"
+    fi
+
+    matching_output_dirs=$(find "$target_path" -maxdepth 1 -type d -name "*output*")
+    if [ -n "$matching_output_dirs" ]; then
+        echo "cleaning output dirs:"
+        echo $matching_output_dirs
+        for dir in $matching_output_dirs; do
+            rm -rf "$dir"
+            echo "deleted $dir"
+        done
+    else
+        echo "$target_path no output dirs found"
+    fi
+}
+
 # Get the list of pending cases
 get_diff_TO_case
 # Remove duplicates and store the results back to the original list
@@ -191,6 +218,7 @@ if [[ ${#case_list[*]} -ne 0 ]];then
             # that there is no need to repeat the download process later.
             export FLAGS_download_data="llama ""$FLAGS_download_data"
             let case_num++
+            clean_file /workspace/PaddleNLP/llm/auto_parallel/llama
         elif [[ ${case} == "gpt-3_auto" ]];then
             cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_auto.sh
             bash $cmd prepare_case llm_gpt_case_list_auto $FLAGS_install_deps $FLAGS_download_data
@@ -198,11 +226,13 @@ if [[ ${#case_list[*]} -ne 0 ]];then
             # there is no need to repeat the `gpt` download process later.
             export FLAGS_download_data="gpt ""$FLAGS_download_data"
             let case_num++
+            clean_file /workspace/PaddleNLP/llm/auto_parallel/gpt-3
         elif [[ ${case} == "gpt-3_dygraph" ]];then
             cmd=/workspace/PaddleNLP/scripts/distribute/ci_case_dy.sh
             bash $cmd prepare_case llm_gpt_case_list_dygraph $FLAGS_install_deps $FLAGS_download_data
             execute_func_list $cmd gpt-3_dygraph
             let case_num++
+            clean_file /workspace/PaddleNLP/llm
         else
             echo -e "\033[31m ---- no ${case} \033"
             let case_num++

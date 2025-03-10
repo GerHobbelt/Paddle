@@ -26,12 +26,12 @@ class TestSimpleNetShardingTensorFusionSaveLoad(
             num_of_devices=2,
             timeout=500,
         )
-        self._default_envs = {"dtype": "float32", "seed": "2023"}
+        self._default_envs = {"dtype": "float32", "seed": "2024"}
         self._changeable_envs = {"backend": ["gpu"]}
 
-    def test_mlp(self):
+    def test_mlp_save_unbalanced_param(self):
         envs_list = test_base.gen_product_envs_list(
-            {"dtype": "float32", "seed": "2023"},
+            {"dtype": "float32", "seed": "2024", "save_unbalanced_param": "1"},
             {"backend": ["gpu"]},
         )
 
@@ -44,9 +44,47 @@ class TestSimpleNetShardingTensorFusionSaveLoad(
             )
             ckpt_path_tmp.cleanup()
 
-    def test_mlp_amp(self):
+    def test_mlp_amp_save_unbalanced_param(self):
         envs_list = test_base.gen_product_envs_list(
-            {"dtype": "float32", "seed": "2023"},
+            {"dtype": "float32", "seed": "2024", "save_unbalanced_param": "1"},
+            {
+                "backend": ["gpu"],
+                "amp": ['1'],
+                "amp_dtype": ['bfloat16'],
+                'amp_level': ['O1'],
+                'use_master_weight': ['1'],
+                'use_master_grad': ['1'],
+            },
+        )
+
+        for envs in envs_list:
+            # self._log_dir.name = "./log"
+            ckpt_path_tmp = tempfile.TemporaryDirectory()
+            envs["ckpt_path"] = ckpt_path_tmp.name
+            self.run_test_case(
+                "sharding_tensor_fusion_save_load.py",
+                user_defined_envs=envs,
+            )
+            ckpt_path_tmp.cleanup()
+
+    def test_mlp_save_balanced_param(self):
+        envs_list = test_base.gen_product_envs_list(
+            {"dtype": "float32", "seed": "2024", "save_unbalanced_param": "0"},
+            {"backend": ["gpu"]},
+        )
+
+        for envs in envs_list:
+            ckpt_path_tmp = tempfile.TemporaryDirectory()
+            envs["ckpt_path"] = ckpt_path_tmp.name
+            self.run_test_case(
+                "sharding_tensor_fusion_save_load.py",
+                user_defined_envs=envs,
+            )
+            ckpt_path_tmp.cleanup()
+
+    def test_mlp_amp_save_balanced_param(self):
+        envs_list = test_base.gen_product_envs_list(
+            {"dtype": "float32", "seed": "2024", "save_unbalanced_param": "0"},
             {
                 "backend": ["gpu"],
                 "amp": ['1'],

@@ -57,7 +57,7 @@ struct StageForloopInfo {
   ir::DeviceAPI device;
 };
 
-//! Store the informations about some other tensor `compute_at` this tensor.
+//! Store the information about some other tensor `compute_at` this tensor.
 struct ComputeAtInfo {
   ComputeAtInfo(const std::string& consumer_tensor_name,
                 const std::string& producer_tensor_name,
@@ -84,7 +84,7 @@ struct ComputeAtInfo {
 };
 
 /**
- * Meta infomation for tensor.
+ * Meta information for tensor.
  */
 struct TensorScheduleMeta {
   //! Store the information of all the other producer tensors `compute_at` this

@@ -49,7 +49,7 @@ enum class CompilationStatus {
   // An error occurred during codegen and jit.
   CODEGEN_JIT_FAIL = 2,
   // An error occurred during build instruction.
-  INSTUCTION_FAIL = 3,
+  INSTRUCTION_FAIL = 3,
   // An error occurred during build runtime program.
   PROGRAM_FAIL = 4,
   // Compile successfully.

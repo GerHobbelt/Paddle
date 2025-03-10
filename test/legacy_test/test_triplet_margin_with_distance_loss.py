@@ -356,7 +356,7 @@ class TestTripletMarginWithDistanceLossDF(unittest.TestCase):
 
 
 class TestTripletMarginWithDistanceLossDFE(unittest.TestCase):
-    def test_TripletMarginWithDistanceLoss_distance_funtion_error(self):
+    def test_TripletMarginWithDistanceLoss_distance_function_error(self):
         paddle.disable_static()
 
         def distance_function(x1, x2):

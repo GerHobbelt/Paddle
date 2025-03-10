@@ -439,7 +439,7 @@ int32_t IterMapRewriter::FindBaseSplit(const ir::IterSum& expr,
     }
   }
 
-  // Finded! return the base index.
+  // Found! return the base index.
   if (base_index != -1) return base_index;
 
   // If not found const scale, compare the symbole length in scale.
@@ -493,7 +493,7 @@ std::optional<Expr> IterMapRewriter::TryFuse(const Expr& expr) {
   // finally matched_pos = 0, expected_scale = 32 * 2 = 64. means match i.
   // if match failed, indicates that expr is illegal and cannot be merged.
   for (size_t i = 0; i < iter_sum->args.size(); ++i) {
-    ir::IndexExpr matched_scale{nullptr};
+    ir::IndexExpr matched_scale;
     int matched_pos =
         i == 0 ? base_index
                : FindSplitWithExactScale(*iter_sum,

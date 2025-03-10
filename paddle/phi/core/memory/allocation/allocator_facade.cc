@@ -825,7 +825,7 @@ class AllocatorFacadePrivate {
   void InitNaiveBestFitCPUAllocator() {
 #if defined(__APPLE__) && defined(__arm64__)
     // NOTE(wuweilong): It is more efficient to use CPUAllocator directly,
-    // but it wll cause some problem in Mac OS m1 chip, so we use
+    // but it will cause some problem in Mac OS m1 chip, so we use
     // NaiveBestFitAllocator instead.
     allocators_[phi::CPUPlace()] =
         std::make_shared<NaiveBestFitAllocator>(phi::CPUPlace());

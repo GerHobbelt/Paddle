@@ -57,8 +57,8 @@ struct CasInterval {
     VLOG(6) << "CasInterval is : [" << expr_l << ", " << expr_r << "].";
     expr_r = detail::ReplaceMinToConstant(expr_r);
     expr_l = detail::ReplaceMaxToConstant(expr_l);
-    optim::Simplify(&expr_l);
-    optim::Simplify(&expr_r);
+    expr_l = optim::ArithSimplify(expr_l);
+    expr_r = optim::ArithSimplify(expr_r);
     VLOG(6) << "After simplify, CasInterval is : [" << expr_l << ", " << expr_r
             << "].";
 

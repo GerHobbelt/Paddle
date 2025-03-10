@@ -410,7 +410,7 @@ void PSGPUWrapper::PreBuildTask(std::shared_ptr<HeterContext> gpu_task,
                     ranks_vec[i]->size(),
                     common::errors::InvalidArgument(
                         "keys_vec[i]->size() should be equal to "
-                        "ranks_vec[i]->size(), but recieved "
+                        "ranks_vec[i]->size(), but received "
                         "keys_vec[i]->size() is %d, ranks_vec[i]->size() is %d",
                         keys_vec[i]->size(),
                         ranks_vec[i]->size()));
@@ -428,7 +428,7 @@ void PSGPUWrapper::PreBuildTask(std::shared_ptr<HeterContext> gpu_task,
                     0UL,
                     common::errors::InvalidArgument(
                         "ranks_vec[i]->size() should be equal to 0, "
-                        "but recieved %d.",
+                        "but received %d.",
                         ranks_vec[i]->size()));
                 for (size_t j = 0; j < keys_vec[i]->size(); ++j) {
                   auto& key = (*keys_vec[i])[j];
@@ -469,7 +469,7 @@ void PSGPUWrapper::PreBuildTask(std::shared_ptr<HeterContext> gpu_task,
           total_keys,
           common::errors::InvalidArgument(
               "Total shard keys number should be less than or equal to total "
-              "keys number, but recieved %d as total shard keys number and %d "
+              "keys number, but received %d as total shard keys number and %d "
               "as total keys number.",
               total_shard_keys,
               total_keys));
@@ -1638,7 +1638,7 @@ void PSGPUWrapper::divide_to_device(std::shared_ptr<HeterContext> gpu_task) {
                           nullptr,
                           common::errors::InvalidArgument(
                               "The value of local dimension pointer should not "
-                              "be nullptr but recieved %d at position %d.",
+                              "be nullptr but received %d at position %d.",
                               h_dim_ptrs[pos],
                               pos));
         d_dim_ptr[cur + k] = h_dim_ptrs[pos];
@@ -2398,7 +2398,7 @@ void PSGPUWrapper::PullSparse(const phi::Place& place,
                               const std::vector<float*>& values,
                               const std::vector<int64_t>& slot_lengths,
                               const int hidden_size) {
-  VLOG(0) << "Warning:: recommand use pull_gpups_sparse op instead. This "
+  VLOG(0) << "Warning:: recommend use pull_gpups_sparse op instead. This "
              "PullSparse is not used.";
 }
 

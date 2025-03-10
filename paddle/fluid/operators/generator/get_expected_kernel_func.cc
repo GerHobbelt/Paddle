@@ -275,7 +275,7 @@ phi::KernelKey GetStridedSliceExpectedKernelType(
             true,
             common::errors::InvalidArgument(
                 "Place of context is %s. Place of input tensor is %s. They "
-                "are should be same, but reveived different place.",
+                "are should be same, but received different place.",
                 string::to_string(ctx.device_context().GetPlace()),
                 string::to_string(tensor.place())));
       }
