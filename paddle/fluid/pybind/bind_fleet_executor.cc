@@ -269,28 +269,28 @@ void BindFleetExecutor(py::module* m) {
       .def(py::init(&DistModelTensorCreate<int32_t>),
            py::arg("data"),
            py::arg("name") = "",
-           py::arg("lod") = std::vector<std::vector<size_t>>(),
+           py::arg("legacy_lod") = std::vector<std::vector<size_t>>(),
            py::arg("copy") = true)
       .def(py::init(&DistModelTensorCreate<int64_t>),
            py::arg("data"),
            py::arg("name") = "",
-           py::arg("lod") = std::vector<std::vector<size_t>>(),
+           py::arg("legacy_lod") = std::vector<std::vector<size_t>>(),
            py::arg("copy") = true)
       .def(py::init(&DistModelTensorCreate<float>),
            py::arg("data"),
            py::arg("name") = "",
-           py::arg("lod") = std::vector<std::vector<size_t>>(),
+           py::arg("legacy_lod") = std::vector<std::vector<size_t>>(),
            py::arg("copy") = true)
       .def(py::init(&DistModelTensorCreate<phi::dtype::float16>),
            py::arg("data"),
            py::arg("name") = "",
-           py::arg("lod") = std::vector<std::vector<size_t>>(),
+           py::arg("legacy_lod") = std::vector<std::vector<size_t>>(),
            py::arg("copy") = true)
       .def_readwrite("name", &DistModelTensor::name)
       .def_readwrite("shape", &DistModelTensor::shape)
       .def_readwrite("data", &DistModelTensor::data)
       .def_readwrite("dtype", &DistModelTensor::dtype)
-      .def_readwrite("lod", &DistModelTensor::lod)
+      .def_readwrite("legacy_lod", &DistModelTensor::lod)
       .def("as_ndarray", &DistModelTensorGetData);
 
   py::enum_<DistModelDataType>(*m, "DistModelDataType")
