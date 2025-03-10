@@ -2941,26 +2941,16 @@ bool RepeatInterleaveOpInferSymbolicShape(
   // what should I do if axis is null
   int axis = attributes.at("axis").dyn_cast<pir::Int32Attribute>().data();
 
-  const std::vector<symbol::DimExpr> &in_dims_sym = [&] {
-    std::vector<symbol::DimExpr> dims;
-    if (operand_shape_or_data.data().has_value()) {
-      dims = operand_shape_or_data.data().value();
-    } else {
-      dims = operand_shape_or_data.shape();
-    }
-    return dims;
-  }();
-
-  int x_rank = in_dims_sym.size();
+  int x_rank = operand_shape_or_data.shape().size();
   if (axis < 0) axis += x_rank;
 
   const auto &out_sym_shape = [&] {
     std::vector<symbol::DimExpr> out_sym_shape;
     for (int i = 0; i < x_rank; i++) {
       if (i == axis) {
-        out_sym_shape.push_back(in_dims_sym.at(i) * repeats);
+        out_sym_shape.push_back(operand_shape_or_data.shape().at(i) * repeats);
       } else {
-        out_sym_shape.push_back(in_dims_sym.at(i));
+        out_sym_shape.push_back(operand_shape_or_data.shape().at(i));
       }
     }
     return out_sym_shape;
@@ -3507,12 +3497,42 @@ bool SplitWithNumOpInferSymbolicShape(
   return true;
 }
 
-// bool StridedSliceOpInferSymbolicShape(pir::Operation *op,
-//                                       pir::InferSymbolicShapeContext
-//                                       *infer_context) {
-//   // pass
-//   return true;
-// }
+bool StridedSliceOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  pir::Value operand_source = op->operand_source(0);
+  pir::Value operand_starts = op->operand_source(1);
+  pir::Value operand_ends = op->operand_source(2);
+  pir::Value operand_strides = op->operand_source(3);
+  pir::Value res = op->result(0);
+
+  const symbol::ShapeOrDataDimExprs &starts_shape_data =
+      infer_context->GetShapeOrDataForValue(operand_starts);
+  const symbol::ShapeOrDataDimExprs &ends_shape_data =
+      infer_context->GetShapeOrDataForValue(operand_ends);
+  const symbol::ShapeOrDataDimExprs &strides_shape_data =
+      infer_context->GetShapeOrDataForValue(operand_strides);
+
+  ExprVec starts = slice_utils::GetExprVecFromData(starts_shape_data);
+  ExprVec ends = slice_utils::GetExprVecFromData(ends_shape_data);
+  ExprVec strides = slice_utils::GetExprVecFromData(strides_shape_data);
+
+  std::vector<int32_t> axes_vec = details::GetVectorAttr<int32_t>(op, "axes");
+  std::vector<int64_t> axes_vec_64(axes_vec.begin(), axes_vec.end());
+
+  infer_context->SetShapeOrDataForValue(
+      res,
+      slice_utils::StridedSliceRawInferSymbolicShape(operand_source,
+                                                     res,
+                                                     starts,
+                                                     ends,
+                                                     strides,
+                                                     axes_vec_64,
+                                                     std::vector<int64_t>{},
+                                                     std::vector<int64_t>{},
+                                                     infer_context));
+
+  return true;
+}
 
 bool SumOpInferSymbolicShape(pir::Operation *op,
                              pir::InferSymbolicShapeContext *infer_context) {
@@ -3741,17 +3761,7 @@ bool TopkOpInferSymbolicShape(pir::Operation *op,
       infer_context->GetShapeOrDataForValue(op->operand_source(1));
   const auto &attributes = op->attributes();
   int axis = attributes.at("axis").dyn_cast<pir::Int32Attribute>().data();
-  const std::vector<symbol::DimExpr> &in_dims_sym = [&] {
-    std::vector<symbol::DimExpr> dims;
-    if (x_shape_or_data.data().has_value()) {
-      dims = x_shape_or_data.data().value();
-    } else {
-      dims = x_shape_or_data.shape();
-    }
-    return dims;
-  }();
-
-  int x_rank = in_dims_sym.size();
+  int x_rank = x_shape_or_data.shape().size();
 
   symbol::DimExpr k = k_shape_or_data.data().value().at(0);
 
@@ -3762,7 +3772,7 @@ bool TopkOpInferSymbolicShape(pir::Operation *op,
       if (i == axis) {
         out_sym_shape.push_back(k);
       } else {
-        out_sym_shape.push_back(in_dims_sym.at(i));
+        out_sym_shape.push_back(x_shape_or_data.shape().at(i));
       }
     }
     return out_sym_shape;
@@ -4462,6 +4472,16 @@ bool UnstackOpInferSymbolicShape(
   }
   infer_context->SetShapeOrDataForValue(op->result(0), out_list_shape_or_data);
   return true;
+}
+
+bool VarianceOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  const auto &axis = details::GetVectorAttr(op, "axis");
+  return details::ReduceInferDim(op,
+                                 infer_context,
+                                 axis,
+                                 GetBoolAttr(op, "keepdim"), /*keepdim*/
+                                 axis.size() == 0 /*reduce_all*/);
 }
 
 bool WeightQuantizeOpInferSymbolicShape(

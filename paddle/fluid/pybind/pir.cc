@@ -50,6 +50,7 @@
 #include "paddle/fluid/pir/dialect/operator/ir/pd_op.h"
 #include "paddle/fluid/pir/dialect/operator/trait/inplace.h"
 #include "paddle/fluid/pir/dialect/operator/utils/op_yaml_info_parser.h"
+#include "paddle/fluid/pir/dialect/operator/utils/shape_analysis_utils.h"
 #include "paddle/fluid/pir/dialect/operator/utils/utils.h"
 #include "paddle/fluid/pir/drr/include/drr_pattern_base.h"
 #include "paddle/fluid/pir/transforms/general/common_subexpression_elimination_pass.h"
@@ -80,6 +81,7 @@
 #include "paddle/pir/include/dialect/shape/ir/shape_attribute.h"
 #include "paddle/pir/include/dialect/shape/ir/shape_dialect.h"
 #include "paddle/pir/include/dialect/shape/transforms/shape_optimization_pass.h"
+#include "paddle/pir/include/dialect/shape/utils/original_attributes_filter.h"
 #include "paddle/pir/include/pass/pass.h"
 #include "paddle/pir/include/pass/pass_manager.h"
 #include "paddle/pir/include/pass/pass_registry.h"
@@ -2370,6 +2372,11 @@ void BindUtils(pybind11::module *m) {
   m->def("set_op_role",
          [](int op_role) { ApiBuilder::Instance().SetOpRole(op_role); });
   m->def("get_op_role", []() { return ApiBuilder::Instance().GetOpRole(); });
+  m->def("set_comp_op_name", [](std::string comp_op_name) {
+    ApiBuilder::Instance().SetCompOpName(comp_op_name);
+  });
+  m->def("get_comp_op_name",
+         []() { return ApiBuilder::Instance().GetCompOpName(); });
   m->def("register_paddle_dialect", []() {
     pir::IrContext::Instance()
         ->GetOrRegisterDialect<paddle::dialect::OperatorDialect>();
@@ -2541,7 +2548,7 @@ void ApplyCinnPass(Program &program) {  // NOLINT
     ctx->GetOrRegisterDialect<cinn::dialect::OperatorDialect>();
     ctx->GetOrRegisterDialect<pir::shape::ShapeDialect>();
     auto pass_manager = std::make_shared<pir::PassManager>(ctx);
-    if (FLAGS_print_ir) {
+    if (FLAGS_print_ir && VLOG_IS_ON(4)) {
       pass_manager->EnableIRPrinting();
     }
     auto &shape_analysis = pir::ShapeAnalysisManager::Instance().Get(&program);
@@ -2584,6 +2591,8 @@ void InferSymbolicShapePass(
     pir::Program &program) {                          // NOLINT
   pir::IrContext *ctx = pir::IrContext::Instance();
   ctx->GetOrRegisterDialect<pir::shape::ShapeDialect>();
+  pir::OriginalAttributesFilter::Instance().SetOriginalAttributesMap(
+      paddle::dialect::GetAllOpOriginalAttributes());
   pass_manager->AddPass(pir::CreateShapeOptimizationPass());
 }
 
@@ -2601,18 +2610,12 @@ std::shared_ptr<Program> ApplyCommonSubexpressionEliminationPass(
   return program;
 }
 
-std::shared_ptr<Program> ApplyReduceAsToSumPass(
-    std::shared_ptr<Program> program) {
+void ApplyReduceAsToSumPass(
+    std::shared_ptr<pir::PassManager> &pass_manager,  // NOLINT
+    pir::Program &program) {                          // NOLINT
 #ifdef PADDLE_WITH_CINN
-  pir::PassManager pm(pir::IrContext::Instance(), 2);
-  pm.AddPass(cinn::dialect::ir::CreateReduceAsToSumPass());
-  pm.AddPass(pir::CreateDeadCodeEliminationPass());
-  pm.Run(program.get());
-  if (FLAGS_print_ir) {
-    std::cout << "IR After ReduceAsToSumPass -------------------" << std::endl;
-    std::cout << *program << std::endl;
-  }
-  return program;
+  pass_manager->AddPass(cinn::dialect::ir::CreateReduceAsToSumPass());
+  pass_manager->AddPass(pir::CreateDeadCodeEliminationPass());
 #else
   PADDLE_THROW(common::errors::Unimplemented(
       "Currently we only support ReduceAsToSumPass Pass for Pir under "

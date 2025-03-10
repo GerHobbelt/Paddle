@@ -26,6 +26,7 @@ from paddle.base import core, framework, unique_name
 from paddle.base.data_feeder import check_variable_and_dtype
 from paddle.base.libpaddle import DataType
 from paddle.common_ops_import import Variable, check_type, default_main_program
+from paddle.distributed.utils.moe_utils import get_complete_pp_mesh
 from paddle.framework import (
     LayerHelper,
     in_dynamic_mode,
@@ -729,6 +730,12 @@ class ClipGradByGlobalNorm(ClipGradBase):
             # if the gradient mesh is not equal to src mesh
             # do reshard to get the result of squared_l2 from other pp stage mesh
             if src_mesh is not None and g.process_mesh != src_mesh:
+                pp_mesh = get_complete_pp_mesh(g.process_mesh)
+                if set(g.process_mesh.process_ids) < set(pp_mesh.process_ids):
+                    sum_square = dist.reshard(
+                        sum_square, pp_mesh, sum_square.placements
+                    )
+
                 sum_square = dist.reshard(
                     sum_square, src_mesh, sum_square.placements
                 )
@@ -773,7 +780,7 @@ class ClipGradByGlobalNorm(ClipGradBase):
         global_norm_var = async_add_n(global_norm_var)
         global_norm_var = paddle.sqrt(global_norm_var)
         max_global_norm = paddle.full(
-            shape=[], dtype=sum_dtype, fill_value=self.clip_norm
+            shape=[1], dtype=sum_dtype, fill_value=self.clip_norm
         )
 
         need_clip = False
@@ -821,11 +828,24 @@ class ClipGradByGlobalNorm(ClipGradBase):
                                 "Reshard a sharded tensor from a local mesh to a global mesh is not supported"
                             )
                     else:
+                        pp_mesh = get_complete_pp_mesh(g.process_mesh)
+
+                        if set(g.process_mesh.process_ids) < set(
+                            pp_mesh.process_ids
+                        ):
+                            clip_input = dist.reshard(
+                                clip_input, pp_mesh, clip_input.placements
+                            )
+
                         clip_input = paddle.distributed.reshard(
                             clip_input, g.process_mesh, clip_input.placements
                         )
-                new_grad = paddle.multiply(g, clip_input)
-                params_and_grads.append((p, new_grad))
+                if g.is_dist() or g.is_dense():
+                    g.multiply_(clip_input)
+                    params_and_grads.append((p, g))
+                else:
+                    new_grad = paddle.multiply(g, clip_input)
+                    params_and_grads.append((p, new_grad))
             else:
                 params_and_grads.append((p, g))
 

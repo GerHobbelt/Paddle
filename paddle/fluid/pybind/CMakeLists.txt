@@ -148,9 +148,19 @@ set(PYBIND_SRCS
     op_callstack_utils.cc
     python_callable_registry.cc)
 
-#ifdef PADDLE_WITH_DISTRIBUTE
-set(PYBIND_SRCS ${PYBIND_SRCS} dist_api.cc)
-#endif
+if(WITH_DISTRIBUTE)
+  set(PYBIND_SRCS ${PYBIND_SRCS} dist_api.cc)
+
+  string(FIND "${CUDA_ARCH_BIN}" "90" ARCH_BIN_CONTAINS_90)
+  if(WITH_GPU AND (ARCH_BIN_CONTAINS_90 GREATER -1))
+    set(PYBIND_DEPS ${PYBIND_DEPS} deep_ep)
+    set(PYBIND_SRCS ${PYBIND_SRCS} deep_ep_api.cc)
+    add_definitions(-DPADDLE_WITH_DEEP_EP)
+    if(WITH_NVSHMEM)
+      set(PYBIND_DEPS ${PYBIND_DEPS} nvshmem)
+    endif()
+  endif()
+endif()
 
 if(NOT WITH_SHARED_IR)
   # Note: We want to compile pir source into paddle.so directly, because
@@ -171,7 +181,7 @@ if(WITH_PYTHON)
     set(PYBIND_DEPS ${PYBIND_DEPS} process_group_nccl async_load)
   endif()
   if(WITH_XPU_BKCL)
-    set(PYBIND_DEPS ${PYBIND_DEPS} process_group_bkcl)
+    set(PYBIND_DEPS ${PYBIND_DEPS} process_group_bkcl xpu_async_load)
   endif()
   if(WITH_GLOO)
     set(PYBIND_DEPS ${PYBIND_DEPS} process_group_gloo)

@@ -319,6 +319,14 @@ class PipelineParallel(MetaParallelBase):
         self._use_batch_p2p_comm = self._strategy.hybrid_configs[
             "pp_configs"
         ].use_batch_p2p_comm
+
+        self._dynamic_shape = self._strategy.hybrid_configs[
+            'pp_configs'
+        ].enable_dynamic_shape
+        logger.info(
+            f"Pipeline scheduler is in dynamic_shape mode={self._dynamic_shape}"
+        )
+
         if self._use_batch_p2p_comm and self._overlap_p2p_comm:
             warnings.warn(
                 "non_batch_p2p_comm should be enabled when overlap_p2p_comm is activated, setting non_batch_p2p_comm=True."
@@ -383,7 +391,9 @@ class PipelineParallel(MetaParallelBase):
         )
 
         # construct pipeline meta info
-        self._p2p_helper = p2p.P2pHelper(self._using_cache)
+        self._p2p_helper = p2p.P2pHelper(
+            self._using_cache, dynamic_shape=self._dynamic_shape
+        )
 
         self.global_rank = self._hcg.get_global_rank()
         self.micro_batch_id = 0
@@ -1345,6 +1355,11 @@ class PipelineParallelWithInterleave(PipelineParallel):
             assert (
                 not self._comm_overlap
             ), "pp best unbalaced scheduler can not run together with dp/sharding overlap"
+
+        self._enable_offload_queue = self._strategy.hybrid_configs[
+            "pp_configs"
+        ].enable_offload_queue
+
         # reinit user hook since now we have virtual stages
         self._init_user_hooks()
 
@@ -1867,6 +1882,7 @@ class PipelineParallelWithInterleave(PipelineParallel):
                         batch_p2p_comm=self._use_batch_p2p_comm,
                         overlap_p2p_comm=True,
                     )
+
                     self.output_tensor_grads[self.num_model_chunks - 1].append(
                         output_tensor_grad
                     )
@@ -2339,6 +2355,10 @@ class PipelineParallelWithInterleave(PipelineParallel):
         self.processed_steps += 1
         self._check_user_hooks_status_at_step_end()
 
+        # reset dynamic meta counter
+        if self._dynamic_shape:
+            self._p2p_helper._dynamic_cnt = 0
+
         return train_loss
 
     def train_batch(
@@ -2641,6 +2661,45 @@ class PipelineParallelWithInterleaveFthenB(PipelineParallelWithInterleave):
         return train_loss
 
 
+class OffloadQueue(queue.Queue):
+    def __init__(self, offload=False, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        logger.info(f"Using OffloadQueue: {offload}")
+        self.offload = offload
+
+    def put(self, tensor, *args, **kwargs):
+        if self.offload and isinstance(
+            tensor, (paddle.Tensor, paddle.base.framework.core.eager.Tensor)
+        ):
+            tensor_cpu = tensor.pin_memory()
+            tensor_cpu._share_buffer_to(tensor)
+        elif self.offload and isinstance(tensor, tuple):
+            for t in tensor:
+                if isinstance(
+                    t, (paddle.Tensor, paddle.base.framework.core.eager.Tensor)
+                ):
+                    t_cpu = t.pin_memory()
+                    t_cpu._share_buffer_to(t)
+        super().put(tensor, *args, **kwargs)
+
+    def get(self, *args, **kwargs):
+        tensor = super().get(*args, **kwargs)
+        if self.offload and isinstance(
+            tensor, (paddle.Tensor, paddle.base.framework.core.eager.Tensor)
+        ):
+            tensor = tensor.to(paddle.base.framework._current_expected_place())
+        elif self.offload and isinstance(tensor, tuple):
+            for t in tensor:
+                if isinstance(
+                    t, (paddle.Tensor, paddle.base.framework.core.eager.Tensor)
+                ):
+                    t_dev = t.to(
+                        paddle.base.framework._current_expected_place()
+                    )
+                    t_dev._share_buffer_to(t)
+        return tensor
+
+
 class VPPFhenBInBalancedMemory(PipelineParallelWithInterleaveFthenB):
     def __init__(self, layers, hcg, strategy):
         super().__init__(layers=layers, hcg=hcg, strategy=strategy)
@@ -2691,8 +2750,12 @@ class VPPFhenBInBalancedMemory(PipelineParallelWithInterleaveFthenB):
         self.input_tensors = [[] for _ in range(self.num_model_chunks)]
         self.output_tensors = [[] for _ in range(self.num_model_chunks)]
         self.output_tensor_grads = [[] for _ in range(self.num_model_chunks)]
-        backward_send_recv_buffer_queue = queue.Queue()
-        forward_send_recv_buffer_queue = queue.Queue()
+        backward_send_recv_buffer_queue = OffloadQueue(
+            offload=self._enable_offload_queue
+        )
+        forward_send_recv_buffer_queue = OffloadQueue(
+            offload=self._enable_offload_queue
+        )
 
         skip_steps = self.accumulate_steps - self.num_stages
         micro_dataset = self._wrap_data(data)

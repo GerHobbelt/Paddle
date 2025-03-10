@@ -96,6 +96,9 @@ static std::string OpsDebugStr(std::vector<pir::Operation*> ops) {
   return ss.str();
 }
 
+std::unordered_set<pir::Operation*> GetGroupOutputOps(
+    const std::vector<pir::Operation*>& ops);
+
 template <typename T>
 void RemoveFromVector(std::vector<T>* vec, T item) {
   auto iter = std::find(vec->begin(), vec->end(), item);
@@ -234,6 +237,29 @@ std::vector<T1> MapKeyToVector(const std::unordered_map<T1, T2>& input) {
   return result;
 }
 
+template <typename T1, typename T2>
+std::vector<T2> GatherMapValue(const std::map<T1, T2>& input,
+                               const std::vector<T1>& keys) {
+  std::vector<T2> result;
+  for (const auto& key : keys) {
+    if (input.count(key)) {
+      result.push_back(input[key]);
+    }
+  }
+  return result;
+}
+template <typename T1, typename T2>
+std::vector<T2> GatherMapValue(const std::unordered_map<T1, T2>& input,
+                               const std::vector<T1>& keys) {
+  std::vector<T2> result;
+  for (const auto& key : keys) {
+    if (input.count(key)) {
+      result.push_back(input.at(key));
+    }
+  }
+  return result;
+}
+
 template <typename Set>
 Set SetUnion(const Set& A, const Set& B) {
   Set result;
@@ -293,15 +319,17 @@ std::pair<std::vector<T>, std::vector<T>> SplitFirstWhetherInSecond(
 }
 
 template <typename T>
-std::vector<T> GatherFirstNotInSecond(const std::vector<T>& first,
-                                      const std::vector<T>& second) {
+std::pair<std::vector<T>, std::vector<int>> GatherFirstNotInSecond(
+    const std::vector<T>& first, const std::vector<T>& second) {
+  std::vector<int> pos;
   std::vector<T> result;
   for (size_t i = 0; i < first.size(); ++i) {
     if (std::find(second.begin(), second.end(), first[i]) == second.end()) {
       result.emplace_back(first[i]);
+      pos.emplace_back(i);
     }
   }
-  return result;
+  return {result, pos};
 }
 
 template <typename T>
@@ -330,6 +358,24 @@ std::vector<T> UniqueConcatVector(const std::vector<T>& first,
   return result;
 }
 
+template <typename Int = int>
+std::vector<Int> ArangeVector(Int start, Int end, Int step = 1) {
+  std::vector<Int> res;
+  for (Int i = start; i < end; i += step) {
+    res.push_back(i);
+  }
+  return res;
+}
+
+template <typename T1, typename T2>
+std::vector<T2> CastVector(const std::vector<T1>& vec) {
+  std::vector<T2> res;
+  for (const auto& item : vec) {
+    res.push_back(static_cast<T2>(item));
+  }
+  return res;
+}
+
 template <typename Int, typename T>
 std::vector<Int> GetTransposePerm(const std::vector<T>& source,
                                   const std::vector<T>& target) {
@@ -349,10 +395,15 @@ std::vector<Int> GetTransposePerm(const std::vector<T>& source,
   return perm;
 }
 
+template <typename Int>
+std::vector<Int> GetReversePerm(const std::vector<Int>& perm) {
+  return GetTransposePerm<Int, Int>(perm, ArangeVector<Int>(0, perm.size()));
+}
+
 template <typename T, typename Int>
 std::vector<T> TransposeVector(const std::vector<T>& v,
                                const std::vector<Int>& perm) {
-  PADDLE_ENFORCE_EQ(
+  PADDLE_ENFORCE_GE(
       v.size(),
       perm.size(),
       ::common::errors::InvalidArgument(
@@ -360,6 +411,9 @@ std::vector<T> TransposeVector(const std::vector<T>& v,
   std::vector<T> result;
   for (size_t i = 0; i < perm.size(); ++i) {
     result.emplace_back(v[perm[i]]);
+  }
+  for (size_t i = perm.size(); i < v.size(); ++i) {
+    result.emplace_back(v[i]);
   }
   return result;
 }
@@ -536,6 +590,23 @@ bool AllFirstInSecond(const std::vector<T>& first,
   return true;
 }
 
+template <typename T>
+std::pair<std::vector<T>, std::vector<T>> SplitVector(const std::vector<T>& vec,
+                                                      int pos) {
+  return {SliceVector(vec, 0, pos), SliceVector(vec, pos, vec.size())};
+}
+
+template <typename T>
+std::vector<size_t> FindPosInVector(const std::vector<T>& vec, const T& item) {
+  std::vector<size_t> result;
+  for (size_t i = 0; i < vec.size(); ++i) {
+    if (vec[i] == item) {
+      result.emplace_back(i);
+    }
+  }
+  return result;
+}
+
 static std::vector<pir::Operation*> FindDownstreamOps(pir::Operation* op) {
   std::vector<pir::Operation*> result;
   for (int i = 0; i < op->num_results(); i++) {
@@ -654,14 +725,28 @@ inline bool Any(const std::vector<bool> a) {
   return res;
 }
 
+std::shared_ptr<pir::ShapeConstraintIRAnalysis> GetShapeAnalysisFromValue(
+    const pir::Value& value);
+
 template <typename Int>
-std::vector<Int> ArangeVector(Int start, Int end, Int step = 1) {
-  std::vector<Int> res;
-  for (Int i = start; i < end; i += step) {
-    res.push_back(i);
+std::vector<symbol::DimExpr> GetValueDims(const pir::Value& value,
+                                          std::vector<Int> axes) {
+  auto shape_analysis = GetShapeAnalysisFromValue(value);
+  const auto rank = GetRank(value);
+  std::vector<symbol::DimExpr> dims;
+  for (const auto& axis : axes) {
+    PADDLE_ENFORCE_LT(
+        axis,
+        rank,
+        ::common::errors::InvalidArgument("Given axis out of range."));
+    dims.push_back(
+        shape_analysis->GetProductDimExpr(value, {static_cast<int>(axis)}));
   }
-  return res;
+  return dims;
 }
+
+std::vector<symbol::DimExpr> GetValueAllDims(const pir::Value& value);
+std::vector<symbol::DimExpr> GetCompatibleValueAllDims(const pir::Value& value);
 
 symbol::DimExpr GetShapeProduct(const std::vector<symbol::DimExpr>& shape,
                                 int start,
@@ -673,6 +758,9 @@ bool ShapeProductEqual(const std::vector<symbol::DimExpr>& in_shape,
                        int in_end,
                        int out_start,
                        int out_end);
+
+bool ShapeProductEqual(const std::vector<symbol::DimExpr>& in_shape,
+                       const std::vector<symbol::DimExpr>& out_shape);
 
 std::vector<std::pair<int, int>> PartitionReshapeAxes(
     const std::vector<symbol::DimExpr>& in_shape,

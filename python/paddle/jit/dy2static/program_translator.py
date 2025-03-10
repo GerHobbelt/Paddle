@@ -495,6 +495,7 @@ class StaticFunction(Generic[_InputT, _RetT]):
             new_static_layer = self._clone()
             if (
                 isinstance(instance, layers.Layer)
+                and hasattr(instance, "_original_funcs")
                 and self._dygraph_function.__name__
                 not in instance._original_funcs.keys()
             ):
@@ -690,11 +691,7 @@ class StaticFunction(Generic[_InputT, _RetT]):
 
     def __deepcopy__(self, memo):
         """
-        Customized behavior for copy.deepcopy, return original decorated function instead
-        of a new StaticFunction Object. StaticFunction itself is not copyable because it's
-        associated with class_instance.
-
-        We add __deepcopy__ here only for the following usage:
+        Customized behavior for copy.deepcopy, return a new StaticFunction instance.
 
         Example::
             .. code-block:: python
@@ -716,19 +713,20 @@ class StaticFunction(Generic[_InputT, _RetT]):
                 >>> x = paddle.randn([10, 1], 'float32')
                 >>> net = paddle.jit.to_static(Net())  # convert into static graph mode
 
-                >>> copy_net = copy.deepcopy(net)      # deepcopy a new net without @to_static
-
-        Please attention that original 'net' will unwrap @to_static and rollback into simple Layer.
+                >>> copy_net = copy.deepcopy(net)      # still in static graph mode
         """
         if self.class_instance is not None:
-            net_name = type(self.class_instance).__name__
-            logging_utils.log(
-                level=-1,
-                msg=f"Not recommend to deepcopy '{net_name}' decorated with @to_static, it has side effect that will"
-                f" rollback into original state before @to_static. Please deepcopy '{net_name}' before applying @to_static.",
+            copied_static_fn = type(self)(
+                self._dygraph_function, self._input_spec, **self._kwargs
             )
-            self.rollback()
-            return self._dygraph_function.__get__(memo[id(self.class_instance)])
+            copied_static_fn._training = self._training
+            copied_static_fn._cuda_graph_pool_id = self._cuda_graph_pool_id
+            copied_static_fn._program_cache = self._program_cache
+            copied_static_fn._descriptor_cache = self._descriptor_cache
+            copied_static_fn._patched_name = self._patched_name
+            return copied_static_fn.__get__(
+                memo[id(self.class_instance)], type(self.class_instance)
+            )
         else:
             return self._dygraph_function
 
@@ -1306,12 +1304,14 @@ class ConcreteProgram:
 
                 # 3. Gets all ParamBases and buffered VarBases in the function
                 from ..pir_dy2static.parameter_recorder import (
+                    _global_inplace_map,
                     _global_parameter_recorder,
                 )
 
                 all_parameters_and_buffers = _global_parameter_recorder.pop(
                     main_program
                 )
+                _global_inplace_map.pop(main_program)
                 if outputs is not None:
                     need_wrap_into_list = (
                         not isinstance(outputs, (tuple, list))

@@ -30,9 +30,9 @@ set(XPU_XFA_LIB_NAME "libxpu_flash_attention.so")
 set(XPU_XPUDNN_LIB_NAME "libxpu_dnn.so")
 
 if(NOT DEFINED XPU_XHPC_BASE_DATE)
-  set(XPU_XHPC_BASE_DATE "dev/20250204")
+  set(XPU_XHPC_BASE_DATE "dev/20250305")
 endif()
-set(XPU_XCCL_BASE_VERSION "3.0.2.1") # For XRE5
+set(XPU_XCCL_BASE_VERSION "3.0.2.3") # For XRE5
 if(NOT DEFINED XPU_XFT_BASE_VERSION)
   set(XPU_XFT_BASE_VERSION "20230602")
 endif()
@@ -45,7 +45,11 @@ if(NOT DEFINED XPU_XRE_BASE_VERSION)
   endif()
 endif()
 
-set(XPU_XPTI_BASE_VERSION "0.0.1")
+if(WITH_XPU_XRE5)
+  set(XPU_XPTI_BASE_VERSION "0.1.0")
+else()
+  set(XPU_XPTI_BASE_VERSION "0.0.1")
+endif()
 
 set(XPU_XRE_BASE_URL
     "https://klx-sdk-release-public.su.bcebos.com/xre/release/${XPU_XRE_BASE_VERSION}"

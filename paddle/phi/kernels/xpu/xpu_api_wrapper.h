@@ -16,6 +16,7 @@
 
 #ifdef PADDLE_WITH_XPU
 
+#include <unordered_map>
 #include <vector>
 #include "paddle/phi/backends/xpu/enforce_xpu.h"
 #include "paddle/phi/backends/xpu/xpu_header.h"
@@ -41,29 +42,60 @@ enum XPUFCCalcType {
   FC_FLOAT16,
 };
 
-template <typename T>
-XPUFCCalcType FCCalcType() {
-  const char* xpu_paddle_fc_float16 = std::getenv("XPU_PADDLE_FC_FLOAT16");
-  if (xpu_paddle_fc_float16 != nullptr &&
-      (std::is_same<phi::dtype::float16, T>::value ||
-       std::is_same<XPUTypeFP16, T>::value || std::is_same<float, T>::value)) {
-    return XPUFCCalcType::FC_FLOAT16;
-  } else if (std::is_same<phi::dtype::float16, T>::value ||
-             std::is_same<XPUTypeFP16, T>::value) {
-    return XPUFCCalcType::FC_INT16;
-  } else if (std::getenv("XPU_PADDLE_FC_INT32") != nullptr) {
-    return XPUFCCalcType::FC_INT32;
-  } else if (std::getenv("XPU_PADDLE_FC_LOCAL_INT16") != nullptr) {
-    return XPUFCCalcType::FC_FLOAT;
-  } else if (std::getenv("XPU_PADDLE_FC_INT32_WITH_LL") != nullptr) {
-    return XPUFCCalcType::FC_INT32_WITH_LL;
-  } else if ((std::is_same<phi::dtype::bfloat16, T>::value ||
-              std::is_same<XPUTypeBF16, T>::value) ||
-             (std::is_same<float, T>::value &&
-              std::getenv("XPU_PADDLE_FC_TF32") != nullptr)) {
-    return XPUFCCalcType::FC_TF32;
+using XPUFCCalcTypeMap = std::vector<std::pair<const char*, XPUFCCalcType>>;
+
+inline XPUFCCalcType GetFCCalcTypeFromEnv(const XPUFCCalcTypeMap& env_map,
+                                          XPUFCCalcType default_calc_type) {
+  for (auto [env_name, calc_type] : env_map) {
+    if (std::getenv(env_name) != nullptr) {
+      return calc_type;
+    }
   }
-  return XPUFCCalcType::FC_INT16;
+  return default_calc_type;
+}
+
+template <typename T>
+inline XPUFCCalcType FCCalcType() {
+  // FLOAT32
+  XPUFCCalcTypeMap calc_type_map = {
+      {"XPU_PADDLE_FC_FLOAT", XPUFCCalcType::FC_FLOAT},
+      {"XPU_PADDLE_FC_LOCAL_INT16", XPUFCCalcType::FC_FLOAT},
+      {"XPU_PADDLE_FC_TF32", XPUFCCalcType::FC_TF32},
+      {"XPU_PADDLE_FC_INT16", XPUFCCalcType::FC_INT16},
+      {"XPU_PADDLE_FC_INT32", XPUFCCalcType::FC_INT32},
+      {"XPU_PADDLE_FC_INT32_WITH_LL", XPUFCCalcType::FC_INT32_WITH_LL},
+  };
+#ifdef PADDLE_WITH_XPU_XRE5
+  auto default_calc_type = XPUFCCalcType::FC_TF32;
+#else
+  auto default_calc_type = XPUFCCalcType::FC_INT16;
+#endif
+  return GetFCCalcTypeFromEnv(calc_type_map, default_calc_type);
+}
+
+template <>
+inline XPUFCCalcType FCCalcType<XPUTypeFP16>() {
+  XPUFCCalcTypeMap calc_type_map = {
+      {"XPU_PADDLE_FC_FLOAT16", XPUFCCalcType::FC_FLOAT16},
+      {"XPU_PADDLE_FC_INT16", XPUFCCalcType::FC_INT16},
+      {"XPU_PADDLE_FC_FLOAT", XPUFCCalcType::FC_FLOAT},
+      {"XPU_PADDLE_FC_LOCAL_INT16", XPUFCCalcType::FC_FLOAT}};
+#ifdef PADDLE_WITH_XPU_XRE5
+  auto default_calc_type = XPUFCCalcType::FC_FLOAT16;
+#else
+  auto default_calc_type = XPUFCCalcType::FC_INT16;
+#endif
+  return GetFCCalcTypeFromEnv(calc_type_map, default_calc_type);
+}
+
+template <>
+inline XPUFCCalcType FCCalcType<XPUTypeBF16>() {
+  XPUFCCalcTypeMap calc_type_map = {
+      // TF32 is the default, do not need to be listed here.
+      {"XPU_PADDLE_FC_FLOAT", XPUFCCalcType::FC_FLOAT},
+      {"XPU_PADDLE_FC_LOCAL_INT16", XPUFCCalcType::FC_FLOAT}};
+  auto default_calc_type = XPUFCCalcType::FC_TF32;
+  return GetFCCalcTypeFromEnv(calc_type_map, default_calc_type);
 }
 
 struct XpuFcInfo {
@@ -239,8 +271,8 @@ static void xblas_fc_wrapper(xpu::Context* ctx,
     l3_addr = RAII_GUARD.alloc_l3_or_gm<XPUType>(m * k);
     PADDLE_ENFORCE_XDNN_NOT_NULL(l3_addr);
 
-    std::vector<int> shape = {k, m};
-    std::vector<int> axis = {1, 0};
+    std::vector<int64_t> shape = {k, m};
+    std::vector<int64_t> axis = {1, 0};
     r = xpu::transpose<XPUType>(ctx, x, l3_addr, shape, axis);
     PADDLE_ENFORCE_XDNN_SUCCESS(r, "transpose");
 #ifdef PADDLE_WITH_XPU_XRE5
@@ -596,8 +628,8 @@ static void MatMulXPUFunction(
       XPUType* x_broadcast_data = nullptr;
       x_broadcast_data = RAII_GUARD.alloc_l3_or_gm<XPUType>(batch_size * m * k);
       PADDLE_ENFORCE_XDNN_NOT_NULL(x_broadcast_data);
-      std::vector<int> x_shape = {1, m, k};
-      std::vector<int> new_x_shape = {batch_size, m, k};
+      std::vector<int64_t> x_shape = {1, m, k};
+      std::vector<int64_t> new_x_shape = {batch_size, m, k};
       int r = xpu::broadcast<XPUType>(
           xpu_ctx, x_data, x_broadcast_data, x_shape, new_x_shape);
       PADDLE_ENFORCE_XDNN_SUCCESS(r, "broadcast");
@@ -608,8 +640,8 @@ static void MatMulXPUFunction(
       XPUType* y_broadcast_data = nullptr;
       y_broadcast_data = RAII_GUARD.alloc_l3_or_gm<XPUType>(batch_size * k * n);
       PADDLE_ENFORCE_XDNN_NOT_NULL(y_broadcast_data);
-      std::vector<int> y_shape = {1, k, n};
-      std::vector<int> new_y_shape = {batch_size, k, n};
+      std::vector<int64_t> y_shape = {1, k, n};
+      std::vector<int64_t> new_y_shape = {batch_size, k, n};
       int r = xpu::broadcast<XPUType>(
           xpu_ctx, y_data, y_broadcast_data, y_shape, new_y_shape);
       PADDLE_ENFORCE_XDNN_SUCCESS(r, "broadcast");

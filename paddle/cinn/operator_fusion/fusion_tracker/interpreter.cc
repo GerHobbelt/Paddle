@@ -159,6 +159,55 @@ void RunItersTransformInstr(const std::shared_ptr<ItersTransformInstr>& instr,
   interpreter->scope[instr->target_] = new_pattern;
 }
 
+void RunAxisTransformInstr(const std::shared_ptr<AxisTransformInstr>& instr,
+                           FusionInterpreter* interpreter) {
+  auto substitute_dimexpr_for_shape = [&](std::vector<symbol::DimExpr>& shape) {
+    for (auto& dim_expr : shape) {
+      if (dim_expr.isa<std::int64_t>()) continue;
+      symbol::DimExpr origin_dim_expr = dim_expr;
+      while (true) {
+        dim_expr = symbol::SubstituteDimExpr(
+            dim_expr, interpreter->substitute_dimexpr_map);
+        if (dim_expr == origin_dim_expr || dim_expr.isa<std::int64_t>()) break;
+        origin_dim_expr = dim_expr;
+      }
+    }
+  };
+  auto substitute_dimexpr_for_transform =
+      adt::match{[&](const AppendAxisTransformPtr& transform) {
+                   substitute_dimexpr_for_shape(transform->shape);
+                 },
+                 [&](const ReshapeTransformPtr& transform) {
+                   substitute_dimexpr_for_shape(transform->in_shape);
+                   substitute_dimexpr_for_shape(transform->out_shape);
+                 },
+                 [&](const auto& transform) {}};
+  auto axis_transform = [&](ir::Expr op_expr) -> ir::Expr {
+    for (auto trans : instr->axis_transform_route_) {
+      std::visit(substitute_dimexpr_for_transform, trans);
+      op_expr = std::visit(ApplyAxisTransform(op_expr), trans);
+    }
+    return op_expr;
+  };
+
+  auto new_pattern = std::make_shared<ScopeElement>();
+  auto fusion_ops = interpreter->scope[instr->source_]->fusion_ops;
+  VLOG(4) << "[AxisTransform] transform route: "
+          << instr->axis_transform_route_;
+  for (const auto& fusion_op : fusion_ops) {
+    ir::Expr op_expr = std::visit(FusibleOp2Expr(), fusion_op).back();
+    VLOG(4) << "[AxisTransform] expr before transform: \n" << op_expr;
+    ir::Expr transformed_expr = axis_transform(op_expr);
+    if (cinn::hlir::framework::pir::trivial_fusion_detail::IsReduceBody(
+            transformed_expr)) {
+      new_pattern->fusion_ops.emplace_back(ReduceOp(transformed_expr));
+    } else {
+      new_pattern->fusion_ops.emplace_back(TrivialOp(transformed_expr));
+    }
+  }
+  interpreter->scope[instr->target_] = new_pattern;
+}
+
 void RunReshapeAlignInstr(const std::shared_ptr<ReshapeAlignInstr>& instr,
                           FusionInterpreter* interpreter) {
   const auto expr = std::visit(
@@ -185,23 +234,21 @@ void RunPaddingInstr(const std::shared_ptr<PaddingInstr>& instr,
 void RunReturnInstr(const std::shared_ptr<ReturnInstr>& instr,
                     FusionInterpreter* interpreter) {
   using namespace cinn::hlir::framework::pir::trivial_fusion_detail;  // NOLINT
+  std::vector<ir::Expr> result;
+  // Insert if for append loop
   for (auto fusion_op : interpreter->scope[instr->target_]->fusion_ops) {
     auto exprs = std::visit(FusibleOp2Expr(), fusion_op);
-    // Insert if for append loops
-    for (const auto& expr : exprs) {
-      // interpreter->ret_expr.push_back(expr);
-      std::vector<std::string> load_tensor_names;
-      for (const auto& tensor : GetOutputTensors(expr)) {
-        load_tensor_names.push_back(tensor->name);
+    for (auto expr : exprs) {
+      std::string output_var_name = GetOutputTensor(expr)->name;
+      if (interpreter->global_var_names.count(output_var_name)) {
+        expr = ExprTransformerUtils::InsertIfForAppendVarsTransformer()(expr);
       }
-      if (AnyFirstInSecond(load_tensor_names, interpreter->global_var_names)) {
-        interpreter->ret_expr.push_back(
-            ExprTransformerUtils::InsertIfForAppendVarsTransformer()(expr));
-      } else {
-        interpreter->ret_expr.push_back(expr);
-      }
+      result.push_back(expr);
     }
   }
+  // Inline global vars
+  InlineGlobalVarCompute(result, interpreter->global_var_names);
+  interpreter->ret_expr = result;
 }
 
 std::vector<ir::Expr> FusionInterpreter::Run() {
@@ -242,6 +289,10 @@ std::vector<ir::Expr> FusionInterpreter::Run() {
       case T_ItersTransform:
         RunItersTransformInstr(
             dynamic_cast_instr_with_err<ItersTransformInstr>(instr), this);
+        break;
+      case T_AxisTransform:
+        RunAxisTransformInstr(
+            dynamic_cast_instr_with_err<AxisTransformInstr>(instr), this);
         break;
       case T_ReshapeAlign:
         RunReshapeAlignInstr(

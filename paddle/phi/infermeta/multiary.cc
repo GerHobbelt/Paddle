@@ -725,14 +725,14 @@ void AucInferMeta(const MetaTensor& input,
       0,
       common::errors::InvalidArgument(
           "The Input(Predict) has not been initialized properly. The "
-          "shape of Input(Predict) = [%s], the shape can not involes 0.",
+          "shape of Input(Predict) = [%s], the shape can not involves 0.",
           predict_dims));
   PADDLE_ENFORCE_NE(
       common::product(label_dims),
       0,
       common::errors::InvalidArgument(
           "The Input(Label) has not been initialized properly. The "
-          "shape of Input(Label) = [%s], the shape can not involes 0.",
+          "shape of Input(Label) = [%s], the shape can not involves 0.",
           label_dims));
 
   if (config.is_runtime) {
@@ -1117,10 +1117,20 @@ void BroadcastTensorsInferMeta(const std::vector<const MetaTensor*>& x,
 
       if (target_dim_size != 1 && dim_size != 1 &&
           target_dim_size != dim_size) {
-        PADDLE_THROW(errors::InvalidArgument(
-            "BroadcastTensorsOp inputs does not satisfy bcast semantics, "
-            "please check axis = %d in reverse order",
-            index));
+        if (dim_size == -1) {
+          dim_size = target_dim_size;
+        } else if (target_dim_size == -1) {
+          target_dim_size = dim_size;
+          continue;
+        } else {
+          PADDLE_THROW(errors::InvalidArgument(
+              "BroadcastTensorsOp inputs does not satisfy bcast semantics, "
+              "please check axis = %d in reverse order, dim_size[%d] != "
+              "target_dim_size[%d]",
+              index,
+              dim_size,
+              target_dim_size));
+        }
       }
 
       // We performed bcast semantics check at python level
@@ -6030,19 +6040,25 @@ void MoeDispatchInferMeta(const MetaTensor& X,
                           MetaTensor* permute_indices_per_token,
                           MetaTensor* expert_scales_float,
                           MetaTensor* top_k_indices) {
-  int token_rows = 0;
+  int token_rows = -1;
   auto input_dims = X.dims();
+  auto gating_dims = gating_output.dims();
   if (input_dims.size() == 3) {
     token_rows = input_dims[0] * input_dims[1];
   } else {
     token_rows = input_dims[0];
   }
+  const int expert_num = gating_dims[gating_dims.size() - 1];
   const int num_rows = token_rows;
   const int hidden_size = X.dims()[input_dims.size() - 1];
 
   permute_input->set_dims({moe_topk * num_rows, hidden_size});
   permute_input->set_dtype(X.dtype());
   permute_input->set_layout(X.layout());
+
+  permute_indices_per_token->set_dims({expert_num});
+  token_nums_per_expert->set_dtype(DataType::INT64);
+  token_nums_per_expert->set_layout(X.layout());
 
   permute_indices_per_token->set_dims({moe_topk, num_rows});
   permute_indices_per_token->set_dtype(DataType::INT32);

@@ -38,6 +38,7 @@
 #include "paddle/cinn/hlir/dialect/operator/transforms/convert_fa_to_qkvmha_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/convert_memory_effec_attn_to_flash_attn_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/dynamic_reshape_pass.h"
+#include "paddle/cinn/hlir/dialect/operator/transforms/fold_full_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/fold_manipulation_ops_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/fuse_parallel_matmul_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/fuse_shape_ops_into_generate_shape_op_pass.h"
@@ -53,6 +54,7 @@
 #include "paddle/cinn/hlir/dialect/operator/transforms/pir_to_py_code_converter.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/reduce_as_to_sum_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/remove_assign_out_pass.h"
+#include "paddle/cinn/hlir/dialect/operator/transforms/remove_redundant_group_output_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/replace_dynamic_expand_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/replace_zero_scale_to_full_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/shape_ops_fallback_to_phi_pass.h"
@@ -126,11 +128,15 @@ void ApplyPdToCinnPass(
   std::shared_ptr<pir::PassManager> pass_manager = CreatePassManager();
   pass_manager->AddPass(cinn::dialect::ir::CreateReduceAsToSumPass());
   pass_manager->AddPass(cinn::dialect::ir::CreateReplaceZeroScaleToFullPass());
+#if (defined(PADDLE_WITH_CUDA) && CUDA_VERSION >= 11060) || \
+    defined(PADDLE_WITH_HIP)
   pass_manager->AddPass(pir::CreateFusedGemmEpiloguePass());
+#endif
   if (FLAGS_enable_fuse_parallel_matmul_pass) {
     pass_manager->AddPass(cinn::dialect::ir::CreateFuseParallelMatmulPass());
   }
   pass_manager->AddPass(cinn::dialect::ir::CreateRemoveAssignOutPass());
+  pass_manager->AddPass(cinn::dialect::ir::CreateFoldFullOpPass());
   pass_manager->AddPass(cinn::dialect::ir::CreateConv2dTransposeFilterPass());
   pass_manager->AddPass(cinn::dialect::ir::CreateConvertMEA2FAPass());
   pass_manager->AddPass(cinn::dialect::ir::CreateConvertFA2QKVMHAPass());
@@ -172,6 +178,7 @@ void ApplyGroupOpPass(::pir::Program* program,
                       const std::function<std::shared_ptr<pir::PassManager>()>&
                           CreatePassManager) {
   std::shared_ptr<pir::PassManager> pass_manager = CreatePassManager();
+
   pass_manager->AddPass(
       cinn::dialect::ir::CreateAddBroadcastToElementwisePass());
   pass_manager->AddPass(cinn::dialect::ir::CreateInsertBroadcastPass());
@@ -192,6 +199,8 @@ void ApplyDivideGroupOpToFusionOpPass(
     const std::function<std::shared_ptr<pir::PassManager>()>&
         CreatePassManager) {
   std::shared_ptr<pir::PassManager> pass_manager = CreatePassManager();
+  pass_manager->AddPass(
+      cinn::dialect::ir::CreateRemoveRedundantGroupOutputPass());
   pass_manager->AddPass(cinn::dialect::ir::CreateAddStoreInGroupOpPass());
   pass_manager->AddPass(cinn::dialect::ir::CreateCinnGroupClusterPass());
 
@@ -262,6 +271,8 @@ void ApplyCinnPass(
     const std::function<std::shared_ptr<pir::PassManager>()>& CreatePassManager,
     bool is_train_mode) {
   const uint32_t origin_num_ops = program->num_ops();
+  if (origin_num_ops == 0) return;
+
   PirToPyCodeConverter(program)
       .file_name("original_programs.py")
       .dump_symbolic_shape(FLAGS_logging_pir_py_code_dump_symbolic_dims)

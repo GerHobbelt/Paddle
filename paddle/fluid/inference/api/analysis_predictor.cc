@@ -59,6 +59,7 @@
 #include "paddle/phi/api/include/context_pool.h"
 #include "paddle/phi/api/include/tensor.h"
 #include "paddle/phi/backends/context_pool.h"
+#include "paddle/phi/backends/device_manager.h"
 #include "paddle/phi/common/backend.h"
 #include "paddle/phi/common/data_type.h"
 #include "paddle/phi/common/place.h"
@@ -108,6 +109,10 @@
 #include "paddle/pir/include/dialect/shape/utils/shape_analysis.h"
 #endif
 
+#ifdef PADDLE_WITH_DNNL
+#include "paddle/fluid/pir/dialect/operator/ir/op_onednn_dialect.h"
+#endif
+
 #include "paddle/common/flags.h"
 #include "paddle/fluid/ir_adaptor/translator/translate.h"
 #include "paddle/fluid/pir/dialect/operator/ir/pd_op.h"
@@ -123,6 +128,7 @@
 #include "paddle/fluid/pir/transforms/general/remove_shadow_feed_pass.h"
 #include "paddle/fluid/pir/transforms/general/replace_fetch_with_shadow_output_pass.h"
 #include "paddle/fluid/pir/transforms/general/transfer_layout_pass.h"
+#include "paddle/fluid/pir/transforms/gpu/matmul_add_act_fuse_pass.h"
 #include "paddle/fluid/pir/transforms/passes.h"
 #include "paddle/fluid/pir/transforms/pd_op_to_kernel_pass.h"
 #include "paddle/fluid/pir/utils/general_functions.h"
@@ -908,13 +914,11 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
         });
         // Infer symbol shape for all ops before fused pass
         fused_op_pm.AddPass(pir::CreateShapeOptimizationPass());
-        const std::vector<std::string> FusedOpPasses{
-            // Operator fusion pass
-            "map_op_to_another_pass",
-            "conv2d_bn_fuse_pass",
-            "conv2d_add_act_fuse_pass",
-            "conv2d_add_fuse_pass",
-            "matmul_add_act_fuse_pass"};
+        const std::vector<std::string> FusedOpPasses{// Operator fusion pass
+                                                     "map_op_to_another_pass",
+                                                     "conv2d_bn_fuse_pass",
+                                                     "conv2d_add_act_fuse_pass",
+                                                     "conv2d_add_fuse_pass"};
 
         for (const auto &fused_op : FusedOpPasses) {
           fused_op_pm.AddPass(pir::PassRegistry::Instance().Get(fused_op));
@@ -929,6 +933,12 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
                 pir::PassRegistry::Instance().Get("transfer_layout_pass"));
           }
         }
+
+        auto matmul_add_act_fuse_pass = ::pir::CreateMatmulAddActFusePass();
+        matmul_add_act_fuse_pass->Set("use_cutlass",
+                                      new bool(config_.use_cutlass_));
+        fused_op_pm.AddPass(std::move(matmul_add_act_fuse_pass));
+
         fused_op_pm.Run(pir_program_.get());
       }
     }
@@ -983,9 +993,27 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
       }
 #endif
 
+#ifdef PADDLE_WITH_CUSTOM_DEVICE
+    } else if (config_.use_custom_device()) {
+      // custom device
+      if (!config_.custom_pass_only_) {
+        auto kPirCustomDevicePasses =
+            phi::CustomDevicePassManager::Instance()->GetCustomDevicePass();
+        for (const auto &custom_device_pass : kPirCustomDevicePasses) {
+          if (std::find(config_.deleted_passes_.begin(),
+                        config_.deleted_passes_.end(),
+                        custom_device_pass) == config_.deleted_passes_.end()) {
+            pass_pm.AddPass(
+                pir::PassRegistry::Instance().Get(custom_device_pass));
+          }
+        }
+      }
+#endif
 #ifdef PADDLE_WITH_DNNL
     } else if (config_.mkldnn_enabled()) {
       // mkldnn
+      pir::IrContext *ctx = pir::IrContext::Instance();
+      ctx->GetOrRegisterDialect<paddle::dialect::OneDNNOperatorDialect>();
       if (!config_.custom_pass_only_) {
         for (const auto &mkldnn_pass : kPirMkldnnPasses) {
           if (std::find(config_.deleted_passes_.begin(),

@@ -29,6 +29,8 @@ from .utils import Singleton
 if TYPE_CHECKING:
     import types
 
+    from .exceptions import BreakGraphReasonBase
+
 
 def try_import_graphviz():
     try:
@@ -216,9 +218,9 @@ class SubGraphRelationInfo(InfoBase):
             dot.node(
                 subgraph_id,
                 f"Subgraph {i} ({info.subgraph_name}, size={info.graph_size})",
-                shape='oval',
-                fillcolor='cyan' if info.is_first_call else None,
-                style='filled' if info.is_first_call else None,
+                shape="oval",
+                fillcolor="cyan" if info.is_first_call else None,
+                style="filled" if info.is_first_call else None,
             )
             for shape_info in info.input_shape_infos:
                 dot.edge(
@@ -265,3 +267,74 @@ class CompileCountInfo(InfoBase):
             )
         summary = "\n".join(summary_lines)
         return summary
+
+
+class BreakGraphReasonInfo(InfoBase):
+    SHORT_NAME = "breakgraph_reason"
+    TYPE = InfoType.E2E_INFO
+
+    def __init__(self, reason: BreakGraphReasonBase):
+        super().__init__()
+        self.reason = reason
+
+    @classmethod
+    def summary(cls, history: list[Self]) -> str:
+        reason_dict = {}
+
+        for info in history:
+            name = info.reason.__class__.__name__
+            if name not in reason_dict:
+                reason_dict[name] = []
+            reason_dict[name].append(str(info.reason))
+
+        reason_list = list(reason_dict.items())
+        reason_list.sort(key=lambda x: len(x[1]), reverse=True)
+
+        return "\n".join(
+            [
+                f"{name} ({len(reasons)}):\n\t" + "\n\t".join(reasons)
+                for name, reasons in reason_list
+            ]
+        )
+
+    @staticmethod
+    def collect_break_graph_reason(reason: BreakGraphReasonBase):
+        if not InfoCollector().need_collect(BreakGraphReasonInfo):
+            return
+
+        InfoCollector().attach(BreakGraphReasonInfo, reason)
+
+
+class SubGraphInfo(InfoBase):
+    SHORT_NAME = "subgraph_info"
+    TYPE = InfoType.STEP_INFO
+
+    def __init__(self, graph, op_num, sir_name):
+        super().__init__()
+        self.graph = graph
+        self.op_num = op_num
+        self.sir_name = sir_name
+
+    def __str__(self):
+        return f"[SIR Name]: {self.sir_name}   [OpNum]: {self.op_num}\n{self.graph}"
+
+    @classmethod
+    def summary(cls, history: list[Self]) -> str:
+
+        num_of_subgraph = len(history)
+        sum_of_op_num = sum(item.op_num for item in history)
+
+        need_details = "details" in ENV_SOT_COLLECT_INFO.get()[cls.SHORT_NAME]
+
+        details = ""
+        if need_details:
+            details = "\n".join(
+                [
+                    f"[SubGraphIdx]: {idx}   {info}"
+                    for idx, info in enumerate(map(str, history))
+                ]
+            )
+
+        summary = f"[Number of subgraph]: {num_of_subgraph} [Sum of opnum]: {sum_of_op_num}"
+
+        return f"{summary}\n{details}"

@@ -201,9 +201,16 @@ struct SimpleOpTypeSetTeller : public Teller {
         return false;
       }
 #endif
-#if !IS_TRT_VERSION_GE(8600)
       auto x_var_name = desc.Input("X")[0];
       auto* x_var_desc = block->FindVarRecursive(x_var_name);
+      auto x_dtype = x_var_desc->GetDataType();
+      if (x_dtype == framework::proto::VarType::COMPLEX64 ||
+          x_dtype == framework::proto::VarType::COMPLEX128) {
+        VLOG(3) << op_type
+                << " op does not support COMPLEX64 or COMPLEX128 input";
+        return false;
+      }
+#if !IS_TRT_VERSION_GE(8600)
       const auto x_shape = x_var_desc->GetShape();
       if (x_shape.empty() && unary_list.find(op_type) != unary_list.end()) {
         VLOG(3) << op_type
@@ -948,6 +955,31 @@ struct SimpleOpTypeSetTeller : public Teller {
       if (resize_inputs.find("SizeTensor") != resize_inputs.end()) {
 #if IS_TRT_VERSION_GE(8200)
         if (desc.Input("SizeTensor").size() == 2) {
+          // TODO(lizexu123): When SizeTensor exists, at least one of the input
+          // variable names must contain 'shape' in order for TRT conversion to
+          // proceed; otherwise, TRT conversion will be disallowed."
+          auto* block = desc.Block();
+          if (block == nullptr) {
+            VLOG(3)
+                << "The block desc is nullptr,we can't continue to analyze.";
+            return false;
+          }
+          bool valid_source = false;
+          //
+          std::vector<std::string> size_tensor_names = desc.Input("SizeTensor");
+          for (const auto& tensor_name : size_tensor_names) {
+            auto* var_desc = block->FindVarRecursive(tensor_name);
+            if (!var_desc) continue;
+            if (tensor_name.find("shape") != std::string::npos) {
+              valid_source = true;
+              break;
+            }
+          }
+          if (!valid_source) {
+            VLOG(3) << "The SizeTensor for bilinear_interp_v2 doesn't come "
+                       "from a valid source.";
+            return false;
+          }
           return true;
         }
 #else

@@ -198,6 +198,7 @@ PYTHON_C_WRAPPER_TEMPLATE = """
 #include "paddle/phi/core/platform/profiler/event_tracing.h"
 #include "paddle/fluid/pybind/op_function_common.h"
 #include "paddle/fluid/eager/api/generated/eager_generated/forwards/dygraph_functions.h"
+#include "paddle/fluid/eager/api/generated/eager_generated/forwards/dygraph_grad_functions.h"
 #include "paddle/fluid/eager/api/manual/eager_manual/dygraph_forward_api.h"
 #include "paddle/fluid/eager/utils.h"
 #include "paddle/fluid/pybind/eager_custom_python_api.h"
@@ -615,7 +616,7 @@ class PythonCSingleFunctionGenerator(FunctionGeneratorBase):
                 )
                 # Generate Python-C Function Registration
                 self.python_c_function_reg_str = python_c_inplace_func_reg_str
-            elif "backward_op" not in self.forward_api_contents:
+            else:
                 self.python_c_function_str += python_c_inplace_func_str
                 self.python_c_function_declare_str += (
                     python_c_function_declare_str
@@ -670,7 +671,7 @@ class PythonCGenerator(GeneratorBase):
         for forward_api_content in forward_api_list:
             if "backward_op" in forward_api_content and forward_api_content[
                 "backward_op"
-            ].endswith(('double_grad', 'triple_grad', 'grad_grad', '_grad_')):
+            ].endswith(('double_grad', 'triple_grad', 'grad_grad')):
                 continue
             f_generator = PythonCSingleFunctionGenerator(
                 forward_api_content, namespace

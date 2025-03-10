@@ -190,6 +190,7 @@ void TileFirstGeneralTactic::ApplyContinuousDataTile(
   const auto sp_loop = context_->config.tile_config.spatial_inner_num;
   const auto rd_thread = context_->config.tile_config.tree_reduce_num;
   const auto rd_block = context_->config.tile_config.grid_reduce_num;
+  const auto rd_loop = context_->config.tile_config.reduce_inner_num;
   VLOG(4) << "ApplyContinuousDataTile sp_thread=" << sp_thread;
   VLOG(4) << "ApplyContinuousDataTile sp_loop=" << sp_loop;
   VLOG(4) << "ApplyContinuousDataTile rd_thread=" << rd_thread;
@@ -235,7 +236,7 @@ void TileFirstGeneralTactic::ApplyContinuousDataTile(
   std::string global_rf_block;
   if (vec_reduce_axis_.size() > 0) {
     auto loops = sch->GetLoops(block_id);
-    sch->Split(loops[current_reduce_axis], {-1, rd_block * rd_thread});
+    sch->Split(loops[current_reduce_axis], {rd_loop, rd_block * rd_thread});
 
     loops = sch->GetLoops(block_id);
     sch->Reorder({loops[current_reduce_axis + 1], loops[current_reduce_axis]});
@@ -367,7 +368,7 @@ void TileFirstGeneralTactic::SplitSptialInner(ir::IRSchedule* sch,
 void TileFirstGeneralTactic::SplitReduceInner(ir::IRSchedule* sch,
                                               const std::string& block_id) {
   const int64_t rd_block = context_->config.tile_config.grid_reduce_num;
-  const int64_t rd_thread = 16;
+  const int64_t rd_thread = context_->config.tile_config.tree_reduce_num;
   const int cur_reduce_axis = 2;
 
   // [ R ] => [ rd_block*rd_thread, rd_inner ]

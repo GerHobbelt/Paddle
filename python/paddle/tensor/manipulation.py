@@ -5678,7 +5678,22 @@ def strided_slice(
             >>> sliced_2 = paddle.strided_slice(x, axes=axes, starts=[minus_3, 0, 2], ends=ends, strides=strides_2)
             >>> # sliced_2 is x[:, 1:3:1, 0:2:1, 2:4:2].
     """
-    if in_dynamic_or_pir_mode():
+    if in_dynamic_mode():
+        return _C_ops.strided_slice(x, axes, starts, ends, strides)
+    elif in_pir_mode():
+
+        def _convert_to_tensor_list(input):
+            if isinstance(input, paddle.pir.Value):
+                input.stop_gradient = True
+            elif isinstance(input, (list, tuple)):
+                if paddle.utils._contain_var(input):
+                    input = paddle.utils.get_int_tensor_list(input)
+            return input
+
+        starts = _convert_to_tensor_list(starts)
+        ends = _convert_to_tensor_list(ends)
+        strides = _convert_to_tensor_list(strides)
+
         return _C_ops.strided_slice(x, axes, starts, ends, strides)
     else:
         helper = LayerHelper('strided_slice', **locals())
@@ -6462,11 +6477,26 @@ def infer_dynamic_broadcast_shape(
     Returns:
         Tensor: The shape tensor for later broadcasting
     """
-    new_shapes = [
-        arr_shape[:axis],
-        indices_shape[axis : axis + 1],
-        arr_shape[axis + 1 :],
-    ]
+    if axis == 0:
+        new_shapes = [
+            indices_shape[
+                :1
+            ],  # use indices_shape[0] will error in concat after, because its shape is [], and shape of arr_shape[1:] is [1]
+            arr_shape[1:],
+        ]
+    elif axis == arr_shape_dim - 1:
+        new_shapes = [
+            arr_shape[:axis],
+            indices_shape[
+                axis:
+            ],  # use indices_shape[axis] will error in concat after, because its shape is [], and shape of arr_shape[axis:] is [1]
+        ]
+    else:
+        new_shapes = [
+            arr_shape[:axis],
+            indices_shape[axis : axis + 1],
+            arr_shape[axis + 1 :],
+        ]
     return paddle.concat(new_shapes)
 
 

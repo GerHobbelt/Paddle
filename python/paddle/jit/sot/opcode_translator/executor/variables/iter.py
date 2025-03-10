@@ -20,11 +20,11 @@ from paddle.jit.sot.opcode_translator.executor.variables.base import (
     VariableBase,
 )
 
-from ....utils import BreakGraphError, FallbackError
+from ....utils import BreakGraphError, FallbackError, UnsupportedOperationBreak
 from ..tracker import ConstTracker, DummyTracker
 from .base import VariableFactory
 from .basic import ConstantVariable
-from .container import ContainerVariable, TupleVariable
+from .container import TupleVariable
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -40,13 +40,18 @@ class IterVariable(VariableBase):
     """
 
     def __init__(
-        self, obj: VariableBase, graph: FunctionGraph, tracker: Tracker
+        self, holded: list[VariableBase], graph: FunctionGraph, tracker: Tracker
     ):
+
         super().__init__(graph, tracker)
-        self.hold = obj
+        self.holds = holded
 
     def make_stringified_guard(self):
-        return self.hold.make_stringified_guard()
+        return [
+            result
+            for holded in self.holds
+            for result in holded.make_stringified_guard()
+        ]
 
     def next(self):
         raise NotImplementedError(f"Can not simulate `next` for {type(self)}")
@@ -55,13 +60,11 @@ class IterVariable(VariableBase):
         return self
 
     def flatten_inner_vars(self) -> list[VariableBase]:
-        holds = self.hold
-        if not isinstance(holds, list):
-            holds = [holds]
+        holded = self.holds
         return [
             inner_var
-            for hold in holds
-            for inner_var in hold.flatten_inner_vars()
+            for obj in holded
+            for inner_var in obj.flatten_inner_vars()
         ]
 
 
@@ -79,15 +82,22 @@ class SequenceIterVariable(IterVariable):
 
     mutable_attrs = ["idx"]
 
-    def __init__(self, obj, graph: FunctionGraph, tracker: Tracker):
-        super().__init__(obj, graph, tracker)
+    def __init__(
+        self,
+        holded: VariableBase | list[VariableBase],
+        graph: FunctionGraph,
+        tracker: Tracker,
+    ):
+        if not isinstance(holded, list):
+            holded = [holded]
+        super().__init__(holded, graph, tracker)
         self.idx = 0
         self.graph.side_effects.record_mutable_variable(self)
 
     def next(self):
-        # TODO: self.hold should have a __len__ method
-        if self.idx < len(self.hold):
-            val = self.hold[self.idx]
+        holded = self.holds[0]
+        if self.idx < len(holded):
+            val = holded[self.idx]
             self.idx += 1
             return val
         else:
@@ -96,10 +106,11 @@ class SequenceIterVariable(IterVariable):
     def to_list(self) -> list:
         if self.has_side_effect():
             raise FallbackError("Can not convert an used iterator into list")
-        self.idx = len(self.hold)
+        holded = self.holds[0]
+        self.idx = len(holded)
         retval = []
-        for i in range(len(self.hold)):
-            retval.append(self.hold[i])
+        for i in range(len(holded)):
+            retval.append(holded[i])
         return retval
 
     def has_side_effect(self) -> bool:
@@ -109,7 +120,7 @@ class SequenceIterVariable(IterVariable):
         if self.has_side_effect():
             super()._reconstruct(codegen)
         else:
-            self.hold.reconstruct(codegen)
+            self.holds[0].reconstruct(codegen)
             codegen.gen_get_iter()
 
     @property
@@ -124,11 +135,13 @@ class EnumerateVariable(SequenceIterVariable):
     EnumerateVariable holds a SequenceIterVariable and return additional index
     """
 
-    def __init__(self, val_iterator, graph, tracker):
+    def __init__(
+        self, val_iterator: IterVariable, graph: FunctionGraph, tracker: Tracker
+    ):
         super().__init__(val_iterator, graph, tracker)
 
     def next(self):
-        val = self.hold.next()
+        val = self.holds[0].next()
         idx_var = ConstantVariable(self.idx, self.graph, ConstTracker(self.idx))
         self.idx += 1
         return TupleVariable(
@@ -136,7 +149,7 @@ class EnumerateVariable(SequenceIterVariable):
         )
 
     def to_list(self):
-        values = self.hold.to_list()
+        values = self.holds[0].to_list()
         idx = [
             ConstantVariable(i, self.graph, ConstTracker(i))
             for i in range(len(values))
@@ -144,14 +157,14 @@ class EnumerateVariable(SequenceIterVariable):
         return list(zip(idx, values))
 
     def has_side_effect(self) -> bool:
-        return self.hold.has_side_effect()
+        return self.holds[0].has_side_effect()
 
     def _reconstruct(self, codegen: PyCodeGen):
         if self.has_side_effect():
             super()._reconstruct(codegen)
         else:
             codegen.gen_load_global("enumerate", push_null=True)
-            self.hold.reconstruct(codegen)
+            self.holds[0].reconstruct(codegen)
             codegen.gen_call_function(1)
 
     @staticmethod
@@ -168,14 +181,16 @@ class ZipVariable(SequenceIterVariable):
     ZipVariable holds a list of SequenceIterVariable
     """
 
-    def __init__(self, iters, graph, tracker):
+    def __init__(
+        self, iters: list[IterVariable], graph: FunctionGraph, tracker: Tracker
+    ):
         super().__init__(iters, graph, tracker)
 
     def next(self):
         # can not use <listcomp> here, because it will raise a RuntimeError("StopIteration")
         # but we want a StopIteration Exception
         values = []
-        for iter_var in self.hold:
+        for iter_var in self.holds:
             next_var = iter_var.next()
             values.append(next_var)
 
@@ -184,24 +199,30 @@ class ZipVariable(SequenceIterVariable):
         )
 
     def to_list(self):
-        lists = [iter_vars.to_list() for iter_vars in self.hold]
+        lists = [iter_vars.to_list() for iter_vars in self.holds]
         min_len = min(len(l) for l in lists)
         result = []
         for i in range(min_len):
-            result.append(tuple(l[i] for l in lists))
+            result.append(
+                VariableFactory.from_value(
+                    tuple(l[i] for l in lists),
+                    self.graph,
+                    DummyTracker(list(self.holds)),
+                )
+            )
         return result
 
     def has_side_effect(self) -> bool:
-        return any(iter_var.has_side_effect() for iter_var in self.hold)
+        return any(iter_var.has_side_effect() for iter_var in self.holds)
 
     def _reconstruct(self, codegen: PyCodeGen):
         if self.has_side_effect():
             super()._reconstruct(codegen)
         else:
             codegen.gen_load_global("zip", push_null=True)
-            for iter_var in self.hold:
+            for iter_var in self.holds:
                 iter_var.reconstruct(codegen)
-            codegen.gen_call_function(len(self.hold))
+            codegen.gen_call_function(len(self.holds))
 
     @staticmethod
     def from_iterator(
@@ -226,52 +247,69 @@ class MapVariable(SequenceIterVariable):
     MapVariable holds a SequenceIterVariable and return a Iterable Variable after map function
     """
 
-    def __init__(self, func, val_iterator, graph, tracker):
-        super().__init__(val_iterator, graph, tracker)
-        self.func = func
+    def __init__(self, fn, iters: list[IterVariable], graph, tracker):
+
+        super().__init__(iters, graph, tracker)
+        self.fn = fn
 
     def next(self):
-        return self.func(self.hold.next())
+
+        return self.fn(*[iter_var.next() for iter_var in self.holds])
 
     def to_list(self) -> list:
-        retval = []
-        while True:
-            try:
-                retval.append(self.func(self.hold.next()))
-            except StopIteration:
-                break
-        return retval
+        lists = [iter_var.to_list() for iter_var in self.holds]
+        min_len = min(len(l) for l in lists)
+        result = []
+        for i in range(min_len):
+            result.append(self.fn(*(l[i] for l in lists)))
+        return result
 
     def has_side_effect(self) -> bool:
-        return self.hold.has_side_effect()
+        return any(iter_var.has_side_effect() for iter_var in self.holds)
 
     def _reconstruct(self, codegen: PyCodeGen):
         if self.has_side_effect():
             super()._reconstruct(codegen)
         else:
             codegen.gen_load_global("map", push_null=True)
-            self.func.reconstruct(codegen)
-            self.hold.reconstruct(codegen)
-            codegen.gen_call_function(2)
+            self.fn.reconstruct(codegen)
+            for iter_var in self.holds:
+                iter_var.reconstruct(codegen)
+            codegen.gen_call_function(len(self.holds) + 1)
 
     @staticmethod
     def from_iterator(
-        func, value, graph: FunctionGraph | None, tracker: Tracker
+        fn,
+        value: Sequence[VariableBase],
+        graph: FunctionGraph | None,
+        tracker: Tracker,
     ):
-        iter_variable = (
-            value.get_iter() if isinstance(value, ContainerVariable) else value
-        )
+        map_targets = []
 
-        if isinstance(iter_variable, IterVariable):
-            return MapVariable(func, iter_variable, graph, tracker)
-        else:
-            return UserDefinedIterVariable(value, graph, tracker)
+        for variable in value:
+            iter_variable = variable.get_iter()
+            if not isinstance(iter_variable, SequenceIterVariable):
+                return UserDefinedIterVariable(value, graph, tracker)
+            map_targets.append(iter_variable)
+
+        return MapVariable(fn, map_targets, graph, tracker)
 
 
 # what UserDefinedIterVariable holds doesn't matter, because use user defined iterator will trigger break graph
 class UserDefinedIterVariable(IterVariable):
-    def __init__(self, obj, graph, tracker):
-        super().__init__(obj, graph, tracker)
+    def __init__(
+        self,
+        holded: VariableBase | list[VariableBase],
+        graph: FunctionGraph,
+        tracker: Tracker,
+    ):
+        if not isinstance(holded, list):
+            holded = [holded]
+        super().__init__(holded, graph, tracker)
 
     def next(self):
-        raise BreakGraphError("Break graph when using user defined iterator")
+        raise BreakGraphError(
+            UnsupportedOperationBreak(
+                reason_str="Break graph when iterating user defined iterator"
+            )
+        )

@@ -4013,7 +4013,7 @@ def _stride_in_no_check_dy2st_diff():
 
 def check_if_to_static_diff_with_dygraph(op_type, inplace_map, outputs):
     if op_type in {"while", "conditional_block"}:
-        # Dont' need check while and conditional_block, it is only a wrapper of inner ops
+        # Don't need check while and conditional_block, it is only a wrapper of inner ops
         # we will stuck in inner op.
         return
     if outputs is not None:
@@ -8506,3 +8506,16 @@ def pir_chunk_id_guard(chunk_id: int - 1) -> Generator[None, None, None]:
     finally:
         if paddle.framework.in_pir_mode():
             pir.set_chunk_id(original_chunk_id)
+
+
+@signature_safe_contextmanager
+def pir_op_name_guard(op_name: str) -> Generator[None, None, None]:
+
+    if paddle.framework.in_pir_mode() and core._is_bwd_prim_enabled():
+        original_comp_op_name = pir.get_comp_op_name()
+        pir.set_comp_op_name(op_name)
+    try:
+        yield
+    finally:
+        if paddle.framework.in_pir_mode() and core._is_bwd_prim_enabled():
+            pir.set_comp_op_name(original_comp_op_name)

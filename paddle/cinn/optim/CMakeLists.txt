@@ -7,11 +7,11 @@ gather_srcs(
   replace_var_with_expr.cc
   ir_simplify.cc
   optimize.cc
-  vectorize_loops.cc
   unroll_loops.cc
   transform_polyfor_to_for.cc
   eliminate_broadcast_in_forloop.cc
   eliminate_invariant_loop.cc
+  entail_loop_condition_pass.cc
   fold_cinn_call_arguments.cc
   call_arg_list_to_pod_value.cc
   insert_debug_log_callee.cc
@@ -23,7 +23,7 @@ gather_srcs(
   replace_const_param_to_integer.cc
   lower_intrin.cc
   cast_bool_to_int8.cc
-  var_mod_simplify.cc
+  realize_welford_pass.cc
   remove_schedule_block_pass.cc
   replace_cross_block_reduction.cc
   replace_cross_thread_reduction.cc
@@ -41,7 +41,8 @@ gather_srcs(
   check_tensor_buffer_map.cc
   longlong2int_pass.cc
   vectorize_for_trans.cc
-  if_fold_pass.cc)
+  if_fold_pass.cc
+  simplify_util.cc)
 
 if(WITH_CUDA OR WITH_ROCM)
   gather_srcs(cinnapi_src SRCS transform_gpu_forloop.cc)

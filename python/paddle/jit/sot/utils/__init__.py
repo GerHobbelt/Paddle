@@ -14,8 +14,6 @@
 
 from .call_ast_utils import get_static_function, try_ast_func  # noqa: F401
 from .envs import (  # noqa: F401
-    ENV_CLEAN_CODE,
-    ENV_COST_MODEL,
     ENV_MIN_GRAPH_SIZE,
     ENV_SOT_ALLOW_DYNAMIC_SHAPE,
     ENV_SOT_ENABLE_FASTER_GUARD,
@@ -25,8 +23,8 @@ from .envs import (  # noqa: F401
     ENV_SOT_LOG_LEVEL,
     ENV_SOT_WITH_CONTROL_FLOW,
     ENV_STRICT_MODE,
+    PEP508LikeEnvironmentVariable,
     allow_dynamic_shape_guard,
-    cost_model_guard,
     export_guard,
     faster_guard_guard,
     guard_tree_guard,
@@ -37,15 +35,25 @@ from .envs import (  # noqa: F401
 )
 from .exceptions import (  # noqa: F401
     BreakGraphError,
+    BreakGraphReasonBase,
+    BuiltinFunctionBreak,
+    DataDependencyControlFlowBreak,
+    DataDependencyDynamicShapeBreak,
+    DataDependencyOperationBreak,
     ExportError,
     FallbackError,
     InnerError,
+    PsdbBreakReason,
+    UnsupportedIteratorBreak,
+    UnsupportedOperationBreak,
     inner_error_default_handler,
 )
 from .info_collector import (  # noqa: F401
+    BreakGraphReasonInfo,
     CompileCountInfo,
     InfoCollector,
     NewSymbolHitRateInfo,
+    SubGraphInfo,
     SubGraphRelationInfo,
 )
 from .magic_methods import magic_method_builtin_dispatch  # noqa: F401
@@ -59,25 +67,23 @@ from .paddle_api_config import (  # noqa: F401
 from .utils import (  # noqa: F401
     Cache,
     ConstTypes,
-    GraphLogger,
     NameGenerator,
     ResumeFnNameFactory,
     Singleton,
     SotUndefinedVar,
     StepInfoManager,
-    StepState,
     count_if,
     current_symbol_registry,
     execute_time,
     flatten,
     flatten_extend,
     get_api_fullname,
+    get_numpy_ufuncs,
     get_unbound_method,
     hashable,
     in_paddle_module,
     is_break_graph_api,
     is_builtin_fn,
-    is_clean_code,
     is_comprehensive_name,
     is_paddle_api,
     is_strict_mode,

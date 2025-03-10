@@ -206,7 +206,7 @@ bool CheckTensorIsBroadcastAndContinuous(
   bool is_broadcast = false;
   for (int i = 0; i < indices.size(); ++i) {
     ir::Expr index = indices[i];
-    cinn::optim::Simplify(&index);
+    index = optim::ArithSimplify(index);
     if (index.is_constant() && index.get_constant() == 0) {
       is_broadcast = true;
       continue;
@@ -244,7 +244,7 @@ bool CheckTensorIsContinuous(
     const std::unordered_map<ir::Var, ir::Expr>& iter_var2value) {
   for (int i = 0; i < indices.size(); ++i) {
     ir::Expr index = indices[i];
-    cinn::optim::Simplify(&index);
+    index = optim::ArithSimplify(index);
     if (index.is_constant()) return false;
     if (!index.is_var()) return false;
     ir::Var iter_var = index.as_var_ref();
@@ -443,10 +443,10 @@ bool GetCanApplyGridReduce(const std::vector<ir::Expr>& op_compute_bodies,
       AddReduceDownstream(expr_block);
     }
 
-    // When a block is downstream of reduce, its output shouldn't contain
-    // reduce axis. Otherwise, it broadcasts the result of reduce. If this
+    // When a block is downstream of reduce, its loop iters shouldn't contain
+    // any reduce axis. Otherwise, it broadcasts the result of reduce. If this
     // is the case, we cannot apply grid reduce.
-    if (is_reduce_downstream && output_has_reduce_axis) {
+    if (is_reduce_downstream && (is_reduce || output_has_reduce_axis)) {
       VLOG(4) << "grid reduce is prohibited by block: " << expr_block;
       return false;
     }
@@ -454,7 +454,7 @@ bool GetCanApplyGridReduce(const std::vector<ir::Expr>& op_compute_bodies,
   return true;
 }
 
-GroupVectorizeInfo GetCanApplyVectorize(
+GroupVectorizeInfo GetGroupVectorizeInfo(
     const std::vector<ir::Expr>& op_compute_bodies,
     const std::unordered_set<std::string>& group_args) {
   bool can_vectorize = true;

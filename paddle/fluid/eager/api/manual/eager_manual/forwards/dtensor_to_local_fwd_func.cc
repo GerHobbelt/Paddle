@@ -18,10 +18,23 @@
 #include "paddle/fluid/eager/api/utils/global_utils.h"
 #include "paddle/phi/core/platform/profiler/event_tracing.h"
 
-paddle::Tensor dtensor_to_local_ad_function(const paddle::Tensor& input) {
+paddle::Tensor dtensor_to_local_ad_function(
+    const paddle::Tensor& input,
+    const phi::distributed::ProcessMesh& process_mesh,
+    const phi::distributed::Placements& placements) {
 #ifdef PADDLE_WITH_DISTRIBUTE
   VLOG(3) << "Running AD API: "
           << "dtensor_to_local dygraph";
+  bool rank_is_in_current_mesh = phi::distributed::IsCurRankInMesh(
+      static_cast<phi::distributed::DistTensor*>(input.impl().get())
+          ->process_mesh());
+
+  if (!rank_is_in_current_mesh) {
+    VLOG(3) << "Current rank is not in the process mesh, returning the input "
+               "directly.";
+    return input;
+  }
+
   // Dygraph Record Event
   phi::RecordEvent dygraph_entrance_record_event(
       "dtensor_to_local dygraph", phi::TracerEventType::Communication, 1);
@@ -49,6 +62,13 @@ paddle::Tensor dtensor_to_local_ad_function(const paddle::Tensor& input) {
 
     // Set TensorWrappers for Forward Inputs if needed
     grad_node->SetTensorWrapperNoNeedBuffer_Input(input);
+
+    phi::distributed::TensorDistAttr grad_dist_attr =
+        ToTensorDistAttr(process_mesh, placements, input.dims());
+
+    grad_node->SetGradDistAttr(grad_dist_attr);
+    grad_node->SetGradProcessMesh(process_mesh);
+    grad_node->SetGradPlacements(placements);
   }
 
   // Forward API Call

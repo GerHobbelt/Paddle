@@ -17,7 +17,7 @@ limitations under the License. */
 #include "paddle/fluid/operators/collective/c_concat_op.h"
 #include "paddle/fluid/operators/load_combine_op.h"
 #include "paddle/fluid/operators/save_combine_op.h"
-#include "paddle/phi/api/backward/backward_api.h"
+#include "paddle/phi/api/backward/backward_api_base.h"
 #include "paddle/phi/api/include/api.h"
 #include "paddle/phi/backends/device_manager.h"
 #include "paddle/phi/core/distributed/comm_context_manager.h"
@@ -1316,40 +1316,6 @@ void FeedDenseTensorKernel(const Context& dev_ctx,
 
 void RegisterCustomDeviceCommonKernel(const std::string& dev_type) {
 #ifdef PADDLE_WITH_CUSTOM_DEVICE
-  auto device_type = dev_type.c_str();
-  REGISTER_OP_CUSTOM_DEVICE_KERNEL(
-      c_concat,
-      device_type,
-      paddle::operators::CConcatOpCustomDeviceKernel<phi::CustomContext, float>,
-      paddle::operators::CConcatOpCustomDeviceKernel<phi::CustomContext,
-                                                     phi::dtype::float16>,
-      paddle::operators::CConcatOpCustomDeviceKernel<phi::CustomContext,
-                                                     phi::dtype::bfloat16>);
-  REGISTER_OP_CUSTOM_DEVICE_KERNEL(
-      c_softmax_with_cross_entropy,
-      device_type,
-      paddle::operators::CSoftmaxWithCrossEntropyOpCustomDeviceKernel<
-          phi::CustomContext,
-          float>,
-      paddle::operators::CSoftmaxWithCrossEntropyOpCustomDeviceKernel<
-          phi::CustomContext,
-          double>,
-      paddle::operators::CSoftmaxWithCrossEntropyOpCustomDeviceKernel<
-          phi::CustomContext,
-          phi::dtype::float16>) {}
-
-  REGISTER_OP_CUSTOM_DEVICE_KERNEL(
-      c_softmax_with_cross_entropy_grad,
-      device_type,
-      paddle::operators::CSoftmaxWithCrossEntropyGradCustomDeviceKernel<
-          phi::CustomContext,
-          float>,
-      paddle::operators::CSoftmaxWithCrossEntropyGradCustomDeviceKernel<
-          phi::CustomContext,
-          double>,
-      paddle::operators::CSoftmaxWithCrossEntropyGradCustomDeviceKernel<
-          phi::CustomContext,
-          phi::dtype::float16>) {}
 
 #endif
 }

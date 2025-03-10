@@ -1,7 +1,15 @@
+string(FIND "${CUDA_ARCH_BIN}" "90" ARCH_BIN_CONTAINS_90)
+
+if(WITH_GPU AND (ARCH_BIN_CONTAINS_90 GREATER -1))
+  message(STATUS "Enable DeepEP alltoall communication.")
+  add_subdirectory(deep_ep)
+  set(DEEPEP_LIB deep_ep)
+endif()
+
 cc_library(
   process_group
   SRCS process_group.cc
-  DEPS phi common xxhash)
+  DEPS phi common xxhash ${DEEPEP_LIB})
 
 cc_library(
   eager_reducer
@@ -33,6 +41,11 @@ if(WITH_XPU_BKCL)
     process_group_bkcl
     SRCS process_group_bkcl.cc bkcl_tools.cc common.cc
     DEPS process_group phi)
+
+  cc_library(
+    xpu_async_load
+    SRCS xpu_async_load.cc
+    DEPS process_group phi ${DEVICE_EVENT_LIBS})
 endif()
 
 if(WITH_MPI)

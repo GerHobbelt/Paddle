@@ -23,7 +23,6 @@
 #include <string>
 #include <vector>
 
-#include "paddle/cinn/common/cas.h"
 #include "paddle/cinn/common/integer_set.h"
 #include "paddle/cinn/common/ir_util.h"
 #include "paddle/cinn/ir/ir.h"
@@ -550,7 +549,7 @@ std::vector<IterRange> CalculateTensorRegions(
     auto range = GetAccessedRange(binded_index, loop_vars, loop_ranges);
 
     // in generally, the range should be constant, but in some cases our
-    // AutoSimplify (algebraic simplification function) can't simplify
+    // Simplify (algebraic simplification function) can't simplify
     // completely where we use the whole shape in this indice as the accessed
     // range conservatively
     if (!range.min.is_constant() || !range.extent.is_constant()) {
