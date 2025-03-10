@@ -372,6 +372,17 @@
   outputs :
     {auc : AUC, stat_pos_out : StatPosOut, stat_neg_out : StatNegOut}
 
+- op : baddbmm
+  backward : baddbmm_grad
+  inputs :
+    {input : Input, x : X, y : Y}
+  outputs :
+    out : Out
+  attrs :
+    {alpha : Alpha, beta : Beta}
+  extra :
+    attrs : [bool use_mkldnn = false]
+
 - op : barrier
   inputs :
     {x : X}
@@ -521,6 +532,7 @@
   drop_empty_grad : [input_grad]
 
 - op : c_concat
+  backward: c_concat_grad
   inputs :
     x : X
   outputs :
@@ -2536,6 +2548,10 @@
     {axis : dim, keepdim : keep_dim}
   extra :
     attrs : [bool use_mkldnn = false]
+  int_array:
+      axis :
+        data_type : int
+        support_tensor : true
 
 - op : mean_all (mean)
   backward : mean_all_grad (mean_grad)

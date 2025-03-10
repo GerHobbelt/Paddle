@@ -26,6 +26,9 @@ from typing import (
 )
 
 import paddle
+from paddle.jit.sot.opcode_translator.executor.variables.base import (
+    VariableBase,
+)
 
 from .... import psdb
 from ....profiler import EventGuard
@@ -66,7 +69,7 @@ from ..tracker import (
     GetIterTracker,
     Tracker,
 )
-from .base import VariableBase, VariableFactory
+from .base import VariableFactory
 from .basic import (
     ConstantVariable,
     ObjectVariable,
@@ -80,6 +83,12 @@ if TYPE_CHECKING:
 
 PD_ALL_CONTAINERS = (paddle.nn.Sequential, paddle.nn.LayerList)
 PD_SEQ_CONTAINERS = (paddle.nn.Sequential, paddle.nn.LayerList)
+PD_PURE_CLASSES = (
+    paddle.distributed.ProcessMesh,
+    paddle.distributed.Shard,
+    paddle.distributed.Replicate,
+    paddle.distributed.Partial,
+)
 
 
 class CallableVariable(VariableBase):
@@ -279,7 +288,7 @@ class PaddleApiVariable(FunctionVariable):
     def call_function(self, /, *args, **kwargs):
         if is_break_graph_api(self.value):
             raise BreakGraphError(
-                f"breakgraph by unsupport function: {self.value.__name__}"
+                f"breakgraph by unsupported function: {self.value.__name__}"
             )
         return self.graph.call_paddle_api(self.value, *args, **kwargs)
 
@@ -361,7 +370,6 @@ class MethodVariable(CallableVariable):
         fn (VariableBase): The method to be wrapped.
         graph(FunctionGraph): The FunctionGraph object that this variable is associated with.
         tracker(Tracker): The Tracker object that tracks the information of this variable.
-        method_name (str): The name of the method to be wrapped.
     """
 
     def __init__(
@@ -370,13 +378,10 @@ class MethodVariable(CallableVariable):
         fn: VariableBase,
         graph: FunctionGraph,
         tracker: Tracker,
-        *,
-        method_name: str | None = None,
     ):
         super().__init__(graph, tracker)
         self.bound_instance = bound_instance
         self.fn = fn
-        self.method_name = method_name
 
     def get_py_value(self, allow_tensor=False):
         return self.fn.get_py_value().__get__(
@@ -385,12 +390,18 @@ class MethodVariable(CallableVariable):
         )
 
     def _reconstruct(self, pycode_gen):
-        assert self.method_name is not None
-        self.tensor.reconstruct(pycode_gen)
-        pycode_gen.gen_load_attr(self.method_name)
+        # We bind the method to the instance before calling the method
+        self.fn.reconstruct(pycode_gen)
+        pycode_gen.gen_load_method("__get__")
+        self.bound_instance.reconstruct(pycode_gen)
+        pycode_gen.gen_call_function(1)
 
     def call_function(self, /, *args, **kwargs):
         return self.fn(*(self.bound_instance, *args), **kwargs)
+
+    def flatten_inner_vars(self) -> list[VariableBase]:
+        # The method's inner_vars is from its bound_instance
+        return self.bound_instance.flatten_inner_vars()
 
     @staticmethod
     def wrap_method(
@@ -400,7 +411,6 @@ class MethodVariable(CallableVariable):
         tracker: Tracker,
         instance: VariableBase | None = None,
         fn: VariableBase | None = None,
-        method_name: str | None = None,
     ):
         # NOTE(SigureMo): Since the method_self need method_var as the obj
         # of the tracker, we need to temporarily set the tracker of method_self
@@ -420,7 +430,6 @@ class MethodVariable(CallableVariable):
         method_var = MethodVariable(
             instance_var,
             fn_var,
-            method_name=method_name,
             graph=graph,
             tracker=tracker,
         )
@@ -441,7 +450,8 @@ class MethodVariable(CallableVariable):
     @property
     def main_info(self) -> dict[str, Any]:
         return {
-            "method": self.method_name,
+            "function": self.fn,
+            "instance": self.bound_instance,
         }
 
 
@@ -557,7 +567,13 @@ class ContainerLayerVariable(LayerVariable):
 
     @VariableFactory.register_from_value(successor="PaddleLayerVariable")
     def from_value(value: Any, graph: FunctionGraph, tracker: Tracker):
-        if isinstance(value, PD_ALL_CONTAINERS):
+        # For Sequential and LayerList, we need to wrap them as ContainerLayerVariable
+        # to ensure inner layers are correctly tracked.
+        # But if user defined a container class and override the forward method,
+        # we should not wrap it as ContainerLayerVariable. Such as: RNNBase
+        if isinstance(value, PD_ALL_CONTAINERS) and value.__class__.forward in (
+            cls.forward for cls in PD_ALL_CONTAINERS
+        ):
             return ContainerLayerVariable(value, graph, tracker)
         return None
 
@@ -894,4 +910,26 @@ class PaddleLayerClassVariable(ClassVariable):
             and value.__module__.startswith("paddle.nn.")
         ):
             return PaddleLayerClassVariable(value, graph, tracker)
+        return None
+
+
+class PureClassVariable(ClassVariable):
+    def __init__(self, class_: type, graph: FunctionGraph, tracker: Tracker):
+        super().__init__(class_, graph, tracker)
+
+    def call_function(self, /, *args, **kwargs):
+        from ..function_graph import convert_to_py_value
+
+        obj = self.value(
+            *convert_to_py_value(args),
+            **convert_to_py_value(kwargs),
+        )
+        return VariableFactory.from_value(
+            obj, self.graph, CreateLayerTracker(self, args, kwargs)
+        )
+
+    @VariableFactory.register_from_value(successor="ClassVariable")
+    def from_value(value: Any, graph: FunctionGraph, tracker: Tracker):
+        if inspect.isclass(value) and value in PD_PURE_CLASSES:
+            return PureClassVariable(value, graph, tracker)
         return None

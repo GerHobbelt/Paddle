@@ -400,7 +400,7 @@ class TEST_API OperatorBase {
   // NOTE: runtime_attrs_ contains the attributes which used for dispatching
   // kernel (use_mkldnn, use_cudnn, ...) or passing additional configuration
   // for special heterogeneous kernel (workspace_size_MB, ...).
-  // The attributes in runtime_attrs_ are setted by framework (such as PASS),
+  // The attributes in runtime_attrs_ are set by framework (such as PASS),
   // and not in the python api.
   AttributeMap runtime_attrs_;
 
@@ -878,11 +878,11 @@ class OperatorWithKernel : public OperatorBase {
    * Transfer data from scope to a transferred scope. If there is no data need
    * to be transferred, it returns nullptr.
    *
-   * transfered_inplace_vars is a output vector.
+   * transferred_inplace_vars is a output vector.
    */
   Scope* PrepareData(const Scope& scope,
                      const phi::KernelKey& expected_kernel_key,
-                     std::vector<std::string>* transfered_inplace_vars,
+                     std::vector<std::string>* transferred_inplace_vars,
                      RuntimeContext* ctx,
                      const phi::Place& place) const;
 

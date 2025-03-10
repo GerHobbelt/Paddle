@@ -57,6 +57,8 @@ class OneDNNBf16PlacementPattern : public pir::RewritePattern {
 
   bool Match(pir::Operation* op) const override {  // NOLINT
     if (!op->isa<paddle::onednn::dialect::BilinearInterpOp>() &&
+        !op->isa<paddle::onednn::dialect::CastOp>() &&
+        !op->isa<paddle::onednn::dialect::Cast_Op>() &&
         !op->isa<paddle::onednn::dialect::ClipOp>() &&
         !op->isa<paddle::onednn::dialect::Clip_Op>() &&
         !op->isa<paddle::onednn::dialect::ConcatOp>() &&
@@ -89,6 +91,7 @@ class OneDNNBf16PlacementPattern : public pir::RewritePattern {
         !op->isa<paddle::onednn::dialect::Squeeze_Op>() &&
         !op->isa<paddle::onednn::dialect::SumOp>() &&
         !op->isa<paddle::onednn::dialect::TransposeOp>() &&
+        !op->isa<paddle::onednn::dialect::SplitOp>() &&
         !op->isa<paddle::onednn::dialect::Transpose_Op>() &&
         !op->isa<paddle::onednn::dialect::FusedConv2dOp>() &&
         !op->isa<paddle::onednn::dialect::FusedMatmulOp>()) {
@@ -116,7 +119,7 @@ class OneDNNBf16PlacementPattern : public pir::RewritePattern {
       bool bias_after_scale =
           op_attr.at("bias_after_scale").dyn_cast<pir::BoolAttribute>().data();
       if (bias_after_scale) {
-        // If bias after scale, add quant/dequant for sacle will cause some
+        // If bias after scale, add quant/dequant for scale will cause some
         // error
         return false;
       }
@@ -225,6 +228,8 @@ class RemoveOrphanedPattern : public pir::RewritePattern {
   // revert mkldnn_data_type attr to float32
   bool Match(pir::Operation* op) const override {  // NOLINT
     if (!op->isa<paddle::onednn::dialect::BilinearInterpOp>() &&
+        !op->isa<paddle::onednn::dialect::CastOp>() &&
+        !op->isa<paddle::onednn::dialect::Cast_Op>() &&
         !op->isa<paddle::onednn::dialect::ClipOp>() &&
         !op->isa<paddle::onednn::dialect::Clip_Op>() &&
         !op->isa<paddle::onednn::dialect::ConcatOp>() &&
@@ -257,6 +262,7 @@ class RemoveOrphanedPattern : public pir::RewritePattern {
         !op->isa<paddle::onednn::dialect::Squeeze_Op>() &&
         !op->isa<paddle::onednn::dialect::SumOp>() &&
         !op->isa<paddle::onednn::dialect::TransposeOp>() &&
+        !op->isa<paddle::onednn::dialect::SplitOp>() &&
         !op->isa<paddle::onednn::dialect::Transpose_Op>() &&
         !op->isa<paddle::onednn::dialect::FusedConv2dOp>() &&
         !op->isa<paddle::onednn::dialect::FusedMatmulOp>()) {

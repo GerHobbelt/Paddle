@@ -386,6 +386,8 @@ from .tensor.math import (  # noqa: F401
     atan_,
     atanh,
     atanh_,
+    baddbmm,
+    baddbmm_,
     bitwise_left_shift,
     bitwise_left_shift_,
     bitwise_right_shift,
@@ -805,6 +807,8 @@ __all__ = [
     'raw',
     'addmm',
     'addmm_',
+    'baddbmm',
+    'baddbmm_',
     'allclose',
     'isclose',
     't',
@@ -1223,3 +1227,13 @@ __all__ = [
     'pi',
     'e',
 ]
+
+import os
+
+FLAGS_trace_api = os.environ.get("FLAGS_trace_api", None)
+if FLAGS_trace_api is not None and FLAGS_trace_api != "":
+    from .api_tracer import start_api_tracer
+
+    api_path = FLAGS_trace_api.split(",")[0]
+    save_config_path = FLAGS_trace_api.split(",")[1]
+    start_api_tracer(api_path, save_config_path)

@@ -96,7 +96,6 @@ limitations under the License. */
 #include "paddle/fluid/platform/tensorrt/engine_params.h"
 #include "paddle/fluid/pybind/auto_parallel_py.h"
 #include "paddle/fluid/pybind/bind_cost_model.h"
-#include "paddle/fluid/pybind/bind_fleet_executor.h"
 #include "paddle/fluid/pybind/box_helper_py.h"
 #include "paddle/fluid/pybind/communication.h"
 #include "paddle/fluid/pybind/compatible.h"
@@ -237,6 +236,7 @@ limitations under the License. */
 #include "paddle/fluid/inference/tensorrt/pir/declare_plugin.h"
 #include "paddle/fluid/platform/tensorrt/trt_plugin.h"
 #endif
+#include "paddle/fluid/eager/accumulation/accumulation_node.h"
 
 COMMON_DECLARE_bool(use_mkldnn);
 COMMON_DECLARE_string(prim_backward_blacklist);
@@ -257,7 +257,8 @@ DECLARE_FILE_SYMBOLS(best_fit_allocator);
 DECLARE_FILE_SYMBOLS(aligned_allocator);
 DECLARE_FILE_SYMBOLS(pass_timing);
 DECLARE_FILE_SYMBOLS(op_compatible_info);
-
+DECLARE_FILE_SYMBOLS(sub_graph_detector);
+DECLARE_FILE_SYMBOLS(pd_op_to_kernel_pass);
 namespace paddle::pybind {
 
 PyTypeObject *g_framework_scope_pytype = nullptr;
@@ -1192,6 +1193,24 @@ PYBIND11_MODULE(libpaddle, m) {
           }
         });
 
+  class NodePostHookRemoveHelper {
+   public:
+    NodePostHookRemoveHelper(std::shared_ptr<egr::GradNodeBase> node,
+                             int64_t hook_id)
+        : node_(node), hook_id_(hook_id) {}
+    ~NodePostHookRemoveHelper() = default;
+    bool remove() { return node_->RemoveNodePostHook(hook_id_); }
+
+   private:
+    std::shared_ptr<egr::GradNodeBase> node_;
+    int64_t hook_id_;
+  };
+
+  py::class_<NodePostHookRemoveHelper,
+             std::shared_ptr<NodePostHookRemoveHelper>>(
+      m, "NodePostHookRemoveHelper")
+      .def("remove", &NodePostHookRemoveHelper::remove);
+
   py::class_<egr::GradNodeBase, std::shared_ptr<egr::GradNodeBase>>(
       m, "GradNodeBase")
       .def("name",
@@ -1208,9 +1227,20 @@ PYBIND11_MODULE(libpaddle, m) {
            [](const std::shared_ptr<egr::GradNodeBase> &self) {
              return self->InputMeta();
            })
-      .def("output_meta", [](const std::shared_ptr<egr::GradNodeBase> &self) {
-        return self->OutputMeta();
-      });
+      .def("output_meta",
+           [](const std::shared_ptr<egr::GradNodeBase> &self) {
+             return self->OutputMeta();
+           })
+      .def("_register_post_hook",
+           [](const std::shared_ptr<egr::GradNodeBase> &self, py::object hook) {
+             if (std::dynamic_pointer_cast<egr::GradNodeAccumulation>(self)) {
+               PADDLE_THROW(common::errors::InvalidArgument(
+                   "Could not register hook for GradNodeAccumulation."));
+             }
+             int64_t hook_id = self->RegisterNodePostHook(
+                 std::make_shared<NodePostHook>(hook));
+             return std::make_shared<NodePostHookRemoveHelper>(self, hook_id);
+           });
 
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
   m.def("cudnn_version", &platform::DnnVersion);
@@ -2638,7 +2668,6 @@ All parameter, weight, gradient are variables in Paddle.
   BindCostModel(&m);
   BindConstValue(&m);
   BindGlobalValueGetterSetter(&m);
-  BindFleetExecutor(&m);
   BindTCPStore(&m);
   BindCommContextManager(&m);
   BindAutoParallel(&m);
@@ -3424,8 +3453,9 @@ All parameter, weight, gradient are variables in Paddle.
     paddle::framework::CollectShapeManager::Instance().ClearShapeInfo();
   });
 #ifdef PADDLE_WITH_TENSORRT
-  m.def("register_paddle_plugin",
-        []() { paddle::platform::TrtPluginRegistry::Global()->RegistToTrt(); });
+  m.def("register_paddle_plugin", []() {
+    paddle::platform::TrtPluginRegistry::Global()->RegisterToTrt();
+  });
 #endif
 
 #if defined(PADDLE_WITH_PSLIB) && !defined(PADDLE_WITH_HETERPS)

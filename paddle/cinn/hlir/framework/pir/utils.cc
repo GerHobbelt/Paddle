@@ -233,6 +233,26 @@ bool HaveUnkDim(const ::pir::Operation& op) {
   return false;
 }
 
+bool HasDynamicRank(const ::pir::Operation& op) {
+  for (size_t i = 0; i < op.num_operands(); i++) {
+    ::pir::Value value = op.operand_source(i);
+    if (value.type().isa<::pir::DenseTensorType>()) {
+      if (value.type().dyn_cast<::pir::DenseTensorType>().dims().size() == -1) {
+        return true;
+      }
+    }
+  }
+  for (size_t i = 0; i < op.num_results(); i++) {
+    ::pir::Value value = op.result(i);
+    if (value.type().isa<::pir::DenseTensorType>()) {
+      if (value.type().dyn_cast<::pir::DenseTensorType>().dims().size() == -1) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 bool AllInputDenseTensor(const ::pir::Operation& op) {
   for (size_t i = 0; i < op.num_operands(); ++i) {
     auto value = op.operand_source(i);
@@ -294,6 +314,12 @@ bool IsDeniedInCinn(const ::pir::Operation& op) {
   if (!AllInputDenseTensor(op) || UnimplementOps(op)) {
     VLOG(5) << "Found " << op.name()
             << " UnimplementOps or NotAllInputDenseTensor. "
+            << "So mark IsDeniedForCinn: " << true;
+    return true;
+  }
+  if (HasDynamicRank(op)) {
+    VLOG(5) << "Found " << op.name()
+            << " has dynamic rank in operand or result value. "
             << "So mark IsDeniedForCinn: " << true;
     return true;
   }
@@ -631,8 +657,29 @@ std::string CompatibleInfo::OpName(const ::pir::Operation& op) {
   return OpNameAfterStripDialect(op);
 }
 
+std::string ShortenOpName(const std::string& name) {
+  static const std::unordered_map<std::string, std::string> OP_SHORT_NAMES = {
+      {"fill_constant", "full"},
+      {"reduce_sum", "sum"},
+      {"reduce_max", "r_max"},
+      {"reduce_min", "r_min"},
+      {"reduce_prod", "prod"},
+      {"elementwise_add", "add"},
+      {"elementwise_mul", "mul"},
+      {"subtract", "sub"},
+      {"divide", "div"},
+      {"broadcast_to", "bc"},
+      {"generate_shape", "gs"},
+      {"yield_store", "yield"},
+  };
+  if (OP_SHORT_NAMES.count(name)) {
+    return OP_SHORT_NAMES.at(name);
+  }
+  return name;
+}
+
 std::string CompatibleInfo::OpFuncName(const ::pir::Operation& op) {
-  std::string op_name = OpName(op);
+  std::string op_name = ShortenOpName(OpName(op));
   std::string func_name =
       cinn::common::Context::Global().NewName("fn_" + op_name);
   return func_name;
@@ -642,7 +689,7 @@ std::string CompatibleInfo::GroupOpsName(
     const std::vector<::pir::Operation*>& ops) {
   std::string name = "fn_";
   for (auto* op : ops) {
-    name += OpName(*op);
+    name += ShortenOpName(OpName(*op));
     name += "_";
   }
   return cinn::common::Context::Global().NewName(name);

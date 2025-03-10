@@ -150,6 +150,88 @@ void AddmmInferMeta(const MetaTensor& input,
   out->set_dtype(input.dtype());
 }
 
+void BaddbmmInferMeta(const MetaTensor& input,
+                      const MetaTensor& x,
+                      const MetaTensor& y,
+                      float beta,
+                      float alpha,
+                      MetaTensor* out) {
+  auto input_dims = input.dims();
+  auto x_dims = x.dims();
+  auto y_dims = y.dims();
+
+  auto ndim_input = input_dims.size();
+  auto ndim_x = x_dims.size();
+  auto ndim_y = y_dims.size();
+
+  VLOG(3) << "baddbmm operator input.shape=" << input_dims
+          << " x.shape=" << x_dims << " y.shape=" << y_dims << " beta=" << beta
+          << " alpha=" << alpha << " ndim_input=" << ndim_input
+          << " ndim_x=" << ndim_x << " ndim_y=" << ndim_y;
+
+  PADDLE_ENFORCE_NE(
+      product(input_dims),
+      0,
+      errors::PreconditionNotMet("The Input variable 'input' has not "
+                                 "been initialized. You may need to confirm "
+                                 "if you put exe.run(startup_program) "
+                                 "after optimizer.minimize function."));
+
+  PADDLE_ENFORCE_NE(
+      product(x_dims),
+      0,
+      errors::PreconditionNotMet("The Input variable 'x' has not "
+                                 "been initialized. You may need to confirm "
+                                 "if you put exe.run(startup_program) "
+                                 "after optimizer.minimize function."));
+
+  PADDLE_ENFORCE_NE(
+      product(y_dims),
+      0,
+      errors::PreconditionNotMet("The Input variable 'y' has not "
+                                 "been initialized. You may need to confirm "
+                                 "if you put exe.run(startup_program) "
+                                 "after optimizer.minimize function."));
+  // dim check
+  PADDLE_ENFORCE_EQ(ndim_input == 3 || ndim_input == 2,
+                    true,
+                    errors::InvalidArgument(
+                        "The input tensor input's dimension must be 3 or 2. "
+                        "But received input's dimension = [%d].",
+                        ndim_input));
+  PADDLE_ENFORCE_EQ(
+      ndim_x,
+      3,
+      errors::InvalidArgument("The input tensor x's dimension must be 3. "
+                              "But received x's dimension = [%d].",
+                              ndim_x));
+  PADDLE_ENFORCE_EQ(
+      ndim_y,
+      3,
+      errors::InvalidArgument("The input tensor y's dimension must be 3. "
+                              "But received y's dimension = [%d].",
+                              ndim_y));
+
+  PADDLE_ENFORCE_EQ(
+      x_dims[2],
+      y_dims[1],
+      errors::InvalidArgument("The second dimension of x must be equal to the "
+                              "first dimension of y. "
+                              "But received x's second dimension = [%d], y's "
+                              "first dimension = [%d].",
+                              x_dims[2],
+                              y_dims[1]));
+
+  std::vector<int64_t> output_dims;
+  output_dims.push_back(x_dims[0]);
+  output_dims.push_back(x_dims[1]);
+  output_dims.push_back(y_dims[2]);
+
+  out->set_dims(common::make_ddim(output_dims));
+  out->share_lod(input);
+  out->set_dtype(input.dtype());
+}
+
 void AffineChannelInferMeta(const MetaTensor& x,
                             const MetaTensor& scale,
                             const MetaTensor& bias,
@@ -544,6 +626,19 @@ void FlashAttnInferMeta(const MetaTensor& q,
     }
     if (softmax_lse) {
       softmax_lse->set_dims({batch_size, num_heads, seqlen_q_rounded});
+    }
+  }
+  if (out_dims.size() == 3) {  // when use flash_attn_unpadded
+    auto round_multiple = [](int x) { return (x + 127) / 128 * 128; };
+    int batch_and_seq_size = q.dims()[0];
+    int num_heads = q.dims()[1];
+    int seqlen_q_rounded = round_multiple(batch_and_seq_size);
+    int seqlen_k_rounded = round_multiple(batch_and_seq_size);
+    if (softmax) {
+      softmax->set_dims({num_heads, seqlen_q_rounded, seqlen_k_rounded});
+    }
+    if (softmax_lse) {
+      softmax_lse->set_dims({num_heads, seqlen_q_rounded});
     }
   }
   if (seed_offset) {
@@ -1863,9 +1958,9 @@ void ScatterInferMeta(const MetaTensor& x,
         index_dims[0],
         updates_dims[0],
         common::errors::InvalidArgument(
-            "The first dimension size of Input(Index) shoud be no greater than "
-            "Input(Updates), but received first dimension size of Input(Index) "
-            "is %d, Input(Updates) is  %d.",
+            "The first dimension size of Input(Index) should be no greater "
+            "than Input(Updates), but received first dimension size of "
+            "Input(Index) is %d, Input(Updates) is  %d.",
             index_dims[0],
             updates_dims[0]));
   } else {

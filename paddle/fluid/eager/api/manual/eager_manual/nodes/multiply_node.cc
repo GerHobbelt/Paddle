@@ -254,6 +254,10 @@ MultiplyGradNode::operator()(
         INPUT_PRINT_TEMPLATE, input_str, output_str);
   }
 
+  if (HasNodePostHook()) {
+    returns = ApplyNodePostHooks(returns, hooked_grads);
+  }
+
   // Return
   if (NeedComplexToRealConversion()) HandleComplexGradToRealGrad(&returns);
   return returns;
@@ -347,7 +351,7 @@ MultiplyDoubleGradNode::operator()(
   // Inplace Strategy
 
   if (trace_backward) {
-    VLOG(6) << "No Inplace should happened for wrappered input: "
+    VLOG(6) << "No Inplace should happened for wrapped input: "
                "{inplace_grad_input_str}";
   } else {
     if (api_output_2 != nullptr && can_be_inplaced) {
@@ -524,6 +528,10 @@ MultiplyDoubleGradNode::operator()(
         INPUT_PRINT_TEMPLATE, input_str, output_str);
   }
 
+  if (HasNodePostHook()) {
+    returns = ApplyNodePostHooks(returns, hooked_grads);
+  }
+
   // Return
   if (NeedComplexToRealConversion()) HandleComplexGradToRealGrad(&returns);
   return returns;
@@ -679,6 +687,10 @@ MultiplyGradNode::operator()(
     VLOG(6) << "gradnode_ptr = " << this;
     VLOG(4) << paddle::string::Sprintf(
         INPUT_PRINT_TEMPLATE, input_str, output_str);
+  }
+
+  if (HasNodePostHook()) {
+    returns = ApplyNodePostHooks(returns, hooked_grads);
   }
 
   // Return
