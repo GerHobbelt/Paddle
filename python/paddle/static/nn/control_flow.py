@@ -551,7 +551,7 @@ class While:
             >>> loop_len = paddle.full(shape=[1], dtype='int64', fill_value=10)
             >>> one = paddle.full(shape=[1], dtype='float32', fill_value=1)
             >>> data = paddle.static.data(name='data', shape=[1], dtype='float32')
-            >>> sums = paddle.full(shape=[1], dtype='float32', fill_value=0)  # Define the variable to be obtained >>> ouside of While, which name should be different from the variable inside the While to be obtained
+            >>> sums = paddle.full(shape=[1], dtype='float32', fill_value=0)  # Define the variable to be obtained outside of While, which name should be different from the variable inside the While to be obtained
 
             >>> cond = paddle.less_than(x=i, y=loop_len)
             >>> while_op = paddle.static.nn.control_flow.While(cond=cond)

@@ -14,7 +14,10 @@
 
 import unittest
 
-from test_case_base import TestCaseBase
+from test_case_base import (
+    TestCaseBase,
+    test_instruction_translator_cache_context,
+)
 
 import paddle
 
@@ -148,6 +151,31 @@ class TestCall(TestCaseBase):
 
     def test_call8(self):
         self.assert_results(foo_8, paddle.to_tensor(9))
+
+
+def apply_fn(fn, x):
+    return fn(x)
+
+
+def fn1(x):
+    return x + 1
+
+
+def fn2(x):
+    return x - 1
+
+
+class TestApplyDifferentFunctions(TestCaseBase):
+    def test_apply_fn(self):
+        x = 1
+        with test_instruction_translator_cache_context() as ctx:
+            self.assertEqual(ctx.translate_count, 0)
+            self.assert_results(apply_fn, fn1, x)
+            self.assertEqual(ctx.translate_count, 1)
+            self.assert_results(apply_fn, fn2, x)
+            self.assertEqual(ctx.translate_count, 2)
+            self.assert_results(apply_fn, fn1, x)
+            self.assertEqual(ctx.translate_count, 2)
 
 
 if __name__ == "__main__":

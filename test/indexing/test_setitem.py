@@ -533,6 +533,17 @@ class TestSetitemInDygraph(unittest.TestCase):
         else:
             np.testing.assert_equal(v.grad.numpy(), expected_v_grad)
 
+    def test_boolean_mask_tensor_broadcast_v(self):
+        tensor_np = np.zeros((2, 2, 3)).astype(np.float32)
+        mask_np = np.array([[True, False], [False, True]])
+        value_np = np.array([100] * 3).astype(np.float32)
+        tensor = paddle.to_tensor(tensor_np)
+        mask = paddle.to_tensor(mask_np)
+        value = paddle.to_tensor(value_np)
+        tensor[mask] = value
+        tensor_np[mask_np] = value_np
+        np.testing.assert_allclose(tensor.numpy(), tensor_np)
+
     def test_boolean_mask_scalar(self):
         tensor_np = np.arange(2 * 3).reshape(2, 3)
         tensor = paddle.to_tensor(tensor_np)
@@ -994,6 +1005,22 @@ class TestSetitemInStatic(unittest.TestCase):
             res = self.exe.run(fetch_list=[tensor])
         tensor_np[mask_np] = value_np
         np.testing.assert_equal(res[0], tensor_np)
+
+    def test_boolean_mask_tensor_broadcast_v(self):
+        tensor_np = np.zeros((2, 2, 3)).astype(np.float32)
+        mask_np = np.array([[True, False], [False, True]])
+        value_np = np.array([100] * 3).astype(np.float32)
+
+        with paddle.static.program_guard(
+            paddle.static.Program(), paddle.static.Program()
+        ):
+            tensor = paddle.to_tensor(tensor_np)
+            mask = paddle.to_tensor(mask_np)
+            value = paddle.to_tensor(value_np)
+            tensor[mask] = value
+            res = self.exe.run(fetch_list=[tensor])[0]
+        tensor_np[mask_np] = value_np
+        np.testing.assert_allclose(res, tensor_np)
 
 
 if __name__ == '__main__':

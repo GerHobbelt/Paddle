@@ -57,7 +57,6 @@ def net(batch_size=4, lr=0.01):
             name="click",
             shape=[-1, 1],
             dtype="float32",
-            lod_level=0,
         )
 
         datas = [dnn_data, lr_data, label]

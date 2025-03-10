@@ -95,7 +95,7 @@ class WriteToArrayInferShape : public framework::InferShapeBase {
         common::errors::NotFound("Input(I) of WriteToArrayOp is not found."));
 
     // TODO(wangchaochaohu) control flow Op do not support runtime infer shape
-    // Later we add [ontext->GetInputDim("I")) == 1] check when it's supported
+    // Later we add [context->GetInputDim("I")) == 1] check when it's supported
 
     if (!context->HasInput("X")) {
       return;

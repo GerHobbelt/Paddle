@@ -421,7 +421,7 @@ inline void TensorToVector(const phi::DenseTensor& src,
   delete[] array;
 }
 
-std::ostream& operator<<(std::ostream& os, const LoD& lod);
+std::ostream& operator<<(std::ostream& os, const LegacyLoD& lod);
 
 template <typename T>
 inline T GetValue(const phi::DenseTensor* x) {

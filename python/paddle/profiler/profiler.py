@@ -228,7 +228,7 @@ def export_chrome_tracing(
     dir_name: str, worker_name: str | None = None
 ) -> Callable[[Profiler], None]:
     r"""
-    Return a callable, used for outputing tracing data to chrome tracing format file.
+    Return a callable, used for outputting tracing data to chrome tracing format file.
     The output file will be saved in directory ``dir_name``, and file name will be set as `worker_name`.
     if `worker_name` is not set, the default name is `[hostname]_[pid]`.
 
@@ -281,7 +281,7 @@ def export_protobuf(
     dir_name: str, worker_name: str | None = None
 ) -> Callable[[Profiler], None]:
     r"""
-    Return a callable, used for outputing tracing data to protobuf file.
+    Return a callable, used for outputting tracing data to protobuf file.
     The output file will be saved in directory ``dir_name``, and file name will be set as ``worker_name``.
     if ``worker_name`` is not set, the default name is `[hostname]_[pid]`.
 

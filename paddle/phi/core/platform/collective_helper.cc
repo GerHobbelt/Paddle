@@ -22,8 +22,7 @@
 #include "paddle/phi/core/platform/device/device_wrapper.h"
 #include "paddle/phi/core/platform/device/gpu/gpu_resource_pool.h"
 
-namespace paddle {
-namespace platform {
+namespace paddle::platform {
 #if defined(PADDLE_WITH_NCCL) || defined(PADDLE_WITH_RCCL)
 class NCCLCommImpl : public NCCLComm {
  public:
@@ -612,5 +611,4 @@ void XCCLCommContext::ReleaseXCCLComms() {
 }
 
 #endif
-}  // namespace platform
-}  // namespace paddle
+}  // namespace paddle::platform

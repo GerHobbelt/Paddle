@@ -1331,7 +1331,7 @@ class TestKeepDim8DReduce(Test1DReduce):
     reason="reduce_max is discontinuous non-derivable function,"
     " its gradient check is not supported by unittest framework."
 )
-class TestReduceMaxOpMultiAxises(OpTest):
+class TestReduceMaxOpMultiAxes(OpTest):
     """Remove Max with subgradient from gradient check to confirm the success of CI."""
 
     def setUp(self):
@@ -1363,7 +1363,7 @@ class TestReduceMaxOpMultiAxises(OpTest):
     reason="reduce_min is discontinuous non-derivable function,"
     " its gradient check is not supported by unittest framework."
 )
-class TestReduceMinOpMultiAxises(OpTest):
+class TestReduceMinOpMultiAxes(OpTest):
     """Remove Min with subgradient from gradient check to confirm the success of CI."""
 
     def setUp(self):
@@ -1379,7 +1379,7 @@ class TestReduceMinOpMultiAxises(OpTest):
         self.check_output()
 
 
-class TestKeepDimReduceSumMultiAxises(OpTest):
+class TestKeepDimReduceSumMultiAxes(OpTest):
     def setUp(self):
         self.op_type = "reduce_sum"
         self.python_api = paddle.sum
@@ -1404,7 +1404,7 @@ class TestKeepDimReduceSumMultiAxises(OpTest):
         self.check_grad(['X'], 'Out', check_prim=True)
 
 
-class TestKeepDimReduceSumMultiAxisesForEager(OpTest):
+class TestKeepDimReduceSumMultiAxesForEager(OpTest):
     def setUp(self):
         self.op_type = "reduce_sum"
         self.python_api = reduce_sum_wrapper2

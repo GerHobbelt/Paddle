@@ -64,7 +64,6 @@ class TestHeterPipelinePsCTR2x2(FleetDistHeterRunnerBase):
                 name="click",
                 shape=[-1, 1],
                 dtype="float32",
-                lod_level=0,
             )
 
             datas = [dnn_data, lr_data, label]

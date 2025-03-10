@@ -202,15 +202,15 @@ bool CandidateGenerator::IsValid(const CandidateType& candidate) const {
 ScheduleConfigSearcher::ScheduleConfigSearcher(
     std::vector<std::unique_ptr<BaseObjectiveFunc>> objective_funcs,
     const std::vector<std::pair<int, int>>& candidate_range,
-    const std::vector<ConstraintFunc>& contraints)
+    const std::vector<ConstraintFunc>& constraints)
     : objective_funcs_(std::move(objective_funcs)),
       candidate_range_(candidate_range),
-      contraints_(contraints) {}
+      constraints_(constraints) {}
 
 std::pair<ScoreType, CandidateType> ScheduleConfigSearcher::Search(
     bool is_search_minimun) {
   VLOG(6) << "Start Search...";
-  CandidateGenerator candidate_generator(candidate_range_, contraints_);
+  CandidateGenerator candidate_generator(candidate_range_, constraints_);
   std::vector<CandidateType> candidates = candidate_generator.Candidates();
   VLOG(6) << "Candidate num = " << candidates.size();
   for (const auto& candidate : candidates) {

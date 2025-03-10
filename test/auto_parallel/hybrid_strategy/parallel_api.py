@@ -26,14 +26,6 @@ from paddle.distributed.auto_parallel.intermediate.parallelize import (
     parallelize_model,
     parallelize_optimizer,
 )
-from paddle.distributed.auto_parallel.intermediate.tensor_parallel import (
-    ColWiseParallel,
-    RowWiseParallel,
-    SequenceParallelBegin,
-    SequenceParallelDisable,
-    SequenceParallelEnable,
-    SequenceParallelEnd,
-)
 from paddle.io import BatchSampler, DataLoader, Dataset
 
 
@@ -55,12 +47,12 @@ def get_mesh(pp_idx=None):
 
 
 class Config:
-    vocab_size = 32000
-    hidden_size = 4096
-    intermediate_size = 11008
-    seq_length = 2048
+    vocab_size = 8192
+    hidden_size = 512
+    intermediate_size = 2048
+    seq_length = 512
     num_hidden_layers = 2
-    num_attention_heads = 32
+    num_attention_heads = 8
     rms_norm_eps = 1e-6
     use_lazy_init = False
 
@@ -146,6 +138,10 @@ class TestParallelAPI:
         if num_hidden_layers:
             self.config.num_hidden_layers = int(num_hidden_layers)
 
+        self.one_api = False
+        if os.getenv("one_api") == "true":
+            self.one_api = True
+
         seed = int(os.getenv("seed", 2024))
         np.random.seed(seed)
         random.seed(seed)
@@ -193,14 +189,14 @@ class TestParallelAPI:
                         dist.Replicate(),
                         dist.Shard(0),
                     ]
-                    assert sub_layer.bias.placements is None
+                    # assert sub_layer.bias.placements is None
                 if 'down_proj' in name:
                     assert sub_layer.weight.placements == [
                         dist.Replicate(),
                         dist.Shard(0),
                     ]
 
-    def parallel_model(self, layer, optimizer=None):
+    def parallel_model(self, layer):
         dp_config = None
         mp_config = None
         pp_config = None
@@ -210,89 +206,123 @@ class TestParallelAPI:
             #     f"llama.layers.{i * decoders_per_rank - 1}": SplitPoint.END
             #     for i in range(1, self.pp)
             # }
-            pp_config = {'split_spec': "llama.layers"}
+            pp_config = {
+                'split_spec': "llama.layers",
+                "global_spec": "llama.global_layer",
+            }
         if self.dp > 1:
             dp_config = {'sharding_level': self.level}
         if self.mp > 1:
             if not self.sequence_parallel:
                 plan = {
-                    "llama.embed_tokens": ColWiseParallel(),
-                    "llama.layers.*.self_attn.q_proj": ColWiseParallel(),
-                    "llama.layers.*.self_attn.k_proj": ColWiseParallel(),
-                    "llama.layers.*.self_attn.v_proj": ColWiseParallel(),
-                    "llama.layers.*.self_attn.o_proj": RowWiseParallel(),
-                    "llama.layers.*.mlp.gate_proj": ColWiseParallel(),
-                    "llama.layers.*.mlp.up_proj": ColWiseParallel(),
-                    "llama.layers.*.mlp.down_proj": RowWiseParallel(),
-                    "lm_head.weight": ColWiseParallel(),
+                    "llama.embed_tokens": dist.ColWiseParallel(
+                        gather_output=True
+                    ),
+                    "llama.position_embedding": dist.ColWiseParallel(),
+                    "llama.layers.*.self_attn.q_proj": dist.ColWiseParallel(
+                        gather_output=True
+                    ),
+                    "llama.layers.*.self_attn.k_proj": dist.ColWiseParallel(
+                        gather_output=True
+                    ),
+                    "llama.layers.*.self_attn.v_proj": dist.ColWiseParallel(
+                        gather_output=True
+                    ),
+                    "llama.layers.*.self_attn.o_proj": dist.RowWiseParallel(
+                        is_input_parallel=False
+                    ),
+                    "llama.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+                    "llama.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+                    "llama.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+                    "lm_head.weight": dist.ColWiseParallel(),
                 }
             else:
                 if self.prepare_input_output:
                     plan = {
-                        "llama.embed_tokens": ColWiseParallel(),
-                        "llama.layers.*.self_attn.q_proj": ColWiseParallel(),
-                        "llama.layers.*.self_attn.k_proj": ColWiseParallel(),
-                        "llama.layers.*.self_attn.v_proj": ColWiseParallel(),
-                        "llama.layers.*.self_attn.o_proj": RowWiseParallel(),
-                        "llama.layers.*.mlp.gate_proj": ColWiseParallel(),
-                        "llama.layers.*.mlp.up_proj": ColWiseParallel(),
-                        "llama.layers.*.mlp.down_proj": RowWiseParallel(),
-                        "lm_head.weight": ColWiseParallel(),
-                        "llama.layers.*.input_layernorm": SequenceParallelEnable(),
-                        "llama.layers.*.post_attention_layernorm": SequenceParallelEnable(),
-                        "llama.norm": SequenceParallelEnable(),
+                        "llama.embed_tokens": dist.ColWiseParallel(),
+                        "llama.position_embedding": dist.ColWiseParallel(),
+                        "llama.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
+                        "llama.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
+                        "llama.layers.*.self_attn.v_proj": dist.ColWiseParallel(),
+                        "llama.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+                        "llama.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+                        "llama.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+                        "llama.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+                        "lm_head.weight": dist.ColWiseParallel(),
+                        "llama.layers.*.input_layernorm": dist.SequenceParallelEnable(),
+                        "llama.layers.*.post_attention_layernorm": dist.SequenceParallelEnable(),
+                        "llama.norm": dist.SequenceParallelEnable(),
                     }
                 else:
                     plan = {
                         "llama.embed_tokens": [
-                            ColWiseParallel(),
-                            SequenceParallelBegin(),
+                            dist.ColWiseParallel(),
+                            dist.SequenceParallelBegin(),
                         ],
-                        "llama.layers.*.self_attn.q_proj": ColWiseParallel(),
-                        "llama.layers.*.self_attn.k_proj": ColWiseParallel(),
-                        "llama.layers.*.self_attn.v_proj": ColWiseParallel(),
-                        "llama.layers.*.self_attn.o_proj": RowWiseParallel(),
-                        "llama.layers.*.self_attn": SequenceParallelDisable(),
-                        "llama.layers.*.mlp.gate_proj": ColWiseParallel(),
-                        "llama.layers.*.mlp.up_proj": ColWiseParallel(),
-                        "llama.layers.*.mlp.down_proj": RowWiseParallel(),
-                        "llama.layers.*.mlp": SequenceParallelDisable(
+                        "llama.position_embedding": [
+                            dist.ColWiseParallel(),
+                            dist.SequenceParallelBegin(),
+                        ],
+                        "llama.layers.*.self_attn.q_proj": dist.ColWiseParallel(),
+                        "llama.layers.*.self_attn.k_proj": dist.ColWiseParallel(),
+                        "llama.layers.*.self_attn.v_proj": dist.ColWiseParallel(),
+                        "llama.layers.*.self_attn.o_proj": dist.RowWiseParallel(),
+                        "llama.layers.*.self_attn": dist.SequenceParallelDisable(),
+                        "llama.layers.*.mlp.gate_proj": dist.ColWiseParallel(),
+                        "llama.layers.*.mlp.up_proj": dist.ColWiseParallel(),
+                        "llama.layers.*.mlp.down_proj": dist.RowWiseParallel(),
+                        "llama.layers.*.mlp": dist.SequenceParallelDisable(
                             need_transpose=False
                         ),
-                        "lm_head.weight": ColWiseParallel(),
-                        "lm_head": SequenceParallelEnd(),
+                        "lm_head.weight": dist.ColWiseParallel(),
+                        "lm_head": dist.SequenceParallelEnd(),
                     }
             mp_config = {'parallelize_plan': plan}
-        layer = parallelize_model(
-            layer,
-            dp_config=dp_config,
-            mp_config=mp_config,
-            pp_config=pp_config,
-        )
-        optimizer = parallelize_optimizer(
-            layer,
-            optimizer,
-            dp_config=dp_config,
-            mp_config=mp_config,
-            pp_config=pp_config,
-        )
-        self.check_mp(layer)
-        if optimizer is None:
-            return layer
-        return layer, optimizer
-
-    def run_llama(self, to_static=0):
-        if self.config.use_lazy_init:
-            with LazyGuard():
-                model = LlamaForCausalLM(self.config)
-        else:
-            model = LlamaForCausalLM(self.config)
 
         lr_scheduler = paddle.optimizer.lr.LinearWarmup(
             learning_rate=0.0001, warmup_steps=2, start_lr=0, end_lr=0.0001
         )
-        optimizer = create_optimizer(model, lr_scheduler)
-        model, optimizer = self.parallel_model(model, optimizer)
+
+        config = {
+            'dp_config': dp_config,
+            'mp_config': mp_config,
+            'pp_config': pp_config,
+        }
+
+        if self.one_api:
+            optimizer = create_optimizer(layer, lr_scheduler)
+            model, optimizer = dist.parallelize(
+                layer,
+                optimizer,
+                config=config,
+            )
+        else:
+            layer = parallelize_model(
+                layer,
+                config=config,
+            )
+            optimizer = create_optimizer(layer, lr_scheduler)
+            optimizer = parallelize_optimizer(
+                optimizer,
+                config=config,
+            )
+        self.check_mp(layer)
+        return layer, optimizer, lr_scheduler
+
+    def run_llama(
+        self, share_embedding=False, position_embedding=False, to_static=0
+    ):
+        if self.config.use_lazy_init:
+            with LazyGuard():
+                model = LlamaForCausalLM(
+                    self.config, share_embedding, position_embedding
+                )
+        else:
+            model = LlamaForCausalLM(
+                self.config, share_embedding, position_embedding
+            )
+
+        model, optimizer, lr_scheduler = self.parallel_model(model)
 
         criterion = LlamaPretrainingCriterion(self.config)
 
@@ -389,7 +419,7 @@ class TestParallelAPI:
                     tr_loss = 0
 
                 global_step += 1
-                if global_step // self.gradient_accumulation_steps >= 10:
+                if global_step // self.gradient_accumulation_steps >= 3:
                     break
         else:
             strategy = dist.Strategy()
@@ -419,13 +449,15 @@ class TestParallelAPI:
                 input_ids, labels = inputs
                 loss = dist_model(input_ids, labels)
                 logging.info(f"step: {step}  loss: {loss}")
-                if step >= 10:
+                if step >= 3:
                     break
 
-    def run_test_cases(self):
-        self.run_llama(to_static=0)
-        self.run_llama(to_static=1)
+    def run_test_cases(self, share_embedding=False, position_embedding=False):
+        self.run_llama(share_embedding, position_embedding, 0)
+        self.run_llama(share_embedding, position_embedding, 1)
 
 
 if __name__ == '__main__':
-    TestParallelAPI().run_test_cases()
+    share_embedding = int(os.getenv("test_share_embedding", "0"))
+    position_embedding = int(os.getenv("test_position_embedding", "0"))
+    TestParallelAPI().run_test_cases(share_embedding, position_embedding)

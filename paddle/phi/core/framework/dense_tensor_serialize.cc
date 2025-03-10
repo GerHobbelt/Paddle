@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "paddle/phi/core/framework/lod_tensor_serialize.h"
+#include "paddle/phi/core/framework/dense_tensor_serialize.h"
 #include <cstdint>
 #include "paddle/phi/core/framework/convert_utils.h"
 
@@ -37,7 +37,7 @@ void SerializeToStream(std::ostream &os,
     os.write(reinterpret_cast<const char *>(&size), sizeof(size));
 
     for (auto &each : lod) {
-      size = each.size() * sizeof(phi::LoD::value_type::value_type);
+      size = each.size() * sizeof(phi::LegacyLoD::value_type::value_type);
       os.write(reinterpret_cast<const char *>(&size), sizeof(size));
       os.write(reinterpret_cast<const char *>(each.data()),
                static_cast<std::streamsize>(size));

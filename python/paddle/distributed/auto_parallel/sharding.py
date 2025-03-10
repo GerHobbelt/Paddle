@@ -237,14 +237,19 @@ class ShardingOptimizerStage1(Optimizer):
                 slice_param_dict, main_shard_fused_param, main_fused_param = (
                     self._fuse_group_param(group_param_list)
                 )
-                dtype = grads[0].dtype
+                dtype = group_grad_list[0].dtype
                 align_size = (
                     fleet.utils.tensor_fusion_helper.alignment[
                         get_current_device_type()
                     ]
-                    // align[dtype]
+                    // align[group_param_list[0].dtype]
                 )
-                align_size = align_size * self._sharding_degree
+                align_size = (
+                    align_size
+                    * self._sharding_degree
+                    * core.size_of_dtype(dtype)
+                    // core.size_of_dtype(group_param_list[0].dtype)
+                )
                 if not self._strategy.sharding.release_gradients:
                     _, fused_grad = paddle._C_ops.coalesce_tensor_(
                         group_grad_list,

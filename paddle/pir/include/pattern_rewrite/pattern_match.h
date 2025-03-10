@@ -302,6 +302,8 @@ class RewriterBase : public Builder {
 
   virtual void NotifyOperationInserted(Operation* op) {}
 
+  virtual void NotifyValueReplaced(Value from, Value to) {}
+
   virtual void StartRootUpdate(Operation* op) {}
 
   virtual void FinalizeRootUpdate(Operation* op) {}

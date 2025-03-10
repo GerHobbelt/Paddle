@@ -85,6 +85,14 @@ class TestBasicFasterGuard(unittest.TestCase):
         layer.train()
         self.assertTrue(guard_layer.check(layer))
 
+    def test_id_match_guard(self):
+        layer = paddle.nn.Linear(10, 10)
+        guard_id = paddle.framework.core.IdMatchGuard(layer)
+        self.assertTrue(guard_id.check(layer))
+        layer.eval()
+        self.assertTrue(guard_id.check(layer))
+        self.assertFalse(guard_id.check(paddle.nn.Linear(10, 10)))
+
 
 class TestFasterGuardGroup(unittest.TestCase):
     def test_guard_group(self):

@@ -132,14 +132,20 @@ class ReduceBlockCreater {
     std::vector<Expr> new_loops(num_loops);
     Expr body = new_update_block_realize_;
     bool has_add_init_block = false;
+    // `is_inside_rf_loop` is used to skip loop inside rf_loop.
+    bool is_inside_rf_loop = true;
     for (int i = num_loops - 1; i >= 0; --i) {
       bool is_spatial_loop =
           new_spatial_loop_var_names_.count(
               original_loops_[i].As<For>()->loop_var->name) > 0;
       bool is_rf_loop = rf_loop_.As<For>()->loop_var->name ==
                         original_loops_[i].As<For>()->loop_var->name;
+      // Outter loop should not skip.
+      if (is_rf_loop) {
+        is_inside_rf_loop = false;
+      }
       // Skip non rf reduction loops of write back block.
-      if (!is_rf_block_ && !is_spatial_loop && !is_rf_loop) {
+      if (!is_rf_block_ && is_inside_rf_loop && !is_spatial_loop) {
         continue;
       }
       // Add reduce init block.

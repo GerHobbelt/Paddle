@@ -31,6 +31,46 @@ def add_net(x, y):
     return x + y
 
 
+def amax_net1(x):
+    return paddle.amax(x, keepdim=True)
+
+
+def amax_net2(x):
+    return paddle.amax(x, keepdim=False)
+
+
+def amax_net3(x):
+    return paddle.amax(x, axis=[0, 1], keepdim=False)
+
+
+def amax_net4(x):
+    return paddle.amax(x, axis=[-1, -2], keepdim=False)
+
+
+def amax_net5(x):
+    return paddle.amax(x, axis=[-1, 0], keepdim=False)
+
+
+def amin_net1(x):
+    return paddle.amin(x, keepdim=True)
+
+
+def amin_net2(x):
+    return paddle.amin(x, keepdim=False)
+
+
+def amin_net3(x):
+    return paddle.amin(x, axis=[0, 1], keepdim=False)
+
+
+def amin_net4(x):
+    return paddle.amin(x, axis=[-1, -2], keepdim=False)
+
+
+def amin_net5(x):
+    return paddle.amin(x, axis=[-1, 0], keepdim=False)
+
+
 def argsort_net1(x):
     return paddle.argsort(x, axis=-1)
 
@@ -67,6 +107,18 @@ def batch_norm_net4(x, y, z):
     return paddle.nn.functional.batch_norm(
         x, mean, var, y, z, use_global_stats=True, data_format='NHWC'
     )
+
+
+def batch_norm_net5(x, y, z):
+    var = paddle.ones([40], dtype="float32")
+    mean = paddle.zeros([40], dtype='float32')
+    return paddle.nn.functional.batch_norm(
+        x, mean, var, y, z, use_global_stats=False, training=True
+    )
+
+
+def ceil_net(x):
+    return paddle.ceil(x)
 
 
 def concat_net1(x):
@@ -281,6 +333,164 @@ class TestPrimAddWithGrad10(TestPrimTwoWithGrad):
         self.x = np.random.random(self.x_shape).astype(self.dtype)
         self.y = np.random.random(self.y_shape).astype(self.dtype)
         self.net = add_net
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAmaxWithGrad1(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amax_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = amax_net1
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAmaxWithGrad2(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amax_grad"
+        self.dtype = "float32"
+        self.x_shape = [30]
+        self.init_x_shape = [None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = amax_net1
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAmaxWithGrad3(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amax_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = amax_net2
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAmaxWithGrad4(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amax_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = amax_net3
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAmaxWithGrad5(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amax_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = amax_net4
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAmaxWithGrad6(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amax_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.x[3] = self.x[7]
+        self.net = amax_net5
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAminWithGrad1(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amin_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = amin_net1
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAminWithGrad2(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amin_grad"
+        self.dtype = "float32"
+        self.x_shape = [30]
+        self.init_x_shape = [None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = amin_net1
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAminWithGrad3(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amin_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.x[4] = self.x[7]
+        self.net = amin_net2
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAminWithGrad4(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amin_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = amin_net3
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAminWithGrad5(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amin_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = amin_net4
+        self.enable_cinn = False
+        self.tol = 1e-6
+
+
+class TestPrimAminWithGrad6(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.amin_grad"
+        self.dtype = "float32"
+        self.x_shape = [10, 10, 10]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = amin_net5
         self.enable_cinn = False
         self.tol = 1e-6
 
@@ -518,6 +728,38 @@ class TestPrimBatchNormWithGrad11(TestPrimThreeWithGrad):
         self.net = batch_norm_net4
         self.enable_cinn = False
         self.tol = 1e-5
+
+
+class TestPrimBatchNormWithGrad12(TestPrimThreeWithGrad):
+    def setUp(self):
+        np.random.seed(2023)
+        self.op_name = "pd_op.batch_norm_grad"
+        self.dtype = "float32"
+        self.x_shape = [30, 40]
+        self.init_x_shape = [None, None]
+        self.y_shape = [40]
+        self.init_y_shape = [None]
+        self.z_shape = [40]
+        self.init_z_shape = [None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.y = np.random.random(self.y_shape).astype(self.dtype)
+        self.z = np.random.random(self.z_shape).astype(self.dtype)
+        self.net = batch_norm_net5
+        self.enable_cinn = False
+        self.tol = 1e-5
+
+
+class TestPrimCeilWithGrad(TestPrimBaseWithGrad):
+    def setUp(self):
+        np.random.seed(2024)
+        self.op_name = "pd_op.ceil_grad"
+        self.dtype = "float32"
+        self.x_shape = [30, 200, 40]
+        self.init_x_shape = [None, None, None]
+        self.x = np.random.random(self.x_shape).astype(self.dtype)
+        self.net = ceil_net
+        self.enable_cinn = False
+        self.tol = 1e-6
 
 
 class TestPrimConcatWithGrad1(TestPrimBaseWithGrad):

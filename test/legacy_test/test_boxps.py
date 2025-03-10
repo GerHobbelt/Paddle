@@ -99,12 +99,8 @@ class TestPullBoxSparseOP(unittest.TestCase):
         with paddle.pir_utils.OldIrGuard():
             program = base.Program()
             with base.program_guard(program):
-                x = paddle.static.data(
-                    name='x', shape=[-1, 1], dtype='int64', lod_level=0
-                )
-                y = paddle.static.data(
-                    name='y', shape=[-1, 1], dtype='int64', lod_level=0
-                )
+                x = paddle.static.data(name='x', shape=[-1, 1], dtype='int64')
+                y = paddle.static.data(name='y', shape=[-1, 1], dtype='int64')
                 emb_x, emb_y = _pull_box_sparse([x, y], size=1)
 
 

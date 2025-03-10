@@ -105,7 +105,7 @@ def create_lod_tensor(data, recursive_seq_lens, place):
         return tensor
     else:
         raise TypeError(
-            "data should be either a LoDTensor, a Numpy array or a list"
+            "data should be either a DenseTensor, a Numpy array or a list"
         )
 
 

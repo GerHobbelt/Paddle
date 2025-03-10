@@ -29,6 +29,7 @@
 - min
 - maximum
 - minimum
+- pow
 - prod
 - cumprod
 - roll

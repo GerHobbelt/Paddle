@@ -216,6 +216,7 @@ class TestVPPPass(unittest.TestCase):
         acc_step,
         manual=True,
         enable_send_recv_overlap=False,
+        batch_size=BATCH_SIZE,
     ):
         self.init()
 
@@ -226,7 +227,7 @@ class TestVPPPass(unittest.TestCase):
         )
 
         loss_fn = nn.MSELoss()
-        loader = self.create_data_loader()
+        loader = self.create_data_loader(batch_size)
         dist_loader = dist.shard_dataloader(
             loader, meshes=[PP_MESH_0, PP_MESH_1]
         )
@@ -257,6 +258,15 @@ class TestVPPPass(unittest.TestCase):
             schedule_mode="FThenB", acc_step=4, manual=False
         )
         self.check_result(loss_fthenb, loss_vpp)
+        # Non-uniform-vpp
+        Non_uniform_loss_vpp = self.run_pipeline(
+            schedule_mode="VPP", acc_step=3, manual=False, batch_size=3
+        )
+        Non_uniform_loss_vpp_manual = self.run_pipeline(
+            schedule_mode="VPP", acc_step=3, manual=True, batch_size=3
+        )
+        self.check_result(Non_uniform_loss_vpp, Non_uniform_loss_vpp_manual)
+        self.check_result(loss_fthenb, Non_uniform_loss_vpp)
 
     def check_result(self, loss1, loss2):
         return np.array_equal(loss1, loss2)

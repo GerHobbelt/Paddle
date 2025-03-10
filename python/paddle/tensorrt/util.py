@@ -131,4 +131,43 @@ def mark_buitlin_op(program):
                     defining_op.has_attr("__l_trt__")
                     and defining_op.attrs()["__l_trt__"]
                 ):
-                    enforce_op_lower_trt(program, op.name())
+                    op.set_bool_attr("__l_trt__", True)
+        if op.name() == "builtin.combine":
+            defining_op = op.results()[0].all_used_ops()[0]
+            if defining_op is not None:
+                if (
+                    defining_op.has_attr("__l_trt__")
+                    and defining_op.attrs()["__l_trt__"]
+                ):
+                    op.set_bool_attr("__l_trt__", True)
+
+
+def weight_to_tensor(network, paddle_value, trt_tensor, use_op_name):
+    # the following op needn't cast trt.Weight to ITensor, because the layer need weight as input
+    forbid_cast_op = [
+        "pd_op.depthwise_conv2d",
+        "pd_op.conv2d",
+        "pd_op.conv2d_transpose",
+        "pd_op.batch_norm",
+        "pd_op.batch_norm_",
+        "pd_op.layer_norm",
+        "pd_op.depthwise_conv2d_transpose",
+    ]
+    if use_op_name in forbid_cast_op:
+        return trt_tensor
+    input_shape = paddle_value.shape
+    if type(trt_tensor) == trt.Weights:
+        return network.add_constant(input_shape, trt_tensor).get_output(0)
+    return trt_tensor
+
+
+def zero_dims_to_one_dims(network, trt_tensor):
+    if trt_tensor is None:
+        return None
+    if type(trt_tensor) == trt.Weights:
+        return trt_tensor
+    if len(trt_tensor.shape) != 0:
+        return trt_tensor
+    shuffle_layer = network.add_shuffle(trt_tensor)
+    shuffle_layer.reshape_dims = (1,)
+    return shuffle_layer.get_output(0)

@@ -66,11 +66,14 @@ struct PatternNode {
   }
 
   pir::Operation* sink_op() const { return sink_op_; }
+  std::vector<pir::Operation*> ops() const {
+    return GetOpsInPattern(stmt_pattern_);
+  }
   const StmtPattern& stmt_pattern() const { return stmt_pattern_; }
   void set_stmt_pattern(const StmtPattern& pattern) { stmt_pattern_ = pattern; }
   const std::vector<PatternNodePtr>& upstream() const { return upstream_; }
   const std::vector<PatternNodePtr>& downstream() const { return downstream_; }
-  std::string name() const { return GetPatternName(stmt_pattern_); }
+  PatternType type() const { return GetPatternType(stmt_pattern_); }
   std::string id() const { return GetPatternId(stmt_pattern_); }
   void set_return() const { SetReturnInstr(stmt_pattern_); }
   void AddNodeToUpstream(PatternNodePtr node) { upstream_.push_back(node); }
@@ -106,4 +109,16 @@ struct PatternNode {
 };
 
 using PatternNodePtr = std::shared_ptr<PatternNode>;
+
+struct PatternNodeCompare {
+  bool operator()(const PatternNodePtr& lhs, const PatternNodePtr& rhs) const {
+    int lhs_id = std::stoi(
+        lhs->id().substr(lhs->id().find_last_of('_') + 1, std::string::npos));
+    int rhs_id = std::stoi(
+        rhs->id().substr(rhs->id().find_last_of('_') + 1, std::string::npos));
+    return lhs->type() == rhs->type() ? lhs_id < rhs_id
+                                      : lhs->type() < rhs->type();
+  }
+};
+using PatternNodePtrSet = std::set<PatternNodePtr, PatternNodeCompare>;
 }  // namespace cinn::fusion

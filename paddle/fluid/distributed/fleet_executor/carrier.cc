@@ -36,8 +36,7 @@ PHI_DEFINE_EXPORTED_bool(
     "executor.");
 COMMON_DECLARE_bool(cache_inference_while_scope);
 
-namespace paddle {
-namespace distributed {
+namespace paddle::distributed {
 
 USE_INTERCEPTOR(Source);
 USE_INTERCEPTOR(Compute);
@@ -422,5 +421,4 @@ void Carrier::CreateInterceptors(
   }
 }
 
-}  // namespace distributed
-}  // namespace paddle
+}  // namespace paddle::distributed

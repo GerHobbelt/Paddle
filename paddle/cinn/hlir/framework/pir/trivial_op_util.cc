@@ -794,13 +794,34 @@ ExprTransformer InsertForsTransformer(const std::vector<int32_t>& axis,
 ExprTransformer InsertIfForAppendVarsTransformer() {
   const auto& f = [=](const ir::Expr& root) -> ir::Expr {
     const auto vars = GetNonReduceLoopVars(root);
-    std::vector<ir::Expr> conditions;
+    std::vector<std::vector<ir::Var>> neighbor_append_vars;
+    bool last_var_is_append = false;
     for (const auto& var : vars) {
-      if (var->name.find("append") == std::string::npos) {
-        continue;
+      if (var->name.find("append") != std::string::npos &&
+          !(var->upper_bound.is_constant() &&
+            var->upper_bound.as_int64() == 1)) {
+        if (last_var_is_append) {
+          neighbor_append_vars.back().push_back(var);
+        } else {
+          neighbor_append_vars.push_back({var});
+          last_var_is_append = true;
+        }
+      } else {
+        last_var_is_append = false;
       }
-      VLOG(4) << "Insert If for append loop: " << var;
-      conditions.push_back(ir::EQ::Make(var, var->lower_bound));
+    }
+    // Merge if for neighbor append vars
+    std::vector<ir::Expr> conditions;
+    for (const auto& vars : neighbor_append_vars) {
+      ir::Expr lhs = Expr(0);
+      ir::Expr rhs = Expr(1);
+      ir::Expr offset = Expr(1);
+      for (int i = vars.size() - 1; i >= 0; --i) {
+        lhs = lhs + vars[i] * offset;
+        rhs = rhs * vars[i]->lower_bound;
+        offset = offset * (vars[i]->upper_bound - vars[i]->lower_bound);
+      }
+      conditions.push_back(ir::EQ::Make(lhs, rhs));
     }
     std::reverse(conditions.begin(), conditions.end());
 

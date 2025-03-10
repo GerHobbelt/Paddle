@@ -175,5 +175,40 @@ class TestBuildOp6(unittest.TestCase):
             )
 
 
+class TestGetValueByOpId(unittest.TestCase):
+    def test_get_value_by_op_id(self):
+        def true_func():
+            return paddle.tensor.fill_constant(
+                shape=[2, 3], dtype='int32', value=2
+            )
+
+        def false_func():
+            return paddle.tensor.fill_constant(
+                shape=[3, 2], dtype='int32', value=-1
+            )
+
+        main_program = paddle.static.Program()
+        startup_program = paddle.static.Program()
+        with paddle.static.program_guard(main_program, startup_program):
+            x = paddle.tensor.fill_constant(
+                shape=[1], dtype='float32', value=0.1
+            )
+            y = paddle.tensor.fill_constant(
+                shape=[1], dtype='float32', value=0.23
+            )
+            pred = paddle.less_than(y, x)
+            out = paddle.static.nn.cond(pred, true_func, false_func)
+            value1 = main_program.get_value_by_op_id(65)
+            self.assertEqual(
+                out.get_defining_op().id(),
+                value1[0].get_defining_op().id(),
+            )
+            value2 = main_program.get_value_by_op_id([58, 65])
+            self.assertEqual(
+                58,
+                value2[0].get_defining_op().id(),
+            )
+
+
 if __name__ == "__main__":
     unittest.main()

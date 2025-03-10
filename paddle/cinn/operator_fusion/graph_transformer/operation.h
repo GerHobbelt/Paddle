@@ -280,19 +280,19 @@ struct HorizontalFusionOperation {
                             const PatternNodePtr& j) {
     VLOG(4) << "Start HorizontalFusionOperation";
     PADDLE_ENFORCE_EQ(
-        GetPatternName(i->stmt_pattern()),
-        HorizontalFusionPattern::name(),
+        GetPatternType(i->stmt_pattern()),
+        HorizontalFusionPattern::type(),
         ::common::errors::PreconditionNotMet(
             "The pattern of the first node should be HorizontalFusionPattern, "
             "but got %s.",
-            GetPatternName(i->stmt_pattern())));
+            GetPatternId(i->stmt_pattern())));
     PADDLE_ENFORCE_EQ(
-        GetPatternName(j->stmt_pattern()),
-        HorizontalFusionPattern::name(),
+        GetPatternType(j->stmt_pattern()),
+        HorizontalFusionPattern::type(),
         ::common::errors::PreconditionNotMet(
             "The pattern of the second node should be HorizontalFusionPattern, "
             "but got %s.",
-            GetPatternName(j->stmt_pattern())));
+            GetPatternId(j->stmt_pattern())));
     auto merged_node = graph->MergeNode(i, j, MergePattern);
     VLOG(4) << "MergeHorizontalPattern: \ni " << i->DebugStr() << "\nj "
             << j->DebugStr() << "\nmerged " << merged_node->DebugStr();
@@ -308,7 +308,7 @@ struct ReshapeAlignInputOperation {
     VLOG(4) << "Start ReshapeAlignInputOperation";
     const auto ops = std::get<TrivialPattern>(node->stmt_pattern()).ops();
     PADDLE_ENFORCE(
-        GetPatternName(node->stmt_pattern()) == TrivialPattern::name() &&
+        GetPatternType(node->stmt_pattern()) == TrivialPattern::type() &&
             std::get<TrivialPattern>(node->stmt_pattern()).ops().size() == 1 &&
             node->sink_op()->name() == "cinn_op.reshape",
         ::common::errors::InvalidArgument(

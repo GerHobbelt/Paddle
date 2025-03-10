@@ -71,12 +71,6 @@
 #include "paddle/phi/kernels/funcs/data_type_transform.h"
 #include "paddle/utils/string/split.h"
 
-#if defined(PADDLE_WITH_DISTRIBUTE) && defined(PADDLE_WITH_PSCORE)
-#include "paddle/fluid/distributed/fleet_executor/fleet_executor.h"
-#include "paddle/fluid/distributed/fleet_executor/fleet_executor_desc.pb.h"
-#include "paddle/fluid/distributed/fleet_executor/task_node.h"
-#endif
-
 #ifdef PADDLE_WITH_MKLML
 #include "paddle/phi/backends/dynload/mklml.h"
 #endif
@@ -108,6 +102,7 @@
 #include "paddle/cinn/hlir/dialect/operator/transforms/add_cinn_pass.h"
 #include "paddle/cinn/hlir/dialect/operator/transforms/check_infer_symbolic_util.h"
 #include "paddle/pir/include/dialect/shape/ir/shape_dialect.h"
+#include "paddle/pir/include/dialect/shape/utils/shape_analysis.h"
 #endif
 
 #include "paddle/common/flags.h"
@@ -136,7 +131,7 @@
 #include "paddle/pir/include/pass/pass_registry.h"
 
 COMMON_DECLARE_bool(pir_apply_inplace_pass);
-
+COMMON_DECLARE_bool(enable_auto_layout_pass);
 namespace paddle {
 namespace {
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
@@ -359,7 +354,7 @@ bool PaddleTensorToDenseTensor(const PaddleTensor &pt,
         "now."));
   }
   // TODO(Superjomn) Low performance, need optimization for heavy LoD copy.
-  phi::LoD lod;
+  phi::LegacyLoD lod;
   for (auto &level : pt.lod) {
     lod.emplace_back(level);
   }
@@ -424,13 +419,15 @@ bool AnalysisPredictor::Init(
     const std::shared_ptr<framework::Scope> &parent_scope,
     const std::shared_ptr<framework::ProgramDesc> &program) {
   VLOG(3) << "Predictor::init()";
-#ifdef PADDLE_WITH_NVTX
+
   if (config_.with_profile_) {
     LOG(WARNING) << "Profiler is activated, which might affect the performance";
+#ifdef PADDLE_WITH_NVTX
     platform::CudaProfilerStart();
     platform::NvprofEnableRecordEvent();
-  }
 #endif
+    platform::EnableProfiler(platform::ProfilerState::kAll);
+  }
 
   if (!status_is_cloned_) {
     root_predictor_id_ = predictor_id_;
@@ -807,6 +804,20 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
                      pass->name()) != this->config_.ir_debug_passes_.end();
   };
 
+  auto AddAutoLayoutPasses = [&](pir::PassManager &pass_manager) {
+    auto &pass_registry = pir::PassRegistry::Instance();
+    std::vector<std::string> passes = {"auto_layout_pass",
+                                       "auto_layout_simplify_pass"};
+
+    for (const auto &pass_name : passes) {
+      if (std::find(config_.deleted_passes_.begin(),
+                    config_.deleted_passes_.end(),
+                    pass_name) == config_.deleted_passes_.end()) {
+        pass_manager.AddPass(pass_registry.Get(pass_name));
+      }
+    }
+  };
+
   auto AddAutoMixedPrecisionPass = [&](pir::PassManager &pass_manager) {
     auto auto_mixed_precision_pass = ::pir::CreateAutoMixedPrecisionPass();
     if (std::find(config_.deleted_passes_.begin(),
@@ -847,6 +858,11 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
             std::make_unique<pir::PassManager::IRPrinterOption>(
                 ir_printing_conditions, ir_printing_conditions));
       }
+      auto &shape_analysis =
+          pir::ShapeAnalysisManager::Instance().Get(pir_program_.get());
+      pass_manager->SetValueReplacedHook([&](pir::Value from, pir::Value to) {
+        shape_analysis.ShareShapeOrData(from, to);
+      });
       return pass_manager;
     };
 
@@ -865,8 +881,13 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
 
         if (config_.enable_gpu_mixed_) {
           AddAutoMixedPrecisionPass(fused_op_pm);
+          if (FLAGS_enable_auto_layout_pass) {
+            AddAutoLayoutPasses(fused_op_pm);
+          } else {
+            fused_op_pm.AddPass(
+                pir::PassRegistry::Instance().Get("transfer_layout_pass"));
+          }
         }
-
         fused_op_pm.Run(pir_program_.get());
       }
     }
@@ -905,7 +926,6 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
           }
         }
       }
-
 #ifdef PADDLE_WITH_XPU
     } else if (config_.use_xpu()) {
       // xpu
@@ -994,14 +1014,18 @@ void AnalysisPredictor::OptimizeInferencePirProgram() {
   if (config_.enable_gpu_mixed_) {
     if (!config_.cinn_enabled()) {
       AddAutoMixedPrecisionPass(basic_pass_pm);
-    }
 
-    auto transfer_layout_pass = ::pir::CreateTransferLayoutPass();
-    if (std::find(config_.deleted_passes_.begin(),
-                  config_.deleted_passes_.end(),
-                  transfer_layout_pass->name()) ==
-        config_.deleted_passes_.end()) {
-      basic_pass_pm.AddPass(std::move(transfer_layout_pass));
+      if (FLAGS_enable_auto_layout_pass) {
+        AddAutoLayoutPasses(basic_pass_pm);
+      } else {
+        auto transfer_layout_pass = ::pir::CreateTransferLayoutPass();
+        if (std::find(config_.deleted_passes_.begin(),
+                      config_.deleted_passes_.end(),
+                      transfer_layout_pass->name()) ==
+            config_.deleted_passes_.end()) {
+          basic_pass_pm.AddPass(std::move(transfer_layout_pass));
+        }
+      }
     }
   }
   auto common_subexpression_elimination_pass =
@@ -1324,17 +1348,6 @@ bool AnalysisPredictor::PrepareExecutor() {
                           common::errors::PreconditionNotMet(
                               "The sub_scope should not be nullptr."));
 
-  if (config_.dist_config().use_dist_model()) {
-#if defined(PADDLE_WITH_DISTRIBUTE) && defined(PADDLE_WITH_PSCORE)
-    VLOG(3) << "use_dist_model is enabled, will init FleetExecutor.";
-    return PrepareFleetExecutor();
-#else
-    PADDLE_THROW(common::errors::PermissionDenied(
-        "Paddle can't use FleetExecutor since it's not compiled with PSCORE,"
-        "Please recompile or reinstall Paddle with PSCORE support."));
-#endif
-  }
-
   if (config_.new_ir_enabled()) {
     executor_->Prepare(sub_scope_);
   } else {
@@ -1375,293 +1388,6 @@ bool AnalysisPredictor::PrepareExecutor() {
   }
   return true;
 }
-
-#if defined(PADDLE_WITH_DISTRIBUTE) && defined(PADDLE_WITH_PSCORE)
-bool AnalysisPredictor::PrepareFleetExecutor() {
-  VLOG(3) << "AnalysisPredictor::PrepareFleetExecutor()";
-  if (config_.dist_config().nranks() > 1 && !CommInit()) {
-    return false;
-  }
-  task_node_ = std::make_unique<distributed::TaskNode>(
-      inference_program_.get(), config_.dist_config().rank());
-  // With auto cut, there is no concept of pp, no need to add dependency.
-  task_node_->SetType("Compute");
-  task_node_->Init(config_.use_feed_fetch_ops_enabled());
-  executor_desc_ = distributed::FleetExecutorDesc();
-  executor_desc_.set_cur_rank(config_.dist_config().rank());
-  std::unordered_map<int64_t, int64_t> id_to_rank;
-  for (int i = 0; i < config_.dist_config().nranks(); ++i) {
-    distributed::RankInfo *rank_info = executor_desc_.add_cluster_info();
-    rank_info->set_rank(i);
-    rank_info->set_ip_port(config_.dist_config().trainer_endpoints()[i]);
-    id_to_rank.insert({i, i});
-  }
-  fleet_exe_ = std::make_unique<distributed::FleetExecutor>(executor_desc_);
-  // NOTE: Vars of feed fetch ops are not persistable,
-  // which will result in that those vars will be created in
-  // the subscope (microscope) in fleet executor. This will
-  // cause that the GetInputTensor/GetOutputTensor funct
-  // in analysis predictor cannot find those vars in the scope
-  // returned by the DistModel, since DistModel only return the
-  // root scope. So, those vars must  to be created in the root
-  // scope instead of in the microscope
-  std::vector<std::string> feed_fetch_vars;
-  for (auto pair : idx2feeds_) {
-    feed_fetch_vars.emplace_back(pair.second);
-  }
-  for (auto pair : idx2fetches_) {
-    feed_fetch_vars.emplace_back(pair.second);
-  }
-  fleet_exe_->Init(config_.dist_config().carrier_id(),
-                   *(inference_program_.get()),
-                   scope_.get(),
-                   place_,
-                   1,
-                   {task_node_.get()},
-                   id_to_rank,
-                   feed_fetch_vars);
-  return true;
-}
-
-bool AnalysisPredictor::CommInit() {
-  std::map<int64_t, std::vector<int64_t>> ring_id_to_ranks{};
-  std::map<int64_t, std::vector<int64_t>> rank_to_ring_ids{};
-  if (!LoadConverterConfig(&ring_id_to_ranks, &rank_to_ring_ids)) {
-    VLOG(3) << "Load converter config failed, DistModel init failed.";
-    return false;
-  }
-  std::unique_ptr<framework::ProgramDesc> comm_init_program(
-      new framework::ProgramDesc());
-  framework::BlockDesc *comm_init_block = comm_init_program->MutableBlock(0);
-  std::vector<int64_t> &ring_ids =
-      rank_to_ring_ids[config_.dist_config().rank()];
-  int64_t order = 0;
-  std::string var_name_base = "comm_init_";
-  for (int64_t ring_id : ring_ids) {
-    VLOG(3) << "Init comm for ring id: " << ring_id;
-    int64_t ranks_in_group = ring_id_to_ranks[ring_id].size();
-    int64_t rank_in_group = 0;
-    std::vector<int64_t> &ranks = ring_id_to_ranks[ring_id];
-    for (int64_t rank : ranks) {
-      if (config_.dist_config().rank() == rank) {
-        break;
-      }
-      rank_in_group += 1;
-    }
-    std::vector<std::string> peer_endpoints;
-    for (int64_t rank : ranks) {
-      if (config_.dist_config().rank() == rank) {
-        continue;
-      }
-      peer_endpoints.emplace_back(
-          config_.dist_config().trainer_endpoints()[rank]);
-    }
-    InsertCommOp(var_name_base + std::to_string(order),
-                 ranks_in_group,
-                 rank_in_group,
-                 peer_endpoints,
-                 comm_init_block,
-                 ring_id);
-    order += 1;
-  }
-  framework::NaiveExecutor e(place_);
-  e.CreateVariables(*comm_init_program, 0, true, scope_.get());
-  e.Prepare(scope_.get(), *comm_init_program, 0);
-  e.Run();
-  VLOG(3) << "Comm init successful.";
-  return true;
-}
-
-void AnalysisPredictor::InsertCommOp(
-    std::string tmp_var_name,
-    int nranks,
-    int rank,
-    const std::vector<std::string> &peer_endpoints,
-    framework::BlockDesc *block,
-    int ring_id) {
-  /*
-   * tmp_var_name: the var name for var comm_id
-   * nranks: number of total ranks
-   * rank: the rank of local rank in the comm group
-   * peer_endpoints: peer's endpoints
-   * block: the block where to insert the comm ops
-   * ring_id: the ring_id to be inited
-   */
-  const std::string &endpoint = config_.dist_config().current_endpoint();
-  std::stringstream ss;
-  ss << "Init comm with tmp var: " << tmp_var_name
-     << ". The ring id is: " << ring_id << ". The group has: " << nranks
-     << " ranks. Current rank in the group is: " << rank
-     << ". The endpoint is: " << endpoint << ". Peer endpoints are: ";
-  for (auto ep : peer_endpoints) {
-    ss << ep << ", ";
-  }
-  VLOG(3) << ss.str();
-  std::string endpoints_str = config_.dist_config().current_endpoint();
-  for (const auto &peer : peer_endpoints) {
-    endpoints_str += "," + peer;
-  }
-  if (config_.use_gpu()) {
-    framework::VarDesc *new_var = block->Var(tmp_var_name);
-    new_var->SetType(framework::proto::VarType::RAW);
-    new_var->SetPersistable(true);
-    framework::OpDesc *gen_nccl_id_op = block->AppendOp();
-    gen_nccl_id_op->SetType("c_gen_nccl_id");
-    gen_nccl_id_op->SetOutput("Out", {tmp_var_name});
-    gen_nccl_id_op->SetAttr("rank", rank);
-    gen_nccl_id_op->SetAttr("endpoint",
-                            config_.dist_config().current_endpoint());
-    gen_nccl_id_op->SetAttr("other_endpoints", peer_endpoints);
-    gen_nccl_id_op->SetAttr("ring_id", ring_id);
-    gen_nccl_id_op->SetAttr("op_role",
-                            static_cast<int>(framework::OpRole::kForward));
-    gen_nccl_id_op->CheckAttrs();
-    framework::OpDesc *comm_init_op = block->AppendOp();
-    comm_init_op->SetType("c_comm_init");
-    comm_init_op->SetInput("X", {tmp_var_name});
-    comm_init_op->SetAttr("rank", rank);
-    comm_init_op->SetAttr("nranks", nranks);
-    comm_init_op->SetAttr("ring_id", ring_id);
-    comm_init_op->SetAttr("endpoints", endpoints_str);
-    comm_init_op->SetAttr("op_role",
-                          static_cast<int>(framework::OpRole::kForward));
-    comm_init_op->CheckAttrs();
-  } else if (config_.use_xpu()) {
-    framework::VarDesc *new_var = block->Var(tmp_var_name);
-    new_var->SetType(framework::proto::VarType::RAW);
-    new_var->SetPersistable(true);
-    framework::OpDesc *gen_bkcl_id_op = block->AppendOp();
-    gen_bkcl_id_op->SetType("c_gen_bkcl_id");
-    gen_bkcl_id_op->SetOutput("Out", {tmp_var_name});
-    gen_bkcl_id_op->SetAttr("rank", rank);
-    gen_bkcl_id_op->SetAttr("endpoint",
-                            config_.dist_config().current_endpoint());
-    gen_bkcl_id_op->SetAttr("other_endpoints", peer_endpoints);
-    gen_bkcl_id_op->SetAttr("ring_id", ring_id);
-    gen_bkcl_id_op->SetAttr("op_role",
-                            static_cast<int>(framework::OpRole::kForward));
-    gen_bkcl_id_op->CheckAttrs();
-    framework::OpDesc *comm_init_op = block->AppendOp();
-    comm_init_op->SetType("c_comm_init");
-    comm_init_op->SetInput("X", {tmp_var_name});
-    comm_init_op->SetAttr("rank", rank);
-    comm_init_op->SetAttr("nranks", nranks);
-    comm_init_op->SetAttr("ring_id", ring_id);
-    comm_init_op->SetAttr("endpoints", endpoints_str);
-    comm_init_op->SetAttr("op_role",
-                          static_cast<int>(framework::OpRole::kForward));
-    comm_init_op->CheckAttrs();
-  } else if (config_.use_custom_device()) {
-    framework::VarDesc *new_var = block->Var(tmp_var_name);
-    new_var->SetType(framework::proto::VarType::RAW);
-    new_var->SetPersistable(true);
-    framework::OpDesc *gen_bkcl_id_op = block->AppendOp();
-    gen_bkcl_id_op->SetType("c_gen_xccl_id");
-    gen_bkcl_id_op->SetOutput("Out", {tmp_var_name});
-    gen_bkcl_id_op->SetAttr("rank", rank);
-    gen_bkcl_id_op->SetAttr("endpoint",
-                            config_.dist_config().current_endpoint());
-    gen_bkcl_id_op->SetAttr("other_endpoints", peer_endpoints);
-    gen_bkcl_id_op->SetAttr("ring_id", ring_id);
-    gen_bkcl_id_op->SetAttr("op_role",
-                            static_cast<int>(framework::OpRole::kForward));
-    gen_bkcl_id_op->CheckAttrs();
-    framework::OpDesc *comm_init_op = block->AppendOp();
-    comm_init_op->SetType("c_comm_init");
-    comm_init_op->SetInput("X", {tmp_var_name});
-    comm_init_op->SetAttr("rank", rank);
-    comm_init_op->SetAttr("nranks", nranks);
-    comm_init_op->SetAttr("ring_id", ring_id);
-    comm_init_op->SetAttr("endpoints", endpoints_str);
-    comm_init_op->SetAttr("op_role",
-                          static_cast<int>(framework::OpRole::kForward));
-    comm_init_op->CheckAttrs();
-  } else {
-    LOG(WARNING) << "DistModelInf doesn't init comm.";
-    // TODO(fleet exe dev): comm init for more devices
-  }
-}
-
-bool AnalysisPredictor::LoadConverterConfig(
-    std::map<int64_t, std::vector<int64_t>> *ring_id_to_ranks,
-    std::map<int64_t, std::vector<int64_t>> *rank_to_ring_ids) {
-  VLOG(3) << "Going to load converter config from: "
-          << config_.dist_config().comm_init_config() << "\n";
-  std::ifstream fin(config_.dist_config().comm_init_config(), std::ios::in);
-  PADDLE_ENFORCE_EQ(
-      static_cast<bool>(fin.is_open()),
-      true,
-      common::errors::NotFound(
-          "Cannot open file %s, please confirm whether the file is normal.",
-          config_.dist_config().comm_init_config()));
-  std::string line;
-  bool ring_to_rank{true};
-  // Reading config from file, the config file should like these format
-  //  [ring_id -> ranks]
-  //  0,0,1,2,3
-  //  1,0,1
-  //  2,2,3
-  //  21,0,1
-  //  22,1,2
-  //  23,2,3
-  //  [rank -> ring_ids]
-  //  0,0,1,21
-  //  1,0,1,21,22
-  //  2,0,2,22,23
-  //  3,0,2,23
-  while (std::getline(fin, line)) {
-    std::vector<std::string> one_line = paddle::string::Split(line, ',');
-    if (one_line.size() == 1) {
-      // start a new section of the config
-      if (line == "[ring_id -> ranks]") {
-        ring_to_rank = true;
-      } else if (line == "[rank -> ring_ids]") {
-        ring_to_rank = false;
-      }
-    } else {
-      // parse key - values pairs in one section
-      int64_t key = std::stoll(one_line[0]);
-      for (size_t i = 1; i < one_line.size(); ++i) {
-        int64_t val = std::stoll(one_line[i]);
-        if (ring_to_rank) {  // NOLINT
-          if (ring_id_to_ranks->find(key) == ring_id_to_ranks->end()) {
-            ring_id_to_ranks->insert({key, std::vector<int64_t>()});
-          }
-          ring_id_to_ranks->at(key).emplace_back(val);
-        } else {
-          if (rank_to_ring_ids->find(key) == rank_to_ring_ids->end()) {
-            rank_to_ring_ids->insert({key, std::vector<int64_t>()});
-          }
-          rank_to_ring_ids->at(key).emplace_back(val);
-        }
-        // NOTE: add more configuration sections here
-      }
-    }
-  }
-  std::stringstream ss;
-  ss << "Loaded the following converter config:\n";
-  ss << "ring_id_to_ranks:\n";
-  for (auto pair : *ring_id_to_ranks) {
-    int64_t key = pair.first;
-    ss << "\t" << key << "\t->\t";
-    for (auto value : pair.second) {
-      ss << value << "\t";
-    }
-    ss << "\n";
-  }
-  ss << "rank_to_ring_ids:\n";
-  for (auto pair : *rank_to_ring_ids) {
-    int64_t key = pair.first;
-    ss << "\t" << key << "\t->\t";
-    for (auto value : pair.second) {
-      ss << value << "\t";
-    }
-    ss << "\n";
-  }
-  VLOG(3) << ss.str();
-  return true;
-}
-#endif
 
 void AnalysisPredictor::MkldnnPreSet(const std::vector<PaddleTensor> &inputs) {
 #ifdef PADDLE_WITH_DNNL
@@ -1822,15 +1548,8 @@ bool AnalysisPredictor::Run(const std::vector<paddle::Tensor> &inputs,
   VLOG(3) << "predict start";
   // set feed variable
   framework::Scope *scope{nullptr};
-#if defined(PADDLE_WITH_DISTRIBUTE) && defined(PADDLE_WITH_PSCORE)
-  if (config_.dist_config().use_dist_model()) {  // NOLINT
-    scope = scope_.get();
-  } else {
-    scope = executor_->GetScope();
-  }
-#else
+
   scope = executor_->GetScope();
-#endif
   PADDLE_ENFORCE_NOT_NULL(
       scope,
       common::errors::PreconditionNotMet("The scope should not be nullptr."));
@@ -1878,18 +1597,6 @@ bool AnalysisPredictor::Run(const std::vector<paddle::Tensor> &inputs,
   }
 #endif
 
-#if defined(PADDLE_WITH_DISTRIBUTE) && defined(PADDLE_WITH_PSCORE)
-  if (config_.dist_config().use_dist_model()) {  // NOLINT
-    VLOG(3) << "ZeroCopyRun will use the fleet executor.";
-    fleet_exe_->Run(config_.dist_config().carrier_id());
-  } else if (config_.new_executor_enabled()) {  // NOLINT
-    executor_->RunInterpreterCore();
-  } else {
-    // Run the inference program
-    // if share variables, we need not create variables
-    executor_->Run();
-  }
-#else
   if (config_.new_executor_enabled()) {  // NOLINT
     executor_->RunInterpreterCore();
   } else {
@@ -1897,7 +1604,6 @@ bool AnalysisPredictor::Run(const std::vector<paddle::Tensor> &inputs,
     // if share variables, we need not create variables
     executor_->Run();
   }
-#endif
 
   inference::DisplayMemoryInfo(place_, "after run");
 #ifdef PADDLE_WITH_XPU
@@ -2687,15 +2393,7 @@ AnalysisPredictor::GetOutputTypes() {
 std::unique_ptr<ZeroCopyTensor> AnalysisPredictor::GetInputTensor(
     const std::string &name) {
   framework::Scope *scope = nullptr;
-#if defined(PADDLE_WITH_DISTRIBUTE) && defined(PADDLE_WITH_PSCORE)
-  if (config_.dist_config().use_dist_model()) {  // NOLINT
-    scope = scope_.get();
-  } else {
-    scope = executor_->GetScope();
-  }
-#else
   scope = executor_->GetScope();
-#endif
   PADDLE_ENFORCE_NOT_NULL(
       scope->FindVar(name),
       common::errors::PreconditionNotMet(
@@ -2729,15 +2427,7 @@ std::unique_ptr<ZeroCopyTensor> AnalysisPredictor::GetInputTensor(
 std::unique_ptr<ZeroCopyTensor> AnalysisPredictor::GetOutputTensor(
     const std::string &name) {
   framework::Scope *scope;  // NOLINT
-#if defined(PADDLE_WITH_DISTRIBUTE) && defined(PADDLE_WITH_PSCORE)
-  if (config_.dist_config().use_dist_model()) {  // NOLINT
-    scope = scope_.get();
-  } else {
-    scope = executor_->GetScope();
-  }
-#else
   scope = executor_->GetScope();
-#endif
   PADDLE_ENFORCE_NOT_NULL(
       scope->FindVar(name),
       common::errors::PreconditionNotMet(
@@ -2770,13 +2460,6 @@ std::unique_ptr<ZeroCopyTensor> AnalysisPredictor::GetOutputTensor(
 
 bool AnalysisPredictor::ZeroCopyRun(bool switch_stream) {
   inference::DisplayMemoryInfo(place_, "before run");
-#if defined(PADDLE_WITH_DISTRIBUTE) && defined(PADDLE_WITH_PSCORE)
-  if (config_.dist_config().use_dist_model()) {  // NOLINT
-    VLOG(3) << "ZeroCopyRun will use the fleet executor.";
-    fleet_exe_->Run(config_.dist_config().carrier_id());
-    return true;
-  }
-#endif
   if (private_context_) {
     phi::DeviceContextPool::SetDeviceContexts(&device_contexts_);
     auto &pool = paddle::experimental::DeviceContextPool::Instance();
@@ -3310,12 +2993,16 @@ AnalysisPredictor::~AnalysisPredictor() {  // NOLINT
     SaveTrtCalibToDisk();
   }
 #endif
-#ifdef PADDLE_WITH_NVTX
+
   if (config_.with_profile_) {
+#ifdef PADDLE_WITH_NVTX
     platform::NvprofDisableRecordEvent();
     platform::CudaProfilerStop();
-  }
 #endif
+    platform::DisableProfiler(platform::EventSortingKey::kTotal,
+                              "./profile.log");
+  }
+
   if (sub_scope_) {
     if (framework::global_transfer_scope_key().find(sub_scope_) !=
         framework::global_transfer_scope_key().end()) {

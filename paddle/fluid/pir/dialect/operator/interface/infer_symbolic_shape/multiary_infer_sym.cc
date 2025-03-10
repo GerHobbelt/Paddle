@@ -650,7 +650,7 @@ bool AssignPosOpInferSymbolicShape(
   const auto &eff_num_len_shape_or_data =
       infer_context->GetShapeOrDataForValue(op->operand_source(2));
   if (eff_num_len_shape_or_data.data()
-          .has_value()) {  // accoding to the kernel code
+          .has_value()) {  // according to the kernel code
     infer_context->SetShapeOrDataForValue(
         op->result(0),
         symbol::ShapeOrDataDimExprs{symbol::TensorShapeOrDataDimExprs(

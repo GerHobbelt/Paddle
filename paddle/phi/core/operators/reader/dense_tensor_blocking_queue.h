@@ -27,13 +27,14 @@ namespace paddle {
 namespace operators {
 namespace reader {
 
-class LoDTensorBlockingQueue {
+class DenseTensorBlockingQueue {
  public:
-  explicit LoDTensorBlockingQueue(size_t capacity, bool speed_test_mode = false)
+  explicit DenseTensorBlockingQueue(size_t capacity,
+                                    bool speed_test_mode = false)
       : queue_(capacity, speed_test_mode) {}
 
-  ~LoDTensorBlockingQueue() {
-    // VLOG(10) << "Destruct LoDTensorBlockingQueue";
+  ~DenseTensorBlockingQueue() {
+    // VLOG(10) << "Destruct DenseTensorBlockingQueue";
   }
 
   bool Push(const phi::TensorArray& lod_tensor_vec) {
@@ -58,7 +59,7 @@ class LoDTensorBlockingQueue {
   inline void ReOpen() { queue_.ReOpen(); }
 
   inline void Close() {
-    // VLOG(1) << "LoDTensorBlockingQueue close";
+    // VLOG(1) << "DenseTensorBlockingQueue close";
     queue_.Close();
   }
 
@@ -72,14 +73,14 @@ class LoDTensorBlockingQueue {
   BlockingQueue<phi::TensorArray> queue_;
 };
 
-class OrderedMultiDeviceLoDTensorBlockingQueue {
+class OrderedMultiDeviceDenseTensorBlockingQueue {
  public:
-  OrderedMultiDeviceLoDTensorBlockingQueue(size_t capacity,
-                                           bool speed_test_mode = false)
+  OrderedMultiDeviceDenseTensorBlockingQueue(size_t capacity,
+                                             bool speed_test_mode = false)
       : capacity_(capacity), speed_test_mode_(speed_test_mode) {}
 
-  ~OrderedMultiDeviceLoDTensorBlockingQueue() {
-    // VLOG(10) << "Destruct OrderedMultiDeviceLoDTensorBlockingQueue";
+  ~OrderedMultiDeviceDenseTensorBlockingQueue() {
+    // VLOG(10) << "Destruct OrderedMultiDeviceDenseTensorBlockingQueue";
   }
 
   bool WaitForInited(size_t milliseconds) {
@@ -96,7 +97,7 @@ class OrderedMultiDeviceLoDTensorBlockingQueue {
                         1,
                         common::errors::InvalidArgument(
                             "Device count to init "
-                            "OrderedMultiDeviceLoDTensorBlockingQueue"
+                            "OrderedMultiDeviceDenseTensorBlockingQueue"
                             " must be larger than 1"));
       if (!queues_.empty()) {
         PADDLE_ENFORCE_EQ(queues_.size(),
@@ -110,13 +111,14 @@ class OrderedMultiDeviceLoDTensorBlockingQueue {
       queues_.resize(dev_cnt);
       for (auto& item : queues_) {
         auto cap = (capacity_ + dev_cnt - 1) / dev_cnt;
-        item = std::make_unique<LoDTensorBlockingQueue>(cap, speed_test_mode_);
+        item =
+            std::make_unique<DenseTensorBlockingQueue>(cap, speed_test_mode_);
       }
     }
     cv_.notify_all();
   }
 
-  const std::shared_ptr<LoDTensorBlockingQueue>& GetQueue(size_t idx) const {
+  const std::shared_ptr<DenseTensorBlockingQueue>& GetQueue(size_t idx) const {
     EnforceIsInited();
     PADDLE_ENFORCE_LT(
         idx,
@@ -160,7 +162,7 @@ class OrderedMultiDeviceLoDTensorBlockingQueue {
     auto dev_cnt = queues_.size();
     for (auto& item : queues_) {
       auto cap = (capacity_ + dev_cnt - 1) / dev_cnt;
-      item = std::make_unique<LoDTensorBlockingQueue>(cap, speed_test_mode_);
+      item = std::make_unique<DenseTensorBlockingQueue>(cap, speed_test_mode_);
     }
     data_index_ = 0;
   }
@@ -178,7 +180,7 @@ class OrderedMultiDeviceLoDTensorBlockingQueue {
   inline size_t Cap() const { return capacity_; }
 
  private:
-  const std::shared_ptr<LoDTensorBlockingQueue>& CurQueue() {
+  const std::shared_ptr<DenseTensorBlockingQueue>& CurQueue() {
     return queues_[(data_index_++) % queues_.size()];
   }
 
@@ -190,7 +192,7 @@ class OrderedMultiDeviceLoDTensorBlockingQueue {
   }
 
  private:
-  std::vector<std::shared_ptr<LoDTensorBlockingQueue>> queues_;
+  std::vector<std::shared_ptr<DenseTensorBlockingQueue>> queues_;
   mutable uint64_t data_index_{0};
 
   size_t dev_cnt_{0};
@@ -205,45 +207,45 @@ class OrderedMultiDeviceLoDTensorBlockingQueue {
   mutable std::condition_variable cv_;
 };
 
-class LoDTensorBlockingQueueHolder {
+class DenseTensorBlockingQueueHolder {
  public:
   void InitOnce(size_t capacity, bool speed_test_mode = false) {
     PADDLE_ENFORCE_EQ(
         queue_,
         nullptr,
-        common::errors::AlreadyExists("LoDTensorBlockingQueueHolder::"
+        common::errors::AlreadyExists("DenseTensorBlockingQueueHolder::"
                                       "InitOnce() can only be called once"));
     queue_ =
-        std::make_unique<LoDTensorBlockingQueue>(capacity, speed_test_mode);
+        std::make_unique<DenseTensorBlockingQueue>(capacity, speed_test_mode);
   }
 
-  inline const std::shared_ptr<LoDTensorBlockingQueue>& GetQueue() const {
+  inline const std::shared_ptr<DenseTensorBlockingQueue>& GetQueue() const {
     return queue_;
   }
 
  private:
-  std::shared_ptr<LoDTensorBlockingQueue> queue_;
+  std::shared_ptr<DenseTensorBlockingQueue> queue_;
 };
 
-class OrderedMultiDeviceLoDTensorBlockingQueueHolder {
+class OrderedMultiDeviceDenseTensorBlockingQueueHolder {
  public:
   void InitOnce(size_t capacity, bool speed_test_mode = false) {
     PADDLE_ENFORCE_EQ(queue_,
                       nullptr,
                       common::errors::AlreadyExists(
-                          "OrderedMultiDeviceLoDTensorBlockingQueueHolder::"
+                          "OrderedMultiDeviceDenseTensorBlockingQueueHolder::"
                           "InitOnce() can only be called once"));
-    queue_ = std::make_unique<OrderedMultiDeviceLoDTensorBlockingQueue>(
+    queue_ = std::make_unique<OrderedMultiDeviceDenseTensorBlockingQueue>(
         capacity, speed_test_mode);
   }
 
-  inline const std::shared_ptr<OrderedMultiDeviceLoDTensorBlockingQueue>&
+  inline const std::shared_ptr<OrderedMultiDeviceDenseTensorBlockingQueue>&
   GetQueue() const {
     return queue_;
   }
 
  private:
-  std::shared_ptr<OrderedMultiDeviceLoDTensorBlockingQueue> queue_;
+  std::shared_ptr<OrderedMultiDeviceDenseTensorBlockingQueue> queue_;
 };
 
 }  // namespace reader

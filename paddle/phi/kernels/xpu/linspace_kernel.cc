@@ -58,7 +58,7 @@ void LinspaceKernel(const Context& ctx,
   using XPUType = typename XPUTypeTrait<T>::Type;
   T start_value = GetValueOfExpectedType<T, Context>(ctx, start);
   T stop_value = GetValueOfExpectedType<T, Context>(ctx, stop);
-  int32_t num = GetValueOfExpectedType<int32_t, Context>(ctx, number);
+  int64_t num = GetValueOfExpectedType<int64_t, Context>(ctx, number);
 
   PADDLE_ENFORCE_GT(
       num,

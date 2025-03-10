@@ -41,6 +41,8 @@ void GroupCompilationContext::SetLoweredFuncs(
     CX86_lowered_funcs_.push_back(std::move(predicate2func.second));
   }
   infer_shape_lowered_func_ = std::move(funcs.infer_shape_func);
+
+  need_x86_kernel_ = (CX86_predicates_.size() > 0);
 }
 
 std::string GroupCompilationContext::PrintPredicate2Funcs() const {
@@ -79,6 +81,7 @@ void GroupCompilationContext::PrepareModuleBuilder() {
                     ::common::errors::InvalidArgument(
                         "The size of predicates and lowered_funcs should be "
                         "the same."));
+
   for (const ir::Expr& predicate : CX86_predicates_) {
     CX86_module_builder_.AddPredicate(predicate);
   }
@@ -203,15 +206,19 @@ void CompilationTask::Lowering() {
 
 std::shared_ptr<pir::CompilationResult> CompilationTask::CodegenAndJit() {
   context_->PrepareModuleBuilder();
+
   ir::Module ir_module = context_->module_builder_.Build();
   ir::Module ir_moduleCX86 = context_->CX86_module_builder_.Build();
-  return BuildPirCINNKernelInfo(ir_module, ir_moduleCX86);
+  return BuildPirCINNKernelInfo(
+      ir_module, ir_moduleCX86, context_->NeedCompileCX86Kernel());
 }
 
 std::shared_ptr<pir::CompilationResult> CompilationTask::BuildPirCINNKernelInfo(
-    const ir::Module& module, const ir::Module& CX86module) {
-  auto compilation_result =
-      std::make_shared<pir::CompilationResult>(context_->target_);
+    const ir::Module& module,
+    const ir::Module& CX86module,
+    bool need_x86_kernel) {
+  auto compilation_result = std::make_shared<pir::CompilationResult>(
+      context_->target_, need_x86_kernel);
   auto backend_resource = std::make_shared<pir::BackendResource>(
       context_->target_,
       context_->group_->FuncName(),
@@ -223,6 +230,7 @@ std::shared_ptr<pir::CompilationResult> CompilationTask::BuildPirCINNKernelInfo(
   backend_resource->GetBackendCompiler()->AppendCX86(CX86module);
   backend_resource->GetBackendCompiler()->EndCompile();
   compilation_result->SetBackendResource(backend_resource);
+
   VLOG(5) << "End to compile module into cuda kernel.";
   return compilation_result;
 }

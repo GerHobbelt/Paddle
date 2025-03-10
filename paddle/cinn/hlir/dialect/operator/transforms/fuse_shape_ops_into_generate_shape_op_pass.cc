@@ -423,6 +423,7 @@ class FuseSingleElementShapeOpsIntoGenerateShapeOpPattern
       auto* user = iter->owner();
       if (IsSingleElementShapeOp(user, &shape_analysis)) return false;
       if (user->isa<cinn::dialect::GenerateShapeOp>()) return false;
+      if (user->isa<pir::ShadowOutputOp>()) return false;
     }
 
     return true;

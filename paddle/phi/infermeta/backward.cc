@@ -1165,6 +1165,9 @@ void MemoryEfficientAttentionGradInferMeta(const MetaTensor& query,
     bias_grad->share_lod(bias);
     bias_grad->set_dtype(bias.dtype());
     bias_grad->set_layout(bias.layout());
+  } else if (bias_grad) {
+    std::vector<int64_t> bias_grad_dims;
+    bias_grad->set_dims(common::make_ddim(bias_grad_dims));
   }
 }
 

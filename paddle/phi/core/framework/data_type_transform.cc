@@ -73,7 +73,7 @@ static void XPUTransDataType(
   } else {
     PADDLE_THROW(common::errors::Unimplemented(
         "Data type (%s) is not supported in XPU when casting data type.",
-        DataTypeToString(dst_type)));
+        VarDataTypeToString(dst_type)));
   }
 }
 
@@ -180,7 +180,7 @@ void TransDataType(const phi::DenseTensor& in,
     default:
       PADDLE_THROW(common::errors::Unimplemented(
           "Data type (%s) is not supported in XPU when casting data type.",
-          DataTypeToString(src_type)));
+          VarDataTypeToString(src_type)));
   }
 
 #else
@@ -226,7 +226,7 @@ void TransDataType(const phi::DenseTensor& in,
     default:
       PADDLE_THROW(common::errors::Unimplemented(
           "Data type (%s) is not supported when casting data type.",
-          DataTypeToString(src_type)));
+          VarDataTypeToString(src_type)));
   }
 #endif
 }

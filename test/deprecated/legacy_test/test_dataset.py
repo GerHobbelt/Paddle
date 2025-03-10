@@ -444,16 +444,16 @@ class TestDataset(unittest.TestCase):
             startup_program = base.Program()
             with base.program_guard(train_program, startup_program):
                 var1 = paddle.static.data(
-                    name="slot1", shape=[-1, 1], dtype="int64", lod_level=0
+                    name="slot1", shape=[-1, 1], dtype="int64"
                 )
                 var2 = paddle.static.data(
-                    name="slot2", shape=[-1, 1], dtype="int64", lod_level=0
+                    name="slot2", shape=[-1, 1], dtype="int64"
                 )
                 var3 = paddle.static.data(
-                    name="slot3", shape=[-1, 1], dtype="float32", lod_level=0
+                    name="slot3", shape=[-1, 1], dtype="float32"
                 )
                 var4 = paddle.static.data(
-                    name="slot4", shape=[-1, 1], dtype="float32", lod_level=0
+                    name="slot4", shape=[-1, 1], dtype="float32"
                 )
                 slots_vars = [var1, var2, var3, var4]
 

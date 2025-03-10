@@ -290,7 +290,10 @@ void FlashAttnKernel(const Context& ctx,
   // 0x45678901, const bool is_causal = true, const TACCUM* attn_mask = nullptr,
   // const TACCUM* bias = nullptr, const float* q_maxptr = nullptr, const float*
   // k_maxptr = nullptr, const float* v_maxptr = nullptr, float* o_maxptr =
-  // nullptr);
+  // nullptr, const bool is_qkv_fusion = false, const int64_t qkv_layout =
+  // AttnQKVLayout_t::ATTN_BLHD, const float* alibi_slopes = nullptr, const
+  // std::vector<int64_t>& alibi_slopes_shape = {}, int window_size_left = -1,
+  // int window_size_right = -1, int64_t v_head_dim = -1);
   int fa_tgemm = get_flash_attn_tgemm<XPUType>();
   auto flash_attention_kernel =
       baidu::xpu::xfa::mha_varlen_fwd<XPUType, float, tfloat32, int>;
@@ -330,7 +333,8 @@ void FlashAttnKernel(const Context& ctx,
                              nullptr,    // alibi_slopes
                              {},         // alibi_slopes_shape
                              -1,         // window_size_left
-                             -1          // window_size_right
+                             -1,         // window_size_right
+                             -1          // v_head_dim
       );
   PADDLE_ENFORCE_XDNN_SUCCESS(r, "mha_varlen_fwd");
 #else

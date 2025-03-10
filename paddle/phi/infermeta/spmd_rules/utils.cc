@@ -106,7 +106,7 @@ std::unordered_map<std::string, int64_t> ShardingMergeForTensors(
     }
   }
 
-  // Resolute "mesh_dim shard by more than one axis" confict.
+  // Resolute "mesh_dim shard by more than one axis" conflict.
   // Now we just naive pick the first axis naively.
   // (TODO) use local cost model to pick the axis with lowest cost(in concern of
   // memory or communication or computation).

@@ -31,8 +31,7 @@ limitations under the License. */
 #include "glog/logging.h"
 #include "paddle/fluid/framework/op_registry.h"
 
-namespace paddle {
-namespace framework {
+namespace paddle::framework {
 
 const uint32_t MAX_FEASIGN_NUM = 1024 * 100 * 100;
 std::shared_ptr<FleetWrapper> FleetWrapper::s_instance_ = NULL;
@@ -1983,7 +1982,7 @@ int32_t FleetWrapper::CopyTableByFeasign(
 size_t FleetWrapper::GetAbsoluteSum(size_t start,
                                     size_t end,
                                     size_t level,
-                                    const phi::LoD& lod) {
+                                    const phi::LegacyLoD& lod) {
   if (level >= lod.size() - 1) {
     return end - start;
   }
@@ -1996,5 +1995,4 @@ size_t FleetWrapper::GetAbsoluteSum(size_t start,
   return ret;
 }
 
-}  // end namespace framework
-}  // end namespace paddle
+}  // namespace paddle::framework

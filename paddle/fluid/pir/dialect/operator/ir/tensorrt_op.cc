@@ -193,7 +193,7 @@ void TensorRTEngineOp::Build(pir::Builder &builder,             // NOLINT
           TransToIrDataType(outputs_dtype[i]),
           phi::DDim(outputs_shape[i].data(), outputs_shape[i].size()),
           phi::DataLayout::kNCHW,
-          phi::LoD(),
+          phi::LegacyLoD(),
           0));
     }
   }

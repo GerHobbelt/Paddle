@@ -414,34 +414,6 @@ REGISTER_OP_CPU_KERNEL(
     indicate_other_data_type_test,
     paddle::framework::EmptyTestKernel<phi::CPUContext, int>);
 
-TEST(IndicateVarDataTypeTest, other) {
-  paddle::framework::InitDevices();
-  paddle::framework::proto::OpDesc op_desc;
-  op_desc.set_type("indicate_other_data_type_test");
-  BuildVar("Other", {"lod_rank_table_1"}, op_desc.add_inputs());
-
-  phi::CPUPlace cpu_place;
-  paddle::framework::Scope scope;
-
-  auto op = paddle::framework::OpRegistry::CreateOp(op_desc);
-  auto* var = scope.Var("lod_rank_table_1");
-  var->GetMutable<paddle::framework::LoDRankTable>();
-
-  bool caught = false;
-  try {
-    op->Run(scope, cpu_place);
-  } catch (paddle::platform::EnforceNotMet& err) {
-    caught = true;
-    std::string ex_msg = err.what();
-    EXPECT_TRUE(ex_msg.find("The Input Variable(Other) of "
-                            "(indicate_other_data_type_test) Operator used to "
-                            "determine kernel data type "
-                            "is empty or not phi::DenseTensor or SelectedRows "
-                            "or DenseTensorArray.") != std::string::npos);
-  }
-  ASSERT_TRUE(caught);
-}
-
 TEST(ExecutionContextAttrAndInOut, new_api) {
   paddle::framework::InitDevices();
   paddle::framework::proto::OpDesc op_desc;
@@ -489,10 +461,11 @@ class GetLoDLevelTest : public OperatorWithKernel {
     OP_INOUT_CHECK(ctx->HasOutput("Out"), "Output", "Out", "GetLoDLevelTest");
 
     auto lod_level = ctx->GetLoDLevel("X");
-    PADDLE_ENFORCE_GT(lod_level,
-                      0,
-                      common::errors::InvalidArgument(
-                          "The LoD level Input(X) should be larger than 0."));
+    PADDLE_ENFORCE_GT(
+        lod_level,
+        0,
+        common::errors::InvalidArgument(
+            "The LegacyLoD level Input(X) should be larger than 0."));
   }
 };
 

@@ -16,12 +16,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Literal, overload
 
+import numpy as np
+
 import paddle
 import paddle.nn.functional as F
 from paddle import _C_ops, in_dynamic_mode
 from paddle.base.framework import in_dynamic_or_pir_mode
 from paddle.base.layer_helper import LayerHelper
 from paddle.base.wrapped_decorator import signature_safe_contextmanager
+from paddle.device.cuda import get_device_capability
 
 g_enable_math = None
 g_enable_flash = None
@@ -31,6 +34,116 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from paddle import Tensor
+
+
+def _get_arch_info():
+    # Get SMVersion from device.
+    cuda_version = paddle.version.cuda()
+    if (
+        cuda_version is not None and cuda_version != 'False'
+    ) or paddle.is_compiled_with_rocm():
+        major, minor = get_device_capability()
+        arch = int(major * 10 + minor)
+        return arch
+    else:
+        raise ValueError(
+            "Paddle is not compiled with CUDA, we cannot get SMVersion from device, please try to compile Paddle with CUDA"
+        )
+
+
+def check_flash_head_dim_constraints(query, dropout_p=0.0):
+    arch = _get_arch_info()
+    is_sm86_to_sm89 = 86 <= arch <= 89
+
+    if not is_sm86_to_sm89:
+        return True
+
+    head_dim = query.shape[-1]
+    requires_grad = not query.stop_gradient
+
+    if not requires_grad:
+        return True
+
+    is_head_dim_gt192 = head_dim > 192
+    is_head_dim_lte224 = head_dim <= 224
+    is_dropout = dropout_p > 0.0
+
+    cond1 = is_head_dim_gt192 and is_head_dim_lte224
+    cond2 = head_dim > 224 and is_dropout
+
+    if cond1 or cond2:
+        return False
+    return True
+
+
+def check_flash_causal_non_square_seqlens(query, key, is_causal=False):
+    if not is_causal:
+        return True
+
+    seqlen_q = query.shape[-3]
+    seqlen_k = key.shape[-3]
+
+    if seqlen_q != seqlen_k:
+        return False
+    return True
+
+
+def check_dtypes_low_precision(query, debug=False):
+    arch = _get_arch_info()
+    dtype = query.dtype
+
+    if arch >= 80:
+        supported_dtypes = [paddle.float16, paddle.bfloat16]
+    else:
+        supported_dtypes = [paddle.float16]
+
+    return dtype in supported_dtypes
+
+
+def can_use_flash_attn(query, key, attn_mask, dropout, is_causal) -> bool:
+    # sdpa flash check
+    # step1 check tensor place on cuda
+    # step2 check tensor shape, flash attn only support shape == 4
+    # step3 check attn_mask, some diff with torch version
+    # step4 check head_dim <= 256
+    # step5 check arch_info > sm80
+    # step5 check specify sm head dim constraint
+    # step6 check causal qk
+    # step7 check sm dtype support
+    if "gpu" not in paddle.get_device():
+        return False
+    if query.ndim != 4:
+        return False
+    if attn_mask is not None and attn_mask.dtype not in [
+        paddle.bool,
+        paddle.float32,
+    ]:
+        return False
+    if query.shape[-1] >= 256:
+        return False
+    if _get_arch_info() < 80:
+        return False
+    if not check_flash_head_dim_constraints(query, dropout):
+        return False
+    if not check_flash_causal_non_square_seqlens(query, key, is_causal):
+        return False
+    if not check_dtypes_low_precision(query):
+        return False
+    return True
+
+
+def can_use_efficient(query) -> bool:
+    # sdpa efficient check
+    # step1 check tensor place on cuda
+    # step2 check arch_info in [sm50, sm90]
+    # step3 check tensor shape, mem efficient only support shape == 4
+    if "gpu" not in paddle.get_device():
+        return False
+    if _get_arch_info() < 50 and _get_arch_info() > 90:
+        return False
+    if query.ndim != 4:
+        return False
+    return True
 
 
 @signature_safe_contextmanager
@@ -73,6 +186,7 @@ def _math_attention(
     query: Tensor,
     key: Tensor,
     value: Tensor,
+    mask: Tensor,
     dropout_rate: float = ...,
     causal: bool = ...,
     return_softmax: Literal[False] = ...,
@@ -85,6 +199,7 @@ def _math_attention(
     query: Tensor,
     key: Tensor,
     value: Tensor,
+    mask: Tensor,
     dropout_rate: float = ...,
     causal: bool = ...,
     return_softmax: Literal[True] = ...,
@@ -97,6 +212,7 @@ def _math_attention(
     query: Tensor,
     key: Tensor,
     value: Tensor,
+    mask: Tensor,
     dropout_rate: float = ...,
     causal: bool = ...,
     return_softmax: bool = ...,
@@ -108,6 +224,7 @@ def _math_attention(
     query,
     key,
     value,
+    mask=None,
     dropout_rate=0.0,
     causal=False,
     return_softmax=False,
@@ -122,6 +239,9 @@ def _math_attention(
     key = paddle.transpose(key, [0, 2, 1, 3])
     value = paddle.transpose(value, [0, 2, 1, 3])
     product = paddle.matmul(x=query * (head_dim**-0.5), y=key, transpose_y=True)
+
+    if mask is not None:
+        product = product + mask
 
     if not causal:
         weights = F.softmax(product)
@@ -146,6 +266,7 @@ def _math_attention(
 
 
 def _select_sdp_cuda(head_dim: int) -> str:
+
     if head_dim <= 256:
         return "flash_attn"
     else:
@@ -186,6 +307,54 @@ def _select_sdp(head_dim: int) -> str:
             return "math"
     if g_enable_flash is True and g_enable_mem_efficient is True:
         return _select_sdp_cuda(head_dim)
+    if g_enable_flash is True:
+        return "flash_attn"
+    return "mem_efficient"
+
+
+def _select_sdp_for_sdpa(query, key, attn_mask, dropout, is_causal) -> str:
+    r"""
+    this select sdpa is alignment for torch version
+    """
+    place = paddle.get_device()
+    if "xpu" in place:
+        return "flash_attn"
+
+    # not use sdp_kernel
+    if (
+        g_enable_flash is None
+        and g_enable_math is None
+        and g_enable_mem_efficient is None
+    ):
+        # test flash attn usage
+        use_flash = can_use_flash_attn(
+            query, key, attn_mask, dropout, is_causal
+        )
+        use_efficient = can_use_efficient(query)
+        use_math = True
+        if use_flash:
+            return "flash_attn"
+        elif use_efficient:
+            return "mem_efficient"
+        elif use_math:
+            return "math"
+
+    if (
+        g_enable_math is False
+        and g_enable_flash is False
+        and g_enable_mem_efficient is False
+    ):
+        raise AssertionError(
+            "No available backend for scaled_dot_product_attention was found."
+        )
+
+    if g_enable_math is True:
+        if g_enable_flash is False and g_enable_mem_efficient is False:
+            return "math"
+        if "gpu" not in place:
+            return "math"
+    if g_enable_flash is True and g_enable_mem_efficient is True:
+        return _select_sdp_cuda(query.shape[-1])
     if g_enable_flash is True:
         return "flash_attn"
     return "mem_efficient"
@@ -1035,64 +1204,103 @@ def scaled_dot_product_attention(
             >>> # doctest: -SKIP
     """
 
+    head_dim = query.shape[3]
+    sdp_func_name = _select_sdp_for_sdpa(
+        query, key, attn_mask, dropout_p, is_causal
+    )
+
     if attn_mask is None:
         # downgraded to ordinary flash attention implementation
         out, _ = flash_attention(query, key, value, dropout_p, is_causal)
         return out
     else:
-        if in_dynamic_or_pir_mode():
-            fixed_seed_offset = None
-            return_softmax = False
-            rng_name = ""
-            out, _, _, _ = _C_ops.flash_attn(
+        if sdp_func_name == "flash_attn":
+            if in_dynamic_or_pir_mode():
+                fixed_seed_offset = None
+                return_softmax = False
+                rng_name = ""
+                out, _, _, _ = _C_ops.flash_attn(
+                    query,
+                    key,
+                    value,
+                    fixed_seed_offset,
+                    attn_mask,
+                    dropout_p,
+                    is_causal,
+                    return_softmax,
+                    not training,
+                    rng_name,
+                )
+                return out
+            else:
+                helper = LayerHelper('flash_attn', **locals())
+                dtype = helper.input_dtype(input_param_name='q')
+                out = helper.create_variable_for_type_inference(dtype)
+                softmax = helper.create_variable_for_type_inference(dtype)
+                softmax_lse = helper.create_variable_for_type_inference(
+                    paddle.float32
+                )
+                seed_offset = helper.create_variable_for_type_inference(
+                    paddle.int64
+                )
+                inputs = {
+                    'q': query,
+                    'k': key,
+                    'v': value,
+                    'attn_mask': attn_mask,
+                }
+                outputs = {
+                    'out': out,
+                    'softmax': softmax,
+                    'softmax_lse': softmax_lse,
+                    'seed_offset': seed_offset,
+                }
+                helper.append_op(
+                    type='flash_attn',
+                    inputs=inputs,
+                    outputs=outputs,
+                    attrs={
+                        'dropout': dropout_p,
+                        'causal': is_causal,
+                        'return_softmax': False,
+                        'is_test': not training,
+                        'rng_name': '',
+                    },
+                )
+                return out
+        elif sdp_func_name == "mem_efficient":
+            from paddle.incubate.nn.functional.variable_length_memory_efficient_attention import (
+                variable_length_memory_efficient_attention,
+            )
+
+            seq_lens = paddle.to_tensor(
+                [query.shape[1]] * query.shape[0], dtype='int32'
+            )
+
+            scale = 1.0 / np.sqrt(query.shape[-1])
+
+            query = query.transpose([0, 2, 1, 3])
+            key = key.transpose([0, 2, 1, 3])
+            value = value.transpose([0, 2, 1, 3])
+
+            output = variable_length_memory_efficient_attention(
+                query, key, value, seq_lens, seq_lens, attn_mask, scale
+            )
+
+            output = output.transpose([0, 2, 1, 3])
+
+            return output
+        elif sdp_func_name == "math":
+            return _math_attention(
                 query,
                 key,
                 value,
-                fixed_seed_offset,
                 attn_mask,
                 dropout_p,
                 is_causal,
-                return_softmax,
-                not training,
-                rng_name,
-            )
-            return out
-        else:
-            helper = LayerHelper('flash_attn', **locals())
-            dtype = helper.input_dtype(input_param_name='q')
-            out = helper.create_variable_for_type_inference(dtype)
-            softmax = helper.create_variable_for_type_inference(dtype)
-            softmax_lse = helper.create_variable_for_type_inference(
-                paddle.float32
-            )
-            seed_offset = helper.create_variable_for_type_inference(
-                paddle.int64
-            )
-            inputs = {
-                'q': query,
-                'k': key,
-                'v': value,
-                'attn_mask': attn_mask,
-            }
-            outputs = {
-                'out': out,
-                'softmax': softmax,
-                'softmax_lse': softmax_lse,
-                'seed_offset': seed_offset,
-            }
-            helper.append_op(
-                type='flash_attn',
-                inputs=inputs,
-                outputs=outputs,
-                attrs={
-                    'dropout': dropout_p,
-                    'causal': is_causal,
-                    'return_softmax': False,
-                    'is_test': not training,
-                    'rng_name': '',
-                },
-            )
-            return out
+                False,
+                training,
+            )[0]
 
 
 def flashmask_attention(

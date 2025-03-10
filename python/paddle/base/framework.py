@@ -2876,7 +2876,7 @@ class Variable(metaclass=VariableMetaClass):
 
         if not (isinstance(value, np.ndarray) or hasattr(value, "__array__")):
             raise TypeError(
-                f"`value` should be `numpy.ndarray` or `LoDTensor`, but received {type(value)}."
+                f"`value` should be `numpy.ndarray` or `DenseTensor`, but received {type(value)}."
             )
 
         if scope is not None and not isinstance(scope, core._Scope):
@@ -8468,7 +8468,12 @@ def auto_complete_op_role(program, op_role):
         yield
     finally:
         if paddle.framework.in_pir_mode() and is_dist_block(block):
-            always_forward_ops = ["pd_op.data", "builtin.parameter"]
+            always_forward_ops = [
+                "pd_op.data",
+                "builtin.parameter",
+                "cf.stack_create",
+                "cf.tuple_push",
+            ]
             set_op_roles(block, op_role, always_forward_ops)
 
 

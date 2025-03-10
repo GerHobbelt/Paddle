@@ -299,7 +299,7 @@ Tensor ondnn() const;
 
 ##### 2.3.3.3 DenseTensor、SparseTensor
 
-- `DenseTensor` is the basic implementation of Tensor, which corresponds to the `LoDTensor` class in the original fluid. `DenseTensorMeta` in `DenseTensor` contains basic members that describe Tensor information, and `Allocation` in `DenseTensor` is the original `Allocation` of fluid.
+- `DenseTensor` is the basic implementation of Tensor. `DenseTensorMeta` in `DenseTensor` contains basic members that describe Tensor information, and `Allocation` in `DenseTensor` is the original `Allocation` of fluid.
 - `SparseCsrTensor` and `SparseCooTensor` are newly designed sparse Tensor types, see code implementation for details.
 
 > In order to be compatible with the original framework scheduling and operators, we have also migrated `SelectedRows` as a basic Tensor type. If it can be replaced by a new sparse Tensor in the future, it will be removed.

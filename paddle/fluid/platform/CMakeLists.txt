@@ -37,8 +37,8 @@ cc_library(
 set(DEVICE_EVENT_LIBS)
 
 cc_library(
-  lodtensor_printer
-  SRCS lodtensor_printer.cc
+  densetensor_printer
+  SRCS densetensor_printer.cc
   DEPS phi common tensor scope lod_tensor variable_helper)
 
 add_subdirectory(profiler)

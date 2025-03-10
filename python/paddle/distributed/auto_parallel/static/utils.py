@@ -56,6 +56,16 @@ _g_gradient_clip_ops = [
     "reduce_sum",
 ]
 
+partition_skip_op_list = [
+    "builtin.combine",
+    "builtin.split",
+    "pd_op.pylayer",
+    "cf.yield",
+    "cf.tuple_push",
+    "cf.tuple_pop",
+    "cf.stack_create",
+]
+
 
 def get_logger(log_level, name="auto_parallel"):
     logger = logging.getLogger(name)
@@ -547,7 +557,7 @@ def _check_param_dict(param_dict):
                 )
             if not isinstance(value, paddle.base.DenseTensor):
                 raise TypeError(
-                    "The type of value of 'param_dict' should be 'LoDTensor', "
+                    "The type of value of 'param_dict' should be 'DenseTensor', "
                     f"but got '{type(value)}'."
                 )
         return param_dict
@@ -1097,6 +1107,9 @@ def _complete_op_dist_attr(program, block=None):
     for op in block.ops:
         for sub_block in op.blocks():
             _complete_op_dist_attr(program, block=sub_block)
+        if op.name() in partition_skip_op_list:
+            continue
+
         if op.dist_attr is None:
             meshes = []
             operand_attrs = []
@@ -1107,7 +1120,8 @@ def _complete_op_dist_attr(program, block=None):
                     operand_attrs.append(pir.Attribute())
                 else:
                     operand_attrs.append(tmp_attr)
-                    meshes.append(tmp_attr.process_mesh)
+                    if tmp_attr.process_mesh not in meshes:
+                        meshes.append(tmp_attr.process_mesh)
 
             for result in op.results():
                 tmp_attr = result.dist_attr()
@@ -1115,9 +1129,13 @@ def _complete_op_dist_attr(program, block=None):
                     result_attrs.append(pir.Attribute())
                 else:
                     result_attrs.append(tmp_attr)
-                    meshes.append(tmp_attr.process_mesh)
+                    if tmp_attr.process_mesh not in meshes:
+                        meshes.append(tmp_attr.process_mesh)
             if len(meshes) > 0:
-                mesh = merge_process_meshes(meshes)
+                if len(meshes) == 1:
+                    mesh = meshes[0]
+                else:
+                    mesh = merge_process_meshes(meshes)
                 op.dist_attr = pir.create_op_dist_attribute(
                     mesh,
                     operand_attrs,

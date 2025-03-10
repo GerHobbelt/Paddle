@@ -44,9 +44,7 @@ COMMON_DECLARE_uint64(initial_gpu_memory_in_mb);
 COMMON_DECLARE_uint64(reallocate_gpu_memory_in_mb);
 COMMON_DECLARE_bool(benchmark);
 
-namespace paddle {
-namespace memory {
-namespace legacy {
+namespace paddle::memory::legacy {
 template <typename Place>
 void *Alloc(const Place &place, size_t size);
 
@@ -609,9 +607,9 @@ size_t Usage::operator()(const phi::GPUPinnedPlace &cuda_pinned) const {
       "'CUDAPinnedPlace' is not supported in CPU only device."));
 #endif
 }
-}  // namespace legacy
+}  // namespace paddle::memory::legacy
 
-namespace allocation {
+namespace paddle::memory::allocation {
 
 phi::Allocation *NaiveBestFitAllocator::AllocateImpl(size_t size) {
   void *ptr = phi::VisitPlace(place_, legacy::AllocVisitor(size));
@@ -629,6 +627,4 @@ uint64_t NaiveBestFitAllocator::ReleaseImpl(const phi::Place &place) {
   return phi::VisitPlace(place, legacy::ReleaseVisitor());
 }
 
-}  // namespace allocation
-}  // namespace memory
-}  // namespace paddle
+}  // namespace paddle::memory::allocation

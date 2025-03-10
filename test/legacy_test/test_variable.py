@@ -48,9 +48,7 @@ class TestVariable(unittest.TestCase):
 
     def test_var(self):
         b = default_main_program().current_block()
-        w = b.create_var(
-            dtype="float64", shape=[784, 100], lod_level=0, name="fc.w"
-        )
+        w = b.create_var(dtype="float64", shape=[784, 100], name="fc.w")
         w_dtype = w.dtype
         if paddle.framework.use_pir_api() and isinstance(
             w_dtype, paddle.base.libpaddle.VarDesc.VarType
@@ -293,11 +291,11 @@ class TestVariable(unittest.TestCase):
 
     def _tostring(self):
         b = default_main_program().current_block()
-        w = b.create_var(dtype="float64", lod_level=0)
+        w = b.create_var(dtype="float64")
         self.assertTrue(isinstance(str(w), str))
 
         if core.is_compiled_with_cuda():
-            wc = b.create_var(dtype="int", lod_level=0)
+            wc = b.create_var(dtype="int")
             self.assertTrue(isinstance(str(wc), str))
 
     def test_tostring(self):
@@ -308,7 +306,7 @@ class TestVariable(unittest.TestCase):
 
     def test_fake_interface_only_api(self):
         b = default_main_program().current_block()
-        var = b.create_var(dtype="float64", lod_level=0)
+        var = b.create_var(dtype="float64")
         with base.dygraph.guard():
             self.assertRaises(AssertionError, var.numpy)
             self.assertRaises(AssertionError, var.backward)
@@ -369,7 +367,7 @@ class TestVariable(unittest.TestCase):
 
     def test_detach(self):
         b = default_main_program().current_block()
-        x = b.create_var(shape=[2, 3, 5], dtype="float64", lod_level=0)
+        x = b.create_var(shape=[2, 3, 5], dtype="float64")
         detach_x = x.detach()
         self.assertEqual(x.persistable, detach_x.persistable)
         self.assertEqual(x.shape, detach_x.shape)

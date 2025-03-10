@@ -523,7 +523,7 @@ class ClipGradByGlobalNormPass(PassBase):
                             OpRole.Optimize,
                             process_mesh=[
                                 -1
-                            ],  # hack to avoid initialize the dist attr for coalesc var
+                            ],  # hack to avoid initialize the dist attr for coalesce var
                             is_recompute=False,
                             sync=False,
                             op_namescope="grad_clip_fill_constant_dep",

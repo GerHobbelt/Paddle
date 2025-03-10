@@ -52,7 +52,7 @@ struct BroadcastDimsSimplifier {
     }
     ExtendInputDimensions(axis);
 
-    // To Merge the dimensions of input_tensors while the consequtive
+    // To Merge the dimensions of input_tensors while the consecutive
     // equal-dimensions appears. Example below :
     //   in_1.shape = [2, 3, 4, 5]    in_1.shape = [2, 12, 5]
     //   in_2.shape = [1, 3, 4, 5] -> in_2.shape = [1, 12, 5]

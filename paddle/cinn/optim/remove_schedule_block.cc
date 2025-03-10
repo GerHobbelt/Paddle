@@ -23,7 +23,7 @@ namespace cinn {
 namespace optim {
 
 struct ScheduleBlockRemover : public ir::IRMutator<Expr*> {
-  void operator()(ir::Module m) { IRMutator::Visit(m.As<ir::_Module_>()); }
+  void operator()(Expr* expr) { ir::IRMutator<ir::Expr*>::Visit(expr, expr); }
 
  private:
   void Visit(const ir::ScheduleBlockRealize* op, Expr* expr) override {
@@ -57,7 +57,7 @@ struct ScheduleBlockRemover : public ir::IRMutator<Expr*> {
   }
 };
 
-void RemoveScheduleBlock(ir::Module m) { ScheduleBlockRemover()(m); }
+void RemoveScheduleBlock(ir::Expr* expr) { ScheduleBlockRemover()(expr); }
 
 }  // namespace optim
 }  // namespace cinn

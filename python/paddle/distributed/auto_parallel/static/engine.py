@@ -29,6 +29,7 @@ import paddle.distributed.auto_parallel.static.utils as auto_utils
 from paddle import pir, static, utils
 from paddle.base.executor import _to_name_str
 from paddle.base.framework import auto_complete_op_role
+from paddle.decomposition import decomp
 from paddle.distributed.fleet.meta_optimizers.common import OpRole
 from paddle.distributed.passes.pass_base import new_pass
 from paddle.distributed.passes.pass_utils import (
@@ -809,7 +810,7 @@ class Engine:
         # and all the Pass in this Part should be optional to allow consistence in dynamic and static mode.
         if self._strategy.auto_mode == "semi-auto":
             # TODO(xxxx) Step 2.1 Entire Graph Completion in Pir.
-            # dist_program = apply_complition_pass(dist_program)
+            # dist_program = apply_completion_pass(dist_program)
             pass
         elif self._strategy.auto_mode == "random" or "full_random":
             # TODO(caozhou) Step 2.3 Basic Random / MCMC Algorithm for Fully Auto Parallel Search.
@@ -837,7 +838,7 @@ class Engine:
         # TODO(hitywt) Step 3.2: Reshard Pass
         #   resolute the reshard op into special collective operation.
         #   collect the communicator created during resolution.
-        ReshardPasses.apply_reshard_pass(dist_program)
+        ReshardPasses.apply_reshard_pass(dist_program, global_params_grads)
 
         # Note(luchang): When using VPP pipeline pass, we need to split the whole graph into
         # multiple chunks and adjust the process mesh accordingly. Here, we need to store the
@@ -897,20 +898,15 @@ class Engine:
         remove_unuseful_comm_op_pass(dense_program)
 
         if core._enable_dist_prim_all():
-            from paddle.decomposition import decomp
-
+            logging.info("apply decompose in auto parallel")
             with decomp.prim_guard():
                 decomp.decompose_dist_program(dense_program)
 
         if core._enable_auto_recompute():
-            from paddle.decomposition import decomp
-
             logging.info("apply auto_recompute in auto parallel")
             dense_program = decomp.auto_recompute_pir_program(
                 dense_program,
-                lambda op: bool(
-                    op.has_attr('op_role') and op.attrs()["op_role"] == 0
-                ),
+                lambda op: bool(op.has_attr('op_role') and op.op_role == 0),
             )
 
         if self._strategy.pipeline.enable:

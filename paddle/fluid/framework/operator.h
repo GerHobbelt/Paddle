@@ -230,7 +230,7 @@ class RuntimeInferShapeContext : public InferShapeContext {
 
   void SetSkipLoD(bool skip);
 
-  std::vector<LoD> GetOutputsLod(const std::string& out) const;
+  std::vector<LegacyLoD> GetOutputsLod(const std::string& out) const;
 
   std::vector<DDim> GetOutputsDim(const std::string& name) const;
 

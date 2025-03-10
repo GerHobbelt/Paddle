@@ -20,7 +20,7 @@ limitations under the License. */
 
 template <typename DeviceContext, typename T>
 void TestSequencePadding(const DeviceContext &context,
-                         const phi::LoD &lod,
+                         const phi::LegacyLoD &lod,
                          const size_t sequence_width) {
   phi::DenseTensor cpu_seq;
   phi::DenseTensor cpu_seq_back;
@@ -107,11 +107,11 @@ TEST(Seq2BatchPadding, CPU) {
   auto *context = static_cast<phi::CPUContext *>(
       phi::DeviceContextPool::Instance().Get(place));
 
-  phi::LoD lod1;
+  phi::LegacyLoD lod1;
   lod1.push_back(std::vector<size_t>{0, 10});
   TestSequencePadding<phi::CPUContext, float>(*context, lod1, 16);
 
-  phi::LoD lod2;
+  phi::LegacyLoD lod2;
   lod2.push_back(std::vector<size_t>{0, 2, 7, 10});
   TestSequencePadding<phi::CPUContext, float>(*context, lod2, 128);
 }
@@ -122,11 +122,11 @@ TEST(SequencePadding, CUDA) {
   auto *context = static_cast<phi::GPUContext *>(
       phi::DeviceContextPool::Instance().Get(place));
 
-  phi::LoD lod1;
+  phi::LegacyLoD lod1;
   lod1.push_back(std::vector<size_t>{0, 10});
   TestSequencePadding<phi::GPUContext, float>(*context, lod1, 16);
 
-  phi::LoD lod2;
+  phi::LegacyLoD lod2;
   lod2.push_back(std::vector<size_t>{0, 2, 7, 10});
   TestSequencePadding<phi::GPUContext, float>(*context, lod2, 128);
 }

@@ -93,10 +93,10 @@ class BeamSearchFunctor<phi::CPUContext, T> {
     low_level.push_back(low_offset);
 
     // fill lod
-    phi::LoD lod(2);
+    phi::LegacyLoD lod(2);
     lod[0].assign(high_level.begin(), high_level.end());
     lod[1].assign(low_level.begin(), low_level.end());
-    if (!CheckLoD(lod)) {
+    if (!CheckLegacyLoD(lod)) {
       PADDLE_THROW(common::errors::InvalidArgument(
           "lod %s is not right in"
           " beam_search, please check your code.",
@@ -155,7 +155,7 @@ class BeamSearchFunctor<phi::CPUContext, T> {
    * since the end tokens must be writed out.
    */
   void PruneEndBeams(const phi::DenseTensor *pre_ids,
-                     const phi::LoD &abs_lod,
+                     const phi::LegacyLoD &abs_lod,
                      std::vector<std::vector<Item>> *items,
                      size_t lod_level,
                      int end_id) {

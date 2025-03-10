@@ -81,6 +81,18 @@ class OpcodeExecutorCache(metaclass=Singleton):
         self.translate_count = 0
         self.code_symbolic_inputs.clear()
 
+    def dump_state(self):
+        return {
+            "cache": self.cache,
+            "translate_count": self.translate_count,
+            "code_symbolic_inputs": self.code_symbolic_inputs,
+        }
+
+    def load_state(self, state):
+        self.cache = state["cache"]
+        self.translate_count = state["translate_count"]
+        self.code_symbolic_inputs = state["code_symbolic_inputs"]
+
     def __call__(self, frame: types.FrameType, **kwargs) -> CustomCode:
         code: types.CodeType = frame.f_code
         if code not in self.cache:

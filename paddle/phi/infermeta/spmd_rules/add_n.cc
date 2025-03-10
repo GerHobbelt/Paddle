@@ -54,14 +54,36 @@ SpmdInfo AddNInferSpmd(
   std::vector<int64_t> dims_mapping =
       GetDimsMappingForAxes(axes, axis_to_dim_map);
 
+  // Infer partial status from inputs
+  // Note: Now only supports cases where all inputs have same
+  // partial status, then output will have the same one.
+  bool all_input_partial_same = true;
+  paddle::flat_hash_map<int64_t, ReduceType> partial_status;
+  for (size_t i = 0; i < inputs.size(); ++i) {
+    TensorDistAttr input_dist_attr_src = inputs[i].dist_attr();
+    if (input_dist_attr_src.is_partial()) {
+      auto input_partial_status = input_dist_attr_src.partial_status();
+      if (i == 0) {
+        partial_status = input_partial_status;
+      } else if (partial_status != input_partial_status) {
+        all_input_partial_same = false;
+        break;
+      }
+    } else {
+      all_input_partial_same = false;
+      break;
+    }
+  }
   std::vector<TensorDistAttr> inputs_spmd_info;
   for (const auto& input : inputs) {
     TensorDistAttr dist_attr_dst =
         CopyTensorDistAttrForOutput(input.dist_attr());
     dist_attr_dst.set_dims_mapping(dims_mapping);
+    if (all_input_partial_same) {
+      dist_attr_dst.set_partial_status(partial_status);
+    }
     inputs_spmd_info.push_back(dist_attr_dst);
   }
-  // Handle input tensor partial(TODO)
 
   return {{inputs_spmd_info}, {inputs_spmd_info[0]}};
 }

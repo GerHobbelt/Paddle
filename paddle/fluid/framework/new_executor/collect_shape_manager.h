@@ -80,6 +80,7 @@ class CollectShapeManager {
   std::map<pir::Value, std::vector<int32_t>> max_values_;
   std::map<pir::Value, std::vector<int32_t>> opt_values_;
   bool is_shape_range_info_ready_ = false;
+  std::mutex info_mutex_;
 };
 
 }  // namespace framework

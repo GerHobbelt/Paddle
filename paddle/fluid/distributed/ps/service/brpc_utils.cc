@@ -91,7 +91,7 @@ void SerializeDenseTensor(framework::Variable* var,
                           butil::IOBuf* iobuf) {
   auto* tensor = var->GetMutable<phi::DenseTensor>();
   var_msg->set_type(::paddle::distributed::DENSE_TENSOR);
-  const phi::LoD lod = tensor->lod();
+  const phi::LegacyLoD lod = tensor->lod();
   if (!lod.empty()) {
     var_msg->set_lod_level(lod.size());
     for (auto& each : lod) {
@@ -231,7 +231,7 @@ void DeserializeDenseTensor(framework::Variable* var,
   }
   tensor->Resize(common::make_ddim(vec_dim));
 
-  phi::LoD lod;
+  phi::LegacyLoD lod;
   for (int i = 0; i < msg.lod_level(); ++i) {
     phi::Vector<size_t> v;
     for (int j = 0; j < msg.lod(i).lod_data_size(); ++j) {

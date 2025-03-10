@@ -251,6 +251,12 @@ void BindVarDesc(pybind11::module *m) {
            pybind11::return_value_policy::reference)
       .def("set_lod_level", &pd::VarDesc::SetLoDLevel)
       .def("set_lod_levels", &pd::VarDesc::SetLoDLevels)
+      .def("legacy_lod_level", &pd::VarDesc::GetLegacyLoDLevel)
+      .def("legacy_lod_levels",
+           &pd::VarDesc::GetLegacyLoDLevels,
+           pybind11::return_value_policy::reference)
+      .def("set_legacy_lod_level", &pd::VarDesc::SetLegacyLoDLevel)
+      .def("set_legacy_lod_levels", &pd::VarDesc::SetLegacyLoDLevels)
       .def("type", &pd::VarDesc::GetType)
       .def("set_type", &pd::VarDesc::SetType)
       .def("serialize_to_string", SerializeMessage<pd::VarDesc>)

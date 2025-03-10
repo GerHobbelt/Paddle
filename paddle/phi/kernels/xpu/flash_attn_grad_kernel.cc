@@ -143,7 +143,12 @@ void FlashAttnGradKernel(const Context& ctx,
   // const TACCUM* bias = nullptr, const float* q_maxptr = nullptr, const float*
   // k_maxptr = nullptr, const float* v_maxptr = nullptr, const float* o_maxptr
   // = nullptr, float* dq_maxptr = nullptr, float* dk_maxptr = nullptr, float*
-  // dv_maxptr = nullptr, const float* do_maxptr = nullptr);
+  // dv_maxptr = nullptr, const float* do_maxptr = nullptr, const bool
+  // is_qkv_fusion = false, const bool is_dqkv_fusion = false, const int64_t
+  // qkv_layout = AttnQKVLayout_t::ATTN_BLHD, const float* alibi_slopes =
+  // nullptr, const std::vector<int64_t>& alibi_slopes_shape = {}, int
+  // window_size_left = -1, int window_size_right = -1, int64_t v_head_dim =
+  // -1);
   int r = flash_attention_grad_kernel(
       ctx.x_context(),
       dout_data,                                  // dout
@@ -182,7 +187,8 @@ void FlashAttnGradKernel(const Context& ctx,
       nullptr,                                    // alibi_slopes
       {},                                         // alibi_slopes_shape
       -1,                                         // window_size_left
-      -1                                          // window_size_right
+      -1,                                         // window_size_right
+      -1                                          // v_head_dim
   );
   PADDLE_ENFORCE_XDNN_SUCCESS(r, "mha_varlen_bwd");
 #else

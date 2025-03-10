@@ -163,7 +163,8 @@ class OpcodeInlineExecutor(OpcodeExecutorBase):
         self._fn_var = fn_variable
         self.return_value: VariableBase | None = None
         self._fn_value = fn_variable.value
-        super().__init__(fn_variable.get_code(), fn_variable.graph)
+        self._code_var = fn_variable.get_code()
+        super().__init__(self._code_var.value, fn_variable.graph)
         self._name = "Inline"
         self._prepare_locals(*args, **kwargs)
         self._prepare_closure()
@@ -273,6 +274,7 @@ class OpcodeInlineExecutor(OpcodeExecutorBase):
         """
         Execute the inline call of the function.
         """
+        self._graph.add_global_guarded_variable(self._code_var)
         self.run()
         assert self.return_value is not None
         return self.return_value

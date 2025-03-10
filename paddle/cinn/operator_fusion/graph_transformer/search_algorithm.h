@@ -42,7 +42,8 @@ struct SearchAlgorithm<NodePattern, GraphMatcher, GraphOperation> {
       if (GraphMatcher()(*graph_, iter_node) &&
           !visited_nodes.count(iter_node)) {
         visited_nodes.insert(iter_node);
-        VLOG(4) << "Find Matched Node: " << iter_node->id();
+        VLOG(4) << "Find Matched Node: " << iter_node->id() << "(" << iter_node
+                << ")";
         return iter_node;
       }
     }
@@ -76,7 +77,8 @@ struct SearchAlgorithm<NodePairPattern, GraphMatcher, GraphOperation> {
         const auto& pair = std::make_pair(i, j);
         if (GraphMatcher()(*graph_, i, j) && !visited_node_pair.count(pair)) {
           visited_node_pair.insert(pair);
-          VLOG(4) << "Find Matched Node Pair: (" << i << ", " << j << ")";
+          VLOG(4) << "Find Matched Node Pair: (" << i->id() << ", " << j->id()
+                  << ")";
           return pair;
         }
       }
@@ -138,8 +140,8 @@ struct SearchAlgorithm<ReverseTopoNodePairPattern,
 template <typename Kind, typename GraphMatcher, typename GraphOperation>
 void GraphTransformer(PatternGraph* graph) {
   VLOG(4) << "Start GraphTransformer...";
-  auto alog = SearchAlgorithm<Kind, GraphMatcher, GraphOperation>(graph);
-  alog();
+  auto algo = SearchAlgorithm<Kind, GraphMatcher, GraphOperation>(graph);
+  algo();
 }
 
 }  // namespace cinn::fusion

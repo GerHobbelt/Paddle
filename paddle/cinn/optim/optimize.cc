@@ -102,8 +102,9 @@ ir::LoweredFunc Optimize(ir::LoweredFunc fn,
   Simplify(&copied->body);
   VLOG(10) << "After Optimize Simplify:" << copied;
 
-  IfFusion(&copied->body);
-  VLOG(10) << "After Optimize IfFusion" << copied;
+  // TODO(liangshuhao): this pass may unexpectedly remove schedule blocks, and
+  // it actually doesn't contribute to performance, so temporarily disabled.
+  // IfFusion(&copied->body);
 
   VectorizeForTrans(&copied->body);
   VLOG(10) << "After Optimize vectorize" << copied;
@@ -111,19 +112,10 @@ ir::LoweredFunc Optimize(ir::LoweredFunc fn,
   Simplify(&copied->body);
   VLOG(10) << "After Optimize Simplify" << copied;
 
-  return copied;
-}
-
-ir::Module Optimize(const ir::Module& module, const Target& target) {
-  auto copied = ir::ir_utils::IRCopy(module);
-
-  RemoveScheduleBlock(copied);
+  RemoveScheduleBlock(&copied->body);
   VLOG(10) << "After RemoveScheduleBlock:" << copied;
-  LowerFunctionCallBindVars(copied);
-  VLOG(10) << "After LowerFunctionCallBindVars:" << copied;
-  CallArgListToPodValue(copied);
-  VLOG(10) << "After CallArgListToPodValue:" << copied;
-  LowerIntrin(copied, target);
+
+  LowerIntrin(&copied->body, target);
   VLOG(10) << "After LowerIntrin:" << copied;
 
   return copied;

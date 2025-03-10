@@ -39,8 +39,6 @@ class FusionOpPattern : public pir::OpRewritePattern<cinn::dialect::FusionOp> {
     ::pir::IrContext* ctx = ::pir::IrContext::Instance();
     auto* program = fusion_op->GetParentProgram();
     auto& shape_analysis = pir::ShapeAnalysisManager::Instance().Get(program);
-    VLOG(4) << "Program before lowering: \n"
-            << pir::CustomPrintHelper(*program, shape_analysis.PrintHook());
 
     // TODO(zhangyuqin1998): Replace pir::Group with a new structure
     OpLoweringGroupPtr group = GetGroup(fusion_op);

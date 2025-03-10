@@ -112,7 +112,7 @@ class _DataLoaderIterBase:
         else:
             self._collate_fn = loader.collate_fn or default_convert_fn
 
-        # LoDTensorBlockingQueue instance for create_py_reader and a thread
+        # DenseTensorBlockingQueue instance for create_py_reader and a thread
         # to put mini-batch data to self._blocking_queue, mini-batch data
         # will be get from:
         # 1. multi-process mode: get data from workers' result queue

@@ -540,7 +540,7 @@ class DygraphGeneratorLoader(DataLoaderBase):
             # NOTE: this process is used to load data asynchronously from self._batch_reader
             self._process = None
 
-        # NOTE: the C++ LoDTensorBlockingQueue instance
+        # NOTE: the C++ DenseTensorBlockingQueue instance
         self._blocking_queue = None
         # NOTE: 1. In multiprocess mode, this thread is used to get next batch data from
         # self._data_queue, then push it into self._blocking_queue; 2. In single process

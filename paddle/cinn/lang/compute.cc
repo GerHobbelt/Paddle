@@ -155,9 +155,9 @@ ir::Tensor Compute(const std::vector<Expr> &domain,
                    std::function<Expr(const std::vector<Expr> &)> fn,
                    const std::string &name,
                    const std::vector<Expr> &shape) {
-  auto axises = cinn::common::GenDefaultAxis(domain.size());
+  auto axes = cinn::common::GenDefaultAxis(domain.size());
   std::vector<Expr> _axis;
-  for (auto &x : axises) _axis.push_back(x);
+  for (auto &x : axes) _axis.push_back(x);
   Expr fn_body = fn(_axis);
 
   std::vector<Var> reduce_axis;

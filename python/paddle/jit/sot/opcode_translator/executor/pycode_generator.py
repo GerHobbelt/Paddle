@@ -899,7 +899,7 @@ class PyCodeGen:
 
     def gen_dup_top(self):
         if sys.version_info >= (3, 11):
-            return self.add_instr("COPY", arg=0)
+            return self.add_instr("COPY", arg=1)
         return self.add_instr("DUP_TOP")
 
     def gen_swap(self, n):
@@ -1009,12 +1009,23 @@ class ResumeFunctionCreator:
         self.codegen = PyCodeGen(frame, disable_eval_frame)
         self.name = ResumeFnNameFactory().next()
 
-    def set_inputs(self, inputs: list[str], stack_size: int):
+    def set_inputs(
+        self, inputs: list[str], stack_size: int, null_indices: list[int] = []
+    ):
         stack_arg_str = self.name + '_stack_{}'
+        assert all(
+            idx < stack_size for idx in null_indices
+        ), "null index out of range"
 
-        self.codegen._code_options['co_argcount'] = len(inputs) + stack_size
+        self.codegen._code_options['co_argcount'] = (
+            len(inputs) + stack_size - len(null_indices)
+        )
         self.codegen._code_options['co_varnames'] = list(
-            [stack_arg_str.format(i) for i in range(stack_size)]
+            [
+                stack_arg_str.format(i)
+                for i in range(stack_size)
+                if i not in null_indices
+            ]
             + inputs
             + [
                 var_name
@@ -1025,7 +1036,11 @@ class ResumeFunctionCreator:
 
         self.codegen._instructions.extend(
             [
-                gen_instr('LOAD_FAST', argval=stack_arg_str.format(i))
+                (
+                    gen_instr("PUSH_NULL")
+                    if i in null_indices
+                    else gen_instr('LOAD_FAST', argval=stack_arg_str.format(i))
+                )
                 for i in range(stack_size)
             ]
         )

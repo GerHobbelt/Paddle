@@ -44,6 +44,7 @@ from .callable import (  # noqa: F401
     MethodVariable,
     PaddleApiVariable,
     PaddleLayerVariable,
+    UserCodeVariable,
     UserDefinedFunctionVariable,
     UserDefinedGeneratorFunctionVariable,
     UserDefinedLayerVariable,

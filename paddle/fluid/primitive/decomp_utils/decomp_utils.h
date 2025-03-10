@@ -352,7 +352,7 @@ class LayerNormDecompHelper {
       return reshape<T>(s, normlized_shape_);
     } else {
       return backend::reshape<T>(
-          s, get_slice_vec<T>(shape<T>(x), begin_norm_axis_, x_rank_));
+          s, get_slice_vec<T>(shape64<T>(x), begin_norm_axis_, x_rank_));
     }
   }
 
@@ -361,7 +361,7 @@ class LayerNormDecompHelper {
     if (normlized_numel_ != -1) {
       return full_scalar<T>(normlized_numel_, x.dtype());
     } else {
-      auto x_shape = shape<T>(x);
+      auto x_shape = shape64<T>(x);
       auto numel = get_slice<T>(x_shape, begin_norm_axis_);
       for (int64_t i = begin_norm_axis_ + 1; i < x_rank_; ++i) {
         numel = numel * get_slice<T>(x_shape, i);
@@ -445,9 +445,9 @@ class BatchNormDecompHelper {
     if (static_nhw) {
       return full_scalar<T>(nhw_numel, x.dtype());
     } else {
-      auto x_shape = shape<T>(x);
+      auto x_shape = shape64<T>(x);
       auto nhw = get_slice<T>(x_shape, 0);
-      for (int64_t i = 0; i < x_rank_; ++i) {
+      for (int64_t i = 1; i < x_rank_; ++i) {
         if (i == channel_axis_) {
           continue;
         }
@@ -484,7 +484,7 @@ class InstanceNormDecompHelper {
     auto dims = phi::vectorize(x.dims());
     int64_t rank = dims.size();
     if (has_dynamic_shape(x.shape())) {
-      Tensor x_shape = shape<T>(x);
+      Tensor x_shape = shape64<T>(x);
       auto hw = full_scalar<T>(1.0, x.dtype());
       for (int64_t i = 2; i < rank; ++i) {
         hw = hw * get_slice<T>(x_shape, i);

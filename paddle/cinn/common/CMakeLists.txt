@@ -26,7 +26,7 @@ gather_srcs(
   dim_expr_converter.cc
   broadcast_tree.cc
   iter_simplify.cc
-  simplify_corner_case.cc)
+  simplify_special_pattern.cc)
 
 cinn_cc_test(test_equation_graph_topo_walker SRCS
              equation_graph_topo_walker_test.cc DEPS gtest glog)

@@ -27,7 +27,12 @@ void LinspaceKernel(const Context& ctx,
                     const DenseTensor& number,
                     DataType dtype,
                     DenseTensor* out) {
-  int32_t num = number.data<int32_t>()[0];
+  int64_t num = 0;
+  if (number.dtype() == phi::DataType::INT64) {
+    num = number.data<int64_t>()[0];
+  } else if (number.dtype() == phi::DataType::INT32) {
+    num = number.data<int32_t>()[0];
+  }
   auto start_t = phi::funcs::TransDataType(ctx, start, dtype);
   auto stop_t = phi::funcs::TransDataType(ctx, stop, dtype);
 

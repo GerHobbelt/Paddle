@@ -132,6 +132,48 @@ type_promote_inplace_white_list = {
     "remainder_": ["x", "y"],
 }
 
+# ops support casting int tensor into float32 to do forward calculation
+type_autocast_op_list = {
+    "acos": ["x"],
+    "acosh": ["x"],
+    "asin": ["x"],
+    "asinh": ["x"],
+    "atan": ["x"],
+    "atanh": ["x"],
+    "ceil": ["x"],
+    "cos": ["x"],
+    "cosh": ["x"],
+    "digamma": ["x"],
+    "erf": ["x"],
+    "erfinv": ["x"],
+    "floor": ["x"],
+    "i0": ["x"],
+    "i0e": ["x"],
+    "i1": ["x"],
+    "i1e": ["x"],
+    "lgamma": ["x"],
+    "logcumsumexp": ["x"],
+    "logit": ["x"],
+    "logsumexp": ["x"],
+    "polygamma": ["x"],
+    "reciprocal": ["x"],
+    "rsqrt": ["x"],
+    "sigmoid": ["x"],
+    "sin": ["x"],
+    "sinh": ["x"],
+    "sqrt": ["x"],
+    "stanh": ["x"],
+    "tan": ["x"],
+    "tanh": ["x"],
+}
+
+# ops support casting int tensor into float32 to do forward calculation,
+# and it is valid to cast float32 gradient back to int tensor.
+type_autocast_valid_grad_op_list = {
+    "ceil",
+    "floor",
+}
+
 # dict of special api that forward api's output will affect backward api's output
 # backward api's output usually affected by backward api's input
 
@@ -331,6 +373,8 @@ TEST_API {} {}({}) {{
 {}
   // Type promotion Logic
 {}
+  // Type autocast Logic
+{}
   // Layout autotune
 {}
   // Get Input AutoGradMeta
@@ -407,6 +451,8 @@ TEST_API {} {}({}) {{
   // AMP Logic
 {}
   // Type promotion Logic
+{}
+  // Type autocast Logic
 {}
   // Layout autotune
 {}
@@ -621,6 +667,15 @@ TYPE_PROMOTION_LOGIC_TEMPLATE = """
   }}
 """
 
+TYPE_AUTOCAST_LOGIC_TEMPLATE = """
+    if (phi::NeedTypeAutoCast({op_func_name}, {x}.dtype())) {{
+    VLOG(5) << "math operation got integer input data type, run type autocast.";
+    LOG_FIRST_N(WARNING, 1) << "math operation got integer input data type, run type autocast, this may cause data type been changed.";
+    {op_name}
+    auto new_{x} = egr::PromoteCast("{x}", {x}, phi::DataType::FLOAT32, {trace_backward});
+    {return_value}
+  }}
+"""
 
 LAYOUT_LOGIC_TEMPLATE = """
   if (egr::Controller::Instance().UseLayoutAutoTune()) {{
@@ -1580,6 +1635,7 @@ class DygraphForwardFunctionGenerator(DygraphFunctionGeneratorBase):
 
         amp_inputs_call_list = ["" for i in range(num_inputs)]
         type_promote_inputs_call_list = ["" for i in range(num_inputs)]
+        type_autocast_inputs_call_list = ["" for i in range(num_inputs)]
         amp_tensors_vector_list = []
         amp_tensors_vector_optional_list = []
         amp_autocast_list = []
@@ -1608,6 +1664,11 @@ class DygraphForwardFunctionGenerator(DygraphFunctionGeneratorBase):
                         type_promote_inputs_call_list[pos] = f"new_{name}"
                 else:
                     type_promote_inputs_call_list[pos] = f"{name}"
+            if forward_api_name in type_autocast_op_list:
+                if name in type_autocast_op_list[forward_api_name]:
+                    type_autocast_inputs_call_list[pos] = f"new_{name}"
+                else:
+                    type_autocast_inputs_call_list[pos] = f"{name}"
             if IsPlainTensorType(ttype):
                 if is_optional:
                     if (
@@ -1699,6 +1760,7 @@ class DygraphForwardFunctionGenerator(DygraphFunctionGeneratorBase):
             inputs_call_list[pos] = name
             amp_inputs_call_list[pos] = name
             type_promote_inputs_call_list[pos] = name
+            type_autocast_inputs_call_list[pos] = name
             if default_val is not None:
                 inputs_args_declaration_list[pos] = (
                     f"{atype} {name} = {default_val}"
@@ -1988,6 +2050,31 @@ class DygraphForwardFunctionGenerator(DygraphFunctionGeneratorBase):
             )
         else:
             type_promotion_logic_str = f'\n VLOG(5) << " No Type Promotion for {forward_ad_function_name} api. "; '
+
+        # Forward type autocast logic
+        if forward_api_name in type_autocast_op_list:
+            # only support one inputs
+            op_func_name = f'"{forward_api_name}"'
+            x = type_autocast_op_list[forward_api_name][0]
+            type_autocast_inputs_call_args_str = ", ".join(
+                type_autocast_inputs_call_list
+            )
+            trace_backward = (
+                forward_api_name in type_autocast_valid_grad_op_list
+            ) and (not self.is_forward_only)
+            trace_backward = str(trace_backward).lower()
+            type_autocast_call_list = f"return {forward_ad_function_name}({type_autocast_inputs_call_args_str});"
+
+            type_autocast_logic_str = TYPE_AUTOCAST_LOGIC_TEMPLATE.format(
+                op_func_name=op_func_name,
+                x=x,
+                op_name=kernel_trans2_op_name_str,
+                trace_backward=trace_backward,
+                return_value=type_autocast_call_list,
+            )
+        else:
+            type_autocast_logic_str = f'\n VLOG(5) << " No Type Autocast for {forward_ad_function_name} api. "; '
+
         # Forward layout autotune
         layout_autotune_list_str = "    ".join(
             layout_autotune_list
@@ -2037,6 +2124,7 @@ class DygraphForwardFunctionGenerator(DygraphFunctionGeneratorBase):
                     dygraph_event_str,
                     amp_logic_str,
                     type_promotion_logic_str,
+                    type_autocast_logic_str,
                     layout_logic_str,
                     forward_api_name,
                     before_log_str,
@@ -2061,6 +2149,7 @@ class DygraphForwardFunctionGenerator(DygraphFunctionGeneratorBase):
                 dygraph_event_str,
                 amp_logic_str,
                 type_promotion_logic_str,
+                type_autocast_logic_str,
                 layout_logic_str,
                 inputs_autograd_meta_str,
                 forward_api_name,

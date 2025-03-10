@@ -33,10 +33,12 @@ class TestCppExtensionSetupInstall(unittest.TestCase):
         cur_dir = os.path.dirname(os.path.abspath(__file__))
         # install general extension
         # compile, install the custom op egg into site-packages under background
+        site_dir = site.getsitepackages()[0]
         cmd = f'cd {cur_dir} && {sys.executable} cpp_extension_setup.py install'
+        if os.name != 'nt':
+            cmd += f' --install-lib={site_dir}'
         run_cmd(cmd)
 
-        site_dir = site.getsitepackages()[0]
         custom_egg_path = [
             x for x in os.listdir(site_dir) if 'custom_cpp_extension' in x
         ]

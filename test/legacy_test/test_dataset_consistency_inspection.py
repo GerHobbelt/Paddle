@@ -413,7 +413,6 @@ class TestDataset(unittest.TestCase):
             name="click",
             shape=[-1, 1],
             dtype="int64",
-            lod_level=0,
         )
         slot_data.append(label)
 

@@ -80,7 +80,7 @@ Store _Store_::Make(Expr tensor, Expr value, const std::vector<Expr> &indices) {
   ref->set_tensor(tensor);
   ref->set_value(value);
   ref->set_indices(
-      utils::GetCompitableStoreLoadIndices(tensor.as_tensor_ref(), indices));
+      utils::GetCompatibleStoreLoadIndices(tensor.as_tensor_ref(), indices));
 
   if (tensor->type() != Void()) {
     ref->set_type(

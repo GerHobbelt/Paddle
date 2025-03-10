@@ -200,6 +200,7 @@ def matrix_transpose(
 
     Args:
         x (Tensor): The input tensor to be transposed. `x` must be an N-dimensional tensor (N >= 2) of any data type supported by Paddle.
+        name (str|None, optional): The name of this layer. For more information, please refer to :ref:`api_guide_Name`. Default is None.
 
     Returns:
         Tensor: A new tensor with the same shape as `x`, except that the last two dimensions are transposed.
@@ -1867,6 +1868,42 @@ def dot(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
         return out
 
 
+def vecdot(
+    x: Tensor,
+    y: Tensor,
+    axis: int = -1,
+    name: str | None = None,
+) -> Tensor:
+    """
+    Computes the dot product of two tensors along a specified axis.
+
+    This function multiplies two tensors element-wise and sums them along a specified axis to compute their dot product. It supports tensors of any dimensionality, including 0-D tensors, as long as the shapes of `x` and `y` are broadcastable along the specified axis.
+
+    Args:
+        x (Tensor): The first input tensor. It should be a tensor with dtype of float32, float64, int32, int64, complex64, or complex128.
+        y (Tensor): The second input tensor. Its shape must be broadcastable with `x` along the specified `axis`, and it must have the same dtype as `x`.
+        axis (int, optional): The axis along which to compute the dot product. Default is -1, which indicates the last axis.
+        name (str|None, optional): Name of the output. Default is None. It's used to print debug info for developers. Details: :ref:`api_guide_Name`
+
+    Returns:
+        Tensor: A tensor containing the dot product of `x` and `y` along the specified axis.
+
+    Examples:
+
+        .. code-block:: python
+
+            >>> import paddle
+            >>> x = paddle.to_tensor([[1, 2, 3], [4, 5, 6]], dtype='float32')
+            >>> y = paddle.to_tensor([[1, 2, 3], [4, 5, 6]], dtype='float32')
+            >>> result = paddle.linalg.vecdot(x, y, axis=1)
+            >>> print(result)
+            Tensor(shape=[2], dtype=float32, place=Place(cpu), stop_gradient=True,
+            [14.0, 77.0])
+    """
+    out = (x.conj() * y).sum(axis=axis)
+    return out
+
+
 def cov(
     x: Tensor,
     rowvar: bool = True,
@@ -2482,8 +2519,8 @@ def bmm(x: Tensor, y: Tensor, name: str | None = None) -> Tensor:
 def histogram(
     input: Tensor,
     bins: int = 100,
-    min: int = 0,
-    max: int = 0,
+    min: float = 0.0,
+    max: float = 0.0,
     weight: Tensor | None = None,
     density: bool = False,
     name: str | None = None,
@@ -2496,8 +2533,8 @@ def histogram(
         input (Tensor): A Tensor with shape :math:`[N_1, N_2,..., N_k]` . The data type of the input Tensor
             should be float32, float64, int32, int64.
         bins (int, optional): number of histogram bins. Default: 100.
-        min (int, optional): lower end of the range (inclusive). Default: 0.
-        max (int, optional): upper end of the range (inclusive). Default: 0.
+        min (float, optional): lower end of the range (inclusive). Default: 0.0.
+        max (float, optional): upper end of the range (inclusive). Default: 0.0.
         weight (Tensor, optional): If provided, it must have the same shape as input. Each value in input contributes its associated
             weight towards the bin count (instead of 1). Default: None.
         density (bool, optional): If False, the result will contain the count (or total weight) in each bin. If True, the result is the
@@ -2518,6 +2555,11 @@ def histogram(
             Tensor(shape=[4], dtype=int64, place=Place(cpu), stop_gradient=True,
             [0, 2, 1, 0])
     """
+    if isinstance(min, int):
+        min = float(min)
+    if isinstance(max, int):
+        max = float(max)
+
     if in_dynamic_or_pir_mode():
         return _C_ops.histogram(input, weight, bins, min, max, density)
     else:
@@ -2559,8 +2601,8 @@ def histogram(
 def histogram_bin_edges(
     input: Tensor,
     bins: int = 100,
-    min: int = 0,
-    max: int = 0,
+    min: float = 0.0,
+    max: float = 0.0,
     name: str | None = None,
 ) -> Tensor:
     """
@@ -2570,8 +2612,8 @@ def histogram_bin_edges(
     Args:
         input (Tensor): The data type of the input Tensor should be float32, float64, int32, int64.
         bins (int, optional): number of histogram bins.
-        min (int, optional): lower end of the range (inclusive). Default: 0.
-        max (int, optional): upper end of the range (inclusive). Default: 0.
+        min (float, optional): lower end of the range (inclusive). Default: 0.0.
+        max (float, optional): upper end of the range (inclusive). Default: 0.0.
         name (str|None, optional): For details, please refer to :ref:`api_guide_Name`. Generally, no setting is required. Default: None.
 
     Returns:
@@ -2588,6 +2630,11 @@ def histogram_bin_edges(
             Tensor(shape=[5], dtype=float32, place=Place(cpu), stop_gradient=True,
             [0.        , 0.75000000, 1.50000000, 2.25000000, 3.        ])
     """
+    if isinstance(min, int):
+        min = float(min)
+    if isinstance(max, int):
+        max = float(max)
+
     check_type(input, 'input', (Variable), 'histogram_bin_edges')
     check_dtype(
         input.dtype,
@@ -2596,13 +2643,13 @@ def histogram_bin_edges(
         'histogram_bin_edges',
     )
     check_type(bins, 'bins', int, 'histogram_bin_edges')
-    if max == 0 and min == 0:
+    if max == 0.0 and min == 0.0:
         min = paddle.min(input)
         max = paddle.max(input)
     else:
         if max < min:
             raise ValueError("max must be larger than min in range parameter")
-    if (min - max) == 0:
+    if (min - max) == 0.0:
         max = max + 0.5
         min = min - 0.5
     return paddle.linspace(min, max, bins + 1, name=name)
@@ -2943,6 +2990,42 @@ def svd(
             attrs=attrs,
         )
         return u, s, vh
+
+
+def svdvals(x: Tensor, name: str | None = None) -> Tensor:
+    r"""
+    Computes the singular values of one matrix or a batch of matrices.
+
+    Let :math:`X` be the input matrix or a batch of input matrices,
+    the output singular values :math:`S` are the diagonal elements of the matrix
+    produced by singular value decomposition:
+
+    .. math::
+        X = U * diag(S) * VH
+
+    Args:
+        x (Tensor): The input tensor. Its shape should be `[..., M, N]`, where
+            `...` is zero or more batch dimensions. The data type of x should
+            be float32 or float64.
+        name (str|None, optional): Name for the operation. For more
+            information, please refer to :ref:`api_guide_Name`.
+            Default: None.
+
+    Returns:
+        Tensor: Singular values of x. The shape is `[..., K]`, where `K = min(M, N)`.
+
+    Examples:
+        .. code-block:: python
+
+            >>> import paddle
+
+            >>> x = paddle.to_tensor([[1.0, 2.0], [1.0, 3.0], [4.0, 6.0]])
+            >>> s = paddle.linalg.svdvals(x)
+            >>> print(s)
+            Tensor(shape=[2], dtype=float32, place=Place(cpu), stop_gradient=True,
+            [8.14753819, 0.78589684])
+    """
+    return _C_ops.svdvals(x)
 
 
 def _conjugate(x):

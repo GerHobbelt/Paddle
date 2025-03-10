@@ -19,7 +19,7 @@
 namespace cinn::ir::utils {
 
 // FIXME(Aurelius84): Return [Expr(1)] for 0D Tensor as the shape.
-static inline std::vector<Expr> GetCompitableShape(
+static inline std::vector<Expr> GetCompatibleShape(
     const std::vector<Expr>& shape) {
   return shape.empty() ? std::vector<Expr>({Expr(1)}) : shape;
 }
@@ -32,7 +32,7 @@ static inline bool MaybeZeroRankTensor(const Tensor& tensor) {
 }
 
 // FIXME(Aurelius84): Return [Expr(0)] for 0D Tensor as the indices.
-static inline std::vector<Expr> GetCompitableStoreLoadIndices(
+static inline std::vector<Expr> GetCompatibleStoreLoadIndices(
     const Tensor& tensor, const std::vector<Expr>& indices) {
   const bool should_fill_zero = indices.empty() && MaybeZeroRankTensor(tensor);
   return should_fill_zero ? std::vector<Expr>({Expr(0)}) : indices;

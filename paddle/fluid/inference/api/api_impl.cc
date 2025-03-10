@@ -281,7 +281,7 @@ bool NativePaddlePredictor::SetFeed(const std::vector<PaddleTensor> &inputs,
     }
 
     // TODO(Superjomn) Low performance, need optimization for heavy LoD copy.
-    phi::LoD lod;
+    phi::LegacyLoD lod;
     for (auto &level : inputs[i].lod) {
       lod.emplace_back(level);
     }

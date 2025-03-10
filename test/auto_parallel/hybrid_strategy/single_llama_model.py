@@ -136,8 +136,8 @@ class LlamaDecoderLayer(nn.Layer):
         self.input_layernorm = LlamaRMSNorm(self.config)
         self.post_attention_layernorm = LlamaRMSNorm(self.config)
 
-    def forward(self, hidden_states):
-        residual = hidden_states
+    def forward(self, hidden_states, global_tensor):
+        residual = hidden_states + global_tensor
         hidden_states = self.input_layernorm(hidden_states)
         hidden_states = self.self_attn(hidden_states)
         hidden_states = residual + hidden_states
@@ -150,8 +150,21 @@ class LlamaDecoderLayer(nn.Layer):
         return hidden_states
 
 
+class GlobalOutputNet(nn.Layer):
+    def __init__(self, config) -> None:
+        super().__init__()
+        self.config = config
+
+    def forward(self, input):
+        return (
+            input
+            if input is not None
+            else paddle.rand([self.config.hidden_size], dtype="float32")
+        )
+
+
 class LlamaModel(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, position_embedding=False):
         super().__init__()
         self.config = config
         self.vocab_size = self.config.vocab_size
@@ -162,6 +175,17 @@ class LlamaModel(nn.Layer):
             self.hidden_size,
         )
 
+        self.position_embedding = (
+            nn.Embedding(
+                self.vocab_size,
+                self.hidden_size,
+            )
+            if position_embedding
+            else None
+        )
+
+        self.global_layer = GlobalOutputNet(self.config)
+
         decoder_layers = []
         for i in range(self.config.num_hidden_layers):
             decoder_layers.append(LlamaDecoderLayer(self.config))
@@ -171,9 +195,17 @@ class LlamaModel(nn.Layer):
 
     def forward(self, input_ids):
         hidden_states = self.embed_tokens(input_ids)
+        if self.position_embedding is not None:
+            ones = paddle.ones(input_ids.shape, dtype="int64")
+            seq_length = paddle.cumsum(ones, axis=-1)
+            position_ids = seq_length - ones
+            position_embeddings = self.position_embedding(position_ids)
+            hidden_states = hidden_states + position_embeddings
+
+        global_tensor = self.global_layer(None)
 
         for idx, (decoder_layer) in enumerate(self.layers):
-            hidden_states = decoder_layer(hidden_states)
+            hidden_states = decoder_layer(hidden_states, global_tensor)
 
         hidden_states = self.norm(hidden_states)
 
@@ -181,17 +213,23 @@ class LlamaModel(nn.Layer):
 
 
 class LlamaLMHead(nn.Layer):
-    def __init__(self, config):
+    def __init__(self, config, weight=None):
         super().__init__()
         self.config = config
-
-        self.weight = self.create_parameter(
-            shape=[self.config.hidden_size, self.config.vocab_size],
-            dtype=paddle.get_default_dtype(),
-        )
+        self.transpose_y = False
+        if weight is not None:
+            self.weight = weight
+            self.transpose_y = True
+        else:
+            self.weight = self.create_parameter(
+                shape=[self.config.hidden_size, self.config.vocab_size],
+                dtype=paddle.get_default_dtype(),
+            )
 
     def forward(self, hidden_states):
-        logits = paddle.matmul(hidden_states, self.weight, transpose_y=False)
+        logits = paddle.matmul(
+            hidden_states, self.weight, transpose_y=self.transpose_y
+        )
         return logits
 
 
@@ -226,12 +264,17 @@ class LlamaPretrainingCriterion(paddle.nn.Layer):
 class LlamaForCausalLM(nn.Layer):
     enable_to_static_method = True
 
-    def __init__(self, config):
+    def __init__(self, config, share_embedding=False, position_embedding=False):
         super().__init__()
         self.config = config
 
-        self.llama = LlamaModel(self.config)
-        self.lm_head = LlamaLMHead(self.config)
+        self.llama = LlamaModel(self.config, position_embedding)
+        if share_embedding:
+            self.lm_head = LlamaLMHead(
+                self.config, self.llama.embed_tokens.weight
+            )
+        else:
+            self.lm_head = LlamaLMHead(self.config)
 
     def forward(self, input_ids=None):
         input_ids.stop_gradient = True

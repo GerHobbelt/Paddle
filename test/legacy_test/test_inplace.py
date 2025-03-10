@@ -271,13 +271,13 @@ class TestDygraphInplaceMaskedFill(TestDygraphInplace):
             self.assertEqual(var.inplace_version, 0)
 
             inplace_var = self.inplace_api_processing(var)
-            self.assertEqual(var.inplace_version, 2)
+            self.assertEqual(var.inplace_version, 1)
 
             inplace_var[0] = 2
-            self.assertEqual(var.inplace_version, 3)
+            self.assertEqual(var.inplace_version, 2)
 
             inplace_var = self.inplace_api_processing(inplace_var)
-            self.assertEqual(var.inplace_version, 5)
+            self.assertEqual(var.inplace_version, 3)
 
     def test_backward_error(self):
         # It raises an error because the inplace operator will result
@@ -295,7 +295,7 @@ class TestDygraphInplaceMaskedFill(TestDygraphInplace):
             loss = paddle.nn.functional.relu(var_c)
             with self.assertRaisesRegex(
                 RuntimeError,
-                f"received tensor_version:{2} != wrapper_version_snapshot:{0}",
+                f"received tensor_version:{1} != wrapper_version_snapshot:{0}",
             ):
                 loss.backward()
 
@@ -1298,13 +1298,13 @@ class TestDygraphInplaceWhereBroadcast(TestDygraphInplaceWithContinuous):
             self.assertEqual(var.inplace_version, 0)
 
             inplace_var = self.inplace_api_processing(var)
-            self.assertEqual(var.inplace_version, 2)
+            self.assertEqual(var.inplace_version, 1)
 
             inplace_var[0] = 2
-            self.assertEqual(var.inplace_version, 3)
+            self.assertEqual(var.inplace_version, 2)
 
             inplace_var = self.inplace_api_processing(inplace_var)
-            self.assertEqual(var.inplace_version, 5)
+            self.assertEqual(var.inplace_version, 3)
 
     def test_backward_error(self):
         # It raises an error because the inplace operator will result
@@ -1322,7 +1322,7 @@ class TestDygraphInplaceWhereBroadcast(TestDygraphInplaceWithContinuous):
             loss = paddle.nn.functional.relu(var_c)
             with self.assertRaisesRegex(
                 RuntimeError,
-                "received tensor_version:2 != wrapper_version_snapshot:0",
+                "received tensor_version:1 != wrapper_version_snapshot:0",
             ):
                 loss.backward()
 

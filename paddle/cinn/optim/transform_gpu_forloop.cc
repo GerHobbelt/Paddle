@@ -400,7 +400,7 @@ class LocalAxisVisitor : public ir::IRMutator<> {
                                              "threadIdx.z"};
 };
 
-class ReplaceVarToZero : public ir::IRMutator<> {
+class ReplaceUnitVarToZero : public ir::IRMutator<> {
  public:
   void operator()(ir::Expr *expr) { ir::IRMutator<>::Visit(expr, expr); }
 
@@ -457,35 +457,40 @@ class ReplaceVarToZero : public ir::IRMutator<> {
 void OptimizeExprGPU(Expr *expr) {
   VLOG(4) << "Before Optimize Expr:\n" << *expr;
 
-  // copy var nodes to prevent one modification leading to multiple changes
+  // Make independent copies for each load/store's indices to prevent cross
+  // modification in later passes.
   RestructureVarNodes restructure_var_nodes;
   restructure_var_nodes(expr);
 
-  // replace var to bind expr
+  // Replace iter_vars used in ScheduleBlocks to their corresponding iter_values
+  // in ScheduleBlockRealizes.
   ReplaceIndexToBindExpr replace_index_to_bind_expr;
   replace_index_to_bind_expr(expr);
 
   // resize buffer axis
   UpdateBufferAxisPass(expr);
 
-  // replace var name with block/thread
+  // Replace variables bound on block/thread to the actual blockIdx/threadIdx.
   ReplaceLoopVarToGpu replace_loop_var_to_gpu;
   replace_loop_var_to_gpu(expr);
 
-  // update shared buffer axis
+  // Replace blockIdx in shared memory's indices to zero, because shared memory
+  // cannot be accessed from another block.
   SharedAxisVisitor shared_axis_visitor;
   shared_axis_visitor(expr);
 
-  // update local buffer axis
+  // Replace blockIdx/threadIdx in local buffer's indices to zero, because local
+  // buffers cannot be accessed from another block/thread.
   LocalAxisVisitor local_axis_visitor;
   local_axis_visitor(expr);
+
+  // Replace variables that are in range [0, 1) to zero.
+  ReplaceUnitVarToZero replace_unit_var_to_zero;
+  replace_unit_var_to_zero(expr);
 
   EliminateCommonFactorOfLocalIndex(expr);
 
   ResizeBufferToMaxVarRange(expr);
-
-  ReplaceVarToZero replace_var_to_zero;
-  replace_var_to_zero(expr);
 
   if (FLAGS_cinn_longlong2int) {
     TryCastLonglong2Int(expr);

@@ -55,7 +55,7 @@ std::vector<int32_t> GetInt32ArrayAttributeData(
 }
 
 std::vector<int64_t> GetReduceAxisIdx(pir::Operation* reduce_op) {
-  const size_t input_rank = GetCompitableRank(reduce_op->operand_source(0));
+  const size_t input_rank = GetCompatibleRank(reduce_op->operand_source(0));
   const auto& attr_val = reduce_op->attributes().at("axis");
   PADDLE_ENFORCE_EQ(attr_val.isa<::pir::ArrayAttribute>(),
                     true,

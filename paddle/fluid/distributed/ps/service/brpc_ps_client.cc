@@ -24,15 +24,12 @@
 
 static const int max_port = 65535;
 
-namespace paddle {
-namespace framework {
+namespace paddle::framework {
 class Scope;
 class Variable;
-}  // namespace framework
-}  // namespace paddle
+}  // namespace paddle::framework
 
-namespace paddle {
-namespace distributed {
+namespace paddle::distributed {
 
 PD_DEFINE_int32(pserver_push_dense_merge_limit,
                 12,
@@ -1520,7 +1517,7 @@ int32_t BrpcPsClient::RecvAndSaveTable(const uint64_t table_id,
                     common::errors::Unavailable(
                         "Cannot open %s to save variables.", file_name));
 
-  framework::SerializeToStream(fout, *var_tensor, dev_ctx);
+  phi::SerializeToStream(fout, *var_tensor, dev_ctx);
   fout.close();
 
   return 0;
@@ -2074,5 +2071,4 @@ void BrpcPsClient::PushDenseRawGradient(std::shared_ptr<DenseAsyncTask> &task,
   }
 }
 
-}  // namespace distributed
-}  // namespace paddle
+}  // namespace paddle::distributed

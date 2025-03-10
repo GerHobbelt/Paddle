@@ -84,7 +84,7 @@ PYBIND11_INVALID_FULL_MAPPING = {
     'TensorLike': 'paddle._typing.TensorLike',
     'DTypeLike': 'paddle._typing.DTypeLike',
     'ShapeLike': 'paddle._typing.ShapeLike',
-    'Numberic': 'paddle._typing.Numberic',
+    'Numeric': 'paddle._typing.Numeric',
     'TypeGuard': 'typing_extensions.TypeGuard',
     '_Interpolation': 'paddle.tensor.stat._Interpolation',
     'ParamAttrLike': 'paddle._typing.ParamAttrLike',
@@ -185,7 +185,7 @@ def _patch_pybind11_invalid_name():
 
 
 def _patch_pybind11_invalid_annotation():
-    # patch invalid annotaion as `Value`, e.g. 'capsule' to 'typing_extensions.CapsuleType'
+    # patch invalid annotation as `Value`, e.g. 'capsule' to 'typing_extensions.CapsuleType'
     def wrap_name(func):
         @functools.wraps(func)
         def wrapper(self, arg: Annotation):

@@ -19,8 +19,7 @@ namespace phi {
 class DenseTensor;
 }  // namespace phi
 
-namespace phi {
-namespace funcs {
+namespace phi::funcs {
 
 template <typename T>
 class ScaleLoDTensorFunctor<phi::CPUContext, T> {
@@ -32,7 +31,7 @@ class ScaleLoDTensorFunctor<phi::CPUContext, T> {
     auto lod = seq->lod();
     const size_t num_seq = lod[level].size() - 1;
     size_t seq_width = seq->dims()[1];
-    phi::LoD abs_offset_lod = phi::ToAbsOffset(lod);
+    phi::LegacyLoD abs_offset_lod = phi::ToAbsOffset(lod);
 
     T* seq_data = context.template Alloc<T>(seq);
     for (size_t i = 0; i < num_seq; ++i) {
@@ -48,5 +47,4 @@ class ScaleLoDTensorFunctor<phi::CPUContext, T> {
 template class ScaleLoDTensorFunctor<phi::CPUContext, float>;
 template class ScaleLoDTensorFunctor<phi::CPUContext, double>;
 
-}  // namespace funcs
-}  // namespace phi
+}  // namespace phi::funcs

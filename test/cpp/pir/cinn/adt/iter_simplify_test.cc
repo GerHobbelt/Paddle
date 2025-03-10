@@ -259,7 +259,6 @@ TEST_F(TestIterSimplify, div) {
   TEST_EXPR(e1, gt1, i_j_k_fused / 8);
   TEST_EXPR(e2, gt2, i_j_k_fused / 32);
   TEST_EXPR(e3, gt3, i_j_k_fused);
-
   TEST_EXPR(e4, gt4, i_j_k_fused * 2);
   TEST_EXPR(e5, gt5, i_j_k_fused / 2);
   TEST_EXPR(e6, gt6, (i_j_k_fused + 8) / 16);

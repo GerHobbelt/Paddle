@@ -17,7 +17,7 @@ limitations under the License. */
 #include "gtest/gtest.h"
 
 using CPUPlace = phi::CPUPlace;
-using LoD = phi::LoD;
+using LegacyLoD = phi::LegacyLoD;
 using DenseTensorArray = phi::TensorArray;
 
 template <typename T>
@@ -53,7 +53,7 @@ void GenerateExample(const std::vector<size_t>& level_0,
 
   CPUPlace place;
 
-  LoD lod;
+  LegacyLoD lod;
   lod.push_back(level_0);
   lod.push_back(level_1);
 
@@ -127,7 +127,7 @@ void BeamSearchDecodeTestFrame() {
   phi::DenseTensor score_tensor;
   helper.Backtrace(ids, scores, &id_tensor, &score_tensor);
 
-  LoD lod = id_tensor.lod();
+  LegacyLoD lod = id_tensor.lod();
   std::vector<size_t> expect_source_lod = {0, 2, 4};
   EXPECT_EQ(lod[0], expect_source_lod);
   std::vector<size_t> expect_sentence_lod = {0, 4, 7, 12, 17};

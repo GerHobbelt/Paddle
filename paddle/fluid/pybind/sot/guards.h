@@ -84,6 +84,19 @@ class TypeMatchGuard : public GuardBase {
   PyTypeObject* expected_;
 };
 
+class IdMatchGuard : public GuardBase {
+ public:
+  explicit IdMatchGuard(PyObject* obj_ptr)
+      : expected_(reinterpret_cast<PyObject*>(obj_ptr)) {}
+  explicit IdMatchGuard(const py::object& py_obj)
+      : expected_(reinterpret_cast<PyObject*>(py_obj.ptr())) {}
+
+  bool check(PyObject* value);
+
+ private:
+  PyObject* expected_;
+};
+
 class ValueMatchGuard : public GuardBase {
  public:
   explicit ValueMatchGuard(PyObject* value_ptr)

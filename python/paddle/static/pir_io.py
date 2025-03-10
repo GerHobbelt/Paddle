@@ -310,7 +310,7 @@ def normalize_pir_program(program, feed_vars, fetch_vars, **kwargs):
             global_block.remove_op(op)
 
     skip_prune_program = kwargs.get('skip_prune_program', False)
-    # if feed var is not conect with target_vars, it will be delete.
+    # if feed var is not connect with target_vars, it will be delete.
     if not skip_prune_program:
         pir_prune_with_input(copy_program, clone_feed_vars, clone_fetch_vars)
     _inference_optimize(copy_program, prune_read_op=True)

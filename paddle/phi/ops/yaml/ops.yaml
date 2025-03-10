@@ -90,17 +90,17 @@
   traits : pir::SideEffectTrait, paddle::dialect::ForwardOnlyTrait
 
 - op : adam_
-  args : (Tensor param, Tensor grad, Tensor learning_rate, Tensor moment1, Tensor moment2, Tensor beta1_pow, Tensor beta2_pow, Tensor master_param, Tensor skip_update, Scalar beta1 = 0.9f, Scalar beta2 = 0.999f, Scalar epsilon = 1.0e-8f, bool lazy_mode = false, int64_t min_row_size_to_use_multithread = 1000, bool multi_precision = false, bool use_global_beta_pow = false)
-  output : Tensor(param_out), Tensor(moment1_out), Tensor(moment2_out), Tensor(beta1_pow_out), Tensor(beta2_pow_out), Tensor(master_param_out)
+  args : (Tensor param, Tensor grad, Tensor learning_rate, Tensor moment1, Tensor moment2, Tensor moment2_max, Tensor beta1_pow, Tensor beta2_pow, Tensor master_param, Tensor skip_update, Scalar beta1 = 0.9f, Scalar beta2 = 0.999f, Scalar epsilon = 1.0e-8f, bool lazy_mode = false, int64_t min_row_size_to_use_multithread = 1000, bool multi_precision = false, bool use_global_beta_pow = false, bool amsgrad = false)
+  output : Tensor(param_out), Tensor(moment1_out), Tensor(moment2_out), Tensor(moment2_max_out), Tensor(beta1_pow_out), Tensor(beta2_pow_out), Tensor(master_param_out)
   infer_meta :
     func : AdamInferMeta
     spmd_rule : AdamInferSpmdDynamic
   kernel :
-    func : adam {dense, dense, dense, dense, dense, dense, dense, dense, dense -> dense, dense, dense, dense, dense, dense},
-           adam_dense_param_sparse_grad {dense, selected_rows, dense, dense, dense, dense, dense, dense, dense -> dense, dense, dense, dense, dense, dense}
+    func : adam {dense, dense, dense, dense, dense, dense, dense, dense, dense, dense -> dense, dense, dense, dense, dense, dense, dense},
+           adam_dense_param_sparse_grad {dense, selected_rows, dense, dense, dense, dense, dense, dense, dense, dense -> dense, dense, dense, dense, dense, dense, dense}
     data_type : param
-  optional : master_param, skip_update, master_param_out
-  inplace : (param -> param_out), (moment1 -> moment1_out), (moment2 -> moment2_out), (beta1_pow -> beta1_pow_out), (beta2_pow -> beta2_pow_out), (master_param -> master_param_out)
+  optional : moment2_max, master_param, skip_update, moment2_max_out, master_param_out
+  inplace : (param -> param_out), (moment1 -> moment1_out), (moment2 -> moment2_out), (moment2_max -> moment2_max_out), (beta1_pow -> beta1_pow_out), (beta2_pow -> beta2_pow_out), (master_param -> master_param_out)
   traits : pir::SideEffectTrait, paddle::dialect::ForwardOnlyTrait
 
 - op : adamax_
@@ -116,16 +116,16 @@
   traits : pir::SideEffectTrait, paddle::dialect::ForwardOnlyTrait
 
 - op : adamw_
-  args : (Tensor param, Tensor grad, Tensor learning_rate, Tensor moment1, Tensor moment2, Tensor beta1_pow, Tensor beta2_pow, Tensor master_param, Tensor skip_update, Scalar beta1 = 0.9f, Scalar beta2 = 0.999f, Scalar epsilon = 1.0e-8f, float lr_ratio = 1.0f, float coeff = 0.01f, bool with_decay = false, bool lazy_mode = false, int64_t min_row_size_to_use_multithread = 1000, bool multi_precision = false, bool use_global_beta_pow = false)
-  output : Tensor(param_out), Tensor(moment1_out), Tensor(moment2_out), Tensor(beta1_pow_out), Tensor(beta2_pow_out), Tensor(master_param_out)
+  args : (Tensor param, Tensor grad, Tensor learning_rate, Tensor moment1, Tensor moment2, Tensor moment2_max, Tensor beta1_pow, Tensor beta2_pow, Tensor master_param, Tensor skip_update, Scalar beta1 = 0.9f, Scalar beta2 = 0.999f, Scalar epsilon = 1.0e-8f, float lr_ratio = 1.0f, float coeff = 0.01f, bool with_decay = false, bool lazy_mode = false, int64_t min_row_size_to_use_multithread = 1000, bool multi_precision = false, bool use_global_beta_pow = false, bool amsgrad = false)
+  output : Tensor(param_out), Tensor(moment1_out), Tensor(moment2_out), Tensor(moment2_max_out), Tensor(beta1_pow_out), Tensor(beta2_pow_out), Tensor(master_param_out)
   infer_meta :
     func : AdamwInferMeta
     spmd_rule : AdamwInferSpmdDynamic
   kernel :
     func : adamw
     data_type : param
-  optional : master_param, skip_update, master_param_out
-  inplace : (param -> param_out), (moment1 -> moment1_out), (moment2 -> moment2_out), (beta1_pow -> beta1_pow_out), (beta2_pow -> beta2_pow_out), (master_param -> master_param_out)
+  optional : moment2_max, master_param, skip_update, moment2_max_out, master_param_out
+  inplace : (param -> param_out), (moment1 -> moment1_out), (moment2 -> moment2_out), (moment2_max -> moment2_max_out), (beta1_pow -> beta1_pow_out), (beta2_pow -> beta2_pow_out), (master_param -> master_param_out)
   traits : pir::SideEffectTrait, paddle::dialect::ForwardOnlyTrait
 
 - op : add_position_encoding
@@ -289,7 +289,7 @@
   kernel :
     func : argmax
     data_type : x
-  interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface, paddle::dialect::LayoutTransformationInterface
   traits : paddle::dialect::ForwardOnlyTrait
 
 - op : argmin
@@ -939,6 +939,7 @@
   kernel :
     func : cholesky_solve
   backward : cholesky_solve_grad
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : class_center_sample
   args : (Tensor label, int num_classes, int num_samples, int ring_id = 0, int rank = 0, int nranks = 1, bool fix_seed = false, int seed = 0)
@@ -1053,7 +1054,7 @@
     func : conv2d_transpose
     data_type : x
   backward : conv2d_transpose_grad
-  interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface, paddle::dialect::LayoutTransformationInterface
 
 - op : conv2d_transpose_bias
   args : (Tensor x, Tensor filter, Tensor bias, int[] strides={1, 1}, int[] paddings={0, 0}, int[] output_padding={}, IntArray output_size={}, str padding_algorithm="EXPLICIT", int groups=1, int[] dilations={1, 1}, str data_format="NCHW")
@@ -1386,21 +1387,6 @@
     func : determinant
   backward : det_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
-
-- op : detection_map
-  args: (Tensor detect_res, Tensor label, Tensor has_state, Tensor pos_count, Tensor
-    true_pos, Tensor false_pos, int class_num, int background_label = 0, float overlap_threshold
-    = .5f, bool evaluate_difficult = true, str ap_type = "integral")
-  output: Tensor (accum_pos_count), Tensor (accum_true_pos), Tensor (accum_false_pos),
-    Tensor (m_ap)
-  infer_meta:
-    func: DetectionMapInferMeta
-  kernel:
-    func: detection_map
-    data_type: detect_res
-  optional: has_state, pos_count, true_pos, false_pos
-  interfaces : paddle::dialect::InferSymbolicShapeInterface
-  traits : paddle::dialect::ForwardOnlyTrait
 
 - op : dgc
   args : (Tensor u, Tensor v, Tensor grad, Tensor param, Tensor current_step, Tensor nranks, float m=0.9, bool use_nesterov=true, float[] sparsity={}, float rampup_begin_step=0.0, float rampup_step=0.0, float regular_coeff=0.0, int regular_type=0)
@@ -2525,7 +2511,7 @@
   backward: hinge_loss_grad
 
 - op : histogram
-  args : (Tensor input, Tensor weight, int64_t bins = 100, int min = 0, int max = 0, bool density = false)
+  args : (Tensor input, Tensor weight, int64_t bins = 100, float min = 0.0, float max = 0.0, bool density = false)
   output : Tensor(out)
   infer_meta :
     func : HistogramInferMeta
@@ -3400,15 +3386,15 @@
   traits : paddle::dialect::ForwardOnlyTrait
 
 - op : merged_adam_
-  args : (Tensor[] param, Tensor[] grad, Tensor[] learning_rate, Tensor[] moment1, Tensor[] moment2, Tensor[] beta1_pow, Tensor[] beta2_pow, Tensor[] master_param, Scalar beta1 = 0.9f, Scalar beta2 = 0.999f, Scalar epsilon = 1.0e-8f, bool multi_precision = false, bool use_global_beta_pow = false)
-  output : Tensor[](param_out){param.size()}, Tensor[](moment1_out){param.size()}, Tensor[](moment2_out){param.size()}, Tensor[](beta1_pow_out){param.size()}, Tensor[](beta2_pow_out){param.size()}, Tensor[](master_param_out){param.size()}
+  args : (Tensor[] param, Tensor[] grad, Tensor[] learning_rate, Tensor[] moment1, Tensor[] moment2, Tensor[] moment2_max, Tensor[] beta1_pow, Tensor[] beta2_pow, Tensor[] master_param, Scalar beta1 = 0.9f, Scalar beta2 = 0.999f, Scalar epsilon = 1.0e-8f, bool multi_precision = false, bool use_global_beta_pow = false, bool amsgrad = false)
+  output : Tensor[](param_out){param.size()}, Tensor[](moment1_out){param.size()}, Tensor[](moment2_out){param.size()}, Tensor[](moment2_max_out){param.size()}, Tensor[](beta1_pow_out){param.size()}, Tensor[](beta2_pow_out){param.size()}, Tensor[](master_param_out){param.size()}
   infer_meta :
     func : MergedAdamInferMeta
   kernel :
     func : merged_adam
     data_type : param
-  optional: master_param, master_param_out
-  inplace : (param -> param_out), (moment1 -> moment1_out), (moment2 -> moment2_out), (beta1_pow -> beta1_pow_out), (beta2_pow -> beta2_pow_out), (master_param -> master_param_out)
+  optional: moment2_max, master_param, moment2_max_out, master_param_out
+  inplace : (param -> param_out), (moment1 -> moment1_out), (moment2 -> moment2_out), (moment2_max -> moment2_max_out), (beta1_pow -> beta1_pow_out), (beta2_pow -> beta2_pow_out), (master_param -> master_param_out)
   traits : pir::SideEffectTrait, paddle::dialect::ForwardOnlyTrait
 
 - op : merged_momentum_
@@ -4475,6 +4461,19 @@
   interfaces : paddle::dialect::InferSymbolicShapeInterface
   traits : paddle::dialect::ForwardOnlyTrait
 
+- op : shape64
+  args : (Tensor input)
+  output : Tensor(out)
+  infer_meta :
+    func : Shape64InferMeta
+  kernel :
+    func : shape64 {dense -> dense},
+           shape64_sr {selected_rows -> dense}
+  data_transform :
+    skip_transform : input
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
+  traits : paddle::dialect::ForwardOnlyTrait
+
 - op : shard_index
   args : (Tensor input, int index_num, int nshards, int shard_id, int ignore_value=-1)
   output : Tensor(out)
@@ -4801,7 +4800,7 @@
   kernel :
     func : strided_slice
   backward : strided_slice_grad
-  # interfaces : paddle::dialect::InferSymbolicShapeInterface
+  interfaces : paddle::dialect::InferSymbolicShapeInterface
 
 - op : sum
   args : (Tensor x, IntArray axis={}, DataType dtype=DataType::UNDEFINED, bool keepdim=false)
@@ -4824,6 +4823,15 @@
     func : svd
   backward : svd_grad
   interfaces : paddle::dialect::InferSymbolicShapeInterface
+
+- op : svdvals
+  args : (Tensor x)
+  output :  Tensor(s)
+  infer_meta :
+    func : SvdvalsInferMeta
+  kernel :
+    func : svdvals
+  backward : svdvals_grad
 
 - op : swiglu
   args : (Tensor x, Tensor y)
@@ -4928,7 +4936,7 @@
   traits : paddle::dialect::ForwardOnlyTrait
 
 - op : tdm_sampler
-  args: (Tensor x, Tensor travel, Tensor layer, bool output_positive=true, int[] neg_samples_num_list={}, int[] layer_offset_lod={}, int seed = 0, int dtype=2)
+  args: (Tensor x, Tensor travel, Tensor layer, bool output_positive=true, int[] neg_samples_num_list={}, int[] layer_offset={}, int seed = 0, int dtype=2)
   output: Tensor(out), Tensor(labels), Tensor(mask)
   infer_meta:
     func : TdmSamplerInferMeta

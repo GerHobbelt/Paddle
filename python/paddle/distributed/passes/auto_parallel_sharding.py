@@ -1303,7 +1303,7 @@ class ShardingPass(PassBase):
                     )
                     idx += 1
 
-                # NOTE(Ruibiao): Why add dependecy here?
+                # NOTE(Ruibiao): Why add dependency here?
                 # It is hack to delay GC for coalesce_var, which significantly reduce memory usage.
                 # With the pattern of reduce_sum + scale, the coalesce_var is used by the reduce_sum
                 # op on the comm-stream, and then released by the scale op on the comp-stream. Since

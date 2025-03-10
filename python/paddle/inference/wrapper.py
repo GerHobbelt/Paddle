@@ -84,7 +84,7 @@ def tensor_share_external_data(self, data: Tensor) -> None:
         )
     else:
         raise TypeError(
-            "In share_external_data, we only support Tensor and LoDTensor."
+            "In share_external_data, we only support Tensor and DenseTensor."
         )
 
 

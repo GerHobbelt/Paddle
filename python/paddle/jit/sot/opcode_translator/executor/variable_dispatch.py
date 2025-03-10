@@ -1242,6 +1242,32 @@ Dispatcher.register(
 )
 
 
+@Dispatcher.register_decorator(max)
+def dispatch_max_star_args(*args: VariableBase):
+    if not args:
+        raise TypeError("max expected at least 1 arguments, got 0")
+    res = args[0]
+    graph = res.graph
+    for arg in args:
+        gt = BuiltinVariable(operator.gt, graph, DanglingTracker())(arg, res)
+        if gt.get_py_value() is True:
+            res = arg
+    return res
+
+
+@Dispatcher.register_decorator(min)
+def dispatch_min_star_args(*args: VariableBase):
+    if not args:
+        raise TypeError("min expected at least 1 arguments, got 0")
+    res = args[0]
+    graph = res.graph
+    for arg in args:
+        lt = BuiltinVariable(operator.lt, graph, DanglingTracker())(arg, res)
+        if lt.get_py_value() is True:
+            res = arg
+    return res
+
+
 # math functions, e.g. math.log, math.sqrt, math.sin, etc.
 def get_math_unary_functions():
     unary_fns = []

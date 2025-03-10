@@ -2534,7 +2534,7 @@ bool PixelShuffleOpInferSymbolicShape(
 
   const bool channel_last = (data_format == "NHWC");
 
-  // the number of channles shoule be able to be divided by the upscale_factor
+  // the number of channels shoule be able to be divided by the upscale_factor
   // ^ 2.
   // TODO(Lans1ot, Buaa): add constrain for the channel number and
   // upscale_factor
@@ -3088,6 +3088,19 @@ bool ShapeOpInferSymbolicShape(pir::Operation *op,
   return true;
 }
 
+bool Shape64OpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  const symbol::ShapeOrDataDimExprs &operand_shape_or_data =
+      infer_context->GetShapeOrDataForValue(op->operand_source(0));
+  const auto &out_data = operand_shape_or_data.shape();
+  const std::vector<symbol::DimExpr> shape{std::int64_t(out_data.size())};
+  symbol::ShapeOrDataDimExprs shape_or_data{
+      symbol::TensorShapeOrDataDimExprs(shape, out_data)};
+
+  infer_context->SetShapeOrDataForValue(op->result(0), shape_or_data);
+  return true;
+}
+
 bool ShardIndexOpInferSymbolicShape(
     pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
   const auto &in_shape_or_data =
@@ -3182,6 +3195,10 @@ bool ShapeSrOpInferSymbolicShape(
   return ShapeOpInferSymbolicShape(op, infer_context);
 }
 
+bool Shape64SrOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  return Shape64OpInferSymbolicShape(op, infer_context);
+}
 // bool ShardIndexOpInferSymbolicShape(pir::Operation *op,
 //                                     pir::InferSymbolicShapeContext
 //                                     *infer_context) {
@@ -3210,23 +3227,65 @@ bool ShuffleChannelOpInferSymbolicShape(
 bool SliceOpInferSymbolicShape(pir::Operation *op,
                                pir::InferSymbolicShapeContext *infer_context) {
   pir::Value operand_source = op->operand_source(0);
-  pir::Value operand_starts = op->operand_source(1);
-  pir::Value operand_ends = op->operand_source(2);
   pir::Value res = op->result(0);
 
-  const symbol::ShapeOrDataDimExprs &starts_shape_data =
-      infer_context->GetShapeOrDataForValue(operand_starts);
-  const symbol::ShapeOrDataDimExprs &ends_shape_data =
-      infer_context->GetShapeOrDataForValue(operand_ends);
-
   std::vector<int64_t> axes_vec = details::GetVectorAttr(op, "axes");
-
-  ExprVec starts = slice_utils::GetExprVecFromData(starts_shape_data);
-  ExprVec ends = slice_utils::GetExprVecFromData(ends_shape_data);
-
   std::vector<int64_t> infer_flags = details::GetVectorAttr(op, "infer_flags");
   const std::vector<int64_t> decrease_axis =
       details::GetVectorAttr(op, "decrease_axis");
+
+  auto GetExprVec = [&](std::vector<symbol::DimExpr> *expr_vec,
+                        const int &operand_idx,
+                        const std::string &attr_name) -> bool {
+    if (op->operand_source(operand_idx)) {
+      const symbol::ShapeOrDataDimExprs &se_shape_data =
+          infer_context->GetShapeOrDataForValue(
+              op->operand_source(operand_idx));
+      if (slice_utils::GetExprVecOfStartEnd(se_shape_data, expr_vec)) {
+        return true;
+      }
+      PADDLE_ENFORCE_EQ(
+          se_shape_data.shape().at(0).isa<std::int64_t>() &&
+              (static_cast<int64_t>(axes_vec.size()) ==
+               se_shape_data.shape().at(0).dyn_cast<std::int64_t>()),
+          true,
+          common::errors::InvalidArgument(
+              "The size of axes must equal size of starts and ends."));
+      return false;
+    } else {
+      if (op->attributes().find(attr_name) != op->attributes().end()) {
+        const std::vector<int64_t> se_raw =
+            paddle::dialect::details::GetVectorAttr(op, attr_name);
+        for (const int64_t &se : se_raw) {
+          expr_vec->push_back(symbol::DimExpr{se});
+        }
+        return true;
+      }
+      return false;
+    }
+  };
+
+  std::vector<symbol::DimExpr> starts;
+  std::vector<symbol::DimExpr> ends;
+  if (!GetExprVec(&starts, 1, "starts") || !GetExprVec(&ends, 2, "ends")) {
+    const auto &in_shapeordata =
+        infer_context->GetShapeOrDataForValue(op->operand_source(0));
+    // NOTE(gongshaotian): When there is no data value in the starts and ends
+    // parameters, only the shape value is processed regardless of whether the
+    // input has a data value, and the  data value is no longer processed.
+    std::vector<symbol::DimExpr> out_shape = in_shapeordata.shape();
+    for (size_t i = 0; i < axes_vec.size(); i++) {
+      int64_t axis = axes_vec[i];
+      out_shape[axis] = infer_context->GetNextSymName();
+    }
+    ExprVec out_dims = paddle::dialect::slice_utils::GetDecreasedDims(
+        out_shape, decrease_axis);
+    infer_context->SetShapeOrDataForValue(
+        res,
+        symbol::ShapeOrDataDimExprs{
+            symbol::TensorShapeOrDataDimExprs(out_dims)});
+    return true;
+  }
 
   infer_context->SetShapeOrDataForValue(
       res,
@@ -3456,12 +3515,42 @@ bool SplitWithNumOpInferSymbolicShape(
   return true;
 }
 
-// bool StridedSliceOpInferSymbolicShape(pir::Operation *op,
-//                                       pir::InferSymbolicShapeContext
-//                                       *infer_context) {
-//   // pass
-//   return true;
-// }
+bool StridedSliceOpInferSymbolicShape(
+    pir::Operation *op, pir::InferSymbolicShapeContext *infer_context) {
+  pir::Value operand_source = op->operand_source(0);
+  pir::Value operand_starts = op->operand_source(1);
+  pir::Value operand_ends = op->operand_source(2);
+  pir::Value operand_strides = op->operand_source(3);
+  pir::Value res = op->result(0);
+
+  const symbol::ShapeOrDataDimExprs &starts_shape_data =
+      infer_context->GetShapeOrDataForValue(operand_starts);
+  const symbol::ShapeOrDataDimExprs &ends_shape_data =
+      infer_context->GetShapeOrDataForValue(operand_ends);
+  const symbol::ShapeOrDataDimExprs &strides_shape_data =
+      infer_context->GetShapeOrDataForValue(operand_strides);
+
+  ExprVec starts = slice_utils::GetExprVecFromData(starts_shape_data);
+  ExprVec ends = slice_utils::GetExprVecFromData(ends_shape_data);
+  ExprVec strides = slice_utils::GetExprVecFromData(strides_shape_data);
+
+  std::vector<int32_t> axes_vec = details::GetVectorAttr<int32_t>(op, "axes");
+  std::vector<int64_t> axes_vec_64(axes_vec.begin(), axes_vec.end());
+
+  infer_context->SetShapeOrDataForValue(
+      res,
+      slice_utils::StridedSliceRawInferSymbolicShape(operand_source,
+                                                     res,
+                                                     starts,
+                                                     ends,
+                                                     strides,
+                                                     axes_vec_64,
+                                                     std::vector<int64_t>{},
+                                                     std::vector<int64_t>{},
+                                                     infer_context));
+
+  return true;
+}
 
 bool SumOpInferSymbolicShape(pir::Operation *op,
                              pir::InferSymbolicShapeContext *infer_context) {
@@ -3879,19 +3968,9 @@ bool SqueezeOpInferSymbolicShape(
   auto axes_shape_or_data =
       infer_context->GetShapeOrDataForValue(op->operand_source(1));
 
-  std::vector<symbol::DimExpr> in_dims_sym;
-  if (x_shape_or_data.data().has_value()) {
-    in_dims_sym = x_shape_or_data.data().value();
-  } else {
-    in_dims_sym = x_shape_or_data.shape();
-  }
-
-  std::vector<symbol::DimExpr> squeeze_dims_sym;
-  if (axes_shape_or_data.data().has_value()) {
-    squeeze_dims_sym = axes_shape_or_data.data().value();
-  } else {
-    squeeze_dims_sym = axes_shape_or_data.shape();
-  }
+  const auto &in_dims_sym = x_shape_or_data.shape();
+  const std::vector<symbol::DimExpr> &squeeze_dims_sym =
+      details::GetExprVecFromData(axes_shape_or_data);
 
   std::vector<int> squeeze_dims;
   for (auto squeeze_dim : squeeze_dims_sym) {
@@ -3929,13 +4008,15 @@ bool SqueezeOpInferSymbolicShape(
 
       if (!should_squeeze.at(current)) {
         // At compile time, dim of SYMBOL is allowed to squeeze?
-        if (in_dims_sym.at(current) == 1) {
-          should_squeeze.at(current) = true;
-        } else if (!in_dims_sym.at(current).Has<std::int64_t>()) {
-          should_squeeze.at(current) = true;
-        } else {
-          should_squeeze.at(current) = true;
+        if (!in_dims_sym.at(current).Has<std::int64_t>()) {
+          should_squeeze[current] = true;
+          continue;
         }
+        if (in_dims_sym.at(current) == 1) {
+          should_squeeze[current] = true;
+          continue;
+        }
+        should_squeeze[current] = false;
       }
     }
   }
@@ -4219,12 +4300,7 @@ bool UnsqueezeOpInferSymbolicShape(
   auto axis_shape_or_data =
       infer_context->GetShapeOrDataForValue(op->operand_source(1));
 
-  std::vector<symbol::DimExpr> x_sym_shape;
-  if (x_shape_or_data.data().has_value()) {
-    x_sym_shape = x_shape_or_data.data().value();
-  } else {
-    x_sym_shape = x_shape_or_data.shape();
-  }
+  const auto &x_sym_shape = x_shape_or_data.shape();
   int x_dims_size = x_sym_shape.size();
 
   std::vector<symbol::DimExpr> axis_sym;

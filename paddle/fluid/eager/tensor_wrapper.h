@@ -171,13 +171,13 @@ class TensorWrapper {
       if (intermidiate_tensor_.is_dense_tensor()) {
         VLOG(6) << "intermidiate_tensor_ is DenseTensor";
         static_cast<phi::DenseTensor*>(intermidiate_tensor_.impl().get())
-            ->ResetHolder(src_dense_tensor->MoveMemoryHolder());
+            ->ResetHolder(src_dense_tensor->Holder());
       } else if (intermidiate_tensor_.is_dist_tensor()) {
         VLOG(6) << "intermidiate_tensor_ is DistTensor";
         static_cast<phi::distributed::DistTensor*>(
             intermidiate_tensor_.impl().get())
             ->unsafe_mutable_value()
-            ->ResetHolder(src_dense_tensor->MoveMemoryHolder());
+            ->ResetHolder(src_dense_tensor->Holder());
       } else {
         PADDLE_THROW(
             common::errors::Fatal("Unrecognized intermidiate_tensor_ type for "

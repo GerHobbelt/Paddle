@@ -1856,7 +1856,7 @@ MatmulJudgeDtypeKernel(const Context& ctx,
                 std::is_same<T, int8_t>::value) {
     if (x.dtype() == phi::DataType::INT8 && x_dims[0] <= 4 &&
         y_dims.size() == 2 && y_dims[0] % 16 == 0 && y_dims[1] % 16 == 0 &&
-        FLAGS_cuda_core_int8_gemm) {
+        FLAGS_cuda_core_int8_gemm && ctx.GetComputeCapability() >= 70) {
       if (!transpose_y) {
         DenseTensor delta;
         phi::EmptyKernel<float, Context>(

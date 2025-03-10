@@ -37,6 +37,7 @@ limitations under the License. */
 #include "paddle/fluid/framework/custom_operator.h"
 #include "paddle/fluid/framework/data_layout.h"
 #include "paddle/fluid/framework/data_type_transform.h"
+#include "paddle/fluid/framework/dense_tensor_array.h"
 #include "paddle/fluid/framework/executor.h"
 #include "paddle/fluid/framework/executor_cache.h"
 #include "paddle/fluid/framework/executor_gc_helper.h"
@@ -48,8 +49,6 @@ limitations under the License. */
 #include "paddle/fluid/framework/ir/cost_model.h"
 #include "paddle/fluid/framework/ir/generate_pass.h"
 #include "paddle/fluid/framework/ir/pass_builder.h"
-#include "paddle/fluid/framework/lod_rank_table.h"
-#include "paddle/fluid/framework/lod_tensor_array.h"
 #include "paddle/fluid/framework/new_executor/executor_statistics.h"
 #include "paddle/fluid/framework/new_executor/standalone_executor.h"
 #include "paddle/fluid/framework/op_info.h"
@@ -178,8 +177,7 @@ PYBIND11_MAKE_OPAQUE(paddle::framework::FetchUnmergedList);
 PYBIND11_MAKE_OPAQUE(paddle::framework::FetchList);
 PYBIND11_MAKE_OPAQUE(paddle::framework::FetchType);
 
-namespace paddle {
-namespace pybind {
+namespace paddle::pybind {
 
 PyTypeObject *g_framework_tensor_pytype = nullptr;
 
@@ -492,19 +490,19 @@ void BindTensor(pybind11::module &m) {  // NOLINT
            }) /* ------ End of original Tensor ------ */
       .def(py::init([](const std::vector<std::vector<size_t>>
                            &recursive_sequence_lengths) {
-        LoD new_lod;
+        LegacyLoD new_lod;
         new_lod.reserve(recursive_sequence_lengths.size());
         std::copy(recursive_sequence_lengths.begin(),
                   recursive_sequence_lengths.end(),
                   std::back_inserter(new_lod));
-        LoD new_offset_lod = ConvertToOffsetBasedLoD(new_lod);
+        LegacyLoD new_offset_lod = ConvertToOffsetBasedLegacyLoD(new_lod);
         PADDLE_ENFORCE_EQ(
-            CheckLoD(new_offset_lod, -1),
+            CheckLegacyLoD(new_offset_lod, -1),
             true,
             common::errors::InvalidArgument(
                 "The provided recursive_sequence_lengths info is "
                 "invalid, "
-                "the LoD converted by recursive_sequence_lengths is %s",
+                "the LegacyLoD converted by recursive_sequence_lengths is %s",
                 new_lod));
         return std::make_unique<phi::DenseTensor>(new_offset_lod);
       }))
@@ -520,19 +518,20 @@ void BindTensor(pybind11::module &m) {  // NOLINT
           [](phi::DenseTensor &self,
              const std::vector<std::vector<size_t>> &lod) {
             // the input lod is offset-based level-of-detail info
-            LoD new_lod;
+            LegacyLoD new_lod;
             new_lod.reserve(lod.size());
             std::copy(lod.begin(), lod.end(), std::back_inserter(new_lod));
             PADDLE_ENFORCE_EQ(
-                CheckLoD(new_lod, common::vectorize(self.dims()).front()),
+                CheckLegacyLoD(new_lod, common::vectorize(self.dims()).front()),
                 true,
                 common::errors::InvalidArgument(
-                    "The provided LoD is invalid, the LoD is %s", new_lod));
+                    "The provided LegacyLoD is invalid, the LegacyLoD is %s",
+                    new_lod));
             self.set_lod(new_lod);
           },
           py::arg("lod"),
           R"DOC(
-           Set LoD of the Tensor.
+           Set LegacyLoD of the Tensor.
 
            Args:
                lod (list[list[int]]): The lod to set.
@@ -559,27 +558,27 @@ void BindTensor(pybind11::module &m) {  // NOLINT
                  &recursive_sequence_lengths) {
             // the input recursive_sequence_lengths is length-based
             // level-of-detail info
-            LoD new_lod;
+            LegacyLoD new_lod;
             new_lod.reserve(recursive_sequence_lengths.size());
             std::copy(recursive_sequence_lengths.begin(),
                       recursive_sequence_lengths.end(),
                       std::back_inserter(new_lod));
-            LoD new_offset_lod = ConvertToOffsetBasedLoD(new_lod);
+            LegacyLoD new_offset_lod = ConvertToOffsetBasedLegacyLoD(new_lod);
             PADDLE_ENFORCE_EQ(
-                CheckLoD(new_offset_lod,
-                         common::vectorize(self.dims()).front()),
+                CheckLegacyLoD(new_offset_lod,
+                               common::vectorize(self.dims()).front()),
                 true,
                 common::errors::InvalidArgument(
                     "The provided recursive_sequence_lengths info is "
                     "invalid, "
-                    "the LoD converted by recursive_sequence_lengths is "
+                    "the LegacyLoD converted by recursive_sequence_lengths is "
                     "%s",
                     new_lod));
             self.set_lod(new_offset_lod);
           },
           py::arg("recursive_sequence_lengths"),
           R"DOC(
-           Set LoD of the Tensor according to recursive sequence lengths.
+           Set LegacyLoD of the Tensor according to recursive sequence lengths.
 
            For example, if recursive_sequence_lengths=[[2, 3]], which means
            there are two sequences with length 2 and 3 respectively, the
@@ -609,14 +608,14 @@ void BindTensor(pybind11::module &m) {  // NOLINT
           "lod",
           [](phi::DenseTensor &self) -> std::vector<std::vector<size_t>> {
             // output the offset-based lod info
-            LoD lod = self.lod();
+            LegacyLoD lod = self.lod();
             std::vector<std::vector<size_t>> new_lod;
             new_lod.reserve(lod.size());
             std::copy(lod.begin(), lod.end(), std::back_inserter(new_lod));
             return new_lod;
           },
           R"DOC(
-           Return the LoD of the Tensor.
+           Return the LegacyLoD of the Tensor.
 
            Returns:
                list[list[int]]: The lod of the Tensor.
@@ -682,7 +681,7 @@ void BindTensor(pybind11::module &m) {  // NOLINT
              auto dtype =
                  static_cast<phi::DataType>(t[1].cast<int>());
              auto dims = common::make_ddim(t[2].cast<std::vector<int>>());
-             auto lod_info = t[3].cast<phi::LoD>();
+             auto lod_info = t[3].cast<phi::LegacyLoD>();
              auto device_id = t[4].cast<int>();
 
              auto shared_reader_holder =
@@ -793,7 +792,7 @@ void BindTensor(pybind11::module &m) {  // NOLINT
                  shared_reader_holder,
                  static_cast<phi::DataType>(t[3].cast<int>()));
              tensor.Resize(common::make_ddim(t[4].cast<std::vector<int>>()));
-             tensor.set_lod(t[5].cast<phi::LoD>());
+             tensor.set_lod(t[5].cast<phi::LegacyLoD>());
 
              return tensor;
            },
@@ -928,7 +927,7 @@ void BindTensor(pybind11::module &m) {  // NOLINT
                  shared_holder,
                  static_cast<phi::DataType>(t[3].cast<int>()));
              tensor.Resize(common::make_ddim(t[4].cast<std::vector<int>>()));
-             tensor.set_lod(t[5].cast<phi::LoD>());
+             tensor.set_lod(t[5].cast<phi::LegacyLoD>());
 
              return tensor;
            },
@@ -1016,7 +1015,7 @@ void BindTensor(pybind11::module &m) {  // NOLINT
                 shared_reader_holder,
                 static_cast<phi::DataType>(t[2].cast<int>()));
             tensor.Resize(common::make_ddim(t[3].cast<std::vector<int>>()));
-            tensor.set_lod(t[4].cast<phi::LoD>());
+            tensor.set_lod(t[4].cast<phi::LegacyLoD>());
 
             return tensor;
           }));
@@ -1105,5 +1104,4 @@ void BindTensor(pybind11::module &m) {  // NOLINT
       });
 }
 
-}  // namespace pybind
-}  // namespace paddle
+}  // namespace paddle::pybind

@@ -109,7 +109,7 @@ static DimUsageRelation CreateOpRelativenessForBroadcast(pir::Operation* op) {
 static DimUsageRelation CreateOpRelativenessForReduce(pir::Operation* op) {
   const auto& reduce_axis_idx = GetReduceAxisIdx(op);
   DimUsageRelation res;
-  const size_t input_rank = GetCompitableRank(op->operand_source(0));
+  const size_t input_rank = GetCompatibleRank(op->operand_source(0));
   int out_idx = 0;
   bool keep_dim = GetReduceOpKeepDims(op);
   for (size_t i = 0; i < input_rank; i++) {

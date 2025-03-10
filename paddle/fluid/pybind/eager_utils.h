@@ -23,8 +23,8 @@ typedef SSIZE_T ssize_t;
 
 #include "paddle/fluid/eager/grad_node_info.h"
 #include "paddle/fluid/eager/hooks.h"
+#include "paddle/fluid/framework/dense_tensor_array.h"
 #include "paddle/fluid/framework/lod_tensor.h"
-#include "paddle/fluid/framework/lod_tensor_array.h"
 #include "paddle/fluid/framework/tensor.h"
 #include "paddle/fluid/jit/function.h"
 #include "paddle/phi/api/lib/kernel_dispatch.h"
@@ -448,6 +448,8 @@ void BindEagerUtils(PyObject* module);
 std::tuple<std::vector<int64_t>,
            paddle::flat_hash_map<int64_t, phi::ReduceType>>
 CvtPlacements(phi::distributed::Placements placements, int ndim);
+
+void EagerSetDeviceId();
 
 }  // namespace pybind
 }  // namespace paddle

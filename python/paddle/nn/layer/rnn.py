@@ -286,6 +286,7 @@ def _rnn_static_graph(
         inputs = paddle.utils.map_structure(_transpose_batch_time, inputs)
 
     max_seq_len = paddle.shape(paddle.utils.flatten(inputs)[0])[0]
+    max_seq_len = paddle.cast(max_seq_len, paddle.int32)
     if sequence_length is not None:
         mask = paddle.static.nn.sequence_lod.sequence_mask(
             sequence_length,

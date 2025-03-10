@@ -42,6 +42,7 @@ from .utils import (
     get_pp_stage_by_pp_degree,
     get_pp_stage_by_process_mesh,
     get_sub_process_mesh_by_program,
+    partition_skip_op_list,
 )
 
 _logger = get_logger(
@@ -105,8 +106,12 @@ def apply_partition_pass(program, block=None):
     for op in block.ops:
         for sub_block in op.blocks():
             apply_partition_pass(program, block=sub_block)
+
         if op.dist_attr is None:
             continue
+        if op.name() in partition_skip_op_list:
+            continue
+
         assert len(op.operands()) == len(
             op.dist_attr.operands()
         ), f"The number of operands and the number of op_dist_attr's operands are not equal in op: {op}"
@@ -289,7 +294,7 @@ class ReshardPasses:
             op.erase()
 
     @staticmethod
-    def reshard_op_pass(dist_program, block=None):
+    def reshard_op_pass(dist_program, global_params_grads=None, block=None):
         if block is None:
             block = dist_program.global_block()
         for op in block.ops:
@@ -308,6 +313,10 @@ class ReshardPasses:
 
                 if src_dist_attr == dst_dist_attr:
                     op.result(0).replace_all_uses_with(var)
+                    if global_params_grads is not None:
+                        for idx, (p, g) in enumerate(global_params_grads):
+                            if g is not None and g.is_same(op.result(0)):
+                                global_params_grads[idx] = (p, var)
                     op.erase()
                     continue
 
@@ -331,13 +340,21 @@ class ReshardPasses:
                     op.result(0).replace_all_uses_with(out_value)
 
                 if op.result(0).use_empty():
+                    if global_params_grads is not None:
+                        for idx, (p, g) in enumerate(global_params_grads):
+                            if g is not None and g.is_same(op.result(0)):
+                                global_params_grads[idx] = (
+                                    (p, out_value)
+                                    if out_value is not None
+                                    else (p, var)
+                                )
                     op.erase()
 
     @staticmethod
-    def apply_reshard_pass(dist_program):
+    def apply_reshard_pass(dist_program, global_params_grads=None):
         ReshardPasses.decompose_reshard_pass(dist_program)
         ReshardPasses.fold_reshard_pass(dist_program)
-        ReshardPasses.reshard_op_pass(dist_program)
+        ReshardPasses.reshard_op_pass(dist_program, global_params_grads)
 
 
 # Replace the specific MoE-related dist op with the
@@ -394,23 +411,17 @@ class RemovePasses:
             if op.name() == "dist_op.moe_sub_mesh_tensors":
                 replace_moe_sub_mesh_tensors(op)
                 continue
-            if op.name() == "dist_op.moe_global_mesh_tensor":
+            elif op.name() == "dist_op.moe_global_mesh_tensor":
                 replace_moe_global_mesh_tensor(op)
                 continue
-            if op.name() == "cf.tuple_push":
+            elif op.name() == "cf.tuple_push":
                 stack_create_op = op.operand_source(0).get_defining_op()
                 if stack_create_op.result(2).use_empty():
                     op.erase()
                 continue
-            if op.name() == "cf.yield":
+            elif op.name() == "cf.yield":
                 continue
-            if op.name() in [
-                "builtin.combine",
-                "builtin.split",
-                "pd_op.pylayer",
-                "cf.tuple_pop",
-                "cf.stack_create",
-            ]:
+            elif op.name() in partition_skip_op_list:
                 can_delete = True
                 for val in op.results():
                     if not val.use_empty():
@@ -418,6 +429,7 @@ class RemovePasses:
                 if can_delete:
                     op.erase()
                 continue
+
             if cur_rank not in op.dist_attr.process_mesh.process_ids:
                 op.erase()
             elif op.name() == "dist_op.reshard":
@@ -811,7 +823,7 @@ def _analyze_use_custom_mesh(ops, seg_method, pp_degree):
     return non_use_custom_mesh
 
 
-def _set_process_mesh_and_chunk_id(op, process_mesh, chunk_id, set_mesh):
+def _set_process_mesh_and_chunk_id(op, chunk_process_mesh, chunk_id, set_mesh):
     def set_var_origin_op_process_mesh(var_origin_op):
         var_origin_op_input_attr = var_origin_op.dist_attr.operands()
         var_origin_op_output_attr = var_origin_op.dist_attr.results()
@@ -820,7 +832,7 @@ def _set_process_mesh_and_chunk_id(op, process_mesh, chunk_id, set_mesh):
         ].as_tensor_dist_attr()
         var_origin_op_output_attr[0] = (
             paddle.base.libpaddle.pir.create_tensor_dist_attribute(
-                process_mesh,
+                chunk_process_mesh,
                 var_origin_op_output_attr[0].dims_mapping,
                 var_origin_op_output_attr[0].partial_status,
             )
@@ -828,36 +840,105 @@ def _set_process_mesh_and_chunk_id(op, process_mesh, chunk_id, set_mesh):
 
         var_origin_op.dist_attr = (
             paddle.base.libpaddle.pir.create_op_dist_attribute(
-                process_mesh,
+                chunk_process_mesh,
                 var_origin_op_input_attr,
                 var_origin_op_output_attr,
                 0,
             )
         )
 
-    def set_process_mesh(vars, attrs):
-        for idx, (var, attr) in enumerate(zip(vars, attrs)):
-            var_dist_attr = var.dist_attr()
-            # Note(luchang): the var generated by builtin.combine will have mutilple dist_attr
-            if var_dist_attr and var_dist_attr.as_array_attr():
-                var_array_attr = var_dist_attr.as_array_attr()
-                for i in range(len(var_array_attr)):
-                    var_dist_attr = var_array_attr[i].as_tensor_dist_attr()
+    def get_var_process_mesh(var):
+        var_process_mesh = None
+        var_dist_attr = var.dist_attr()
+
+        def get_attr_mesh(var_dist_attr):
+            if var_dist_attr:
+                if var_dist_attr.as_array_attr():
+                    var_array_attr = var_dist_attr.as_array_attr()
+                    return var_array_attr[0].as_tensor_dist_attr().process_mesh
+                else:
+                    return var_dist_attr.process_mesh
+
+        if var_dist_attr:
+            var_process_mesh = get_attr_mesh(var_dist_attr)
+        elif var.is_combine():
+            # NOTE(zhangwl): op var may is vec_type , need get var dist_attr one by one
+            var_list = var.type().as_vec_type()
+            var_list = var_list.as_list() if var_list is not None else var_list
+            var_attr_list = []
+            for combine_var in var_list:
+                var_dist_attr = combine_var.as_dist_type().dist_attr()
+                var_process_mesh = get_attr_mesh(var_dist_attr)
+                if var_process_mesh is not None:
+                    return var_process_mesh
+
+    def get_var_attr_with_process_mesh(
+        var_dist_attr, var_origin_op, process_mesh
+    ):
+        # Note(luchang): the var generated by builtin.combine will have mutilple dist_attr
+        if var_dist_attr and var_dist_attr.as_array_attr():
+            var_array_attr = var_dist_attr.as_array_attr()
+            for i in range(len(var_array_attr)):
+                var_dist_attr = var_array_attr[i].as_tensor_dist_attr()
+                if op_mesh is not None:
                     if var_dist_attr.process_mesh == op_mesh:
                         var_array_attr[i] = copy_dist_attr_with_new_member(
                             var_dist_attr, new_process_mesh=process_mesh
                         )
-                var.update_dist_attr(var_array_attr)
-            elif var_dist_attr and var_dist_attr.process_mesh == op_mesh:
-                var.update_dist_attr(
-                    copy_dist_attr_with_new_member(
+                else:
+                    var_array_attr[i] = copy_dist_attr_with_new_member(
                         var_dist_attr, new_process_mesh=process_mesh
                     )
+            return var_array_attr
+        elif var_dist_attr:
+            if op_mesh is not None:
+                if var_dist_attr.process_mesh == op_mesh:
+                    if var_origin_op.name() in [
+                        "pd_op.data",
+                        "builtin.parameter",
+                    ]:
+                        set_var_origin_op_process_mesh(var_origin_op)
+                    var_attr = copy_dist_attr_with_new_member(
+                        var_dist_attr, new_process_mesh=process_mesh
+                    )
+                    return var_attr
+            else:
+                var_attr = copy_dist_attr_with_new_member(
+                    var_dist_attr, new_process_mesh=process_mesh
                 )
-                var_origin_op = var.get_defining_op()
-                if var_origin_op.name() in ["pd_op.data", "builtin.parameter"]:
-                    set_var_origin_op_process_mesh(var_origin_op)
+                return var_attr
+        return var_dist_attr
 
+    def set_var_process_mesh(var, process_mesh):
+        var_dist_attr = var.dist_attr()
+        var_origin_op = var.get_defining_op()
+        if var_dist_attr:
+            var_attr = get_var_attr_with_process_mesh(
+                var_dist_attr, var_origin_op, process_mesh
+            )
+            if var_attr is not None:
+                var.update_dist_attr(var_attr)
+        elif var.is_combine():
+            # NOTE(zhangwl): op var may is vec_type , need set var dist_attr one by one
+            var_list = var.type().as_vec_type()
+            var_list = var_list.as_list() if var_list is not None else var_list
+            var_attr_list = []
+            for combine_var in var_list:
+                var_dist_attr = combine_var.as_dist_type().dist_attr()
+                var_attr_list.append(
+                    get_var_attr_with_process_mesh(
+                        var_dist_attr, var_origin_op, process_mesh
+                    )
+                )
+            var_array_attr = (
+                paddle.base.libpaddle.pir.create_array_dist_attribute(
+                    var_attr_list
+                )
+            )
+            var.update_dist_attr(var_array_attr)
+
+    def set_attrs_process_mesh(attrs, process_mesh):
+        for idx, attr in enumerate(attrs):
             if attr.as_array_attr():
                 array_attr = attr.as_array_attr()
                 new_array_attr = []
@@ -880,17 +961,37 @@ def _set_process_mesh_and_chunk_id(op, process_mesh, chunk_id, set_mesh):
                         tensor_attr, new_process_mesh=process_mesh
                     )
 
+    def set_process_mesh(vars, attrs, process_mesh):
+        if vars is not None:
+            for var in vars:
+                set_var_process_mesh(var, process_mesh)
+        if attrs is not None:
+            set_attrs_process_mesh(attrs, process_mesh)
+
+    op_input_vars = op.operands_source()
+    op_output_vars = op.results()
+    # NOTE(zhangwl):dist_skip_op donnot have op_mesh
+    op_mesh = None
+    if op.name() in dist_skip_op_list:
+        input_var_process_mesh = None
+        # NOTE(zhangwl):dist_skip_op output_process_mesh must equal to input_process_mesh
+        for var in op_input_vars:
+            input_var_process_mesh = get_var_process_mesh(var)
+            if input_var_process_mesh is not None:
+                break
+        if input_var_process_mesh is not None:
+            set_process_mesh(op_output_vars, None, input_var_process_mesh)
+        return
+
     op_dist_attr = op.dist_attr
     op_mesh = op_dist_attr.process_mesh
     op_input_attrs = op_dist_attr.operands()
     op_output_attrs = op_dist_attr.results()
-    op_input_vars = op.operands_source()
-    op_output_vars = op.results()
-
+    # if op in seq_chunk , vpp need set var and op chunk_process_mesh and chunk_id
     if set_mesh:
-        set_process_mesh(op_input_vars, op_input_attrs)
-        set_process_mesh(op_output_vars, op_output_attrs)
-        op_mesh = process_mesh
+        set_process_mesh(op_input_vars, op_input_attrs, chunk_process_mesh)
+        set_process_mesh(op_output_vars, op_output_attrs, chunk_process_mesh)
+        op_mesh = chunk_process_mesh
 
     op.dist_attr = paddle.base.libpaddle.pir.create_op_dist_attribute(
         op_mesh,
@@ -972,8 +1073,6 @@ def complete_chunk_id(dist_program, startup_program, pipeline_strategy):
         )
 
         for idx in range(start_idx, end_idx):
-            if ops[idx].name() in dist_skip_op_list:
-                continue
             if ops[idx].name() == "dist_op.reshard":
                 reshard_ops.append(ops[idx])
                 continue

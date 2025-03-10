@@ -587,6 +587,12 @@ def load_state_dict(
             offload,
         )
 
+        for flat_key, keys in mapping.items():
+            tmp = state_dict
+            for key in keys[:-1]:
+                tmp = tmp[key]
+            tmp[keys[-1]] = flat_state_dict[flat_key]
+
 
 def _load_state_dict(
     target_state_dict,
@@ -597,13 +603,6 @@ def _load_state_dict(
     offload=False,
 ) -> None:
     with paddle.base.dygraph.guard():
-
-        state_dict_in_cpu = {}
-        for k, v in target_state_dict.items():
-            if v.place.is_cpu_place():
-                state_dict_in_cpu[k] = v
-                target_state_dict[k] = v.cuda()
-
         use_dist = True if paddle.distributed.get_world_size() > 1 else False
 
         local_load_files = list(source_state_dict.keys())
@@ -616,7 +615,14 @@ def _load_state_dict(
         read_items = get_read_items(
             metadata_list, target_state_dict, process_group, use_dist
         )
+        state_dict_in_cpu = []
+        idx = 0
         for item in read_items:
+            key = item.local_tensor_index.tensor_key
+            if key in target_state_dict:
+                if target_state_dict[key].place.is_cpu_place():
+                    state_dict_in_cpu.append(key)
+                    target_state_dict[key] = target_state_dict[key].cuda()
             assert (
                 item.local_tensor_index in load_infos
             ), f"read item:{item}, load_infos:{load_infos}"
@@ -716,11 +722,13 @@ def _load_state_dict(
                         tmp_tensor, src=src_rank, group=process_group
                     )
                     paddle.assign(tmp_tensor, cur_chunk_tensor)
-
-        for k, v in target_state_dict.items():
-            if k in state_dict_in_cpu:
-                value = state_dict_in_cpu[k]
-                paddle.assign(v.cpu(), value)
+            if (
+                key in state_dict_in_cpu
+                and idx + 1 < len(read_items)
+                and read_items[idx + 1].local_tensor_index.tensor_key != key
+            ):
+                target_state_dict[key] = target_state_dict[key].cpu()
+            idx = idx + 1
 
         if use_dist:
             paddle.distributed.barrier(process_group)

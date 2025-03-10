@@ -42,8 +42,7 @@ limitations under the License. */
 
 using egr::ConvertToDistTensor;
 
-namespace paddle {
-namespace pybind {
+namespace paddle::pybind {
 
 PyTypeObject* p_pylayer_type;
 extern PyTypeObject* p_tensor_type;
@@ -818,5 +817,4 @@ void BindEagerPyLayer(PyObject* module) {
   }
 }
 
-}  // namespace pybind
-}  // namespace paddle
+}  // namespace paddle::pybind

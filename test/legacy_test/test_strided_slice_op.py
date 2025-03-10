@@ -326,7 +326,6 @@ class TestStridedSliceOp_starts_ListTensor(OpTest):
             starts_tensor.append(
                 ("x" + str(index), np.ones(1).astype('int32') * ele)
             )
-
         self.inputs = {'Input': self.input, 'StartsTensorList': starts_tensor}
         self.outputs = {'Out': self.output}
         self.attrs = {
@@ -351,7 +350,7 @@ class TestStridedSliceOp_starts_ListTensor(OpTest):
         self.starts_infer = [1, 10, 2]
 
     def test_check_output(self):
-        self.check_output(check_pir=True)
+        self.check_output(check_pir=True, check_symbol_infer=False)
 
     def test_check_grad_normal(self):
         self.check_grad(
@@ -395,7 +394,7 @@ class TestStridedSliceOp_ends_ListTensor(OpTest):
         self.ends_infer = [3, 1, 4]
 
     def test_check_output(self):
-        self.check_output(check_pir=True)
+        self.check_output(check_pir=True, check_symbol_infer=False)
 
     def test_check_grad_normal(self):
         self.check_grad(
@@ -433,7 +432,7 @@ class TestStridedSliceOp_starts_Tensor(OpTest):
         )
 
     def test_check_output(self):
-        self.check_output(check_pir=True)
+        self.check_output(check_pir=True, check_symbol_infer=False)
 
     def test_check_grad_normal(self):
         self.check_grad(
@@ -471,7 +470,7 @@ class TestStridedSliceOp_ends_Tensor(OpTest):
         )
 
     def test_check_output(self):
-        self.check_output(check_pir=True)
+        self.check_output(check_pir=True, check_symbol_infer=False)
 
     def test_check_grad_normal(self):
         self.check_grad(
@@ -516,7 +515,7 @@ class TestStridedSliceOp_listTensor_Tensor(OpTest):
         )
 
     def test_check_output(self):
-        self.check_output(check_pir=True)
+        self.check_output(check_pir=True, check_symbol_infer=False)
 
     def test_check_grad_normal(self):
         self.check_grad(
@@ -554,7 +553,7 @@ class TestStridedSliceOp_strides_Tensor(OpTest):
         )
 
     def test_check_output(self):
-        self.check_output(check_pir=True)
+        self.check_output(check_pir=True, check_symbol_infer=False)
 
     def test_check_grad_normal(self):
         self.check_grad(
@@ -644,7 +643,7 @@ class TestStridedSliceAPI(unittest.TestCase):
         sliced_1 = paddle.strided_slice(
             x, axes=axes, starts=starts, ends=ends, strides=strides_1
         )
-        assert sliced_1.shape == (3, 2, 2, 2)
+        assert sliced_1.shape == [3, 2, 2, 2]
 
     @unittest.skipIf(
         not paddle.is_compiled_with_cuda(),

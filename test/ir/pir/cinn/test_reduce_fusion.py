@@ -185,6 +185,20 @@ class TestReduceFusion(unittest.TestCase):
 
         self.check_accuracy_and_kernel_num(init, func, kernel_num=1)
 
+    def test_horizontal_fusion_with_reduce_dim_equals_one(self):
+        def func(x):
+            a = x + 1
+            a = paddle.max(a, axis=[0])
+            b = x * 2
+            b = paddle.max(b, axis=[2])
+            return a, b
+
+        def init():
+            x = paddle.rand((1, 32, 8), dtype='float32')
+            return (x,)
+
+        self.check_accuracy_and_kernel_num(init, func)
+
 
 if __name__ == "__main__":
     unittest.main()

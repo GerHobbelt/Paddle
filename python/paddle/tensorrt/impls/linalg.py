@@ -16,7 +16,11 @@
 import tensorrt as trt
 
 from paddle.tensorrt.converter_utils import (
+    add_1D_constant_layer,
     broadcast,
+    get_shape_tensor_element,
+    trt_shape,
+    trt_sum,
 )
 from paddle.tensorrt.register import converter_registry
 
@@ -71,3 +75,42 @@ def bmm_converter(network, paddle_op, inputs):
         inputs[0], trt.MatrixOperation.NONE, inputs[1], trt.MatrixOperation.NONE
     )
     return out.get_output(0)
+
+
+@converter_registry.register("pd_op.flip", trt_version="8.x")
+def flip_converter(network, paddle_op, inputs):
+    input_tensor = inputs[0]
+    input_dims = input_tensor.shape
+    rank = len(input_dims)
+    axis = paddle_op.attrs()["axis"]
+    axis = [a + rank if a < 0 else a for a in axis]
+    shape_tensor = trt_shape(network, input_tensor)
+
+    def get_axis_length(axis_idx):
+        dim_val = input_dims[axis_idx]
+        if dim_val >= 0:
+            return add_1D_constant_layer(network, [dim_val], is_scalar=True)
+        else:
+            return get_shape_tensor_element(
+                network, shape_tensor, axis_idx, is_scalar=True
+            )
+
+    for axis_idx in axis:
+        loop_layer = network.add_loop()
+        trip_limit = get_axis_length(axis_idx)
+        loop_layer.add_trip_limit(trip_limit, trt.TripLimit.COUNT)
+        iterator = loop_layer.add_iterator(input_tensor, axis_idx, reverse=True)
+        zero_tensor = add_1D_constant_layer(network, [0])
+        one_tensor = add_1D_constant_layer(network, [1])
+        iRec_layer = loop_layer.add_recurrence(zero_tensor)
+        iCur = iRec_layer.get_output(0)
+        iNext_layer = trt_sum(network, iCur, one_tensor)
+        iRec_layer.set_input(1, iNext_layer)
+        loop_out_layer = loop_layer.add_loop_output(
+            iterator.get_output(0), trt.LoopOutput.CONCATENATE, axis_idx
+        )
+        loop_out_layer.set_input(1, trip_limit)
+        input_tensor = loop_out_layer.get_output(0)
+
+    identity_layer = network.add_identity(input_tensor)
+    return identity_layer.get_output(0)

@@ -410,7 +410,7 @@ class ListVariable(ContainerVariable):
 
     def min(self):
         if len(self) == 0:
-            raise ValueError("max() arg is an empty sequence")
+            raise ValueError("min() arg is an empty sequence")
         res = self[0]
         getitem = BuiltinVariable(
             operator.getitem, self.graph, DanglingTracker()

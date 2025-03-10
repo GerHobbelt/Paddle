@@ -1053,7 +1053,7 @@ class TensorRTEngineOp : public framework::OperatorBase {
                 model_opt_cache_dir_, engine_key_);
         trt_engine_->Deserialize(trt_engine_serialized_data);
       } else {
-        // This brach mainly used to ut.
+        // This branch mainly used to ut.
         PrepareTRTEngine(scope, trt_engine_);
       }
     }

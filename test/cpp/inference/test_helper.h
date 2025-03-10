@@ -69,7 +69,7 @@ void SetupTensor(phi::DenseTensor* input,
 
 template <typename T>
 void SetupLoDTensor(phi::DenseTensor* input,
-                    const phi::LoD& lod,
+                    const phi::LegacyLoD& lod,
                     T lower,
                     T upper) {
   input->set_lod(lod);
@@ -80,7 +80,7 @@ void SetupLoDTensor(phi::DenseTensor* input,
 template <typename T>
 void SetupLoDTensor(phi::DenseTensor* input,
                     phi::DDim dims,
-                    const phi::LoD lod,
+                    const phi::LegacyLoD lod,
                     const std::vector<T>& data) {
   const size_t level = lod.size() - 1;
   PADDLE_ENFORCE_EQ(dims[0],

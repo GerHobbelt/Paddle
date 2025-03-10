@@ -20,3 +20,10 @@ def shape_converter(network, paddle_op, inputs):
     input_tensor = inputs[0]
     shape_layer = network.add_shape(input_tensor)
     return shape_layer.get_output(0)
+
+
+@converter_registry.register("pd_op.shape64", trt_version="8.x")
+def shape64_converter(network, paddle_op, inputs):
+    input_tensor = inputs[0]
+    shape_layer = network.add_shape(input_tensor)
+    return shape_layer.get_output(0)

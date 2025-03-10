@@ -253,7 +253,7 @@ void DistributeFpnProposalsKernel(
       Copy(dev_ctx, sub_lod, dev_ctx.GetPlace(), true, rois_num_t);
       rois_num_t->Resize({lod_size});
     }
-    LoD lod;
+    LegacyLoD lod;
     lod.emplace_back(offset);
     multi_fpn_rois[i]->set_lod(lod);
   }

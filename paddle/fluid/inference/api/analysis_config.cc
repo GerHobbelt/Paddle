@@ -585,9 +585,6 @@ AnalysisConfig::AnalysisConfig(const AnalysisConfig &other) {
   CP_MEMBER(ipu_custom_ops_info_);
   CP_MEMBER(ipu_custom_patterns_);
 
-  // fleet exe related
-  CP_MEMBER(dist_config_);
-
   // custom device related.
   CP_MEMBER(use_custom_device_);
   CP_MEMBER(custom_device_type_);

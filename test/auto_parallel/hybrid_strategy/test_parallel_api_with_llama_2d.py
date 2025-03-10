@@ -38,6 +38,13 @@ class TestMPPPAPI(test_base.CommunicationTestDistBase):
             "use_lazy_init": ["true"],
             "sequence_parallel": ["true"],
             "prepare_input_output": ["false"],
+            "test_share_embedding": [
+                "0",
+            ],
+            "test_position_embedding": [
+                "1",
+            ],
+            "one_api": ["true", "false"],
         }
 
     def test_simple_net_mp2_pp2(self):
@@ -74,6 +81,13 @@ class TestDPPPAPI(test_base.CommunicationTestDistBase):
             "use_lazy_init": ["true"],
             "num_hidden_layers": ["2", "4"],
             "sharding_stage": ["0"],
+            "test_share_embedding": [
+                "0",
+            ],
+            "test_position_embedding": [
+                "1",
+            ],
+            "one_api": ["true", "false"],
         }
 
     def test_simple_net_dp2_pp2(self):
@@ -111,6 +125,13 @@ class TestDPMPAPI(test_base.CommunicationTestDistBase):
             "sequence_parallel": ["true"],
             "prepare_input_output": ["false"],
             "sharding_stage": ["0"],
+            "test_share_embedding": [
+                "0",
+            ],
+            "test_position_embedding": [
+                "1",
+            ],
+            "one_api": ["true", "false"],
         }
 
     def test_simple_net_mp2_pp2(self):

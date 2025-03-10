@@ -196,7 +196,7 @@ struct npy_format_descriptor<phi::dtype::complex<float>> {
     //     print '{0:14s} : {1:40s}'.format(str(k), v)
     return "F";
   }
-  static constexpr auto name = _("complext64");
+  static constexpr auto name = _("complex64");
 };
 
 template <>
@@ -214,7 +214,7 @@ struct npy_format_descriptor<phi::dtype::complex<double>> {
     //     print '{0:14s} : {1:40s}'.format(str(k), v)
     return "D";
   }
-  static constexpr auto name = _("complext128");
+  static constexpr auto name = _("complex128");
 };
 
 template <>

@@ -474,6 +474,7 @@ void Simplify(Expr* expr) {
   mutator(expr);
 
   ReplaceFracWithDivMutator()(expr);
+  VLOG(3) << "End Simplify " << *expr;
 }
 
 void SimplifyCast(Expr* expr) { SimplifyCastMutator()(expr); }

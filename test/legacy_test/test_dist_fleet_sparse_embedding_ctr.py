@@ -205,7 +205,6 @@ class TestDistMnistAsync2x2WithGauss(TestFleetBase):
                 name="click",
                 shape=[-1, 1],
                 dtype="int64",
-                lod_level=0,
             )
 
             datas = [dnn_data, lr_data, label]

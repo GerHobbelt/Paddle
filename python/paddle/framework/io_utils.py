@@ -276,7 +276,7 @@ def _unpack_saved_dict(saved_obj, protocol):
 def set_value(var, value, scope=None):
     if not (isinstance(value, np.ndarray) or hasattr(value, "__array__")):
         raise TypeError(
-            f"`value` should be `numpy.ndarray` or `LoDTensor`, but received {type(value)}."
+            f"`value` should be `numpy.ndarray` or `DenseTensor`, but received {type(value)}."
         )
 
     if scope is not None and not isinstance(scope, core._Scope):

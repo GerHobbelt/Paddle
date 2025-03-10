@@ -152,7 +152,7 @@ std::vector<std::vector<size_t>> AssignValueGroupBySize(
     PADDLE_ENFORCE_NOT_NULL(
         x,
         common::errors::Fatal(
-            "Only support assgin group for dense tensor value!"));
+            "Only support assign group for dense tensor value!"));
     auto ir_tensor = std::make_shared<dialect::IrTensor>(
         dialect::TransToPhiDataType(x.dtype()),
         x.dims(),

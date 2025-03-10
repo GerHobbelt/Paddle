@@ -1065,7 +1065,7 @@ std::string LoDTensorSummary(const phi::DenseTensor &tensor) {
   return ss.str();
 }
 
-static bool CompareLoD(const phi::LoD &a, const phi::LoD &b) {
+static bool CompareLoD(const phi::LegacyLoD &a, const phi::LegacyLoD &b) {
   if (a.size() != b.size()) {
     LOG(ERROR) << string::Sprintf(
         "lod size not match %d != %d", a.size(), b.size());

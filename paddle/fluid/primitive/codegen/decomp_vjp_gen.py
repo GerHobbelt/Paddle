@@ -68,6 +68,7 @@ BACKENDS_BLACK_LIST = [
 # prim op with one input and one output, with no attribute
 UNARY_PRIM_VJP_OPS = [
     'abs_grad',
+    'ceil_grad',
     'erf_grad',
     'exp_grad',
     'floor_grad',
@@ -138,6 +139,8 @@ OTHER_PRIM_VJP_OPS = [
 PRIM_VJP = UNARY_PRIM_VJP_OPS + BINARY_PRIM_VJP_OPS + OTHER_PRIM_VJP_OPS
 
 CUSTOM_VJP = [
+    'amax_grad',
+    'amin_grad',
     'bce_loss_grad',
     'batch_norm_grad',
     'dropout_grad',

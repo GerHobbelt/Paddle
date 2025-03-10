@@ -20,7 +20,7 @@ limitations under the License. */
 
 using CPUPlace = phi::CPUPlace;
 using XPUPlace = phi::XPUPlace;
-using LoD = phi::LoD;
+using LegacyLoD = phi::LegacyLoD;
 using DenseTensorArray = phi::TensorArray;
 
 template <typename T>
@@ -59,7 +59,7 @@ void GenerateXPUExample(const std::vector<size_t>& level_0,
 
   XPUPlace xpu_place(XPU_PlaceNo);
 
-  LoD lod;
+  LegacyLoD lod;
   lod.push_back(level_0);
   lod.push_back(level_1);
 
@@ -182,7 +182,7 @@ void BeamSearchDecodeTestByXPUFrame() {
       ids, scores, &id_tensor_cpu, &score_tensor_cpu, 2, 1);
   bs_xpu.apply_xpu<T>();
 
-  LoD lod = id_tensor_cpu.lod();
+  LegacyLoD lod = id_tensor_cpu.lod();
   std::vector<size_t> expect_source_lod = {0, 2, 4};
   ASSERT_EQ(lod[0], expect_source_lod);
 

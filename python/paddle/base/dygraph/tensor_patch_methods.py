@@ -29,8 +29,10 @@ from paddle.base.data_feeder import (
     _PADDLE_DTYPE_2_NUMPY_DTYPE,
     convert_uint16_to_float,
 )
+from paddle.base.libpaddle import Place
 from paddle.profiler.utils import in_profiler_mode
 from paddle.utils import deprecated
+from paddle.utils.dlpack import DLDeviceType
 
 from .. import core, framework, unique_name
 from ..framework import (
@@ -1257,6 +1259,39 @@ def monkey_patch_tensor():
         """
         return _C_ops.sparse_coalesce(self)
 
+    @framework.dygraph_only
+    def __dlpack_device__(self):
+        """
+        Extract the DLPack device type and device ID for the current tensor.
+
+        Returns:
+            tuple: A tuple containing the DLPack device type and device ID.
+                - device_type (DLDeviceType): The type of device (e.g., kDLCPU, kDLCUDA, etc.).
+                - device_id (int): The device ID.
+        """
+        place = self.place
+        if isinstance(place, Place):
+            if place.is_gpu_place():
+                return DLDeviceType.kDLCUDA, place.gpu_device_id()
+            elif place.is_cpu_place():
+                return DLDeviceType.kDLCPU, None
+            elif place.is_cuda_pinned_place():
+                return DLDeviceType.kDLCUDAHost, None
+            elif place.is_xpu_place():
+                return DLDeviceType.kDLOneAPI, place.xpu_device_id()
+            else:
+                raise RuntimeError(f"Unsupported Paddle device type {place}")
+        elif place.is_cpu_place():
+            return DLDeviceType.kDLCPU, None
+        elif place.is_cuda_pinned_place():
+            return DLDeviceType.kDLCUDAHost, None
+        elif place.is_gpu_place():
+            return DLDeviceType.kDLCUDA, place.get_device_id()
+        elif place.is_xpu_place():
+            return DLDeviceType.kDLOneAPI, place.get_device_id()
+        else:
+            raise ValueError(f"Unsupported tensor place: {place}")
+
     @property
     def __cuda_array_interface__(self):
         """Array view description for cuda tensors.
@@ -1330,6 +1365,39 @@ def monkey_patch_tensor():
             "version": 2,
         }
 
+    def __dlpack__(self, stream=None):
+        """
+        Creates a DLPack capsule of the current tensor to be exported to other libraries.
+        Args:
+            stream (int | None): An optional Python integer representing a pointer
+                                to a CUDA stream. Synchronizes the tensor with this
+                                stream before exporting.
+                                If None or -1, no synchronization is performed.
+                                If 0, the default stream is used.
+        """
+
+        if self.is_sparse():
+            raise AttributeError(
+                "Can't get __dlpack__ from a Tensor that requires gradients, "
+                "use tensor.detach() if gradients are not required."
+            )
+
+        if not self.stop_gradient:
+            raise RuntimeError(
+                "Can't get __dlpack__ from Tensor that requires gradients. "
+                "If gradients aren't required, use tensor.detach() to get a tensor without gradient."
+            )
+
+        if stream is not None:
+            if self.place.is_gpu_place():
+                current_stream = paddle.device.cuda.current_stream()
+                if stream != current_stream:
+                    event = paddle.device.cuda.Event()
+                    event.record(current_stream)
+                    current_stream.synchronize()
+
+        return paddle.to_dlpack(self)
+
     if not hasattr(core, "eager"):
         return
 
@@ -1374,6 +1442,8 @@ def monkey_patch_tensor():
         ("_use_gpudnn", _use_gpudnn),
         ("_md5sum", _md5sum),
         ("__cuda_array_interface__", __cuda_array_interface__),
+        ("__dlpack__", __dlpack__),
+        ("__dlpack_device__", __dlpack_device__),
     ):
         setattr(core.eager.Tensor, method_name, method)
 

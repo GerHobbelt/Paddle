@@ -133,7 +133,8 @@ class IR_API ConcatOp
   bool InferSymbolicShape(pir::InferSymbolicShapeContext *infer_context);
 };
 
-class IR_API SplitOp : public pir::Op<SplitOp> {
+class IR_API SplitOp
+    : public pir::Op<SplitOp, paddle::dialect::InferSymbolicShapeInterface> {
  public:
   using Op::Op;
 
@@ -150,6 +151,8 @@ class IR_API SplitOp : public pir::Op<SplitOp> {
                     int axis);
 
   void VerifySig() const {}
+
+  bool InferSymbolicShape(pir::InferSymbolicShapeContext *infer_context);
 };
 
 class IR_API GenerateShapeOp

@@ -31,6 +31,7 @@
 #include "paddle/phi/core/compat/convert_utils.h"
 #include "paddle/phi/core/dense_tensor.h"
 #include "paddle/phi/kernels/funcs/common_infer_shape_functions.h"
+#include "paddle/phi/kernels/funcs/strided_slice.h"
 #include "pybind11/numpy.h"
 #include "pybind11/pybind11.h"
 #include "pybind11/stl.h"
@@ -143,11 +144,9 @@ static int _PySlice_GetIndices(PySliceObject* r,
           "tensor(int) and numpy(int) in slice item, but received %s.",
           std::string(Py_TYPE(r->start)->tp_name)));
     }
-    if (*start < 0) *start += length;
-    *start = std::max(*start, static_cast<Py_ssize_t>(0));
   }
   if (r->stop == Py_None) {
-    *stop = *step < 0 ? -1 : length;
+    *stop = *step < 0 ? -length - 1 : length;
   } else {
     if (PyCheckInteger(r->stop) || IsNumpyType(r->stop)) {
       *stop = PyLong_AsLong(r->stop);
@@ -159,9 +158,13 @@ static int _PySlice_GetIndices(PySliceObject* r,
           "tensor(int) and numpy(int) in slice item, but received %s.",
           std::string(Py_TYPE(r->stop)->tp_name)));
     }
-    if (0 < *step && *stop < 0) *stop += length;
-    *stop = std::min(*stop, length);
   }
+
+  // normalize start and stop
+  bool dummy_zero_dim_out = false;
+  phi::funcs::normalize_interval(
+      *start, *stop, *step, length, start, stop, &dummy_zero_dim_out);
+  // return value below seems to be useless...
   if (*stop > length) return -1;
   if (*start >= length) return -1;
   if (*step == 0) return -1;

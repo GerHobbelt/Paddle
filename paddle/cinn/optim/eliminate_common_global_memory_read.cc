@@ -191,7 +191,7 @@ struct GlobalTensorInfoCollector : public ir::IRMutator<Expr*> {
       VLOG(6) << "Total buffer size: " << size;
       common::cas_intervals_t var_intervals;
       common::SymbolicExprAnalyzer analyzer(var_intervals);
-      std::optional<bool> prove_gt = analyzer.ProveGT(size, ir::Expr(128));
+      std::optional<bool> prove_gt = analyzer.ProveGT(size, ir::Expr(8));
       return prove_gt.value_or(false);
     };
 

@@ -75,12 +75,12 @@ void FusedLayerNormKernel(const Context& dev_ctx,
                                 residual_alpha);
   PADDLE_ENFORCE_XDNN_SUCCESS(r, "constant");
 
-  r = baidu::xpu::api::cast_v2(
+  r = baidu::xpu::api::cast(
       xpu_ctx->x_context(),
       residual_alpha_tmp.data<float>(),
       reinterpret_cast<XPUType*>(residual_alpha_ptr.data<T>()),
       1);
-  PADDLE_ENFORCE_XDNN_SUCCESS(r, "cast_v2");
+  PADDLE_ENFORCE_XDNN_SUCCESS(r, "cast");
 
   if (residual) {
     dev_ctx.template Alloc<T>(residual_out);

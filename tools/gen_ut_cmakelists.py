@@ -270,7 +270,7 @@ class DistUTPortManager:
                         break
                 name = lines[k - 1].strip()
 
-                # matcg right tets name format, the name must start with 'test_' follwed bu at least one cahr of
+                # matcg right tets name format, the name must start with 'test_' follwed bu at least one char of
                 # '0-9'. 'a-z'. 'A-Z' or '_'
                 assert re.compile("^test_[0-9a-zA-Z_]+").search(
                     name
@@ -318,7 +318,7 @@ class DistUTPortManager:
         if depth == 0:
             # After all directories are scanned and processed
             # 1. Get the num_port of last added test and set DIST_UT_PORT+=num_port
-            #    to guarantee the DIST_UT_PORT is not assined
+            #    to guarantee the DIST_UT_PORT is not assigned
             # 2. Summary all the directories which include csv but no cmake and show an error
             #    if such a drectory exists
 

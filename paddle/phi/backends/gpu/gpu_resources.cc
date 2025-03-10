@@ -166,7 +166,7 @@ void InitGpuProperties(Place place,
                           << get_cudnn_major(cudnn_dso_ver) << "."
                           << get_cudnn_minor(cudnn_dso_ver) << ".";
 
-  // Check CUDA/CUDNN version compatiblity
+  // Check CUDA/CUDNN version compatibility
   auto local_cuda_version =
       (*driver_version / 1000) * 10 + (*driver_version % 100) / 10;
   auto compile_cuda_version =

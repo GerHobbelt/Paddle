@@ -104,7 +104,10 @@ class FallbackWrapper:
     def graph_size(self):
         if self.partial_program is None:
             input_spec = convert_meta_to_input_spec(
-                [self.SIR.symbol_meta_map[symbol] for symbol in self.SIR.inputs]
+                tuple(
+                    self.SIR.symbol_meta_map[symbol]
+                    for symbol in self.SIR.inputs
+                )
             )
             (
                 self.concrete_program,
@@ -181,7 +184,7 @@ class CompileSIRCache(Cache, metaclass=Singleton):
         self,
         context: SymbolicTraceContext,
         sir_name: str,
-        input_spec: list[InputSpec],
+        input_spec: tuple[InputSpec, ...],
         **kwargs,
     ):
         """
@@ -204,7 +207,7 @@ class CompileSIRCache(Cache, metaclass=Singleton):
         self,
         context: SymbolicTraceContext,
         sir_name: str,
-        input_spec: list[InputSpec],
+        input_spec: tuple[InputSpec, ...],
         **kwargs,
     ):
         """

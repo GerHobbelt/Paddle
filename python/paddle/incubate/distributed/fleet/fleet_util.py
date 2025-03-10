@@ -1699,7 +1699,7 @@ class FleetUtil:
         )
         self.rank0_print(
             f"{print_prefix} global AUC={auc:.6f} BUCKET_ERROR={bucket_error:.6f} MAE={mae:.6f} "
-            f"RMSE={rmse:.6f} Actural_CTR={actual_ctr:.6f} Predicted_CTR={predicted_ctr:.6f} "
+            f"RMSE={rmse:.6f} Actual_CTR={actual_ctr:.6f} Predicted_CTR={predicted_ctr:.6f} "
             f"COPC={copc:.6f} MEAN Q_VALUE={mean_predict_qvalue:.6f} Ins number={total_ins_num}"
         )
 

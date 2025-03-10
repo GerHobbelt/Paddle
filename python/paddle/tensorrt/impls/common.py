@@ -51,7 +51,6 @@ def dropout_converter(network, paddle_op, inputs):
 @converter_registry.register("pd_op.bilinear_interp", trt_version="8.x")
 def bilinear_interp_converter(network, paddle_op, inputs):
     input_tensor = inputs[0]
-    input_shape = paddle_op.operands()[0].source().shape
     data_format = paddle_op.attrs().get("data_format")
     interp_method = paddle_op.attrs().get("interp_method")
     align_corners = paddle_op.attrs().get("align_corners")
@@ -166,7 +165,6 @@ def bilinear_interp_converter(network, paddle_op, inputs):
 @converter_registry.register("pd_op.nearest_interp", trt_version="8.x")
 def nearest_interp_converter(network, paddle_op, inputs):
     input_tensor = inputs[0]
-    input_shape = paddle_op.operands()[0].source().shape
     data_format = paddle_op.attrs().get("data_format")
     interp_method = paddle_op.attrs().get("interp_method")
     align_corners = paddle_op.attrs().get("align_corners")

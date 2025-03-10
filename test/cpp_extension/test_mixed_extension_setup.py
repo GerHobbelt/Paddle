@@ -103,10 +103,12 @@ class TestCppExtensionSetupInstall(unittest.TestCase):
         cur_dir = os.path.dirname(os.path.abspath(__file__))
         # install mixed custom_op and extension
         # compile, install the custom op egg into site-packages under background
+        site_dir = site.getsitepackages()[0]
         cmd = f'cd {cur_dir} && {sys.executable} mix_relu_and_extension_setup.py install'
+        if os.name != 'nt':
+            cmd += f' --install-lib={site_dir}'
         run_cmd(cmd)
 
-        site_dir = site.getsitepackages()[0]
         custom_egg_path = [
             x for x in os.listdir(site_dir) if 'mix_relu_extension' in x
         ]

@@ -34,6 +34,7 @@ from .impls.attribute import *  # noqa: F403
 from .impls.common import *  # noqa: F403
 from .impls.conv import *  # noqa: F403
 from .impls.creation import *  # noqa: F403
+from .impls.input import *  # noqa: F403
 from .impls.linalg import *  # noqa: F403
 from .impls.logic import *  # noqa: F403
 from .impls.manipulation import *  # noqa: F403
@@ -46,7 +47,12 @@ from .impls.search import *  # noqa: F403
 from .impls.stat import *  # noqa: F403
 from .impls.vision import *  # noqa: F403
 from .register import converter_registry
-from .util import get_trt_version_list, map_dtype
+from .util import (
+    get_trt_version_list,
+    map_dtype,
+    weight_to_tensor,
+    zero_dims_to_one_dims,
+)
 
 version_list = get_trt_version_list()
 
@@ -77,6 +83,24 @@ def remove_duplicate_value(value_list):
             ret_list.append(value)
             ret_list_id.append(value.id)
     return ret_list
+
+
+# We use a special rule to judge whether a paddle value is a shape tensor.
+# The rule is consistent with the rule in C++ source code(collect_shape_manager.cc).
+# We use the rule for getting min/max/opt value shape from collect_shape_manager.
+# We don't use trt_tensor.is_shape_tensor, because sometimes, the trt_tensor that corresponding to paddle value is not a shape tensor
+# when it is a output in this trt graph, but it is a shape tensor when it is a input in next trt graph.
+def is_shape_tensor(value):
+    dims = value.shape
+    total_elements = 1
+    if (
+        dims.count(-1) > 1
+    ):  # we can only deal with the situation that is has one dynamic dims
+        return False
+    for dim in dims:
+        total_elements *= abs(dim)  # add abs for dynamic shape -1
+    is_int_dtype = value.dtype == paddle.int32 or value.dtype == paddle.int64
+    return total_elements <= 8 and total_elements >= 1 and is_int_dtype
 
 
 class PaddleToTensorRTConverter:
@@ -179,6 +203,9 @@ class PaddleToTensorRTConverter:
                 shape = value.shape
                 dtype = map_dtype(value.dtype.name)
                 input_name = f"input_{value.id}"
+                # 0-dims -> 1-dims
+                if len(shape) == 0:
+                    shape = [1]
                 input_tensor = network.add_input(
                     name=input_name, dtype=dtype, shape=shape
                 )
@@ -187,7 +214,7 @@ class PaddleToTensorRTConverter:
 
         for op in operations:
             # Adding marker labels to builtin ops facilitates convert processing, but they ultimately do not enter the TensorRT subgraph.
-            if op.name() == "builtin.split":
+            if op.name() == "builtin.split" or op.name() == "builtin.combine":
                 continue
             operands = []
             for operand in op.operands():
@@ -202,9 +229,16 @@ class PaddleToTensorRTConverter:
                         combined_source = combined_operand.source()
                         combined_source_id = combined_source.id
                         if combined_source_id in value_to_trt_tensor:
-                            operand_list.append(
-                                value_to_trt_tensor[combined_source_id]
+                            trt_input_tensor = weight_to_tensor(
+                                network,
+                                combined_source,
+                                value_to_trt_tensor[combined_source_id],
+                                op.name(),
                             )
+                            trt_input_tensor = zero_dims_to_one_dims(
+                                network, trt_input_tensor
+                            )
+                            operand_list.append(trt_input_tensor)
                         else:
                             raise RuntimeError(
                                 f'{combined_source_id} not found in value_to_trt_tensor'
@@ -213,7 +247,16 @@ class PaddleToTensorRTConverter:
                 else:
                     source_id = source.id
                     if source_id in value_to_trt_tensor:
-                        operands.append(value_to_trt_tensor[source_id])
+                        trt_input_tensor = weight_to_tensor(
+                            network,
+                            source,
+                            value_to_trt_tensor[source_id],
+                            op.name(),
+                        )
+                        trt_input_tensor = zero_dims_to_one_dims(
+                            network, trt_input_tensor
+                        )
+                        operands.append(trt_input_tensor)
                     else:
                         raise RuntimeError(
                             f'{source_id} not found in value_to_trt_tensor'
@@ -349,7 +392,7 @@ class PaddleToTensorRTConverter:
             min_value = []
             opt_value = []
             max_value = []
-            if output_tensor.is_shape_tensor:
+            if is_shape_tensor(result_value):
                 min_value = get_value_shape_range_info(
                     result_value, True, paddle.base.core.ShapeMode.kMIN
                 )

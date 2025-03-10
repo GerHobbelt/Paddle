@@ -24,8 +24,7 @@ limitations under the License. */
 #include "paddle/phi/backends/xpu/xpu_header.h"
 #endif
 
-namespace paddle {
-namespace memory {
+namespace paddle::memory {
 
 #ifdef PADDLE_WITH_CUSTOM_DEVICE
 template <>
@@ -875,5 +874,4 @@ TEST_API void Copy<phi::Place, phi::CPUPlace>(phi::Place dst_place,
 }
 #endif
 
-}  // namespace memory
-}  // namespace paddle
+}  // namespace paddle::memory

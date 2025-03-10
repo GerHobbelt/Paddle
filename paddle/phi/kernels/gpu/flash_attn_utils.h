@@ -391,7 +391,7 @@ static void CheckFlashAttnStatus(const bool status) {
 static void RaiseNotSupportedError(int version = 2) {
   PADDLE_THROW(common::errors::Unimplemented(
       "FlashAttentio%d is unsupported, please check "
-      "the GPU compability and CUDA Version.",
+      "the GPU compatibility and CUDA Version.",
       version));
 }
 

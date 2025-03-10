@@ -41,7 +41,7 @@ class TEST_API SelectedRowsType
 
   const phi::DataLayout &data_layout() const;
 
-  const phi::LoD &lod() const;
+  const phi::LegacyLoD &lod() const;
 
   const size_t &offset() const;
 
@@ -57,7 +57,7 @@ class TEST_API SelectedRowsType
                               Type dtype,
                               const phi::DDim &dims,
                               DataLayout layout = DataLayout::kNCHW,
-                              const phi::LoD &lod = {},
+                              const phi::LegacyLoD &lod = {},
                               size_t offset = 0u) {
     return Base::get(ctx, dtype, dims, layout, lod, offset);
   }

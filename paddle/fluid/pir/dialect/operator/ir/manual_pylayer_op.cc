@@ -84,14 +84,17 @@ void PyLayerOp::Build(pir::Builder &builder,             // NOLINT
 
   auto &op = fwd_block->back();
 
-  std::vector<pir::Attribute> outs_stop_gradient;
+  auto outs_stop_gradient_attr = true;
   for (size_t i = 0; i < op.num_operands(); ++i) {
     argument.AddOutput(op.operand(i).type());
     auto bool_attr = op.operand_source(i).attribute<pir::BoolAttribute>(
         pir::kStopGradientAttrName);
-    outs_stop_gradient.push_back(bool_attr ? bool_attr
-                                           : builder.bool_attr(false));
+    if (!bool_attr || (bool_attr && !bool_attr.data())) {
+      outs_stop_gradient_attr = false;
+    }
   }
+  std::vector<pir::Attribute> outs_stop_gradient(
+      op.num_operands(), builder.bool_attr(outs_stop_gradient_attr));
 
   argument.AddAttribute(
       kBackwardFunctionIdAttrName,

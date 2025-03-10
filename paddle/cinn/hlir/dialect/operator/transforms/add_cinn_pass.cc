@@ -218,7 +218,7 @@ void ApplyCinnLowerPass(
 
   if (FLAGS_enable_cinn_accuracy_check) {
     VLOG(0) << "Enable CINN Accuracy Check Pass";
-    pass_manager->AddPass(cinn::dialect::ir::CreateAccuarcyCheckPass());
+    pass_manager->AddPass(cinn::dialect::ir::CreateAccuracyCheckPass());
   }
   if (FLAGS_enable_fusion_fallback) {
     VLOG(0) << "Enable Fusion Fallback Pass";
@@ -278,7 +278,7 @@ void ApplyCinnPass(::pir::Program* program,
   LOG(INFO) << "FusionOp count before lowering : *****[ "
             << GetOpCount<cinn::dialect::FusionOp>(program->module_op())
             << " ]*****";
-  if (FLAGS_print_ir) {
+  if (VLOG_IS_ON(1)) {
     auto& shape_analysis = pir::ShapeAnalysisManager::Instance().Get(program);
     std::cout << "Program before lowering: \n"
               << pir::CustomPrintHelper(*program, shape_analysis.PrintHook())

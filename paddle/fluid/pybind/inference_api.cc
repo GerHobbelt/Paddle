@@ -1018,24 +1018,7 @@ void BindAnalysisConfig(py::module *m) {
            py::arg("custom_pass_only") = false)
       .def("set_optimization_level",
            &AnalysisConfig::SetOptimizationLevel,
-           py::arg("opt_level") = 2)
-      .def("set_dist_config", &AnalysisConfig::SetDistConfig)
-      .def("dist_config", &AnalysisConfig::dist_config);
-
-  py::class_<DistConfig>(*m, "DistConfig")
-      .def(py::init<>())
-      .def("set_carrier_id", &DistConfig::SetCarrierId)
-      .def("set_comm_init_config", &DistConfig::SetCommInitConfig)
-      .def("set_endpoints", &DistConfig::SetEndpoints)
-      .def("set_ranks", &DistConfig::SetRanks)
-      .def("enable_dist_model", &DistConfig::EnableDistModel)
-      .def("carrier_id", &DistConfig::carrier_id)
-      .def("current_endpoint", &DistConfig::current_endpoint)
-      .def("trainer_endpoints", &DistConfig::trainer_endpoints)
-      .def("nranks", &DistConfig::nranks)
-      .def("rank", &DistConfig::rank)
-      .def("comm_init_config", &DistConfig::comm_init_config)
-      .def("use_dist_model", &DistConfig::use_dist_model);
+           py::arg("opt_level") = 2);
 }
 
 void BindXpuConfig(py::module *m) {

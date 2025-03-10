@@ -559,6 +559,11 @@ void ShapeConstraintIRAnalysis::InferShapeOrDataForValue(Value val) {
         op->dyn_cast<pir::InferSymbolicShapeInterface>();
     if (infer_symbolic_shape_interface) {
       infer_symbolic_shape_interface.InferSymbolicShape(&context_);
+      // Note(ooooo): Temporarily skip check for CombineOp because TensorArray
+      // inputs.
+      if (op->isa<pir::CombineOp>()) {
+        return;
+      }
       int index = -1;
       for (auto& result_value : op->results()) {
         index++;
@@ -611,6 +616,12 @@ ShapeConstraintIRAnalysis::GetShapeOrDataForValue(Value val) {
 void ShapeConstraintIRAnalysis::SetShapeOrDataForValue(
     Value val, const symbol::ShapeOrDataDimExprs& shape_or_data) {
   context_.SetShapeOrDataForValue(val, shape_or_data);
+}
+
+void ShapeConstraintIRAnalysis::ShareShapeOrData(Value from, Value to) {
+  if (context_.HasShapeOrDataForValue(from)) {
+    context_.SetShapeOrDataForValue(to, context_.GetShapeOrDataForValue(from));
+  }
 }
 
 bool ShapeConstraintIRAnalysis::IsEqual(const symbol::DimExpr& lhs,
@@ -793,7 +804,6 @@ pir::PrintHooks ShapeConstraintIRAnalysis::PrintHook() {
       }
     }
     printer.os << " }";
-    printer.os << "\t(op_" << op.id() << ")";
   };
   return print_hook;
 }

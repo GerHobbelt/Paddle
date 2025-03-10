@@ -1400,9 +1400,7 @@ class TestBook(LayerTest):
     def test_shuffle_batch(self):
         # TODO(minqiyang): dygraph do not support lod now
         with self.static_graph():
-            x = paddle.static.data(
-                name='X', shape=[-1, 4, 50], dtype='float32', lod_level=0
-            )
+            x = paddle.static.data(name='X', shape=[-1, 4, 50], dtype='float32')
             out1 = shuffle_batch(x)
             paddle.seed(1000)
             out2 = shuffle_batch(x)

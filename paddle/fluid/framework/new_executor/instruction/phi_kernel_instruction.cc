@@ -38,8 +38,7 @@ PHI_DEFINE_EXPORTED_bool(print_kernel_run_info,
                          false,
                          "Whether print kernel run info.");
 
-namespace paddle {
-namespace framework {
+namespace paddle::framework {
 
 PhiKernelInstruction::PhiKernelInstruction(
     size_t id,
@@ -233,5 +232,4 @@ void PhiKernelInstruction::Run() {
   VLOG(6) << "End run op " << phi_op_name_ << " kernel.";
 }
 
-}  // namespace framework
-}  // namespace paddle
+}  // namespace paddle::framework

@@ -75,7 +75,7 @@ struct CachedDimExprToValueConverter {
     auto iter = tensor2shape_.find(input_tensor);
     if (iter == tensor2shape_.end()) {
       pir::Value shape =
-          rewriter->Build<paddle::dialect::ShapeOp>(input_tensor).out();
+          rewriter->Build<paddle::dialect::Shape64Op>(input_tensor).out();
       pir::Value cast_shape =
           rewriter->Build<paddle::dialect::CastOp>(shape, phi::DataType::INT64)
               .out();

@@ -39,6 +39,13 @@ class TestDPMPPPAPI(test_base.CommunicationTestDistBase):
             "sequence_parallel": ["true"],
             "prepare_input_output": ["false"],
             "sharding_stage": ["0", "1"],
+            "test_share_embedding": [
+                "0",
+            ],
+            "test_position_embedding": [
+                "1",
+            ],
+            "one_api": ["true", "false"],
         }
 
     def test_simple_net_dp2_mp2_pp2(self):

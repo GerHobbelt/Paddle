@@ -51,7 +51,7 @@ Tensor _Tensor_::Make(const std::string &name,
                         "Required tensor name shall not be empty."));
   auto n = make_shared<_Tensor_>();
   n->name = name;
-  n->shape = utils::GetCompitableShape(shape);
+  n->shape = utils::GetCompatibleShape(shape);
   n->domain = domain;
   n->reduce_axis = reduce_axis;
   n->set_type(dtype);
@@ -71,7 +71,7 @@ Tensor _Tensor_::Make(const std::string &name,
                         "Required tensor name shall not be empty."));
   auto n = make_shared<_Tensor_>();
   n->name = name;
-  n->shape = utils::GetCompitableShape(shape);
+  n->shape = utils::GetCompatibleShape(shape);
   n->domain = domain;
   n->reduce_axis = reduce_axis;
   n->operation = PlaceholderOp::Make(n->name, n->shape, Float(32));
@@ -178,14 +178,14 @@ Expr Tensor::operator()(const std::vector<Expr> &indices) const {
                     ::common::errors::PreconditionNotMet(
                         "Required tensor shall not be tuple type."));
   auto *node = operator->();
-  const auto compitable_indices =
-      utils::GetCompitableStoreLoadIndices(*this, indices);
+  const auto compatible_indices =
+      utils::GetCompatibleStoreLoadIndices(*this, indices);
 
-  PADDLE_ENFORCE_EQ(compitable_indices.size(),
+  PADDLE_ENFORCE_EQ(compatible_indices.size(),
                     ndims(),
                     ::common::errors::PreconditionNotMet(
                         "number of indices not match the dimension"));
-  return Load::Make(*this, compitable_indices);
+  return Load::Make(*this, compatible_indices);
 }
 
 Expr _Tensor_::inline_expanded(const std::vector<Expr> &indices) {

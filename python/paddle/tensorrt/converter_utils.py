@@ -170,6 +170,14 @@ def add_1D_constant_layer(network, data, dtype=np.int32, is_scalar=False):
     return constant_layer.get_output(0)
 
 
+# Create and add ND constant layer
+def add_constant_layer(network, data, shape, dtype=np.int32):
+    constant_data = np.array(data, dtype=dtype)
+    constant_data = np.resize(constant_data, shape)
+    constant_layer = network.add_constant(shape, constant_data)
+    return constant_layer.get_output(0)
+
+
 # Create an constant layer with shape_tensor and value
 def fill_constant_layer(network, shape_tensor, tensor_rank, data, trt_dtype):
     fill_layer = network.add_fill(
@@ -300,6 +308,12 @@ def trt_equal(network, a, b):
     return layer.get_output(0)
 
 
+def trt_gather(network, input, indices, axis=0):
+    indices_tensor = add_1D_constant_layer(network, indices)
+    result = network.add_gather(input, indices_tensor, axis).get_output(0)
+    return result
+
+
 def trt_prod(network, a, b):
     layer = network.add_elementwise(a, b, trt.ElementWiseOperation.PROD)
     return layer.get_output(0)
@@ -378,7 +392,7 @@ def map_trt_dtype(trt_dtype):
         trt.DataType.HALF: np.float16,
         trt.DataType.INT32: np.int32,
         trt.DataType.INT8: np.int8,
-        trt.DataType.BOOL: np.bool,
+        trt.DataType.BOOL: bool,
     }
     if trt_dtype in dtype_map:
         return dtype_map[trt_dtype]
@@ -627,3 +641,16 @@ def squeeze_trt(network, input_tensor, axes):
     reshape_layer = network.add_shuffle(input_tensor)
     reshape_layer.set_input(1, new_shape_tensor)
     return reshape_layer.get_output(0)
+
+
+# resize shape tensor's shape to 1dim
+def resize_to_1d(network, shape_tensor):
+    if len(shape_tensor.shape) > 1:
+        # shape_tensor need 1-dim in trt
+        shape_tensor_layer = network.add_shuffle(shape_tensor)
+        numel = 1
+        for ele in shape_tensor.shape:
+            numel *= ele
+        shape_tensor_layer.reshape_dims = [numel]
+        shape_tensor = shape_tensor_layer.get_output(0)
+    return shape_tensor

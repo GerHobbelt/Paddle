@@ -54,6 +54,9 @@ class TestCustomRawReluOp(unittest.TestCase):
         path = os.path.dirname(os.path.abspath(__file__))
         path = os.path.join(path, "custom_raw_op_kernel_op_setup.py")
         cmd = [sys.executable, path, "install", "--force"]
+        if os.name != 'nt':
+            install_lib = f"--install-lib={site.getsitepackages()[0]}"
+            cmd.append(install_lib)
         cmd = " ".join([shlex.quote(c) for c in cmd])
         os.environ['MODULE_NAME'] = MODULE_NAME
         assert os.system(cmd) == 0

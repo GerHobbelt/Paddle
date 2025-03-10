@@ -12,7 +12,7 @@ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License. */
 
-#include "paddle/fluid/platform/lodtensor_printer.h"
+#include "paddle/fluid/platform/densetensor_printer.h"
 
 #include "paddle/fluid/framework/convert_utils.h"
 #include "paddle/fluid/framework/scope.h"
@@ -21,14 +21,11 @@ namespace phi {
 class DenseTensor;
 }  // namespace phi
 
-namespace paddle {
-namespace framework {
+namespace paddle::framework {
 class Variable;
-}  // namespace framework
-}  // namespace paddle
+}  // namespace paddle::framework
 
-namespace paddle {
-namespace platform {
+namespace paddle::platform {
 
 void PrintVar(framework::Scope* scope,
               const std::string& var_name,
@@ -81,5 +78,4 @@ void PrintVar(framework::Scope* scope,
   _ForEachDataType_(PrintTensorCallback);
 }
 
-}  // end namespace platform
-}  // end namespace paddle
+}  // namespace paddle::platform

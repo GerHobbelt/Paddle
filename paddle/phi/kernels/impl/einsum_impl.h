@@ -519,8 +519,12 @@ DenseTensor PerformContraction(
                                                   label2type);
       trans_t = PerformTranspose<T, Context>(
           dev_ctx, reduct_t, perm, reordered_all_labels, label2type);
-      if (cache[operand_idx] != nullptr)
+      if (cache[operand_idx] != nullptr) {
         cache[operand_idx]->ShareBufferWith(trans_t);
+        cache[operand_idx]->Resize(trans_t.dims());
+        VLOG(5) << "Set dims of cache[" << operand_idx
+                << "]: " << trans_t.dims();
+      }
     }
     auto mul_dims = GetShapeByType<int>(
         all_labels, label2type, perm, label2shape, {LabelType::Batch});

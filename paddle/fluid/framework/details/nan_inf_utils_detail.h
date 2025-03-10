@@ -86,7 +86,8 @@ void tensor_check(const std::string& op_type,
                   const phi::DenseTensor& tensor,
                   const phi::Place& place) {
   TensorCheckerVisitor<Context> vistor(op_type, var_name, tensor, place);
-  VisitDataType(framework::TransToProtoVarType(tensor.dtype()), vistor);
+  framework::VisitDataType(framework::TransToProtoVarType(tensor.dtype()),
+                           vistor);
 }
 
 void InitWhiteListFormEnv();

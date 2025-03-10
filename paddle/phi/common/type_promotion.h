@@ -94,6 +94,15 @@ static std::unordered_set<std::string> support_promotion_ops = {
     "less_than", "less_equal",      "greater_than",    "greater_equal",
 };
 
+static std::unordered_set<std::string> support_autocast_ops = {
+    "acos",       "acosh",  "asin",         "asinh",   "atan",      "atanh",
+    "ceil",       "cos",    "cosh",         "digamma", "erf",       "erfinv",
+    "floor",      "lgamma", "logcumsumexp", "logit",   "logsumexp", "polygamma",
+    "reciprocal", "rsqrt",  "sin",          "sinh",    "sqrt",      "stanh",
+    "tan",        "tanh",   "i0",           "i0e",     "i1",        "i1e",
+    "sigmoid",
+};
+
 inline bool is_support_float(DataType dtype) {
   if (dtype == DataType::FLOAT16 || dtype == DataType::FLOAT32 ||
       dtype == DataType::FLOAT64 || dtype == DataType::BFLOAT16) {
@@ -264,4 +273,12 @@ inline bool NeedTypePromotionOldIr(const std::string& op_name,
   }
 }
 
+inline bool NeedTypeAutoCast(const std::string& op_name,
+                             const DataType& x_dtype) {
+  if (support_autocast_ops.find(op_name) != support_autocast_ops.end() &&
+      (is_support_int(x_dtype))) {
+    return true;
+  }
+  return false;
+}
 }  // namespace phi

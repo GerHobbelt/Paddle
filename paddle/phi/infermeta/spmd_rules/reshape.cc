@@ -313,7 +313,7 @@ SpmdInfo ReshapeInferSpmdReverse(const DistMetaTensor& x,
   return {{x_dist_attr}, {out_dist_attr_dst}};
 }
 
-// FIXME(dev): XShape will be decprecated in the future, so we
+// FIXME(dev): XShape will be deprecated in the future, so we
 // need unify inferSpmd into ReshapeInferSpmd function.
 SpmdInfo ReshapeInferSpmdDynamic(const DistMetaTensor& x,
                                  const std::vector<int64_t>& shape) {

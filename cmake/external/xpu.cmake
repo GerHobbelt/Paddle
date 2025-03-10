@@ -22,6 +22,7 @@ set(XPU_API_LIB_NAME "libxpuapi.so")
 set(XPU_RT_LIB_NAME "libxpurt.so")
 set(XPU_CUDA_LIB_NAME "libxpucuda.so")
 set(XPU_CUDA_RT_LIB_NAME "libcudart.so")
+set(XPU_ML_LIB_NAME "libxpuml.so")
 set(XPU_XFT_LIB_NAME "libxft.so")
 set(XPU_XPTI_LIB_NAME "libxpti.so")
 set(XPU_XBLAS_LIB_NAME "libxpu_blas.so")
@@ -29,9 +30,9 @@ set(XPU_XFA_LIB_NAME "libxpu_flash_attention.so")
 set(XPU_XPUDNN_LIB_NAME "libxpu_dnn.so")
 
 if(NOT DEFINED XPU_XHPC_BASE_DATE)
-  set(XPU_XHPC_BASE_DATE "dev/20241118")
+  set(XPU_XHPC_BASE_DATE "dev/20241203")
 endif()
-set(XPU_XCCL_BASE_VERSION "3.0.0.5") # For XRE5
+set(XPU_XCCL_BASE_VERSION "3.0.1.1") # For XRE5
 if(NOT DEFINED XPU_XFT_BASE_VERSION)
   set(XPU_XFT_BASE_VERSION "20230602")
 endif()
@@ -146,6 +147,7 @@ set(XPU_XBLAS_LIB "${XPU_LIB_DIR}/${XPU_XBLAS_LIB_NAME}")
 set(XPU_RT_LIB "${XPU_LIB_DIR}/${XPU_RT_LIB_NAME}")
 set(XPU_CUDA_LIB "${XPU_LIB_DIR}/${XPU_CUDA_LIB_NAME}")
 set(XPU_CUDA_RT_LIB "${XPU_LIB_DIR}/${XPU_CUDA_RT_LIB_NAME}")
+set(XPU_ML_LIB "${XPU_LIB_DIR}/${XPU_ML_LIB_NAME}")
 set(XPU_XFA_LIB "${XPU_LIB_DIR}/${XPU_XFA_LIB_NAME}")
 set(XPU_XPUDNN_LIB "${XPU_LIB_DIR}/${XPU_XPUDNN_LIB_NAME}")
 
@@ -190,6 +192,7 @@ if(WITH_XPU_XRE5)
     BUILD_BYPRODUCTS ${XPU_XFA_LIB}
     BUILD_BYPRODUCTS ${XPU_RT_LIB}
     BUILD_BYPRODUCTS ${XPU_CUDA_RT_LIB}
+    BUILD_BYPRODUCTS ${XPU_ML_LIB}
     BUILD_BYPRODUCTS ${XPU_BKCL_LIB})
 else()
   ExternalProject_Add(
@@ -220,12 +223,6 @@ set_property(TARGET shared_xpuapi PROPERTY IMPORTED_LOCATION "${XPU_API_LIB}")
 # generate a static dummy target to track xpulib dependencies
 # for cc_library(xxx SRCS xxx.c DEPS xpulib)
 generate_dummy_static_lib(LIB_NAME "xpulib" GENERATOR "xpu.cmake")
-
-if(WITH_XPU_XRE5)
-  target_link_libraries(xpulib ${XPU_API_LIB} ${XPU_RT_LIB} ${XPU_CUDA_RT_LIB})
-else()
-  target_link_libraries(xpulib ${XPU_API_LIB} ${XPU_RT_LIB})
-endif()
 
 if(WITH_XPU_XFT)
   message(STATUS "Compile with XPU XFT!")
@@ -272,13 +269,20 @@ if(WITH_XPU_XRE5)
     xpulib
     ${XPU_RT_LIB}
     ${XPU_CUDA_RT_LIB}
-    ${XPU_BKCL_LIB}
     ${XPU_XBLAS_LIB}
     ${XPU_API_LIB}
     ${XPU_XFA_LIB}
     ${XPU_XPUDNN_LIB})
 else()
-  target_link_libraries(xpulib ${XPU_RT_LIB} ${XPU_BKCL_LIB} ${XPU_API_LIB})
+  target_link_libraries(xpulib ${XPU_RT_LIB} ${XPU_API_LIB})
+endif()
+
+if(WITH_XPU_BKCL)
+  if(WITH_XPU_XRE5)
+    target_link_libraries(xpulib ${XPU_ML_LIB} ${XPU_BKCL_LIB})
+  else()
+    target_link_libraries(xpulib ${XPU_BKCL_LIB})
+  endif()
 endif()
 
 add_dependencies(xpulib ${XPU_PROJECT})

@@ -152,7 +152,7 @@ class ReduceAsOpPattern
     size_t x_rank = x_shape.size();
     size_t y_rank = y_shape.size();
 
-    // Get reduc aixs and
+    // Get reduc axis and
     int64_t compare_offset = x_rank - y_rank;
 
     for (size_t i = 0; i < y_rank; ++i) {

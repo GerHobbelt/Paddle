@@ -94,21 +94,32 @@ class NestSequence:
             variable_list.append(value)
         return variable_map, variable_list
 
-    def restore(self, value_list):
+    def restore(self, tensor_result_list):
         """
-        Restores the nested sequence from value list.
+        Restores the nested sequence from tenosr list.
         """
-        assert len(self._var_list) == len(value_list)
+        assert len(self._var_list) == len(tensor_result_list)
 
-        def to_value(x):
+        def to_tensor_result(x):
             if isinstance(x, Value):
-                return value_list[self._var_map[x]]
+                return tensor_result_list[self._var_map[x]]
             return x
 
         return paddle.utils.pack_sequence_as(
             self._raw_input,
-            list(map(to_value, paddle.utils.flatten(self._raw_input))),
+            list(map(to_tensor_result, paddle.utils.flatten(self._raw_input))),
         )
+
+    @cached_property
+    def quick_index_map(self):
+        raw_inputs = self._raw_input
+        if len(raw_inputs) == 1:
+            raw_inputs = raw_inputs[0]
+        assert all(isinstance(v, Value) for v in raw_inputs)
+        return [self._var_map[v] for v in raw_inputs]
+
+    def quick_restore(self, tensor_list):
+        return [tensor_list[idx] for idx in self.quick_index_map]
 
     def __getitem__(self, item):
         return self._var_list[item]
@@ -249,8 +260,8 @@ class RunnableProgram:
             self.x_grad_values,
             self.param_grad_values,
             self.out_grad_values,
-            list(self.forward_range),
-            list(self.backward_range),
+            self.forward_range,
+            self.backward_range,
         )
         return [fwd_prog, bwd_prog], prog_attr
 
@@ -623,8 +634,7 @@ class PartialProgramLayer:
             self._cuda_graph_vec,
             *attrs,
         )
-        restored_nest_out = self._restore_out(out_vars)
-        return restored_nest_out
+        return self._outputs.quick_restore(out_vars)
 
     @cached_property
     def origin_runnable_program(self) -> RunnableProgram:
@@ -761,7 +771,7 @@ class PartialProgramLayer:
                         elif kw_name in forward_name_value_map:
                             return forward_name_value_map[kw_name]
                         else:
-                            raise Exception(f"kw_args: {kw_name} not found")
+                            return None
 
                     for [kw_name, kw_value] in (
                         backward_program.global_block().kwargs().items()
@@ -769,9 +779,10 @@ class PartialProgramLayer:
                         forward_matched_value = (
                             get_kwargs_forward_matched_value(kw_name, kw_value)
                         )
-                        share_symbol_shape_from_forward_to_backward(
-                            forward_matched_value, kw_value
-                        )
+                        if forward_matched_value is not None:
+                            share_symbol_shape_from_forward_to_backward(
+                                forward_matched_value, kw_value
+                            )
 
                 if cse_is_enabled():
                     paddle.base.libpaddle.pir.apply_cse_pass(forward_program)
@@ -926,10 +937,9 @@ class PartialProgramLayer:
         inputs = train_runnable_program.x_values
         params = train_runnable_program.param_values
         combined_inputs = list(itertools.chain(inputs, params))
-        forward_prog_len = len(program.global_block().ops)
-        forward_end_idx = forward_prog_len - 1
+        forward_end_idx = len(program.global_block().ops)
         forward_end_op = None
-        if forward_prog_len > 0:
+        if forward_end_idx > 0:
             forward_end_op = program.global_block().ops[-1]
         grad_info_map = [None] * len(combined_inputs)
         with backend_guard(self._backend):
@@ -959,7 +969,7 @@ class PartialProgramLayer:
                     "grad_input_",
                 )
                 op_between_forward_and_backward = (
-                    len(program.global_block().ops) - forward_prog_len
+                    len(program.global_block().ops) - forward_end_idx
                 )
 
                 # call grad to get backward ops.
@@ -986,7 +996,7 @@ class PartialProgramLayer:
                     if forward_end_op is not None:
                         for idx, op in enumerate(program.global_block().ops):
                             if op == forward_end_op:
-                                forward_end_idx = idx
+                                forward_end_idx = idx + 1
                                 break
 
             for hooker in self._hookers:
@@ -1020,12 +1030,11 @@ class PartialProgramLayer:
         output_grads_to_append = list(
             filter(lambda x: not is_fake_value(x), x_grad_value + p_grad_value)
         )
-        backward_prog_len = len(program.global_block().ops)
-        backward_end_op_index = backward_prog_len - 1
+        backward_end_op_index = len(program.global_block().ops)
         paddle.base.libpaddle.pir.append_shadow_outputs(
             program,
             output_grads_to_append,
-            backward_prog_len,
+            backward_end_op_index,
             "grad_output_",
         )
 
@@ -1038,11 +1047,7 @@ class PartialProgramLayer:
             [inputs, params, targets, x_grad_value, p_grad_value, o_grad_value]
         )
         forward_index_pass = IndicesPreservePass(
-            [
-                forward_end_idx + 1,
-                backward_start_op_index + 1,
-                backward_end_op_index + 1,
-            ],
+            [forward_end_idx, backward_start_op_index, backward_end_op_index],
             fused_bn_add_act_pass,
         )
         program = forward_index_pass(program)
@@ -1055,17 +1060,17 @@ class PartialProgramLayer:
             o_grad_value,
         ) = fused_bn_add_act_pass.values
         (
-            forward_end_range,
-            backward_start_range,
-            backward_end_op_range,
+            forward_end_idx,
+            backward_start_op_index,
+            backward_end_op_index,
         ) = forward_index_pass.new_indices
 
         return RunnableProgram(
             program,
             (inputs, params, targets),
             (x_grad_value, p_grad_value, o_grad_value),
-            (0, forward_end_range),
-            (backward_start_range, backward_end_op_range),
+            (0, forward_end_idx),
+            (backward_start_op_index, backward_end_op_index),
         )
 
     def _prepare_attributes(self, in_sot_mode=False):

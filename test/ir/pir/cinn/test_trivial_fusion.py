@@ -65,8 +65,8 @@ class TestTrivialFusion(unittest.TestCase):
 
     def test_generate_shape_concat(self):
         def func(x, y, z):
-            x = paddle.cast(x, 'int32')
-            y = paddle.cast(y, 'int32')
+            x = paddle.cast(x, 'int64')
+            y = paddle.cast(y, 'int64')
             a = paddle.shape(z)[0:1]
             b = paddle.concat([a, x, y], axis=0)
             return b

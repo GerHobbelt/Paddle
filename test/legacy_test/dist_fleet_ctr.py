@@ -77,7 +77,6 @@ class TestDistCTR2x2(FleetDistRunnerBase):
             name="click",
             shape=[-1, 1],
             dtype="int64",
-            lod_level=0,
         )
 
         datas = [dnn_data, lr_data, label]

@@ -299,16 +299,22 @@ PatternGraph::PatternGraph(const std::vector<PatternContent>& contents,
 }
 
 void PatternGraph::RemoveNode(const PatternNodePtr& node) {
-  VLOG(4) << "Start Remove: " << node;
-  if (all_pattern_nodes_.find(node) != all_pattern_nodes_.end()) {
-    VLOG(4) << "Removed! ";
-    all_pattern_nodes_.erase(node);
+  VLOG(4) << "Start Remove: " << node->id() << "(" << node << ")";
+  for (auto it = all_pattern_nodes_.begin(); it != all_pattern_nodes_.end();
+       ++it) {
+    // Here we use traversal instead of count() or find() builtin function
+    // because all_pattern_nodes_ is sorted by node id when initialization
+    // but node id may be changed in copy instruction that may destroy the
+    // order of set.
+    if ((*it)->id() == node->id()) {
+      VLOG(4) << "Removed " << (*it)->id();
+      all_pattern_nodes_.erase(it);
+      break;
+    }
   }
-
   for (const PatternNodePtr& upstream : node->upstream()) {
     upstream->RemoveNodeFromDownstream(node);
   }
-
   for (const PatternNodePtr& downstream : node->downstream()) {
     downstream->RemoveNodeFromUpstream(node);
   }
@@ -321,7 +327,7 @@ void PatternGraph::AppendNode(const PatternNodePtr& node) {
 std::string PatternGraph::GraphInfo() const {
   std::stringstream ss;
   ss << "\n========= GraphInfo ===========";
-  for (const auto& v : SortByTopoOrder()) {
+  for (const auto& v : all_pattern_nodes_) {
     ss << "\n##############################";
     ss << "\n" << v->DebugStr();
     ss << "    IsOutput: " << IsOutputNodeMatcher()(*this, v);

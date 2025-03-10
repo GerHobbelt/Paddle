@@ -289,6 +289,28 @@ if(WITH_XPU)
          common
          op_compat_infos
          type_info)
+elseif(WITH_NCCL OR WITH_RCCL)
+  cc_library(
+    operator
+    SRCS operator.cc transfer_scope_cache.cc unused_var_check.cc
+         infershape_utils.cc
+    DEPS op_info
+         proto_desc
+         tensor
+         scope
+         glog
+         shape_inference
+         data_transform
+         lod_tensor
+         op_kernel_type
+         op_call_stack
+         detail_op_handle
+         phi_utils
+         phi
+         common
+         op_compat_infos
+         type_info
+         process_group_nccl)
 else()
   cc_library(
     operator
@@ -443,11 +465,6 @@ if(WITH_PSCORE)
 endif()
 
 cc_library(
-  lod_rank_table
-  SRCS lod_rank_table.cc
-  DEPS lod_tensor)
-
-cc_library(
   feed_fetch_method
   SRCS feed_fetch_method.cc
   DEPS lod_tensor scope glog)
@@ -467,7 +484,6 @@ set(NAIVE_EXECUTOR_DEPS
     scope
     phi
     glog
-    lod_rank_table
     feed_fetch_method
     feed_hook
     graph_to_program_pass
@@ -529,8 +545,7 @@ if(WITH_DISTRIBUTE)
            ps_gpu_wrapper
            box_wrapper
            metrics
-           lodtensor_printer
-           lod_rank_table
+           densetensor_printer
            feed_fetch_method
            feed_hook
            ${GLOB_DISTRIBUTE_DEPS}
@@ -558,7 +573,7 @@ if(WITH_DISTRIBUTE)
     #         pull_dense_worker.cc section_worker.cc heter_section_worker.cc device_worker_factory.cc data_set.cc DEPS op_registry
     #         device_context scope framework_proto data_feed_proto heter_service_proto trainer_desc_proto glog
     #         index_sampler index_wrapper sampler index_dataset_proto
-    #         lod_rank_table framework_io fleet_wrapper heter_wrapper box_wrapper metrics lodtensor_printer feed_fetch_method feed_hook
+    #         framework_io fleet_wrapper heter_wrapper box_wrapper metrics densetensor_printer feed_fetch_method feed_hook
     #         graph_to_program_pass variable_helper
     #         heter_service_proto fleet heter_server brpc fleet_executor
     #         graph_gpu_wrapper)
@@ -594,13 +609,12 @@ if(WITH_DISTRIBUTE)
            index_sampler
            index_wrapper
            index_dataset_proto
-           lod_rank_table
            framework_io
            fleet_wrapper
            heter_wrapper
            box_wrapper
            metrics
-           lodtensor_printer
+           densetensor_printer
            feed_fetch_method
            feed_hook
            graph_to_program_pass
@@ -659,14 +673,13 @@ if(WITH_DISTRIBUTE)
       DEPS op_registry
            scope
            glog
-           lod_rank_table
            framework_io
            fleet_wrapper
            heter_wrapper
            ps_gpu_wrapper
            box_wrapper
            metrics
-           lodtensor_printer
+           densetensor_printer
            feed_fetch_method
            feed_hook
            graph_to_program_pass
@@ -712,13 +725,12 @@ elseif(WITH_PSLIB)
     DEPS op_registry
          scope
          glog
-         lod_rank_table
          framework_io
          fleet_wrapper
          heter_wrapper
          ps_gpu_wrapper
          box_wrapper
-         lodtensor_printer
+         densetensor_printer
          feed_fetch_method
          feed_hook
          graph_to_program_pass
@@ -752,13 +764,12 @@ else()
     DEPS op_registry
          scope
          glog
-         lod_rank_table
          framework_io
          fleet_wrapper
          heter_wrapper
          ps_gpu_wrapper
          box_wrapper
-         lodtensor_printer
+         densetensor_printer
          feed_fetch_method
          feed_hook
          graph_to_program_pass

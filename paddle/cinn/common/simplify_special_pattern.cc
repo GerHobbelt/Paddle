@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #pragma once
-#include "paddle/cinn/common/simplify_corner_case.h"
+#include "paddle/cinn/common/simplify_special_pattern.h"
 #include <optional>
 #include <stack>
 #include <unordered_map>
@@ -58,6 +58,43 @@ std::optional<ir::IndexExpr> DivMulAddModCornerCase(const ir::IndexExpr& lhs,
   return std::nullopt;
 }
 
+// (S0 * 8 + S1 * 2 + S2) + (S1 * 2 + S2) * (-1) ===> 0
+std::optional<ir::IndexExpr> AddMulCornerCase(
+    const ir::IndexExpr& lhs,
+    const ir::IndexExpr& rhs,
+    const ir::IndexExpr& scale = ir::IndexExpr(1)) {
+  auto rhsMul = rhs.As<ir::Mul>();
+  if (!rhsMul) return std::nullopt;
+  if (!rhsMul->b().is_constant()) return std::nullopt;
+
+  auto scale_ = scale * rhsMul->b().as_index();
+  auto flatten = GetFlattenExprs<ir::Add>(rhsMul->a());
+  std::optional<ir::IndexExpr> resOpt;
+  ir::IndexExpr res = lhs;
+  for (const auto& expr : flatten) {
+    if (auto innerMul = expr.As<ir::Mul>()) {
+      if (!innerMul->b().is_constant()) return std::nullopt;
+      auto resOpt = AddMulCornerCase(res, expr, scale_);
+      if (!resOpt.has_value())
+        return std::nullopt;
+      else
+        res = resOpt.value();
+    } else {
+      if (!IsSumPartialBySymbol(res, expr)) return std::nullopt;
+    }
+  }
+
+  for (const auto& expr : flatten) {
+    if (expr.As<ir::Mul>()) continue;
+    if (expr.is_constant()) {
+      res = res + expr * scale_;
+      continue;
+    }
+    res = SimplifySymbolicAdd(res, expr, scale_);
+  }
+  return res;
+}
+
 // (S0 + S1 - (S0 + S1) % S2) % S2 == 0
 // (S0 + S1 - (S0 + S1) % S2) / S2 == (S0 + S1) / S2
 std::optional<ir::IndexExpr> SubModCornerCase(const ir::IndexExpr& lhs,
@@ -85,6 +122,20 @@ std::optional<ir::IndexExpr> SubModCornerCase(const ir::IndexExpr& lhs,
       if (!isDiv) return ir::IndexExpr(0);
       return isNeg ? innerMod->a().as_index() / rhs
                    : -(innerMod->a().as_index() / rhs);
+    }
+
+    // For simplify mod case: ((S0 * 256 + S1) % 512 - S1) % 32 == 0
+    if (!isDiv) {
+      auto diffBeforeNegation = diff;
+      auto isDiffNeg = IsNegatedIndexExpr(diff, diffBeforeNegation);
+      if (isDiffNeg) diff = diffBeforeNegation;
+      auto flatten_diff = GetFlattenExprs<ir::Add>(diff);
+      bool isDivisible = true;
+      for (const auto& expr : flatten_diff) {
+        if (!isDivisible) break;
+        if (!ProveDivisible(expr, rhs)) isDivisible = false;
+      }
+      if (isDivisible) return ir::IndexExpr(0);
     }
   }
   return std::nullopt;
@@ -125,9 +176,8 @@ std::optional<ir::IndexExpr> SimplifyCornerCase(const ir::IndexExpr& expr) {
 
 std::optional<ir::IndexExpr> SimplifyAddCornerCase(const ir::IndexExpr& lhs,
                                                    const ir::IndexExpr& rhs) {
-  if (DivMulAddModCornerCase(lhs, rhs).has_value())
-    return DivMulAddModCornerCase(lhs, rhs).value();
-
+  if (auto res = DivMulAddModCornerCase(lhs, rhs)) return res.value();
+  if (auto res = AddMulCornerCase(lhs, rhs)) return res.value();
   // Add other corner cases
   return std::nullopt;
 }
@@ -140,21 +190,17 @@ std::optional<ir::IndexExpr> SimplifyMulCornerCase(const ir::IndexExpr& lhs,
 
 std::optional<ir::IndexExpr> SimplifyDivCornerCase(const ir::IndexExpr& lhs,
                                                    const ir::IndexExpr& rhs) {
-  if (SubModCornerCase(lhs, rhs, true).has_value())
-    return SubModCornerCase(lhs, rhs, true).value();
-  if (MultiArgsDivAndMod(lhs, rhs, true).has_value())
-    return MultiArgsDivAndMod(lhs, rhs, true).value();
+  if (auto res = SubModCornerCase(lhs, rhs, true)) return res.value();
+  if (auto res = MultiArgsDivAndMod(lhs, rhs, true)) return res.value();
   // Add other corner cases
   return std::nullopt;
 }
 
 std::optional<ir::IndexExpr> SimplifyModCornerCase(const ir::IndexExpr& lhs,
                                                    const ir::IndexExpr& rhs) {
-  if (SubModCornerCase(lhs, rhs, false).has_value())
-    return SubModCornerCase(lhs, rhs, false).value();
+  if (auto res = SubModCornerCase(lhs, rhs, false)) return res.value();
   // Add other corner cases
-  if (MultiArgsDivAndMod(lhs, rhs, false).has_value())
-    return MultiArgsDivAndMod(lhs, rhs, false).value();
+  if (auto res = MultiArgsDivAndMod(lhs, rhs, false)) return res.value();
   return std::nullopt;
 }
 

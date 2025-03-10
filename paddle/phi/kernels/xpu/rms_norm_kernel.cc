@@ -78,7 +78,7 @@ void RmsNormKernel(const Context& dev_ctx,
   dev_ctx.template Alloc<T>(out);
   T* out_data = out->data<T>();
   float* inv_var_data = nullptr;
-  if (inv_var != nullptr) {
+  if (inv_var != nullptr && std::getenv("XPU_RMS_NORM_INFER_OPT") == nullptr) {
     dev_ctx.template Alloc<float>(inv_var);
     inv_var_data = inv_var->data<float>();
   }

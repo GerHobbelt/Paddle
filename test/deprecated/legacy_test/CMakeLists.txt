@@ -204,12 +204,7 @@ if(APPLE)
       "These tests has been disabled in OSX before being fixed:\n test_fuse_elewise_add_act_pass_deprecated \n test_dist_se_resnext_*"
   )
   # this op is not support on mac
-  list(REMOVE_ITEM TEST_OPS test_fusion_seqexpand_concat_fc_op)
   list(REMOVE_ITEM TEST_OPS test_fuse_elewise_add_act_pass_deprecated)
-endif()
-if(NOT WITH_MKLML)
-  # this op is not support on openblas
-  list(REMOVE_ITEM TEST_OPS test_fusion_seqexpand_concat_fc_op)
 endif()
 
 if(NOT WITH_MKL OR NOT WITH_AVX)

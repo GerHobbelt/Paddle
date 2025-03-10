@@ -29,7 +29,7 @@ inline void SetXShape(const DenseTensor &x, DenseTensor *xshape) {
     xshape_dims[i + 1] = in_dims[i];
   }
   xshape->ResizeAndAllocate(common::make_ddim(xshape_dims));
-  xshape->ResetLoD(x.meta().lod);
+  xshape->ResetLoD(x.meta().legacy_lod);
 }
 
 inline void GetBroadcastDimsArrays(const DDim &x_dims,

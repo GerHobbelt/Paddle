@@ -37,7 +37,7 @@ static const std::set<std::string> kIntrinsicCalls{
  *
  * Notes: only support cpu currently.
  */
-void LowerIntrin(ir::Module m, Target target);
+void LowerIntrin(ir::Expr *expr, Target target);
 
 }  // namespace optim
 }  // namespace cinn

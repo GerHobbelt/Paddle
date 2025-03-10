@@ -59,7 +59,15 @@ std::pair<DimExpr, DimExpr> EliminateCommonFactor(const OpT<DimExpr>& lhs,
       lhs_diffs->push_back(lhs_dim_expr);
     }
   }
-  if (lhs_diffs->empty() || rhs_diffs->empty()) return std::pair(lhs, rhs);
+  if (lhs_diffs->empty() && rhs_diffs->empty()) return std::pair(lhs, lhs);
+
+  bool opt_is_add = DimExpr(lhs).isa<Add<DimExpr>>();
+  if (lhs_diffs->empty()) {
+    lhs_diffs->push_back(opt_is_add ? DimExpr(0) : DimExpr(1));
+  }
+  if (rhs_diffs->empty()) {
+    rhs_diffs->push_back(opt_is_add ? DimExpr(0) : DimExpr(1));
+  }
   auto lhs_diff =
       lhs_diffs->size() == 1 ? lhs_diffs->at(0) : OpT<DimExpr>{lhs_diffs};
   auto rhs_diff =
@@ -77,6 +85,10 @@ std::pair<DimExpr, DimExpr> SimplifyEqCstr(const DimExpr& lhs,
       [](const Mul<DimExpr>& lhs,
          const Mul<DimExpr>& rhs) -> std::pair<DimExpr, DimExpr> {
         return EliminateCommonFactor<Mul>(lhs, rhs);
+      },
+      [](const Mul<DimExpr>& lhs, int64_t rhs) -> std::pair<DimExpr, DimExpr> {
+        Mul<DimExpr> mul_rhs{List<DimExpr>{rhs}};
+        return EliminateCommonFactor<Mul>(lhs, mul_rhs);
       },
       [](const auto& lhs, const auto& rhs) -> std::pair<DimExpr, DimExpr> {
         return std::make_pair(DimExpr(lhs), DimExpr(rhs));
