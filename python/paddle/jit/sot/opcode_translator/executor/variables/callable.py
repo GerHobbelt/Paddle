@@ -369,7 +369,9 @@ class TensorFunctionVariable(FunctionVariable):
     def call_function(self, /, *args, **kwargs):
         if is_break_graph_tensor_methods(self.method_name):
             raise BreakGraphError(
-                DataDependencyOperationBreak("call break_graph_tensor_method.")
+                DataDependencyOperationBreak(
+                    f"Calling `Tensor.{self.method_name}` causes breakgraph."
+                )
             )
         return self.graph.call_tensor_method(self.method_name, *args, **kwargs)
 
@@ -889,7 +891,12 @@ class UserDefinedGeneratorFunctionVariable(FunctionVariable):
             inline_gen_executor = OpcodeInlineGeneratorExecutor(
                 vframe, code_var, self.graph
             )
-            return inline_gen_executor.inline_call()
+            gen = inline_gen_executor.inline_call()
+            assert isinstance(
+                gen, GeneratorVariable
+            ), f"GeneratorFunction calling result should be GeneratorVariable, but got {type(gen)}"
+            gen.tracker = DummyTracker([self, *args, *kwargs.values()])
+            return gen
         return GeneratorVariable(
             code_var,
             vframe,

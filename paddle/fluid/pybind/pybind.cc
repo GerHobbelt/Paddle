@@ -1015,29 +1015,34 @@ void BindVjp(pybind11::module *m) {
 }
 
 void BindDecompRule(pybind11::module *m) {
-  m->def("sinking_decomp",
-         [](pir::Program *program,
-            std::vector<pir::Value> &src_vars,
-            std::set<std::string> &blacklist,
-            std::set<std::string> &whitelist,
-            int start_index,
-            int end_index) {
-           VLOG(4) << "[Prim] Bind Decomp sinking_decomp begin.";
-           py::list res;
-           DecompProgram decomp_object(
-               program, src_vars, blacklist, whitelist, start_index, end_index);
-           decomp_object.decomp_program();
-           std::vector<pir::Value> tar_vars = decomp_object.get_dst_vars();
-           for (size_t i = 0; i < tar_vars.size(); ++i) {
-             if (!tar_vars[i]) {
-               res.append(nullptr);
-             } else {
-               res.append(tar_vars[i]);
-             }
-           }
-           VLOG(4) << "[Prim] Bind Decomp sinking_decomp end.";
-           return res;
-         });
+  m->def(
+      "sinking_decomp",
+      [](pir::Program *program,
+         std::vector<pir::Value> &src_vars,
+         std::set<std::string> &blacklist,
+         std::set<std::string> &whitelist,
+         int start_index,
+         int end_index) {
+        VLOG(4) << "[Prim] Bind Decomp sinking_decomp begin.";
+        py::list res;
+        auto original_insertion_point =
+            paddle::dialect::ApiBuilder::Instance().GetCurrentInsertionPoint();
+        DecompProgram decomp_object(
+            program, src_vars, blacklist, whitelist, start_index, end_index);
+        decomp_object.decomp_program();
+        std::vector<pir::Value> tar_vars = decomp_object.get_dst_vars();
+        for (size_t i = 0; i < tar_vars.size(); ++i) {
+          if (!tar_vars[i]) {
+            res.append(nullptr);
+          } else {
+            res.append(tar_vars[i]);
+          }
+        }
+        paddle::dialect::ApiBuilder::Instance().SetInsertionPoint(
+            original_insertion_point);
+        VLOG(4) << "[Prim] Bind Decomp sinking_decomp end.";
+        return res;
+      });
 
   m->def("call_decomp_rule", [](pir::Operation &fwd_op) {
     py::list res;
@@ -1151,6 +1156,8 @@ PYBIND11_MODULE(libpaddle, m) {
         &paddle::prim::PrimCommonUtils::SetFwdPrimEnabled);
   m.def("_is_fwd_prim_enabled",
         &paddle::prim::PrimCommonUtils::IsFwdPrimEnabled);
+  m.def("_is_all_prim_enabled",
+        &paddle::prim::PrimCommonUtils::IsAllPrimEnabled);
   m.def("__set_all_prim_enabled",
         &paddle::prim::PrimCommonUtils::SetAllPrimEnabled);
   m.def("_is_eager_prim_enabled",
@@ -2097,7 +2104,22 @@ All parameter, weight, gradient are variables in Paddle.
                 paddle::memory::allocation::AllocatorFacade::Instance()
                     .GetZeroAllocator(phi::CPUPlace())
                     .get());
+            context->SetPinnedAllocator(
+                paddle::memory::allocation::AllocatorFacade::Instance()
+                    .GetAllocator(phi::XPUPinnedPlace())
+                    .get());
             return context;
+#endif
+          })
+      .def_static(
+          "create",
+          [](phi::XPUPinnedPlace &place) -> phi::DeviceContext * {
+#if !defined(PADDLE_WITH_XPU)
+            PADDLE_THROW(common::errors::PermissionDenied(
+                "Cannot use XPUPinnedPlace in CPU only version, "
+                "Please recompile or reinstall Paddle with XPU support."));
+#else
+            return new phi::XPUPinnedContext(place);
 #endif
           })
       .def_static("create",
@@ -2274,6 +2296,13 @@ All parameter, weight, gradient are variables in Paddle.
            [](OperatorBase &self,
               const Scope &scope,
               const phi::GPUPinnedPlace &place) {
+             pybind11::gil_scoped_release release;
+             self.Run(scope, place);
+           })
+      .def("run",
+           [](OperatorBase &self,
+              const Scope &scope,
+              const phi::XPUPinnedPlace &place) {
              pybind11::gil_scoped_release release;
              self.Run(scope, place);
            })
@@ -2469,11 +2498,25 @@ All parameter, weight, gradient are variables in Paddle.
       .def(py::init<phi::GPUPlace>(), py::arg("place"))
       .def(
           "start",
-          [](phi::GPUEventTimer &timer) { timer.Start(); },
+          [](phi::GPUEventTimer &timer, phi::CUDAStream *stream) {
+            if (stream == nullptr) {
+              timer.Start();
+            } else {
+              timer.Start(stream->raw_stream());
+            }
+          },
+          py::arg("stream") = nullptr,
           py::call_guard<py::gil_scoped_release>())
       .def(
           "stop",
-          [](phi::GPUEventTimer &timer) { timer.Stop(); },
+          [](phi::GPUEventTimer &timer, phi::CUDAStream *stream) {
+            if (stream == nullptr) {
+              timer.Stop();
+            } else {
+              timer.Stop(stream->raw_stream());
+            }
+          },
+          py::arg("stream") = nullptr,
           py::call_guard<py::gil_scoped_release>())
       .def("reset",
            &phi::GPUEventTimer::Reset,

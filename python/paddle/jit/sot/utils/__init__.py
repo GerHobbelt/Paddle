@@ -78,6 +78,7 @@ from .utils import (  # noqa: F401
     StepInfoManager,
     count_if,
     current_symbol_registry,
+    do_until_stop_iteration,
     execute_time,
     flatten,
     flatten_extend,
@@ -104,4 +105,5 @@ from .utils import (  # noqa: F401
     no_eval_frame,
     printable,
     switch_symbol_registry,
+    update_list_inplace,
 )
