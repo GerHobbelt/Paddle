@@ -1,4 +1,4 @@
-// Copyright (c) 2024 PaddlePaddle Authors. All Rights Reserved.
+// Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,15 +14,26 @@
 
 #pragma once
 
-#include <memory>
-#include "paddle/pir/include/pass/pass.h"
+#include <mutex>
+#include <queue>
+#include "paddle/fluid/distributed/collective/deep_ep/kernels/exception.cuh"
 
-namespace cinn {
-namespace dialect {
-namespace ir {
+namespace deep_ep::detail {
 
-std::unique_ptr<pir::Pass> CreateAddStoreInGroupOpPass();
+class EventPool {
+ public:
+  EventPool() = default;
+  EventPool(const EventPool&) = delete;
+  EventPool(EventPool&&) = delete;
+  ~EventPool();
 
-}  // namespace ir
-}  // namespace dialect
-}  // namespace cinn
+  cudaEvent_t CreateCudaEventFromPool();
+
+  static EventPool& Instance();
+
+ private:
+  std::queue<cudaEvent_t> incomplished_events_;
+  std::mutex mtx_;
+};
+
+}  // namespace deep_ep::detail
