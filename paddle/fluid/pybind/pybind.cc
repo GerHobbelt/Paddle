@@ -308,6 +308,14 @@ bool IsCompiledWithNCCL() {
 #endif
 }
 
+bool IsCompiledWithFlagcx() {
+#ifdef PADDLE_WITH_FLAGCX
+  return true;
+#else
+  return false;
+#endif
+}
+
 bool IsCompiledWithMPI() {
 #ifdef PADDLE_WITH_MPI
   return true;
@@ -2582,6 +2590,7 @@ All parameter, weight, gradient are variables in Paddle.
         std::make_unique<paddle::operants::PhiTensorOperants>();
     VLOG(4) << "Initialize tensor operants successfully";
   });
+  m.def("is_compiled_with_flagcx", IsCompiledWithFlagcx);
   m.def("is_compiled_with_avx", IsCompiledWithAVX);
   m.def("is_compiled_with_cuda", IsCompiledWithCUDA);
   m.def("is_compiled_with_cudnn_frontend", IsCompiledWithCudnnFrontend);
@@ -3469,7 +3478,16 @@ All parameter, weight, gradient are variables in Paddle.
       .def_readwrite("optim_shape_tensor",
                      &paddle::platform::EngineParams::optim_shape_tensor)
       .def_readwrite("engine_serialized_data",
-                     &paddle::platform::EngineParams::engine_serialized_data);
+                     &paddle::platform::EngineParams::engine_serialized_data)
+      .def_readwrite("use_cuda_graph",
+                     &paddle::platform::EngineParams::use_cuda_graph)
+      .def_readwrite("refit_params_path",
+                     &paddle::platform::EngineParams::refit_params_path)
+      .def_readwrite("refit_param_name",
+                     &paddle::platform::EngineParams::refit_param_names)
+      .def_readwrite(
+          "refit_param_names2trt_names",
+          &paddle::platform::EngineParams::refit_param_names2trt_names);
 
   py::enum_<paddle::framework::ShapeMode>(m, "ShapeMode")
       .value("kMIN", paddle::framework::ShapeMode::kMIN)
