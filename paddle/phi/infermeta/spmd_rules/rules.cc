@@ -719,6 +719,11 @@ PD_REGISTER_SPMD_RULE(
     PD_INFER_SPMD(phi::distributed::ArgMaxInferSpmdBase),
     PD_INFER_SPMD(phi::distributed::ArgMaxInferSpmdReverseBase));
 
+// topk
+PD_REGISTER_SPMD_RULE(topk,
+                      PD_INFER_SPMD(phi::distributed::TopkInferSpmd),
+                      PD_INFER_SPMD(phi::distributed::TopkGradInferSpmd));
+
 // unbind
 PD_REGISTER_SPMD_RULE(unbind,
                       PD_INFER_SPMD(phi::distributed::UnbindInferSpmd),
@@ -747,4 +752,9 @@ PD_REGISTER_SPMD_RULE(nonzero,
 
 // add_n
 PD_REGISTER_SPMD_RULE(add_n, PD_INFER_SPMD(phi::distributed::AddNInferSpmd));
+
+// argsort
+PD_REGISTER_SPMD_RULE(argsort,
+                      PD_INFER_SPMD(phi::distributed::ArgSortInferSpmd),
+                      PD_INFER_SPMD(phi::distributed::ArgSortGradInferSpmd));
 }  // namespace phi::distributed
