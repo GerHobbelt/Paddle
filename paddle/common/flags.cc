@@ -1799,6 +1799,15 @@ PHI_DEFINE_EXPORTED_string(
     "",
     "Remove some redundant information when printing the pir program");
 
+#ifdef _WIN32
+PHI_DEFINE_EXPORTED_string(
+    flagcx_dir,  // NOLINT
+    "",
+    "Specify path for loading libflagcx.so. For instance, "
+    "For instance, /usr/local/flagcx/lib. If default, "
+    "dlopen will search flagcx from LD_LIBRARY_PATH");
+#endif
+
 /**
  * ProcessGroupNCCL related FLAG
  * Name: enable_async_trace
@@ -2139,6 +2148,16 @@ PHI_DEFINE_EXPORTED_bool(
     enable_auto_growth_allocator_add_lock,
     false,
     "Enable add lock when call AutoGrowthBestFitAllocator::ReleaseImpl");
+
+PHI_DEFINE_EXPORTED_int64(offload_retry_times, -1, "Offload retry times.");
+
+PHI_DEFINE_EXPORTED_bool(offload_inplace_tensor,
+                         true,
+                         "Whether to allow offload inplace tensor.");
+
+PHI_DEFINE_EXPORTED_bool(print_offload_info,
+                         false,
+                         "Whether to print the offload information.");
 
 #if defined(PADDLE_WITH_CUDA) || defined(PADDLE_WITH_HIP)
 /**
