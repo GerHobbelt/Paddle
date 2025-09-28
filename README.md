@@ -19,7 +19,7 @@ PaddlePaddle originates from industrial practices with dedication and commitment
 
 ## Installation
 
-### Latest PaddlePaddle Release: [3.0](https://github.com/PaddlePaddle/Paddle/tree/release/3.0)
+### Latest PaddlePaddle Release: [3.1](https://github.com/PaddlePaddle/Paddle/tree/release/3.1)
 
 Our vision is to enable deep learning for everyone via PaddlePaddle.
 Please refer to our [release announcement](https://github.com/PaddlePaddle/Paddle/releases) to track the latest features of PaddlePaddle.
@@ -35,7 +35,7 @@ pip install paddlepaddle-gpu
 
 For more information about installation, please view [Quick Install](https://www.paddlepaddle.org.cn/install/quick)
 
-## **PaddlePaddle New Generation Framework 3.0**
+## **PaddlePaddle New Generation Framework 3.1**
 
 * **Unified Dynamic/Static Graphs and Automatic Parallelism**
 
