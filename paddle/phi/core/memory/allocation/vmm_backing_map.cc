@@ -361,6 +361,19 @@ void VMMBackingMap::MarkIPCExported(VMMDevicePtr va, size_t size) {
   }
 }
 
+void VMMBackingMap::ClearIPCExported(VMMDevicePtr va, size_t size) {
+  std::lock_guard<SpinLock> guard(spinlock_);
+  size_t start = 0;
+  size_t count = 0;
+  if (!CheckRangeLocked(va, size, "ClearIPCExported", &start, &count)) {
+    return;
+  }
+  for (size_t i = 0; i < count; ++i) {
+    pages_[start + i].ipc_exported = false;
+    pages_[start + i].epoch++;
+  }
+}
+
 void VMMBackingMap::MarkPendingEvent(VMMDevicePtr va,
                                      size_t size,
                                      gpuStream_t stream,
@@ -520,8 +533,11 @@ bool VMMBackingMap::IsRangeReleasable(VMMDevicePtr va, size_t size) const {
     return false;
   }
   for (size_t i = 0; i < count; ++i) {
-    if (pages_[start + i].ipc_exported ||
-        !PageCanUseBackingLocked(&pages_[start + i], "IsRangeReleasable")) {
+    // An imported CUDA VMM handle keeps the backing alive through its own
+    // driver reference. Once the exporter range is idle, release its local
+    // mapping and handle like a regular allocation. Remap eligibility keeps
+    // its separate IPC-export check.
+    if (!PageCanUseBackingLocked(&pages_[start + i], "IsRangeReleasable")) {
       return false;
     }
   }
@@ -542,8 +558,26 @@ bool VMMBackingMap::CanReleaseHandle(VMMDevicePtr va,
   for (size_t i = 0; i < count; ++i) {
     auto& page = pages_[start + i];
     if (!page.mapped || page.handle != handle || page.meta != meta ||
-        page.ipc_exported ||
         !PageEventsReadyLocked(&page, "CanReleaseHandle")) {
+      return false;
+    }
+  }
+  return true;
+}
+
+bool VMMBackingMap::IsHandleMappedAt(VMMDevicePtr va,
+                                     VMMAllocHandle handle,
+                                     const std::shared_ptr<VMMHandleMeta>& meta,
+                                     size_t size) const {
+  std::lock_guard<SpinLock> guard(spinlock_);
+  size_t start = 0;
+  size_t count = 0;
+  if (!CheckRangeLocked(va, size, "IsHandleMappedAt", &start, &count)) {
+    return false;
+  }
+  for (size_t i = 0; i < count; ++i) {
+    const auto& page = pages_[start + i];
+    if (!page.mapped || page.handle != handle || page.meta != meta) {
       return false;
     }
   }

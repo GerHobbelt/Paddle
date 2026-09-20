@@ -15,6 +15,7 @@
 #include "paddle/phi/core/memory/allocation/stream_safe_cuda_allocator.h"
 
 #include <algorithm>
+#include <chrono>
 #include <thread>
 
 #include "glog/logging.h"
@@ -34,6 +35,7 @@ COMMON_DECLARE_bool(vmm_v2_remap_on_oom);
 #if defined(PADDLE_WITH_CUDA)
 #include "paddle/phi/backends/gpu/cuda/cuda_graph.h"
 #include "paddle/phi/core/memory/allocation/vmm_auto_growth_best_fit_multi_pool_allocator_v2.h"
+#include "paddle/phi/core/platform/cuda_device_guard.h"
 #elif defined(PADDLE_WITH_HIP)
 #include "paddle/phi/backends/gpu/rocm/hip_graph.h"
 #endif
@@ -63,7 +65,11 @@ VMMAutoGrowthBestFitMultiPoolAllocatorV2* GetVMMV2MultiPoolAllocator(
 
 enum class VMMV2RemapOutcome {
   kDisabled,
-  kNoProgress,
+  kNotAttempted,
+  kInsufficientMovableMemory,
+  kNoMovableMemory,
+  kAttemptedNoProgress,
+  kRetryWithoutRemapFailed,
   kRetryFailed,
 };
 
@@ -94,7 +100,9 @@ std::string BuildVMMV2OOMSummary(
     const GPUPlace& place,
     size_t requested_size,
     VMMV2RemapOutcome remap_outcome,
-    size_t remapped_bytes = 0) {
+    size_t remapped_bytes = 0,
+    size_t movable_bytes = 0,
+    size_t required_bytes = 0) {
   size_t total_free = 0;
   size_t largest_free_block = 0;
   allocator->GetFreeBlockStats(
@@ -114,15 +122,37 @@ std::string BuildVMMV2OOMSummary(
   std::string remap_result;
   switch (remap_outcome) {
     case VMMV2RemapOutcome::kDisabled:
-      remap_result = "disabled";
+      remap_result =
+          "remap was not attempted because memory defragmentation is disabled";
       break;
-    case VMMV2RemapOutcome::kNoProgress:
-      remap_result = "no releasable free memory was found";
+    case VMMV2RemapOutcome::kNotAttempted:
+      remap_result =
+          "remap was not attempted because no useful remap work was identified";
+      break;
+    case VMMV2RemapOutcome::kInsufficientMovableMemory:
+      remap_result = string::Sprintf(
+          "remap was not attempted; %s could be safely moved, but %s was "
+          "required to recover this allocation",
+          string::HumanReadableSize(movable_bytes),
+          string::HumanReadableSize(required_bytes));
+      break;
+    case VMMV2RemapOutcome::kNoMovableMemory:
+      remap_result =
+          "remap was not attempted because no safely movable free memory was "
+          "available";
+      break;
+    case VMMV2RemapOutcome::kAttemptedNoProgress:
+      remap_result = "remap was attempted, but no memory was moved";
+      break;
+    case VMMV2RemapOutcome::kRetryWithoutRemapFailed:
+      remap_result =
+          "remap was skipped because a sufficiently large free block was "
+          "available, but the allocation retry still failed";
       break;
     case VMMV2RemapOutcome::kRetryFailed:
-      remap_result =
-          string::Sprintf("reclaimed %s, but the allocation retry still failed",
-                          string::HumanReadableSize(remapped_bytes));
+      remap_result = string::Sprintf(
+          "remap moved %s, but the allocation retry still failed",
+          string::HumanReadableSize(remapped_bytes));
       break;
   }
 
@@ -136,23 +166,25 @@ std::string BuildVMMV2OOMSummary(
 
   return string::Sprintf(
       "\n\nOut of memory error on GPU %d. Cannot allocate %s memory.\n"
-      "Memory pool state: total free=%s, largest free block=%s.\n"
-      "Paddle memory state: allocated=%s, reserved=%s.\n"
-      "GPU memory state: available=%s, total=%s.%s\n"
-      "Memory defragmentation: %s.\n"
-      "Please stop other processes using GPU %d or use another GPU; "
-      "otherwise, decrease the model batch size.\n",
+      "Paddle allocator memory:\n"
+      "  Allocated (in use): %s\n"
+      "  Reserved by Paddle: %s\n"
+      "  Free in Paddle memory pool: %s\n"
+      "  Largest contiguous free block: %s\n"
+      "CUDA driver memory:\n"
+      "  Free on device: %s\n"
+      "  Total device capacity: %s%s\n"
+      "Memory defragmentation: %s.\n",
       place.device,
       string::HumanReadableSize(requested_size),
-      string::HumanReadableSize(total_free),
-      string::HumanReadableSize(largest_free_block),
       string::HumanReadableSize(std::max<int64_t>(paddle_allocated, 0)),
       string::HumanReadableSize(std::max<int64_t>(paddle_reserved, 0)),
+      string::HumanReadableSize(total_free),
+      string::HumanReadableSize(largest_free_block),
       string::HumanReadableSize(driver_available),
       string::HumanReadableSize(driver_total),
       configured_limit,
-      remap_result,
-      place.device);
+      remap_result);
 }
 
 void MarkVMMV2RemapPendingStream(StreamSafeCUDAAllocator* allocator,
@@ -425,34 +457,110 @@ phi::Allocation* StreamSafeCUDAAllocator::AllocateImpl(size_t size) {
         underlying_allocation = underlying_allocator_->Allocate(size);
       } catch (const BadAlloc& second_bad_alloc) {
         if (FLAGS_vmm_v2_remap_on_oom) {
-          const size_t remapped_bytes = vmm->RemapForAllocation(place_, size);
-          if (remapped_bytes > 0) {
+          const auto* grow_oom =
+              dynamic_cast<const VMMGrowOOM*>(&second_bad_alloc);
+          const auto remap_start = std::chrono::steady_clock::now();
+          VMMRemapAttemptResult remap_result;
+          const size_t remapped_bytes = vmm->RemapForAllocation(
+              place_,
+              size,
+              grow_oom == nullptr ? nullptr : &grow_oom->info(),
+              &remap_result);
+          const auto remap_us =
+              std::chrono::duration_cast<std::chrono::microseconds>(
+                  std::chrono::steady_clock::now() - remap_start)
+                  .count();
+          VMMV2RemapOutcome remap_status_outcome =
+              VMMV2RemapOutcome::kNotAttempted;
+          switch (remap_result.status) {
+            case VMMRemapAttemptStatus::kNotAttempted:
+              break;
+            case VMMRemapAttemptStatus::kRetryWithoutRemap:
+              remap_status_outcome =
+                  VMMV2RemapOutcome::kRetryWithoutRemapFailed;
+              break;
+            case VMMRemapAttemptStatus::kInsufficientMovableMemory:
+              remap_status_outcome =
+                  VMMV2RemapOutcome::kInsufficientMovableMemory;
+              break;
+            case VMMRemapAttemptStatus::kNoMovableMemory:
+              remap_status_outcome = VMMV2RemapOutcome::kNoMovableMemory;
+              break;
+            case VMMRemapAttemptStatus::kAttempted:
+              remap_status_outcome = VMMV2RemapOutcome::kAttemptedNoProgress;
+              break;
+          }
+          const bool retry_without_remap =
+              remap_result.status == VMMRemapAttemptStatus::kRetryWithoutRemap;
+          if (remapped_bytes > 0 || retry_without_remap) {
             try {
               underlying_allocation = underlying_allocator_->Allocate(size);
+              if (remapped_bytes > 0) {
+                VLOG(0)
+                    << "Recovered the " << string::HumanReadableSize(size)
+                    << " allocation on GPU " << static_cast<int>(place_.device)
+                    << " after memory defragmentation; the remap phase moved "
+                    << string::HumanReadableSize(remapped_bytes) << " and took "
+                    << static_cast<double>(remap_us) / 1000.0 << " ms.";
+              } else {
+                VLOG(3) << "Recovered the " << string::HumanReadableSize(size)
+                        << " allocation on GPU "
+                        << static_cast<int>(place_.device)
+                        << " after a sufficiently large free block became "
+                           "available during OOM recovery.";
+              }
             } catch (const BadAlloc& final_bad_alloc) {
-              const std::string oom_summary =
-                  BuildVMMV2OOMSummary(vmm,
-                                       place_,
-                                       size,
-                                       VMMV2RemapOutcome::kRetryFailed,
-                                       remapped_bytes);
+              if (remapped_bytes > 0) {
+                VLOG(3) << "The remap phase moved "
+                        << string::HumanReadableSize(remapped_bytes) << " in "
+                        << static_cast<double>(remap_us) / 1000.0
+                        << " ms, but the " << string::HumanReadableSize(size)
+                        << " allocation retry still failed on GPU "
+                        << static_cast<int>(place_.device) << ".";
+              } else {
+                VLOG(3) << "A sufficiently large free block was detected "
+                           "during OOM recovery, but the "
+                        << string::HumanReadableSize(size)
+                        << " allocation retry still failed on GPU "
+                        << static_cast<int>(place_.device) << ".";
+              }
+              const auto remap_outcome = remapped_bytes > 0
+                                             ? VMMV2RemapOutcome::kRetryFailed
+                                             : remap_status_outcome;
+              const std::string oom_summary = BuildVMMV2OOMSummary(
+                  vmm, place_, size, remap_outcome, remapped_bytes);
               const std::string initial_summary =
                   ExtractAllocationFailureSummary(first_bad_alloc);
+              const std::string reclaim_retry_summary =
+                  ExtractAllocationFailureSummary(second_bad_alloc);
               const std::string final_summary =
                   ExtractAllocationFailureSummary(final_bad_alloc);
+              const char* final_retry_label =
+                  retry_without_remap
+                      ? "Retry after detecting an available free block"
+                      : "Retry after memory defragmentation";
               ClearGpuLastError();
               PADDLE_THROW_BAD_ALLOC(common::errors::ResourceExhausted(
                   "%s"
-                  "Allocation attempts:\n"
+                  "Allocation failure summary:\n"
                   "1. Initial attempt: %s\n"
-                  "2. Retry after memory defragmentation: %s",
+                  "2. Retry after reclaiming pending frees: %s\n"
+                  "3. %s: %s",
                   oom_summary,
                   initial_summary.c_str(),
+                  reclaim_retry_summary.c_str(),
+                  final_retry_label,
                   final_summary.c_str()));
             }
           } else {
-            const std::string oom_summary = BuildVMMV2OOMSummary(
-                vmm, place_, size, VMMV2RemapOutcome::kNoProgress);
+            const std::string oom_summary =
+                BuildVMMV2OOMSummary(vmm,
+                                     place_,
+                                     size,
+                                     remap_status_outcome,
+                                     0,
+                                     remap_result.movable_bytes,
+                                     remap_result.required_bytes);
             const std::string initial_summary =
                 ExtractAllocationFailureSummary(first_bad_alloc);
             const std::string retry_summary =
@@ -460,7 +568,7 @@ phi::Allocation* StreamSafeCUDAAllocator::AllocateImpl(size_t size) {
             ClearGpuLastError();
             PADDLE_THROW_BAD_ALLOC(common::errors::ResourceExhausted(
                 "%s"
-                "Allocation attempts:\n"
+                "Allocation failure summary:\n"
                 "1. Initial attempt: %s\n"
                 "2. Retry after reclaiming pending frees: %s",
                 oom_summary,
@@ -477,7 +585,7 @@ phi::Allocation* StreamSafeCUDAAllocator::AllocateImpl(size_t size) {
           ClearGpuLastError();
           PADDLE_THROW_BAD_ALLOC(common::errors::ResourceExhausted(
               "%s"
-              "Allocation attempts:\n"
+              "Allocation failure summary:\n"
               "1. Initial attempt: %s\n"
               "2. Retry after reclaiming pending frees: %s",
               oom_summary,
@@ -526,8 +634,93 @@ uint64_t StreamSafeCUDAAllocator::ReleaseImpl(const Place& place) {
   std::lock_guard<SpinLock> lock_guard(allocator_map_lock_);
   std::vector<StreamSafeCUDAAllocator*>& allocators = allocator_map_[place];
   uint64_t released_size = 0;
-  for (StreamSafeCUDAAllocator* allocator : allocators) {
-    released_size += allocator->ProcessUnfreedAllocationsAndRelease();
+  uint64_t device_sync_us = 0;
+  const bool log_release_stats = VLOG_IS_ON(3);
+  const auto release_start = std::chrono::steady_clock::now();
+
+#if defined(PADDLE_WITH_CUDA)
+  std::vector<VMMAutoGrowthBestFitMultiPoolAllocatorV2*> vmm_allocators;
+  for (auto* allocator : allocators) {
+    auto* vmm = allocator->vmm_v2_allocator_;
+    if (vmm != nullptr &&
+        std::find(vmm_allocators.begin(), vmm_allocators.end(), vmm) ==
+            vmm_allocators.end()) {
+      vmm_allocators.push_back(vmm);
+    }
+  }
+  const bool use_coordinated_vmm_release = !vmm_allocators.empty();
+#else
+  constexpr bool use_coordinated_vmm_release = false;
+#endif
+
+  for (size_t i = 0; i < allocators.size(); ++i) {
+    StreamSafeCUDAAllocator* allocator = allocators[i];
+    PendingAllocationStats pending_before;
+    if (log_release_stats) {
+      pending_before = allocator->GetPendingAllocationStats();
+    }
+    const auto stream_start = std::chrono::steady_clock::now();
+    uint64_t stream_released = 0;
+    if (use_coordinated_vmm_release) {
+      allocator->ProcessUnfreedAllocations();
+#if defined(PADDLE_WITH_CUDA)
+      if (allocator->vmm_v2_allocator_ == nullptr) {
+        stream_released = allocator->underlying_allocator_->Release(place_);
+      }
+#endif
+    } else {
+      allocator->ProcessUnfreedAllocations();
+      stream_released = allocator->underlying_allocator_->Release(place_);
+    }
+    released_size += stream_released;
+    if (log_release_stats) {
+      const auto pending_after = allocator->GetPendingAllocationStats();
+      const auto stream_us =
+          std::chrono::duration_cast<std::chrono::microseconds>(
+              std::chrono::steady_clock::now() - stream_start)
+              .count();
+      VLOG(3) << "Allocator stream cache release: device="
+              << static_cast<int>(place_.device) << " stream_index=" << i
+              << " stream=" << allocator->default_stream_
+              << " pending_before=" << pending_before.count
+              << " pending_bytes_before=" << pending_before.bytes
+              << " pending_after=" << pending_after.count
+              << " pending_bytes_after=" << pending_after.bytes
+              << " released_bytes=" << stream_released
+              << " elapsed_us=" << stream_us;
+    }
+  }
+
+#if defined(PADDLE_WITH_CUDA)
+  if (use_coordinated_vmm_release) {
+    bool has_release_candidate = false;
+    for (auto* allocator : vmm_allocators) {
+      has_release_candidate =
+          allocator->PrepareBackingRelease() || has_release_candidate;
+    }
+    if (has_release_candidate) {
+      platform::CUDADeviceGuard device_guard(place_.device);
+      const auto sync_start = std::chrono::steady_clock::now();
+      PADDLE_ENFORCE_GPU_SUCCESS(cudaDeviceSynchronize());
+      device_sync_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                           std::chrono::steady_clock::now() - sync_start)
+                           .count();
+      for (auto* allocator : vmm_allocators) {
+        released_size += allocator->ReleaseAfterDeviceSynchronize(place_);
+      }
+    }
+  }
+#endif
+  if (log_release_stats) {
+    const auto total_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                              std::chrono::steady_clock::now() - release_start)
+                              .count();
+    VLOG(3) << "Allocator cache release complete: device="
+            << static_cast<int>(place_.device)
+            << " streams=" << allocators.size()
+            << " released_bytes=" << released_size
+            << " device_sync_us=" << device_sync_us
+            << " elapsed_us=" << total_us;
   }
   VLOG(8) << "Release " << released_size << " bytes memory from all streams";
   return released_size;
@@ -569,9 +762,15 @@ void StreamSafeCUDAAllocator::ProcessUnfreedAllocations() {
   }
 }
 
-uint64_t StreamSafeCUDAAllocator::ProcessUnfreedAllocationsAndRelease() {
-  ProcessUnfreedAllocations();
-  return underlying_allocator_->Release(place_);
+StreamSafeCUDAAllocator::PendingAllocationStats
+StreamSafeCUDAAllocator::GetPendingAllocationStats() {
+  std::lock_guard<SpinLock> lock_guard(unfreed_allocation_lock_);
+  PendingAllocationStats stats;
+  stats.count = unfreed_allocations_.size();
+  for (const auto* allocation : unfreed_allocations_) {
+    stats.bytes += allocation->size();
+  }
+  return stats;
 }
 
 thread_local std::once_flag StreamSafeCUDAAllocation::once_flag_;
