@@ -19,6 +19,7 @@
 # implemented as independent modules with no runtime dependency on PyTorch.
 
 import math
+import sys as _sys
 import typing
 
 __is_metainfo_generated = False
@@ -259,6 +260,9 @@ from paddle import (
     vision as vision,
 )
 
+distributions = distribution
+_sys.modules['paddle.distributions'] = distribution
+
 # high-level api
 from . import (
     _C as _C,
@@ -366,6 +370,7 @@ from .nn.functional.distance import (
     pdist,
 )
 from .nn.initializer.lazy_init import LazyGuard
+from .random import initial_seed
 from .tensor.attribute import (
     imag,
     is_complex,
@@ -1569,6 +1574,7 @@ __all__ = [
     'layer_norm',
     'relu',
     'manual_seed',
+    'initial_seed',
     'softmax',
     'log_softmax',
     'Generator',
